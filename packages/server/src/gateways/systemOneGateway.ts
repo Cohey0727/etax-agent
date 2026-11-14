@@ -85,7 +85,7 @@ class SystemOneHttpClient implements SystemOneClient {
       questions: {
         account: {
           type: "choice",
-          options: accounts.map((a) => a.account),
+          instructions: "この支出または収入は、どの勘定科目に該当しますか？",
           criteria,
         },
       },
