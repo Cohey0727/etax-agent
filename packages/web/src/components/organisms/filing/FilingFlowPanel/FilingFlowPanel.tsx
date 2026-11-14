@@ -1,6 +1,7 @@
 import { filterYear, Transaction } from "@etax/shared";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
+import { ConfirmSummary } from "../ConfirmSummary";
 import { AppView, FilingStatus } from "@types";
 import { fetchFilingStatuses, updateFilingStatus } from "@utils/api";
 import styles from "./FilingFlowPanel.css";
@@ -143,7 +144,22 @@ export const FilingFlowPanel = ({ transactions, year, onNavigate }: FilingFlowPa
               やることが下に表示されます。状態はダッシュボードの申告ステータスと共有されます。
             </Text>
             {allDone ? (
-              <Text>全ステップ完了です。この年の申告は提出済みになっています。</Text>
+              <Col gap="sm">
+                <Text>全ステップ完了です。この年の申告は提出済みになっています。</Text>
+                <Text variant="muted">
+                  提出後に内容の誤りに気づいた場合は、修正申告で訂正します。
+                </Text>
+                <Row>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={!onNavigate}
+                    onClick={() => onNavigate?.(AppView.Amend)}
+                  >
+                    修正申告を開く →
+                  </Button>
+                </Row>
+              </Col>
             ) : null}
           </Col>
 
@@ -216,6 +232,9 @@ export const FilingFlowPanel = ({ transactions, year, onNavigate }: FilingFlowPa
                 ? ` ・ 未分類 ${unclassifiedCount} 件が残っています。帳簿で勘定科目を付けてください。`
                 : " ・ 未分類はありません。"}
             </Text>
+          ) : null}
+          {selectedStep.key === "confirmed" ? (
+            <ConfirmSummary transactions={transactions} year={year} />
           ) : null}
           <Row gap="sm" align="center">
             {selectedStep.links.map((link, index) => (
