@@ -9,7 +9,7 @@ import { AppView } from "@types";
 const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Dashboard]: "dashboard",
   [AppView.Ledger]: "ledger",
-  [AppView.Filing]: "tax",
+  [AppView.Filing]: "final-tax",
   [AppView.Amend]: "amend",
   [AppView.Import]: "import",
   [AppView.Receipt]: "receipt",
@@ -58,7 +58,7 @@ export const parsePath = (
     const year = asYear(parts[1]);
     if (year === null) return null;
     if (parts.length === 2) return { view: AppView.Dashboard, year };
-    const view = viewForSlug(parts[2]);
+    const view = viewForSlug(parts[2]) ?? LEGACY_SLUGS[parts[2]] ?? null;
     return view ? { view, year } : null;
   }
   // 旧形式の互換読み取り（開いているタブやブックマークを引き継ぐ）
