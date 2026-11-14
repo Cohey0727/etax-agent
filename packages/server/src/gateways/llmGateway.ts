@@ -38,9 +38,17 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
+export interface ChatImage {
+  mimeType: string;
+  /** Base64（data: プレフィックスなし）。 */
+  dataBase64: string;
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** user メッセージに添付する画像（領収書の読み取りなど）。 */
+  images?: ChatImage[];
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
@@ -138,6 +146,16 @@ class OpenAICompatibleLLM implements LLMClient {
       model: this.config.model,
       messages: messages.map((m) => {
         const out: Record<string, unknown> = { role: m.role, content: m.content };
+        if (m.images && m.images.length > 0) {
+          // 画像つきメッセージは content をパート配列にする（OpenAI 形式）
+          out["content"] = [
+            { type: "text", text: m.content },
+            ...m.images.map((image) => ({
+              type: "image_url",
+              image_url: { url: `data:${image.mimeType};base64,${image.dataBase64}` },
+            })),
+          ];
+        }
         if (m.tool_calls) {
           out["tool_calls"] = m.tool_calls.map((tc) => ({
             id: tc.id,
@@ -206,7 +224,20 @@ class ClaudeLLM implements LLMClient {
       if (m.role === "system") {
         if (m.content) systemParts.push(m.content);
       } else if (m.role === "user") {
-        conv.push({ role: "user", content: m.content });
+        if (m.images && m.images.length > 0) {
+          conv.push({
+            role: "user",
+            content: [
+              ...m.images.map((image) => ({
+                type: "image",
+                source: { type: "base64", media_type: image.mimeType, data: image.dataBase64 },
+              })),
+              { type: "text", text: m.content },
+            ],
+          });
+        } else {
+          conv.push({ role: "user", content: m.content });
+        }
       } else if (m.role === "assistant") {
         const blocks: Array<Record<string, unknown>> = [];
         if (m.content) blocks.push({ type: "text", text: m.content });

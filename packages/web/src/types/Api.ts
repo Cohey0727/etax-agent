@@ -33,3 +33,33 @@ export interface AgentChatResponse {
   toolCalls: Array<{ name: string; arguments: Record<string, unknown>; result: unknown }>;
   error?: string;
 }
+
+export type ClassificationSource = "history" | "systemone" | "rules" | "none";
+
+export interface AccountClassification {
+  account: string;
+  confidence: number | null;
+  source: ClassificationSource;
+  candidates: Array<{ account: string; probability: number }>;
+}
+
+export interface AnalyzeReceiptResponse {
+  date: string | null;
+  amount: number | null;
+  payee: string;
+  description: string;
+  classification: AccountClassification;
+}
+
+export interface FreeeTrialBalanceAccount {
+  name: string;
+  category: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface FreeeTrialBalance {
+  source: string;
+  years: Array<{ year: number; accounts: FreeeTrialBalanceAccount[] }>;
+}

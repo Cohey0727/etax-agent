@@ -22,6 +22,11 @@
  *   GET    /api/imports             取込履歴（DB）
  *   POST   /api/import/csv          CSV取込（AI/ヒューリスティクス自動マッピング）
  *   POST   /api/agent/chat          対話エージェント（要 AGENT_API_KEY）
+ *   POST   /api/classify/account    勘定科目の判定（履歴→SystemOne→ルール）
+ *   POST   /api/classify/batch      勘定科目の一括判定（カード明細等）
+ *   POST   /api/classify/feedback   確定した科目を学習履歴に記録
+ *   POST   /api/receipts/analyze    領収書画像の読み取り＋科目判定（要 AGENT_API_KEY）
+ *   GET    /api/freee/trial-balance freee試算表（データディレクトリの取り込み済み実績）
  *
  * DATABASE_URL 未設定でも起動し、DB不要のエンドポイントはそのまま動く。
  * Bun で起動した場合は packages/web のビルド成果物（dist）も同一ポートで配信する
@@ -36,8 +41,11 @@ import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
 import agentRoutes from "./routes/agent";
 import calcRoutes from "./routes/calc";
+import classifyRoutes from "./routes/classify";
+import freeeRoutes from "./routes/freee";
 import healthRoutes from "./routes/health";
 import importsRoutes from "./routes/imports";
+import receiptsRoutes from "./routes/receipts";
 import transactionsRoutes from "./routes/transactions";
 
 const app = new OpenAPIHono();
@@ -48,6 +56,9 @@ app.route("/", calcRoutes);
 app.route("/", transactionsRoutes);
 app.route("/", importsRoutes);
 app.route("/", agentRoutes);
+app.route("/", classifyRoutes);
+app.route("/", receiptsRoutes);
+app.route("/", freeeRoutes);
 
 // 画面（React のビルド成果物）を API と同一ポートで配信する。
 // API ルートより後に登録するので、/api/* は上のルートが先に処理する。

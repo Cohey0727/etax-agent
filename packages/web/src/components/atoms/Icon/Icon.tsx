@@ -10,7 +10,8 @@ export type IconName =
   | "moon"
   | "close"
   | "panelLeft"
-  | "panelRight";
+  | "panelRight"
+  | "receipt";
 
 // 線画アイコンのパス集。色は currentColor で呼び出し側に委ねる。
 const ICON_PATHS: Record<IconName, ReactNode> = {
@@ -74,6 +75,13 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M14.5 4v16" />
+    </>
+  ),
+  receipt: (
+    <>
+      <path d="M6 2h12v20l-2-1.4L14 22l-2-1.4L10 22l-2-1.4L6 22Z" />
+      <path d="M9 7h6" />
+      <path d="M9 11h6" />
     </>
   ),
 };

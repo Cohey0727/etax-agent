@@ -6,6 +6,7 @@ import { ImportCsvResponse } from "@types";
 import { importCsvFile } from "@utils";
 import { ImportedTransactionsTable } from "../ImportedTransactionsTable";
 import { MappingSummary } from "../MappingSummary";
+import { AccountClassificationPanel } from "../AccountClassificationPanel";
 import styles from "./CsvImportPanel.css";
 
 export interface CsvImportPanelProps {
@@ -15,6 +16,8 @@ export interface CsvImportPanelProps {
 
 export const CsvImportPanel = ({ onUseTransactions, onLoadSample }: CsvImportPanelProps) => {
   const [result, setResult] = useState<ImportCsvResponse | null>(null);
+  // 科目判定で書き換わるため、取込結果の取引は編集可能なコピーで保持する
+  const [txs, setTxs] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -25,6 +28,7 @@ export const CsvImportPanel = ({ onUseTransactions, onLoadSample }: CsvImportPan
     try {
       const res = await importCsvFile(file);
       setResult(res);
+      setTxs(res.transactions);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setResult(null);
@@ -69,8 +73,9 @@ export const CsvImportPanel = ({ onUseTransactions, onLoadSample }: CsvImportPan
 
       {result && (
         <>
-          <MappingSummary result={result} onUseTransactions={onUseTransactions} />
-          <ImportedTransactionsTable transactions={result.transactions} />
+          <MappingSummary result={{ ...result, transactions: txs }} onUseTransactions={onUseTransactions} />
+          <AccountClassificationPanel transactions={txs} onApply={setTxs} />
+          <ImportedTransactionsTable transactions={txs} />
         </>
       )}
     </Col>

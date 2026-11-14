@@ -12,7 +12,14 @@
  *              デフォルトは OpenRouter (https://openrouter.ai/api/v1)。
  *              AGENT_BASE_URL を差し替えれば OpenCode 等の互換エンドポイントでも動く。
  *   - claude : Anthropic Messages API (https://api.anthropic.com)。
+ *
+ * 科目判定（SystemOne）用の環境変数:
+ *   SYSTEMONE_BASE_URL : /v1/systemone 互換エンドポイントのベースURL
+ *                        （デフォルト: http://127.0.0.1:11434 = ローカルの Ollama）
+ *   SYSTEMONE_API_KEY  : 任意。クラウドの判定API（TypeSafe Jev / Liquid d1 等）用
+ *   SYSTEMONE_MODEL    : 任意。判定モデル名の上書き
  */
+import { join } from "node:path";
 
 /** 設定不備を表す例外。instanceof 判定のための慣用としてクラスで定義する。 */
 export class ConfigError extends Error {}
@@ -63,4 +70,32 @@ export function loadAgentConfig(): AgentConfig {
     },
   };
   return cfg;
+}
+
+// ---------------------------------------------------------------------------
+// SystemOne（判定モデルAPI）の設定
+// ---------------------------------------------------------------------------
+
+export interface SystemOneConfig {
+  baseUrl: string;
+  apiKey: string | null;
+  model: string | null;
+}
+
+/** 環境変数から SystemOne 互換エンドポイントの設定を読み込む。 */
+export function loadSystemOneConfig(): SystemOneConfig {
+  return {
+    baseUrl: (process.env.SYSTEMONE_BASE_URL || "http://127.0.0.1:11434").replace(/\/+$/, ""),
+    apiKey: process.env.SYSTEMONE_API_KEY || null,
+    model: process.env.SYSTEMONE_MODEL || null,
+  };
+}
+
+/**
+ * サーバー側データファイルの置き場（packages/server/data）。
+ * freee試算表の実績データや科目判定の学習履歴など、Git管理しない
+ * 運用データを置く（.gitignore 対象）。
+ */
+export function serverDataDir(): string {
+  return join(import.meta.dir, "../../data");
 }

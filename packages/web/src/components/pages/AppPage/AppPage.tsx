@@ -7,10 +7,12 @@ import { AppView, ViewPageProps } from "@types";
 import { AmendPage } from "../AmendPage";
 import { DashboardPage } from "../DashboardPage";
 import { ImportPage } from "../ImportPage";
+import { ReceiptPage } from "../ReceiptPage";
 
 const appViews = [
   { id: AppView.Dashboard, label: "ダッシュボード", icon: "grid", Component: DashboardPage },
   { id: AppView.Import, label: "取引・CSV取込", icon: "import", Component: ImportPage },
+  { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", Component: ReceiptPage },
   { id: AppView.Amend, label: "修正申告", icon: "amend", Component: AmendPage },
 ] as const satisfies readonly {
   id: AppView;

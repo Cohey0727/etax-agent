@@ -53,6 +53,53 @@ export function suggestCategory(
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// 勘定科目の候補と判定基準（SystemOne の choice 質問の criteria に使う）
+// ---------------------------------------------------------------------------
+
+export interface AccountCriterion {
+  account: string;
+  /** その科目に該当する支出/収入の説明（判定モデルへの criteria）。 */
+  criteria: string;
+}
+
+/**
+ * 科目判定の選択肢（青色申告決算書の一般的な科目＋収入科目）。
+ * 判定は「どの帳簿（勘定科目）に付けるか」をこの一覧から選ぶ形で統一する。
+ * 「その他」は受け皿: 並びの末尾ではなく中ほどに置く（判定モデルの位置バイアス対策）。
+ */
+export const ACCOUNT_CRITERIA: AccountCriterion[] = [
+  { account: "売上高", criteria: "事業の売上・業務報酬・開発費用などの請求による収入" },
+  { account: "家賃収入", criteria: "賃貸物件の家賃・賃料による収入" },
+  { account: "仕入高", criteria: "販売する商品・材料の仕入れ" },
+  { account: "租税公課", criteria: "税金・印紙・手数料などの公的負担（固定資産税、自動車税、登録免許税など）" },
+  { account: "荷造運賃", criteria: "荷造り材料費・配送費・宅配便・送料" },
+  { account: "水道光熱費", criteria: "電気・ガス・水道などの光熱費" },
+  { account: "旅費交通費", criteria: "電車・バス・タクシー・航空券・ガソリン・駐車場・宿泊などの移動費" },
+  { account: "通信費", criteria: "電話・インターネット回線・サーバー・ドメイン・クラウドサービス・郵便料金" },
+  { account: "広告宣伝費", criteria: "広告出稿・宣伝・プロモーション費用" },
+  { account: "交際費", criteria: "取引先との飲食・贈答・慶弔などの交際費" },
+  { account: "会議費", criteria: "会議・打ち合わせに伴う飲食代・会場費・会議用のお茶代" },
+  { account: "新聞図書費", criteria: "書籍・雑誌・新聞・ニュースサービス・技術書の購入" },
+  { account: "支払手数料", criteria: "振込手数料・決済手数料・各種サービスの手数料" },
+  { account: "損害保険料", criteria: "火災保険・自動車保険などの保険料" },
+  { account: "その他", criteria: "他のどの科目にも当てはまらないもの" },
+  { account: "修繕費", criteria: "建物・設備・機器の修繕・修理・リフォーム" },
+  { account: "消耗品費", criteria: "事務用品・PC周辺機器・工具など10万円未満の物品購入" },
+  { account: "減価償却費", criteria: "高額な固定資産の減価償却分" },
+  { account: "福利厚生費", criteria: "従業員の福利厚生・健康診断・慶弔見舞" },
+  { account: "給料賃金", criteria: "従業員への給料・賃金" },
+  { account: "外注費", criteria: "外部業者・フリーランスへの業務委託費・外注費・外注工賃" },
+  { account: "利子割引料", criteria: "借入金の利息・手形割引料" },
+  { account: "地代家賃", criteria: "事務所・店舗の家賃、駐車場代などの賃借料の支払い" },
+  { account: "管理費", criteria: "賃貸物件の管理会社への管理費・共益費" },
+  { account: "貸倒金", criteria: "売掛金などの貸倒れ損失" },
+  { account: "雑費", criteria: "少額で他の科目に分類しにくい経費（振込手数料、書籍、セミナー参加費など）" },
+];
+
+/** 科目判定の選択肢名の一覧（ACCOUNT_CRITERIA と同じ順序）。 */
+export const ACCOUNT_NAMES: string[] = ACCOUNT_CRITERIA.map((c) => c.account);
+
 /** 摘要・科目から収入区分を推定する（家賃まわりは不動産所得、それ以外は科目が付けば事業所得）。 */
 export function guessIncomeType(description: string, category: string): IncomeType {
   if (category === "家賃収入") return "real_estate";

@@ -1,6 +1,7 @@
 export const AppView = {
   Dashboard: "dashboard",
   Import: "import",
+  Receipt: "receipt",
   Amend: "amend",
   Agent: "agent",
 } as const;
