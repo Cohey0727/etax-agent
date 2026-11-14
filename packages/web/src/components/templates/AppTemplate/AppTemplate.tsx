@@ -94,13 +94,20 @@ export const AppTemplate = ({
   };
   const activeLabel = views.find((view) => view.id === activeView)?.label ?? "";
   const navViews = views.filter((view) => view.nav);
-  // 狭い画面ではサイドバーが上部の帯になるため、ナビは横並びタブにする。
+  // 狭い画面ではサイドバーはドロワーになる（初期は閉じる／遷移したら閉じる）。
   const isNarrow = useMediaQuery("(max-width: 900px)");
+  const handleViewChange = (view: AppView) => {
+    onViewChange(view);
+    if (isNarrow) setSidebarOpen(false);
+  };
   return (
     <div className={styles.root}>
       <Row gap="none" align="start" className={styles.shell}>
+        {isNarrow && sidebarOpen ? (
+          <div className={styles.backdrop} onClick={toggleSidebar} aria-hidden="true" />
+        ) : null}
         <aside className={clsx(styles.sidebar, !sidebarOpen && styles.sidebarClosed)}>
-          {sidebarOpen ? (
+          {sidebarOpen || isNarrow ? (
             <div className={styles.sidebarInner}>
               <Row gap="sm" align="center">
                 <div className={styles.brandMark}>
@@ -129,8 +136,8 @@ export const AppTemplate = ({
               <Tabs
                 items={navViews}
                 activeId={activeView}
-                onChange={onViewChange}
-                orientation={isNarrow ? "horizontal" : "vertical"}
+                onChange={handleViewChange}
+                orientation="vertical"
               />
               <div className={styles.spacer} />
               <div className={styles.dataPanel}>
@@ -223,7 +230,7 @@ export const AppTemplate = ({
             <Button
               variant={activeView === AppView.Settings ? "tabActive" : "ghost"}
               size="sm"
-              onClick={() => onViewChange(AppView.Settings)}
+              onClick={() => handleViewChange(AppView.Settings)}
               aria-pressed={activeView === AppView.Settings}
               aria-label="設定"
               title="設定"

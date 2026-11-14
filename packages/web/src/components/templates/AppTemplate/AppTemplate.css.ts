@@ -49,15 +49,37 @@ const styles = {
     overflow: "hidden",
     transition: panelTransition,
     "@media": {
-      "(max-width: 900px)": { width: "100%" },
+      // 狭い画面ではレイアウトを占有せず、左からせり出すドロワーにする。
+      "(max-width: 900px)": {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: theme.component.sidebarWidth,
+        zIndex: 50,
+        transform: "translateX(0)",
+        transition: `transform ${theme.animation.durationSlow} ${theme.animation.springSoft}`,
+        boxShadow: theme.shadow.cardHover,
+      },
     },
   }),
   // 閉じた状態は完全には隠さず、アイコンだけの細いレールにする。
+  // 狭い画面ではレールは出さず、ドロワーごと画面外へ退ける。
   sidebarClosed: style({
     width: theme.component.sidebarRailWidth,
     "@media": {
-      "(max-width: 900px)": { display: "none" },
+      "(max-width: 900px)": {
+        width: theme.component.sidebarWidth,
+        transform: "translateX(-105%)",
+      },
     },
+  }),
+  // ドロワーを開いたときの背面。タップで閉じる。狭い画面でのみ描画される。
+  backdrop: style({
+    position: "fixed",
+    inset: 0,
+    background: "rgba(23, 20, 54, 0.45)",
+    zIndex: 40,
   }),
   // レール内側。ブランドマークとナビのアイコンボタンだけを縦に並べる。
   railInner: style({
@@ -91,14 +113,11 @@ const styles = {
     borderRight: `1px solid ${theme.color.border}`,
     boxSizing: "border-box",
     "@media": {
+      // ドロワーの中身はデスクトップと同じ縦レイアウトのまま全高で出す。
       "(max-width: 900px)": {
-        width: "100%",
-        height: "auto",
-        overflowY: "visible",
-        borderRight: "none",
-        borderBottom: `1px solid ${theme.color.border}`,
-        gap: theme.space.md,
-        padding: `${theme.space.md} ${theme.space.md}`,
+        width: theme.component.sidebarWidth,
+        height: "100%",
+        overflowY: "auto",
       },
     },
   }),
@@ -126,10 +145,6 @@ const styles = {
     background: theme.color.bg,
     borderRadius: theme.borderRadius.md,
     padding: `${theme.space.sm} ${theme.space.md}`,
-    "@media": {
-      // 狭い画面では上部を詰めるためデータ表示は省く（件数は帳簿などで確認できる）。
-      "(max-width: 900px)": { display: "none" },
-    },
   }),
   // 本体はここだけがスクロールする。
   main: style({
