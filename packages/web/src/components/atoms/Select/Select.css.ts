@@ -9,6 +9,10 @@ const styles = {
     border: `1px solid ${theme.color.border}`,
     fontSize: theme.fontSizes.sm,
     fontFamily: "inherit",
+    "@media": {
+      // iOS Safari のフォーカス時自動ズーム防止（Input と同じ）。
+      "(max-width: 640px)": { fontSize: "16px" },
+    },
     background: theme.color.inputBg,
     // 開く矢印は自前のシェブロンに統一する（ブラウザ標準の矢印は位置・色が揃わないため）。
     backgroundImage:

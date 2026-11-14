@@ -8,6 +8,10 @@ const styles = {
     border: `1px solid ${theme.color.border}`,
     fontSize: theme.fontSizes.sm,
     fontFamily: "inherit",
+    "@media": {
+      // iOS Safari のフォーカス時自動ズーム防止（Input と同じ）。
+      "(max-width: 640px)": { fontSize: "16px" },
+    },
     lineHeight: 1.6,
     background: theme.color.inputBg,
     color: theme.color.text,

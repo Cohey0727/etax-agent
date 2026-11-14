@@ -7,10 +7,17 @@ const styles = {
     flex: "0 0 210px",
     display: "flex",
     alignItems: "center",
+    "@media": {
+      // 狭い画面ではラベルを入力欄の上に積む（210px固定だと入力欄が潰れるため）。
+      "(max-width: 640px)": { flex: "1 1 100%" },
+    },
   }),
   // 金額の入力欄。数字を右寄せにする。
   fieldInput: style({
     flex: "1 1 auto",
+    "@media": {
+      "(max-width: 640px)": { flex: "1 1 100%" },
+    },
     textAlign: "right",
   }),
   // グループ見出し。

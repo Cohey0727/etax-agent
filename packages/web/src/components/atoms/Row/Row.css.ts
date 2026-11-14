@@ -5,6 +5,10 @@ const styles = {
   root: style({
     display: "flex",
     flexDirection: "row",
+    "@media": {
+      // 狭い画面では横並びを維持せず折り返す（潰れ・はみ出し防止）。
+      "(max-width: 640px)": { flexWrap: "wrap" },
+    },
   }),
   gap: styleVariants({
     none: { gap: 0 },

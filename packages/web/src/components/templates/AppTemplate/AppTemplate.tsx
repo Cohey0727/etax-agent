@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { clsx } from "clsx";
 import { Badge, Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
 import { Tabs } from "@components/molecules";
@@ -42,6 +42,21 @@ const savePanelOpen = (key: string, open: boolean): void => {
   }
 };
 
+/** メディアクエリの一致を購読する（モバイルではナビの向きを切り替えるため）。 */
+const useMediaQuery = (query: string): boolean => {
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const onChange = () => setMatches(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [query]);
+  return matches;
+};
+
 export const AppTemplate = ({
   views,
   activeView,
@@ -73,6 +88,8 @@ export const AppTemplate = ({
   };
   const activeLabel = views.find((view) => view.id === activeView)?.label ?? "";
   const navViews = views.filter((view) => view.nav);
+  // 狭い画面ではサイドバーが上部の帯になるため、ナビは横並びタブにする。
+  const isNarrow = useMediaQuery("(max-width: 900px)");
   return (
     <div className={styles.root}>
       <Row gap="none" align="start" className={styles.shell}>
@@ -103,7 +120,12 @@ export const AppTemplate = ({
                   ))}
                 </Select>
               </Col>
-              <Tabs items={navViews} activeId={activeView} onChange={onViewChange} orientation="vertical" />
+              <Tabs
+                items={navViews}
+                activeId={activeView}
+                onChange={onViewChange}
+                orientation={isNarrow ? "horizontal" : "vertical"}
+              />
               <div className={styles.spacer} />
               <div className={styles.dataPanel}>
                 <Col gap="sm">

@@ -14,6 +14,10 @@ const styles = {
     gridTemplateColumns: "150px 1fr 110px",
     alignItems: "center",
     gap: "12px",
+    "@media": {
+      // 狭い画面では方式名／バー／金額を縦に積む（150px+110px固定だとバーが潰れるため）。
+      "(max-width: 640px)": { gridTemplateColumns: "1fr" },
+    },
   }),
   barTrack: style({
     background: theme.color.lineSoft,
@@ -37,6 +41,9 @@ const styles = {
   barAmount: style({
     textAlign: "right",
     fontVariantNumeric: "tabular-nums",
+    "@media": {
+      "(max-width: 640px)": { textAlign: "left" },
+    },
   }),
 };
 

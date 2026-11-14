@@ -97,6 +97,8 @@ const styles = {
         overflowY: "visible",
         borderRight: "none",
         borderBottom: `1px solid ${theme.color.border}`,
+        gap: theme.space.md,
+        padding: `${theme.space.md} ${theme.space.md}`,
       },
     },
   }),
@@ -124,6 +126,10 @@ const styles = {
     background: theme.color.bg,
     borderRadius: theme.borderRadius.md,
     padding: `${theme.space.sm} ${theme.space.md}`,
+    "@media": {
+      // 狭い画面では上部を詰めるためデータ表示は省く（件数は帳簿などで確認できる）。
+      "(max-width: 900px)": { display: "none" },
+    },
   }),
   // 本体はここだけがスクロールする。
   main: style({
