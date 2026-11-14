@@ -1,3 +1,3 @@
 export * from "./ConfirmSummary";
 export * from "./ConsumptionTaxPanel";
-export * from "./FilingFlowPanel";
+export * from "./FilingPanel";

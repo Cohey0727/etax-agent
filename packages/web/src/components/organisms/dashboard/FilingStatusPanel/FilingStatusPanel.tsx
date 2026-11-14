@@ -1,30 +1,30 @@
 import { filterYear, Transaction } from "@etax/shared";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { AppView, FilingStatus } from "@types";
 import { fetchFilingStatuses } from "@utils/api";
 import styles from "./FilingStatusPanel.css";
 
-type ManualStepKey = "confirmed" | "calculated" | "submitted";
+type ManualKey = "confirmed" | "calculated" | "submitted";
 
-interface ManualStep {
-  key: ManualStepKey;
+interface ManualItem {
+  key: ManualKey;
   label: string;
 }
 
-const MANUAL_STEPS: readonly ManualStep[] = [
-  { key: "confirmed", label: "確認" },
+const MANUAL_ITEMS: readonly ManualItem[] = [
+  { key: "confirmed", label: "帳簿の確認" },
   { key: "calculated", label: "控除・計算" },
   { key: "submitted", label: "提出" },
 ];
 
-// スケルトン表示用のステップ名（実データと同じ並び）。
+// スケルトン表示用の項目名（実データと同じ並び）。
 const SKELETON_LABELS: readonly string[] = [
   "帳簿",
-  ...MANUAL_STEPS.map((step) => step.label),
+  ...MANUAL_ITEMS.map((item) => item.label),
 ];
 
-interface StatusStep {
+interface StatusRowData {
   label: string;
   done: boolean;
   state: string;
@@ -39,8 +39,8 @@ export interface FilingStatusPanelProps {
 }
 
 /**
- * 申告ステータス（帳簿 → 確認 → 控除・計算 → 提出）の進捗表示（表示専用）。
- * 確定申告画面のステッパーと同じく横一列で示す。ステータスの変更は
+ * 申告ステータス（表示専用）。帳簿・確認・控除・提出は独立した項目として
+ * 一覧で示す（順序を表すステッパーは置かない）。ステータスの変更は
  * 確定申告画面で行い、ここからはリンクで遷移するだけ。
  * 読み込み中は同じ形のスケルトンを出し、DB未接続の環境では何も表示しない。
  */
@@ -72,24 +72,18 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
           <Col gap="sm">
             <Text variant="sectionTitle">申告ステータス — {year}年分</Text>
             <Text variant="muted">
-              帳簿 → 確認 → 控除・計算 → 提出 の順に進めます。ステータスの変更は確定申告画面で行います。
+              帳簿・確認・控除・提出はそれぞれ独立した項目です。ステータスの変更は確定申告画面で行います。
               提出は e-Tax で行い、ここは進捗の表示用です。
             </Text>
           </Col>
-          <div className={styles.stepper} aria-hidden="true">
-            {SKELETON_LABELS.map((label, index) => (
-              <Fragment key={label}>
-                {index > 0 ? <span className={styles.connector} /> : null}
-                <div className={styles.step}>
-                  <span className={`${styles.circle} ${styles.circleSkeleton}`}>{index + 1}</span>
-                  <span className={styles.stepLabel}>{label}</span>
-                  <span className={styles.stepState}>
-                    <span className={styles.skeletonBar} />
-                  </span>
-                </div>
-              </Fragment>
+          <Col gap="sm" aria-hidden="true">
+            {SKELETON_LABELS.map((label) => (
+              <div key={label} className={styles.statusRow}>
+                <Text>{label}</Text>
+                <span className={styles.skeletonBar} />
+              </div>
             ))}
-          </div>
+          </Col>
           {onNavigate ? <div className={styles.skeletonFooter} aria-hidden="true" /> : null}
         </Col>
       </Card>
@@ -98,23 +92,22 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
 
   if (statuses === null) return null;
 
-  const steps: StatusStep[] = [
+  const rows: StatusRowData[] = [
     {
       label: "帳簿",
       done: yearTransactions.length > 0,
       state: `取引 ${yearTransactions.length} 件${unclassifiedCount > 0 ? ` ・ 未分類 ${unclassifiedCount} 件` : ""}`,
     },
-    ...MANUAL_STEPS.map((step) => {
-      const done = status[step.key];
-      const doneAt = status[`${step.key}_at`];
+    ...MANUAL_ITEMS.map((item) => {
+      const done = status[item.key];
+      const doneAt = status[`${item.key}_at`];
       return {
-        label: step.label,
+        label: item.label,
         done,
-        state: done && doneAt ? `${formatDate(doneAt)} 済み` : "未",
+        state: done && doneAt ? `${formatDate(doneAt)} 済み` : done ? "済み" : "未",
       };
     }),
   ];
-  const currentIndex = steps.findIndex((step) => !step.done);
 
   return (
     <Card>
@@ -122,54 +115,29 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
         <Col gap="sm">
           <Text variant="sectionTitle">申告ステータス — {year}年分</Text>
           <Text variant="muted">
-            帳簿 → 確認 → 控除・計算 → 提出 の順に進めます。ステータスの変更は確定申告画面で行います。
+            帳簿・確認・控除・提出はそれぞれ独立した項目です。ステータスの変更は確定申告画面で行います。
             提出は e-Tax で行い、ここは進捗の表示用です。
           </Text>
         </Col>
 
-        <div className={styles.stepper}>
-          {steps.map((step, index) => (
-            <Fragment key={step.label}>
-              {index > 0 ? (
-                <span
-                  className={
-                    steps[index - 1]?.done
-                      ? `${styles.connector} ${styles.connectorDone}`
-                      : styles.connector
-                  }
-                />
-              ) : null}
-              <div className={styles.step}>
-                <span
-                  className={
-                    step.done
-                      ? `${styles.circle} ${styles.circleDone}`
-                      : index === currentIndex
-                        ? `${styles.circle} ${styles.circleCurrent}`
-                        : styles.circle
-                  }
-                >
-                  {step.done ? "✓" : index + 1}
+        <Col gap="sm">
+          {rows.map((row) => (
+            <div key={row.label} className={styles.statusRow}>
+              <Text className={styles.itemLabel}>
+                {row.label}
+                <span className={row.done ? styles.stateDone : styles.stateTodo}>
+                  {row.done ? "済み" : "未"}
                 </span>
-                <span
-                  className={
-                    step.done || index === currentIndex
-                      ? `${styles.stepLabel} ${styles.stepLabelActive}`
-                      : styles.stepLabel
-                  }
-                >
-                  {step.label}
-                </span>
-                <span className={styles.stepState}>{step.state}</span>
-              </div>
-            </Fragment>
+              </Text>
+              <Text variant="muted">{row.state}</Text>
+            </div>
           ))}
-        </div>
+        </Col>
 
         {onNavigate ? (
           <Row gap="sm">
             <Button variant="ghost" size="sm" onClick={() => onNavigate(AppView.Filing)}>
-              確定申告画面で進める →
+              確定申告画面を開く →
             </Button>
             {status.submitted ? (
               <Button variant="ghost" size="sm" onClick={() => onNavigate(AppView.Amend)}>
