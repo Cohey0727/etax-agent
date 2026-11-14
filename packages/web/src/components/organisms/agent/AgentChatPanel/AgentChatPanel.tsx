@@ -1,7 +1,11 @@
 import { Transaction } from "@etax/shared";
 import { clsx } from "clsx";
-import { useState } from "react";
-import { Button, Card, Col, Input, LoadingCircle, Row, Text } from "@components/atoms";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
+import { Button, Input, LoadingCircle, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { AppView, ChatMessage, ChatRole } from "@types";
 import { agentChat } from "@utils";
@@ -24,7 +28,11 @@ export interface AgentChatPanelProps {
 const viewLabels: Record<string, string> = {
   [AppView.Dashboard]: "ダッシュボード",
   [AppView.Import]: "取引・CSV取込",
+  [AppView.Receipt]: "領収書から帳簿",
   [AppView.Amend]: "修正申告",
+  [AppView.Ledger]: "帳簿",
+  [AppView.Filing]: "確定申告",
+  [AppView.Settings]: "設定",
 };
 
 // ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。
@@ -64,6 +72,13 @@ export const AgentChatPanel = ({ transactions, onUiAction }: AgentChatPanelProps
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  // 新しいメッセージが来たら会話ログを一番下までスクロールする。
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading]);
 
   const send = async () => {
     const text = input.trim();
@@ -97,58 +112,66 @@ export const AgentChatPanel = ({ transactions, onUiAction }: AgentChatPanelProps
   };
 
   return (
-    <Col gap="md">
-      <Card>
-        <Col gap="sm">
+    <div className={styles.root}>
+      <Text variant="muted">
+        表示中の取引データ（{transactions.length}件）を添付して質問します。集計・計算はツールが
+        実行し、年度切替や画面遷移も代行します。金額はLLMが作らず、決定的な計算で出します。
+      </Text>
+      <div className={styles.chatLog} ref={logRef}>
+        {messages.length === 0 && (
           <Text variant="muted">
-            質問への回答に加えて、画面操作の代行もできます（年度の切替・画面の遷移・集計や税額計算の実行）。
-            現在表示中の取引データ（{transactions.length}件）を添付して質問します。
-            金額の計算はツール（決定的な計算）が行い、LLMは数字を作りません。
+            例: 「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
           </Text>
-          <Col gap="sm" className={styles.chatLog}>
-            {messages.length === 0 && (
-              <Text variant="muted">
-                例: 「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
-              </Text>
-            )}
-            {messages.map((m, i) => (
-              <div key={i} className={clsx(styles.bubble, styles.role[m.role])}>
-                {m.content}
+        )}
+        {messages.map((m, i) =>
+          m.role === ChatRole.Assistant ? (
+            <div key={i} className={clsx(styles.bubble, styles.role[m.role])}>
+              <div className={styles.markdown}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                >
+                  {m.content}
+                </ReactMarkdown>
               </div>
-            ))}
-            {loading && (
-              <div className={clsx(styles.bubble, styles.role[ChatRole.Assistant])}>
-                <Row gap="sm" align="center">
-                  <LoadingCircle />
-                  <span>考え中…</span>
-                </Row>
-              </div>
-            )}
-          </Col>
-          {error && <AlertBox variant="error">{error}</AlertBox>}
-          <Row gap="sm">
-            <Input
-              className={styles.inputFlex}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void send();
-              }}
-              placeholder="質問を入力（Enterで送信）"
-              disabled={loading}
-            />
-            <Button onClick={() => void send()} disabled={loading}>
-              送信
-            </Button>
-          </Row>
-          {actionLog.length > 0 && (
-            <Text variant="muted">画面操作: {actionLog.slice(-3).join(" ／ ")}</Text>
-          )}
-          {toolLog.length > 0 && (
-            <Text variant="muted">実行したツール: {toolLog.slice(-5).join(" / ")}</Text>
-          )}
-        </Col>
-      </Card>
-    </Col>
+            </div>
+          ) : (
+            <div key={i} className={clsx(styles.bubble, styles.role[m.role])}>
+              {m.content}
+            </div>
+          ),
+        )}
+        {loading && (
+          <div className={clsx(styles.bubble, styles.role[ChatRole.Assistant])}>
+            <Row gap="sm" align="center">
+              <LoadingCircle />
+              <span>考え中…</span>
+            </Row>
+          </div>
+        )}
+      </div>
+      {error && <AlertBox variant="error">{error}</AlertBox>}
+      {actionLog.length > 0 && (
+        <Text variant="muted">画面操作: {actionLog.slice(-3).join(" ／ ")}</Text>
+      )}
+      {toolLog.length > 0 && (
+        <Text variant="muted">実行したツール: {toolLog.slice(-5).join(" / ")}</Text>
+      )}
+      <Row gap="sm" className={styles.inputRow}>
+        <Input
+          className={styles.inputFlex}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void send();
+          }}
+          placeholder="質問を入力（Enterで送信）"
+          disabled={loading}
+        />
+        <Button onClick={() => void send()} disabled={loading}>
+          送信
+        </Button>
+      </Row>
+    </div>
   );
 };

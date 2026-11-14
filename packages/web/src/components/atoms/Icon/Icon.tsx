@@ -15,7 +15,9 @@ export type IconName =
   | "settings"
   | "book"
   | "plus"
-  | "bill";
+  | "chevronDown"
+  | "bill"
+  | "fileCheck";
 
 // 線画アイコンのパス集。色は currentColor で呼び出し側に委ねる。
 const ICON_PATHS: Record<IconName, ReactNode> = {
@@ -106,12 +108,20 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
       <path d="M5 12h14" />
     </>
   ),
+  chevronDown: <path d="m6 9 6 6 6-6" />,
   bill: (
     <>
       <rect x="2" y="6" width="20" height="12" rx="2" />
       <circle cx="12" cy="12" r="2" />
       <path d="M6 12h.01" />
       <path d="M18 12h.01" />
+    </>
+  ),
+  fileCheck: (
+    <>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+      <path d="m9 15 2 2 4-4" />
     </>
   ),
 };

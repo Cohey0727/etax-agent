@@ -12,6 +12,7 @@ import {
 } from "@utils/api";
 import { AmendPage } from "../AmendPage";
 import { DashboardPage } from "../DashboardPage";
+import { FilingPage } from "../FilingPage";
 import { ImportPage } from "../ImportPage";
 import { LedgerPage } from "../LedgerPage";
 import { ReceiptPage } from "../ReceiptPage";
@@ -23,6 +24,7 @@ const appViews = [
   { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", Component: ReceiptPage },
   { id: AppView.Amend, label: "修正申告", icon: "amend", Component: AmendPage },
   { id: AppView.Ledger, label: "帳簿", icon: "book", Component: LedgerPage },
+  { id: AppView.Filing, label: "確定申告", icon: "fileCheck", Component: FilingPage },
   { id: AppView.Settings, label: "設定", icon: "settings", Component: SettingsPage },
 ] as const satisfies readonly {
   id: AppView;
@@ -141,6 +143,7 @@ export const AppPage = () => {
         onUseTransactions={handleUseImported}
         onLoadSample={handleLoadSample}
         onSyncTransactions={handleSyncTransactions}
+        onNavigate={setActiveView}
         themeMode={themeMode}
         onThemeModeChange={handleThemeModeChange}
       />

@@ -1,5 +1,6 @@
 import { Col } from "@components/atoms";
 import {
+  BreakdownPanel,
   DashboardPanel,
   FilingStatusPanel,
   FreeeTrialBalance,
@@ -11,6 +12,7 @@ export const DashboardPage = ({ transactions, year }: ViewPageProps) => {
     <Col gap="md">
       <FilingStatusPanel transactions={transactions} year={year} />
       <DashboardPanel transactions={transactions} year={year} />
+      <BreakdownPanel transactions={transactions} year={year} />
       <FreeeTrialBalance year={year} />
     </Col>
   );

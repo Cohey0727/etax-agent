@@ -1,9 +1,10 @@
 import { ACCOUNT_NAMES, Transaction } from "@etax/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Card,
   Col,
+  Icon,
   Input,
   LoadingCircle,
   Row,
@@ -14,7 +15,7 @@ import {
   Text,
 } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { LedgerTransaction, LedgerTransactionInput } from "@types";
+import { AppView, LedgerTransaction, LedgerTransactionInput } from "@types";
 import {
   createLedgerTransaction,
   deleteLedgerTransaction,
@@ -32,6 +33,8 @@ export interface LedgerPanelProps {
   year: number;
   /** 帳簿の変更をアプリ全体の取引へ反映する（メモリのみ・遷移なし）。 */
   onSyncTransactions?: (transactions: Transaction[]) => void;
+  /** 取込系の画面への遷移（「追加」ドロップダウンの写真・CSVから使う）。 */
+  onNavigate?: (view: AppView) => void;
 }
 
 type LoadStatus = "loading" | "ready" | "unavailable";
@@ -62,7 +65,7 @@ const emptyDraft = (year: number): LedgerTransactionInput => ({
   income_type: "business",
 });
 
-export const LedgerPanel = ({ transactions, year, onSyncTransactions }: LedgerPanelProps) => {
+export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate }: LedgerPanelProps) => {
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [rows, setRows] = useState<LedgerTransaction[]>([]);
   const [edits, setEdits] = useState<Record<number, LedgerTransactionInput>>({});
@@ -70,6 +73,29 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions }: LedgerPa
   const [deleteArmedId, setDeleteArmedId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [addFormOpen, setAddFormOpen] = useState(false);
+  const addFormRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = () => {
+    setMenuOpen(false);
+    setIntakeOpen(false);
+  };
+
+  const handleIntakeNavigate = (view: AppView) => {
+    closeMenu();
+    onNavigate?.(view);
+  };
+
+  const handleManualAdd = () => {
+    closeMenu();
+    setAddFormOpen(true);
+    // フォームは表の下に開くので、開いたらそこまでスクロールする。
+    window.setTimeout(() => {
+      addFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  };
 
   const syncParent = (freshRows: LedgerTransaction[]) => {
     if (!onSyncTransactions) return;
@@ -230,13 +256,74 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions }: LedgerPa
         <Col gap="md">
           <Row gap="md" align="center" justify="spaceBetween">
             <Text variant="sectionTitle">{year}年の帳簿</Text>
-            <Text variant="body">
-              {rows.length}件 ・ 収入 {formatYen(incomeTotal)} ・ 支出 {formatYen(expenseTotal)}
-            </Text>
+            <Row gap="md" align="center">
+              <Text variant="body">
+                {rows.length}件 ・ 収入 {formatYen(incomeTotal)} ・ 支出 {formatYen(expenseTotal)}
+              </Text>
+              <div className={styles.addMenuWrap}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
+                >
+                  <Icon name="plus" size={15} />
+                  追加
+                  <Icon name="chevronDown" size={15} />
+                </Button>
+                {menuOpen ? (
+                  <>
+                    <div className={styles.menuBackdrop} onClick={closeMenu} />
+                    <div className={styles.addMenu} role="menu">
+                      <button
+                        type="button"
+                        className={styles.menuItem}
+                        onClick={() => setIntakeOpen((open) => !open)}
+                      >
+                        <Icon name="import" size={16} />
+                        写真・CSVから
+                        <span
+                          className={
+                            intakeOpen
+                              ? `${styles.menuChevron} ${styles.menuChevronOpen}`
+                              : styles.menuChevron
+                          }
+                        >
+                          <Icon name="chevronDown" size={15} />
+                        </span>
+                      </button>
+                      {intakeOpen ? (
+                        <>
+                          <button
+                            type="button"
+                            className={`${styles.menuItem} ${styles.menuSubItem}`}
+                            onClick={() => handleIntakeNavigate(AppView.Receipt)}
+                          >
+                            <Icon name="receipt" size={16} />
+                            領収書の写真から
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.menuItem} ${styles.menuSubItem}`}
+                            onClick={() => handleIntakeNavigate(AppView.Import)}
+                          >
+                            <Icon name="import" size={16} />
+                            CSVファイルから
+                          </button>
+                        </>
+                      ) : null}
+                      <button type="button" className={styles.menuItem} onClick={handleManualAdd}>
+                        <Icon name="plus" size={16} />
+                        手動
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </Row>
           </Row>
           {rows.length === 0 ? (
             <Text variant="body">
-              この年の取引はまだありません。下のフォームから追加するか、CSV取込・領収書から
+              この年の取引はまだありません。右上の「追加」ボタンから追加するか、CSV取込・領収書から
               取り込むと自動で帳簿に保存されます。
             </Text>
           ) : (
@@ -348,10 +435,17 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions }: LedgerPa
           )}
         </Col>
       </Card>
-      <Card>
-        <Col gap="md">
-          <Text variant="sectionTitle">取引を追加</Text>
-          <div className={styles.addGrid}>
+      {addFormOpen ? (
+        <div ref={addFormRef}>
+          <Card>
+            <Col gap="md">
+              <Row gap="md" align="center" justify="spaceBetween">
+                <Text variant="sectionTitle">取引を追加（手動）</Text>
+                <Button variant="ghost" size="sm" onClick={() => setAddFormOpen(false)}>
+                  閉じる
+                </Button>
+              </Row>
+              <div className={styles.addGrid}>
             <Col gap="sm">
               <Text variant="statLabel">日付</Text>
               <Input
@@ -410,14 +504,16 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions }: LedgerPa
               />
             </Col>
           </div>
-          <Row gap="sm" align="center">
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => void handleAdd()}>
-              帳簿に追加
-            </Button>
-            <Text variant="caption">追加・保存・削除はそのまま帳簿データベースに記録されます。</Text>
-          </Row>
-        </Col>
-      </Card>
+              <Row gap="sm" align="center">
+                <Button variant="primary" size="sm" disabled={busy} onClick={() => void handleAdd()}>
+                  帳簿に追加
+                </Button>
+                <Text variant="caption">追加・保存・削除はそのまま帳簿データベースに記録されます。</Text>
+              </Row>
+            </Col>
+          </Card>
+        </div>
+      ) : null}
     </Col>
   );
 };

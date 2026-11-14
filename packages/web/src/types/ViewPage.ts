@@ -1,4 +1,5 @@
 import { Transaction } from "@etax/shared";
+import { AppView } from "./AppView";
 import { ThemeMode } from "./Theme";
 
 /**
@@ -14,6 +15,8 @@ export interface ViewPageProps {
   onLoadSample: () => void;
   /** 帳簿画面の変更を全体へ反映する（メモリのみ・画面遷移なし）。 */
   onSyncTransactions?: (transactions: Transaction[]) => void;
+  /** 他画面への遷移（帳簿の「追加」ドロップダウンなどから使う）。 */
+  onNavigate?: (view: AppView) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
 }

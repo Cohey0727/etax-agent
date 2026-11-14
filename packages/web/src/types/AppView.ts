@@ -4,6 +4,7 @@ export const AppView = {
   Receipt: "receipt",
   Amend: "amend",
   Ledger: "ledger",
+  Filing: "filing",
   Settings: "settings",
   Agent: "agent",
 } as const;

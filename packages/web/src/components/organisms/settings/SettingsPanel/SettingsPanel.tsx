@@ -13,14 +13,14 @@ const THEME_OPTIONS: readonly {
   icon: IconName;
   caption: string;
 }[] = [
-  { mode: "light", label: "ライト", icon: "sun", caption: "常に明るいテーマで表示します" },
-  { mode: "dark", label: "ダーク", icon: "moon", caption: "常に暗いテーマで表示します" },
   {
     mode: "system",
     label: "端末に合わせる",
     icon: "settings",
     caption: "端末の外観設定（ライト/ダーク）に追随します",
   },
+  { mode: "light", label: "ライト", icon: "sun", caption: "常に明るいテーマで表示します" },
+  { mode: "dark", label: "ダーク", icon: "moon", caption: "常に暗いテーマで表示します" },
 ];
 
 const INFO_ROWS: readonly { label: string; value: string }[] = [

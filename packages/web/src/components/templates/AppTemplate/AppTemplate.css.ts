@@ -168,10 +168,12 @@ const styles = {
       },
     },
   }),
+  // パネル本体はスクロールさせず、会話ログ側がスクロールして入力欄が下端に残る。
   panelBody: style({
     flex: 1,
-    overflowY: "auto",
     minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
   }),
   // 画面下部の細いアクションバー（VS Code のステータスバー相当）。
   // fixed ではなくシェルの一部として置く（root が 100dvh のため最下部に残る）。
