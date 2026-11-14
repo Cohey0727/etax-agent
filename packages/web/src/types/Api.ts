@@ -71,6 +71,17 @@ export interface FreeeTrialBalance {
   years: Array<{ year: number; accounts: FreeeTrialBalanceAccount[] }>;
 }
 
+/** 年度ごとの申告ステータス。サーバーAPIのワイヤ形式（snake_case）。 */
+export interface FilingStatus {
+  year: number;
+  confirmed: boolean;
+  confirmed_at: string | null;
+  calculated: boolean;
+  calculated_at: string | null;
+  submitted: boolean;
+  submitted_at: string | null;
+}
+
 /** 帳簿（DB）に保存された取引1件。サーバーAPIのワイヤ形式（snake_case）。 */
 export interface LedgerTransaction {
   id: number;

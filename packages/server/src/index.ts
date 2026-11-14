@@ -49,6 +49,7 @@ import agentRoutes from "./routes/agent";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
 import filesRoutes from "./routes/files";
+import filingStatusRoutes from "./routes/filingStatus";
 import freeeRoutes from "./routes/freee";
 import healthRoutes from "./routes/health";
 import importsRoutes from "./routes/imports";
@@ -67,6 +68,7 @@ app.route("/", classifyRoutes);
 app.route("/", receiptsRoutes);
 app.route("/", filesRoutes);
 app.route("/", freeeRoutes);
+app.route("/", filingStatusRoutes);
 
 // 画面（React のビルド成果物）を API と同一ポートで配信する。
 // API ルートより後に登録するので、/api/* は上のルートが先に処理する。

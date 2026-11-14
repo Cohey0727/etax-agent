@@ -4,6 +4,7 @@ import {
   AgentChatResponse,
   AnalyzeReceiptResponse,
   ChatMessage,
+  FilingStatus,
   FreeeTrialBalance,
   ImportCsvResponse,
   LedgerTransaction,
@@ -146,6 +147,37 @@ export async function fetchFreeeTrialBalance(): Promise<FreeeTrialBalance | null
     const resp = await fetch("/api/freee/trial-balance");
     if (!resp.ok) return null;
     return (await resp.json()) as FreeeTrialBalance;
+  } catch {
+    return null;
+  }
+}
+
+/** 申告ステータス一覧。DB未接続などで取得できない場合は null。 */
+export async function fetchFilingStatuses(): Promise<FilingStatus[] | null> {
+  try {
+    const resp = await fetch("/api/filing-status");
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { statuses: FilingStatus[] };
+    return data.statuses;
+  } catch {
+    return null;
+  }
+}
+
+/** 申告ステータスの部分更新。失敗した場合は null。 */
+export async function updateFilingStatus(
+  year: number,
+  patch: { confirmed?: boolean; calculated?: boolean; submitted?: boolean },
+): Promise<FilingStatus | null> {
+  try {
+    const resp = await fetch(`/api/filing-status/${year}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { status: FilingStatus };
+    return data.status;
   } catch {
     return null;
   }

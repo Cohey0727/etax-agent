@@ -70,5 +70,14 @@ export async function ensureTables(): Promise<void> {
       created_at timestamp NOT NULL DEFAULT now()
     )
   `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS filing_status (
+      year integer PRIMARY KEY,
+      confirmed_at timestamp,
+      calculated_at timestamp,
+      submitted_at timestamp,
+      updated_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
   tablesEnsured = true;
 }

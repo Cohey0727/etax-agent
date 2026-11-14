@@ -1,8 +1,9 @@
 /**
  * schema.ts — Drizzle ORM スキーマ（Postgres）。repositories 層の土台。
  *
- * imports      : CSV取込の記録（ファイル名・自動マッピング結果・件数）
- * transactions : 取引（取込元 imports への参照つき）
+ * imports       : CSV取込の記録（ファイル名・自動マッピング結果・件数）
+ * transactions  : 取引（取込元 imports への参照つき）
+ * filing_status : 年度ごとの申告ステータス（確認・控除計算・提出の済み日時）
  */
 import { integer, jsonb, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
@@ -31,6 +32,19 @@ export const transactionsTable = pgTable("transactions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const filingStatusTable = pgTable("filing_status", {
+  /** 対象年（西暦） */
+  year: integer("year").primaryKey(),
+  /** 帳簿の内容を確認済みにした日時。未確認なら null */
+  confirmedAt: timestamp("confirmed_at"),
+  /** 控除・税額計算を済ませた日時。未了なら null */
+  calculatedAt: timestamp("calculated_at"),
+  /** e-Tax で提出済みにした日時。未提出なら null */
+  submittedAt: timestamp("submitted_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export type ImportRow = typeof importsTable.$inferSelect;
 export type TransactionRow = typeof transactionsTable.$inferSelect;
 export type NewTransactionRow = typeof transactionsTable.$inferInsert;
+export type FilingStatusRow = typeof filingStatusTable.$inferSelect;
