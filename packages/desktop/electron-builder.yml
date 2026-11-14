@@ -1,0 +1,21 @@
+appId: work.koheiokamoto.etaxagent
+productName: eTaxAgent
+directories:
+  output: release
+files:
+  - main.mjs
+  - package.json
+extraResources:
+  - from: server-bundle
+    to: server
+  - from: web
+    to: web
+  - from: runtime/bun
+    to: bun/bun
+mac:
+  target:
+    - dir
+    - dmg
+  # 個人利用のため未署名（初回は右クリック→「開く」で起動する）。
+  identity: null
+  category: public.app-category.finance

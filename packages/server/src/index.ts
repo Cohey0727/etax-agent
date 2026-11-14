@@ -74,7 +74,9 @@ app.route("/", etaxRoutes);
 
 // 画面（React のビルド成果物）を API と同一ポートで配信する。
 // API ルートより後に登録するので、/api/* は上のルートが先に処理する。
-const webDistRoot = join(import.meta.dir, "../../web/dist");
+// 画面の配信元。既定はソース配置（packages/web/dist）。
+// デスクトップ同梱時は ETAX_WEB_ROOT で同梱先を指す。
+const webDistRoot = process.env.ETAX_WEB_ROOT || join(import.meta.dir, "../../web/dist");
 app.use("/*", serveStatic({ root: webDistRoot }));
 
 // エラーは従来どおり { error: string } 形式で返す（HTTPException の文言をそのまま使う）。
