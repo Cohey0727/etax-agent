@@ -21,6 +21,13 @@ const styles = {
   actionsRow: style({
     width: "max-content",
   }),
+  // 表はカードに入れず、幅が足りないときはこの中で横スクロールさせる。
+  // サイドバーやエージェントパネルを開いて主領域が狭くなっても、
+  // 列が画面（旧カード）の外へはみ出さないようにするための受け皿。
+  tableWrap: style({
+    width: "100%",
+    overflowX: "auto",
+  }),
   descriptionInput: style({
     width: "100%",
     minWidth: "180px",

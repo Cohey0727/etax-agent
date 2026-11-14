@@ -236,7 +236,7 @@ export const FilingFlowPanel = ({ transactions, year, onNavigate }: FilingFlowPa
           {selectedStep.key === "confirmed" ? (
             <ConfirmSummary transactions={transactions} year={year} />
           ) : null}
-          <Row gap="sm" align="center">
+          <Row gap="sm" align="center" justify="end">
             {selectedStep.links.map((link, index) => (
               <Button
                 key={link.view + link.label}

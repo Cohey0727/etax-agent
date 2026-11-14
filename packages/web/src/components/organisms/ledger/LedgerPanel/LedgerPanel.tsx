@@ -19,6 +19,7 @@ import { AppView, LedgerTransaction, LedgerTransactionInput } from "@types";
 import {
   createLedgerTransaction,
   deleteLedgerTransaction,
+  downloadLedgerPdf,
   fetchLedgerTransactions,
   ledgerRowToTransaction,
   recordClassificationFeedback,
@@ -73,6 +74,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   const [deleteArmedId, setDeleteArmedId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [addFormOpen, setAddFormOpen] = useState(false);
   const addFormRef = useRef<HTMLDivElement>(null);
@@ -191,6 +193,19 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    setError(null);
+    try {
+      await downloadLedgerPdf(year);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "PDFのダウンロードに失敗しました");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleAdd = async () => {
     if (busy) return;
     if (!draft.date.startsWith(`${year}-`)) {
@@ -250,14 +265,21 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   return (
     <Col gap="lg">
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
-      <Card>
-        <Col gap="md">
+      <Col gap="md">
           <Row gap="md" align="center" justify="spaceBetween">
             <Text variant="sectionTitle">{year}年の帳簿</Text>
             <Row gap="md" align="center">
               <Text variant="body">
                 {rows.length}件 ・ 収入 {formatYen(incomeTotal)} ・ 支出 {formatYen(expenseTotal)}
               </Text>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={downloading}
+                onClick={() => void handleDownloadPdf()}
+              >
+                PDFでダウンロード
+              </Button>
               <div className={styles.addMenuWrap}>
                 <Button
                   variant="primary"
@@ -304,6 +326,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
               取り込むと自動で帳簿に保存されます。
             </Text>
           ) : (
+            <div className={styles.tableWrap}>
             <Table>
               <thead>
                 <tr>
@@ -409,9 +432,9 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
                 })}
               </tbody>
             </Table>
+            </div>
           )}
-        </Col>
-      </Card>
+      </Col>
       {addFormOpen ? (
         <div ref={addFormRef}>
           <Card>
