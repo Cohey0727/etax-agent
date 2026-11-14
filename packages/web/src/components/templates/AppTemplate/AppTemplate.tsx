@@ -71,7 +71,13 @@ export const AppTemplate = ({
   children,
 }: AppTemplateProps) => {
   // 左右パネルの開閉はレイアウト側の状態で、端末に保存して次回も引き継ぐ。
-  const [sidebarOpen, setSidebarOpen] = useState(() => loadPanelOpen(SIDEBAR_OPEN_KEY, true));
+  // ただし狭い画面ではサイドバーが上部を占有するので、保存値によらず閉じた状態から始める
+  // （下部バーのボタンでいつでも開ける。開閉の保存はデスクトップ幅でのみ効く）。
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () =>
+      loadPanelOpen(SIDEBAR_OPEN_KEY, true) &&
+      !(typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches),
+  );
   const [agentPanelOpen, setAgentPanelOpen] = useState(() =>
     loadPanelOpen(AGENT_OPEN_KEY, false),
   );
