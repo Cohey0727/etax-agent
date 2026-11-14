@@ -66,12 +66,23 @@ const readStoredSendKeyMode = (): SendKeyMode => {
   return "enter";
 };
 
+const YEAR_STORAGE_KEY = "etax-selected-year";
+
+const readStoredYear = (): number => {
+  try {
+    const saved = Number(localStorage.getItem(YEAR_STORAGE_KEY));
+    return Number.isInteger(saved) && saved > 0 ? saved : 0;
+  } catch {
+    return 0;
+  }
+};
+
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);
   const [transactions, setTransactions] = useState<Transaction[]>(sample);
   const [dataSource, setDataSource] = useState("サンプルデータ");
   const [activeView, setActiveView] = useState<AppView>(AppView.Dashboard);
-  const [selectedYear, setSelectedYear] = useState<number>(0);
+  const [selectedYear, setSelectedYear] = useState<number>(() => readStoredYear());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const [sendKeyMode, setSendKeyMode] = useState<SendKeyMode>(() => readStoredSendKeyMode());
 
@@ -137,9 +148,18 @@ export const AppPage = () => {
       // 保存できなくても切替自体は有効にする
     }
   };
+  // 年度の切替は端末に保存し、次回も同じ年度から始める。
+  const handleYearChange = (nextYear: number) => {
+    setSelectedYear(nextYear);
+    try {
+      localStorage.setItem(YEAR_STORAGE_KEY, String(nextYear));
+    } catch {
+      // 保存できなくても切替自体は有効にする
+    }
+  };
   const handleUiAction = (action: AgentUiAction) => {
     if (action.type === "setYear") {
-      setSelectedYear(action.year);
+      handleYearChange(action.year);
     } else if (appViews.some((view) => view.id === action.view)) {
       setActiveView(action.view);
     }
@@ -154,7 +174,7 @@ export const AppPage = () => {
       activeView={activeView}
       years={years}
       selectedYear={year}
-      onYearChange={setSelectedYear}
+      onYearChange={handleYearChange}
       dataSource={dataSource}
       transactionCount={transactions.length}
       agentPanel={
