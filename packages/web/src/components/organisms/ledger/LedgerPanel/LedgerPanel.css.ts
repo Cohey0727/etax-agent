@@ -70,18 +70,6 @@ const styles = {
       "&:hover": { background: theme.color.hover },
     },
   }),
-  // 「写真・CSVから」の下に一段下げて出すサブ項目。
-  menuSubItem: style({
-    paddingLeft: "34px",
-  }),
-  menuChevron: style({
-    marginLeft: "auto",
-    display: "inline-flex",
-    transition: `transform ${theme.animation.durationFast} ease`,
-  }),
-  menuChevronOpen: style({
-    transform: "rotate(180deg)",
-  }),
 };
 
 export default styles;

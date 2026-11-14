@@ -10,11 +10,13 @@ const bounceIn = keyframes({
 });
 
 const styles = {
-  // ステッパー全体（丸印の列＋連結線）。
+  // ステッパー全体（丸印の列＋連結線）。幅いっぱいに広げず、中央に寄せて余裕を持たせる。
   stepper: style({
     display: "flex",
     alignItems: "flex-start",
     width: "100%",
+    maxWidth: "560px",
+    margin: "0 auto",
   }),
   // 1ステップ分（丸印＋ラベル）。クリックで詳細を切り替える。
   step: style({

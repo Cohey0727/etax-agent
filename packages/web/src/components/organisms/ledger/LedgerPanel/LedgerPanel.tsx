@@ -33,7 +33,7 @@ export interface LedgerPanelProps {
   year: number;
   /** 帳簿の変更をアプリ全体の取引へ反映する（メモリのみ・遷移なし）。 */
   onSyncTransactions?: (transactions: Transaction[]) => void;
-  /** 取込系の画面への遷移（「追加」ドロップダウンの写真・CSVから使う）。 */
+  /** 取込系の画面への遷移（「追加」ドロップダウンの写真から・CSVから使う）。 */
   onNavigate?: (view: AppView) => void;
 }
 
@@ -74,13 +74,11 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [intakeOpen, setIntakeOpen] = useState(false);
   const [addFormOpen, setAddFormOpen] = useState(false);
   const addFormRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = () => {
     setMenuOpen(false);
-    setIntakeOpen(false);
   };
 
   const handleIntakeNavigate = (view: AppView) => {
@@ -277,40 +275,19 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
                       <button
                         type="button"
                         className={styles.menuItem}
-                        onClick={() => setIntakeOpen((open) => !open)}
+                        onClick={() => handleIntakeNavigate(AppView.Receipt)}
+                      >
+                        <Icon name="receipt" size={16} />
+                        写真から
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.menuItem}
+                        onClick={() => handleIntakeNavigate(AppView.Import)}
                       >
                         <Icon name="import" size={16} />
-                        写真・CSVから
-                        <span
-                          className={
-                            intakeOpen
-                              ? `${styles.menuChevron} ${styles.menuChevronOpen}`
-                              : styles.menuChevron
-                          }
-                        >
-                          <Icon name="chevronDown" size={15} />
-                        </span>
+                        CSVから
                       </button>
-                      {intakeOpen ? (
-                        <>
-                          <button
-                            type="button"
-                            className={`${styles.menuItem} ${styles.menuSubItem}`}
-                            onClick={() => handleIntakeNavigate(AppView.Receipt)}
-                          >
-                            <Icon name="receipt" size={16} />
-                            領収書の写真から
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.menuItem} ${styles.menuSubItem}`}
-                            onClick={() => handleIntakeNavigate(AppView.Import)}
-                          >
-                            <Icon name="import" size={16} />
-                            CSVファイルから
-                          </button>
-                        </>
-                      ) : null}
                       <button type="button" className={styles.menuItem} onClick={handleManualAdd}>
                         <Icon name="plus" size={16} />
                         手動
