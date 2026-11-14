@@ -14,6 +14,15 @@ export const AgentChatRequestSchema = z
     messages: z.array(z.unknown()),
     transactions: z.unknown().optional(),
     csvText: z.string().optional().catch(undefined),
+    // 設定画面（外部接続）からの上書き。空・欠落はサーバー設定を使う。
+    agentConfig: z
+      .object({
+        apiKey: z.string().optional().catch(undefined),
+        baseUrl: z.string().optional().catch(undefined),
+        model: z.string().optional().catch(undefined),
+      })
+      .optional()
+      .catch(undefined),
   })
   .openapi("AgentChatRequest");
 

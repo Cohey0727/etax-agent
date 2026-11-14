@@ -37,7 +37,10 @@ export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリー�
 進め方:
 1. まず対象年と取引データの有無を確認する（import_csv_info で添付データの概要が分かります）。
 2. aggregate_year → consumption_tax の順で進め、方式（本則/簡易/2割特例）の比較を提示する。
-3. 修正申告の相談なら申告済みと修正後のJSONを用意してもらい amendment_delta で差分を出す。`;
+3. 修正申告の相談なら申告済みと修正後のJSONを用意してもらい amendment_delta で差分を出す。
+
+画面操作:
+- 画面のテーマ（ダークモード/ライトモード/端末に合わせる）の変更を頼まれたら、set_theme ツールで切り替えてください。「私ではできません」と断らないでください。`;
 
 export const agentTools: ToolDef[] = [
   {
@@ -74,6 +77,21 @@ export const agentTools: ToolDef[] = [
           method: { type: "string", enum: ["standard", "simplified", "special20"] },
         },
         required: ["year", "method"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "set_theme",
+      description:
+        "画面のテーマ（表示モード）を切り替える。ダークモードにして、明るくして、端末設定に合わせて、等の依頼に使う。mode は light（ライト）/ dark（ダーク）/ system（端末に合わせる）。",
+      parameters: {
+        type: "object",
+        properties: {
+          mode: { type: "string", enum: ["light", "dark", "system"] },
+        },
+        required: ["mode"],
       },
     },
   },
@@ -199,6 +217,14 @@ export function dispatchTool(
           corrected as Record<string, unknown>,
         );
         return { year: d.year, field_diffs: d.fieldDiffs, tax_delta: d.taxDelta };
+      }
+      case "set_theme": {
+        // 実際の切替はクライアント側が行う。ここでは依頼を記録として返すだけ。
+        const mode = typeof args["mode"] === "string" ? args["mode"] : "";
+        if (mode !== "light" && mode !== "dark" && mode !== "system") {
+          throw new Error("mode は light / dark / system のいずれかを指定してください");
+        }
+        return { ok: true, applied: "theme", mode };
       }
       default:
         return { error: `未知のツールです: ${name}` };

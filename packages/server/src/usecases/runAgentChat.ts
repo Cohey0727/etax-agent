@@ -54,13 +54,28 @@ export const runAgentChatHandler: RouteHandler<typeof runAgentChatRoute> = async
   } catch (e) {
     throw new HTTPException(500, { message: errorMessage(e) });
   }
+  const raw = await readJsonBody(c);
+  // 設定画面（外部接続）から送られた接続情報があれば、環境変数より優先する。
+  const override = raw?.agentConfig as
+    | { apiKey?: unknown; baseUrl?: unknown; model?: unknown }
+    | undefined;
+  if (override) {
+    if (typeof override.apiKey === "string" && override.apiKey.trim()) {
+      cfg.apiKey = override.apiKey.trim();
+    }
+    if (typeof override.baseUrl === "string" && override.baseUrl.trim()) {
+      cfg.baseUrl = override.baseUrl.trim().replace(/\/+$/, "");
+    }
+    if (typeof override.model === "string" && override.model.trim()) {
+      cfg.model = override.model.trim();
+    }
+  }
   if (!cfg.apiKey) {
     throw new HTTPException(503, {
       message:
-        "AGENT_API_KEY が未設定のためエージェントは利用できません。サーバーの環境変数に AGENT_API_KEY を設定してください（集計・計算・CSV取込はキー不要で使えます）。",
+        "AGENT_API_KEY が未設定のためエージェントは利用できません。サーバーの環境変数に AGENT_API_KEY を設定するか、設定画面の「外部接続」にAPIキーを入力してください（集計・計算・CSV取込はキー不要で使えます）。",
     });
   }
-  const raw = await readJsonBody(c);
   const parsed = raw === null ? null : AgentChatRequestSchema.safeParse(raw);
   if (!parsed || !parsed.success) {
     throw new HTTPException(400, { message: "messages 配列が必要です" });
