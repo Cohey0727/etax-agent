@@ -1,0 +1,210 @@
+/**
+ * agentTools.ts — 対話エージェントが使うツール定義と実行（services/agent）。
+ *
+ * 役割分担:
+ *   - お金の計算は全部 @etax/shared の決定的な関数が行う。
+ *   - LLM は会話の進行、ツールの選択、結果の説明だけを担当する。
+ *   - 数字が不足している場合は、LLM に推測させず「不足している」と
+ *     ユーザーに伝えるようシステムプロンプトで強く指示する。
+ *
+ * HTTP はステートレスなので、取引データはリクエストに添付されてくる
+ * （クライアントが保持する取引リスト）。ツールはそのデータに対して動く。
+ */
+import {
+  aggregateIncome,
+  amendmentDelta,
+  blueDeduction,
+  consumptionTax,
+  estimateInputTax,
+  filterYear,
+  importCsvText,
+  residentialRentTotal,
+  taxableSalesFromBreakdown,
+  ConsumptionMethod,
+  Transaction,
+} from "@etax/shared";
+import { ToolDef } from "../../gateways/llmGateway";
+
+export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリーランス）向けの確定申告「準備」アシスタントです。
+
+厳守事項:
+- 金額の計算は必ずツール（aggregate_year / consumption_tax / amendment_delta）の結果だけを使い、自分で暗算したり、数字を作ったりしないでください。
+- ツールを使うには取引データが必要です。取引データが会話に添付されていない・対象年のデータが無いなどの場合は、その旨をはっきり伝えて、ユーザーにCSV取込やデータの用意をお願いしてください。不足を推測で埋めることは絶対にしないでください。
+- あなたは申告書の「作成準備と計算」までを手伝います。e-Tax への最終提出は納税者本人が行うものであり、あなたが提出を代行することはできません。その境界を聞かれたら説明してください。
+- 税制の前提（青色申告特別控除の上限、簡易課税のみなし仕入率、2割特例、住宅家賃は消費税非課税など）で不確かな点があれば、不確かだと明言してください。
+- 回答は簡潔な日本語で。金額にはカンマ区切りと「円」を付けてください。
+
+進め方:
+1. まず対象年と取引データの有無を確認する（import_csv_info で添付データの概要が分かります）。
+2. aggregate_year → consumption_tax の順で進め、方式（本則/簡易/2割特例）の比較を提示する。
+3. 修正申告の相談なら申告済みと修正後のJSONを用意してもらい amendment_delta で差分を出す。`;
+
+export const agentTools: ToolDef[] = [
+  {
+    type: "function",
+    function: {
+      name: "import_csv_info",
+      description:
+        "会話に添付されている取引データの概要（件数・年・年ごとの件数）を返す。データの有無の確認に使う。",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "aggregate_year",
+      description: "指定年の事業所得・不動産所得を集計し、青色申告特別控除も計算する。",
+      parameters: {
+        type: "object",
+        properties: { year: { type: "integer", description: "対象年（西暦）" } },
+        required: ["year"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consumption_tax",
+      description:
+        "指定年の消費税を計算する。method は standard（本則）/ simplified（簡易課税）/ special20（2割特例）。",
+      parameters: {
+        type: "object",
+        properties: {
+          year: { type: "integer" },
+          method: { type: "string", enum: ["standard", "simplified", "special20"] },
+        },
+        required: ["year", "method"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "amendment_delta",
+      description:
+        "申告済みJSON（original）と修正後JSON（corrected）を比較し、項目ごとの差分と税額の増減を返す。ユーザーが両方のJSONを提示した場合に使う。",
+      parameters: {
+        type: "object",
+        properties: {
+          original: { type: "object", description: "申告済み内容のフラットなJSON" },
+          corrected: { type: "object", description: "修正後内容のフラットなJSON" },
+        },
+        required: ["original", "corrected"],
+      },
+    },
+  },
+];
+
+export interface AgentContext {
+  transactions: Transaction[];
+  /** 内部形式CSVの生テキスト（任意）。import_csv_info が優先的に読む。 */
+  csvText?: string;
+}
+
+export interface ToolCallLog {
+  name: string;
+  arguments: Record<string, unknown>;
+  result: unknown;
+}
+
+/** 対象年の取引を取り出す。添付データ自体が無ければエラーを投げる（LLMへ返す）。 */
+function yearTransactions(ctx: AgentContext, year: number): Transaction[] {
+  if (ctx.transactions.length === 0) {
+    throw new Error(
+      "取引データが添付されていません。先に「取引・CSV取込」画面でCSVを取り込むか、サンプルデータを読み込んでください。",
+    );
+  }
+  return filterYear(ctx.transactions, year);
+}
+
+/** ツール実行（Python 版 AgentSession の各ツールに対応）。 */
+export function dispatchTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: AgentContext,
+): unknown {
+  try {
+    switch (name) {
+      case "import_csv_info": {
+        let tx = ctx.transactions;
+        let viaCsv = false;
+        if (ctx.csvText) {
+          tx = importCsvText(ctx.csvText);
+          viaCsv = true;
+        }
+        const byYear: Record<string, number> = {};
+        for (const t of tx) byYear[String(t.year)] = (byYear[String(t.year)] ?? 0) + 1;
+        return {
+          ok: true,
+          source: viaCsv ? "csvText" : "attachedTransactions",
+          count: tx.length,
+          years: Object.keys(byYear).map(Number).sort(),
+          byYear,
+        };
+      }
+      case "aggregate_year": {
+        const year = Number(args["year"]);
+        const tx = yearTransactions(ctx, year);
+        const b = aggregateIncome(tx);
+        const blue = blueDeduction(b.realEstateIncome, b.businessIncome);
+        return {
+          year,
+          business_revenue: b.businessRevenue,
+          business_expenses: b.businessExpenses,
+          business_income: b.businessIncome,
+          real_estate_revenue: b.realEstateRevenue,
+          real_estate_expenses: b.realEstateExpenses,
+          real_estate_income: b.realEstateIncome,
+          blue_deduction_real_estate: blue.realEstate,
+          blue_deduction_business: blue.business,
+          blue_deduction_total: blue.total,
+          business_income_after_blue: b.businessIncome - blue.business,
+          real_estate_income_after_blue: b.realEstateIncome - blue.realEstate,
+        };
+      }
+      case "consumption_tax": {
+        const year = Number(args["year"]);
+        const method = (typeof args["method"] === "string" ? args["method"] : "standard") as ConsumptionMethod;
+        const tx = yearTransactions(ctx, year);
+        const b = aggregateIncome(tx);
+        const rent = residentialRentTotal(tx);
+        const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
+        const inputTax = method === "standard" ? estimateInputTax(tx) : 0;
+        const r = consumptionTax({
+          taxableSalesIncl: taxable,
+          nontaxableSalesIncl: nontaxable,
+          inputTax,
+          method,
+        });
+        return {
+          year,
+          method: r.method,
+          taxable_sales_incl_tax: r.taxableSalesIncl,
+          nontaxable_sales_incl_tax: r.nontaxableSalesIncl,
+          output_tax: r.outputTax,
+          input_tax: r.inputTax,
+          payable: r.payable,
+          detail: r.detail,
+          note: "仕入税額は経費からの概算です（本則の場合）。正式には請求書等で確定してください。",
+        };
+      }
+      case "amendment_delta": {
+        const original = args["original"];
+        const corrected = args["corrected"];
+        if (typeof original !== "object" || original === null || typeof corrected !== "object" || corrected === null) {
+          throw new Error("original と corrected の両方（JSONオブジェクト）が必要です");
+        }
+        const d = amendmentDelta(
+          original as Record<string, unknown>,
+          corrected as Record<string, unknown>,
+        );
+        return { year: d.year, field_diffs: d.fieldDiffs, tax_delta: d.taxDelta };
+      }
+      default:
+        return { error: `未知のツールです: ${name}` };
+    }
+  } catch (e) {
+    // ツール側の例外はLLMへ返して判断させる（Python 版と同一方針）
+    return { error: `${e instanceof Error ? e.name : "Error"}: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}

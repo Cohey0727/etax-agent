@@ -1,0 +1,18 @@
+/**
+ * sample.ts — examples/ のサンプルデータ。
+ * ダッシュボードの既定データや修正申告サンプルとして使う。
+ * CSVは etax-agent/examples/sample_transactions.csv と同一内容。
+ */
+import type { Transaction } from "./types";
+import { importCsvText } from "./ledger";
+
+export const SAMPLE_CSV = "date,description,amount,account,category,income_type\n2024-01-10,AWS 利用料,-18000,PayPayカード,,business\n2024-01-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-01-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-02-05,電車（打合せ移動）,-12000,交通系IC,,business\n2024-02-10,AWS 利用料,-18000,PayPayカード,,business\n2024-02-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-02-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-03-10,AWS 利用料,-18000,PayPayカード,,business\n2024-03-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-03-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-03-28,開発費用（四半期分）請求,2850000,事業口座,売上高,business\n2024-04-05,電車（打合せ移動）,-12000,交通系IC,,business\n2024-04-10,AWS 利用料,-18000,PayPayカード,,business\n2024-04-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-04-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-05-10,AWS 利用料,-18000,PayPayカード,,business\n2024-05-15,外注費（業務委託）,-550000,事業口座,外注工賃,business\n2024-05-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-05-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-06-01,固定資産税（賃貸物件）,-96000,事業口座,租税公課,real_estate\n2024-06-05,電車（打合せ移動）,-12000,交通系IC,,business\n2024-06-10,AWS 利用料,-18000,PayPayカード,,business\n2024-06-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-06-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-06-28,開発費用（四半期分）請求,2850000,事業口座,売上高,business\n2024-07-10,AWS 利用料,-18000,PayPayカード,,business\n2024-07-20,技術書籍,-30000,PayPayカード,新聞図書費,business\n2024-07-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-07-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-08-05,電車（打合せ移動）,-12000,交通系IC,,business\n2024-08-10,AWS 利用料,-18000,PayPayカード,,business\n2024-08-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-08-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-09-03,賃貸物件 修繕費（水回り）,-85000,事業口座,修繕費,real_estate\n2024-09-10,AWS 利用料,-18000,PayPayカード,,business\n2024-09-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-09-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-09-28,開発費用（四半期分）請求,2850000,事業口座,売上高,business\n2024-10-05,電車（打合せ移動）,-12000,交通系IC,,business\n2024-10-10,AWS 利用料,-18000,PayPayカード,,business\n2024-10-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-10-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-11-10,AWS 利用料,-18000,PayPayカード,,business\n2024-11-12,Mac mini 購入,-131500,PayPayカード,,business\n2024-11-15,外注費（業務委託）,-550000,事業口座,外注工賃,business\n2024-11-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-11-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-12-05,電車（打合せ移動）,-12000,交通系IC,,business\n2024-12-10,AWS 利用料,-18000,PayPayカード,,business\n2024-12-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2024-12-27,賃貸管理費,-8000,事業口座,管理費,real_estate\n2024-12-28,開発費用（四半期分）請求,2850000,事業口座,売上高,business\n2025-01-25,家賃収入（足立区の自宅マンション）,147000,事業口座,家賃収入,real_estate\n2025-02-28,開発費用 請求,950000,事業口座,売上高,business\n";
+
+/** サンプルCSVを内部形式で読み込んだ取引リスト（2024年52件 + 2025年2件）。 */
+export function sampleTransactions(): Transaction[] {
+  return importCsvText(SAMPLE_CSV);
+}
+
+export const SAMPLE_ORIGINAL_2024: Record<string, unknown> = {"blue_deduction": 650000, "business_expenses": 1826500, "business_revenue": 13164000, "housing_loan_credit": 150000, "income_tax": 1480000, "real_estate_expenses": 0, "real_estate_revenue": 0, "year": 2024};
+
+export const SAMPLE_CORRECTED_2024: Record<string, unknown> = {"blue_deduction": 750000, "business_expenses": 1549500, "business_revenue": 11400000, "housing_loan_credit": 0, "income_tax": 1615000, "real_estate_expenses": 277000, "real_estate_revenue": 1764000, "year": 2024};

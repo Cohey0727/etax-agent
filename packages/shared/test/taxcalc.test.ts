@@ -1,0 +1,274 @@
+/**
+ * taxcalc.test.ts — Python 版 tests/run_tests.py の移植（bun test）。
+ * 検証する主な税務ルール:
+ *   (a) 簡易課税: 課税売上（税込） ¥15,000,000 → 納付税額 ¥681,818
+ *   (b) 2割特例 : 同上 → ¥272,727
+ *   (c) 青色申告特別控除: 不動産所得30万・事業所得500万 → 10万 + 65万 = 75万
+ *   (d) 本則課税: 住宅家賃（非課税）は課税売上から除外される
+ *   サンプル2024年分: 消費税3方式 本則 879,045 / 簡易 518,181 / 2割 207,272
+ *   修正申告差分: 税額 +135,000
+ */
+import { describe, expect, test } from "bun:test";
+import {
+  aggregateIncome,
+  amendmentDelta,
+  blueDeduction,
+  classifyTransactionRow,
+  computeCorrectedFigures,
+  consumptionTax,
+  estimateInputTax,
+  filterYear,
+  importCsvText,
+  residentialRentTotal,
+  sampleTransactions,
+  suggestCategory,
+  taxableSalesFromBreakdown,
+  SAMPLE_CSV,
+  SAMPLE_ORIGINAL_2024,
+} from "../src/index";
+
+describe("消費税の素計算", () => {
+  test("(a) 簡易課税 課税売上（税込）15,000,000 → 681,818", () => {
+    const r = consumptionTax({ taxableSalesIncl: 15_000_000, method: "simplified" });
+    expect(r.payable).toBe(681_818);
+  });
+
+  test("(a2) 売上税額は 1,363,636", () => {
+    const r = consumptionTax({ taxableSalesIncl: 15_000_000, method: "simplified" });
+    expect(r.outputTax).toBe(1_363_636);
+  });
+
+  test("(b) 2割特例 課税売上（税込）15,000,000 → 272,727", () => {
+    const r = consumptionTax({ taxableSalesIncl: 15_000_000, method: "special20" });
+    expect(r.payable).toBe(272_727);
+  });
+
+  test("本則: 1,363,636 − 100,000 = 1,263,636", () => {
+    const r = consumptionTax({
+      taxableSalesIncl: 15_000_000,
+      inputTax: 100_000,
+      method: "standard",
+    });
+    expect(r.payable).toBe(1_263_636);
+  });
+});
+
+describe("青色申告特別控除の振り分け", () => {
+  test("(c) 不動産30万・事業500万 → 100,000 + 650,000 = 750,000", () => {
+    const blue = blueDeduction(300_000, 5_000_000);
+    expect(blue.realEstate).toBe(100_000);
+    expect(blue.business).toBe(650_000);
+    expect(blue.total).toBe(750_000);
+  });
+
+  test("控除は所得が上限（不動産5万・事業0）", () => {
+    const blue = blueDeduction(50_000, -10_000);
+    expect(blue.realEstate).toBe(50_000);
+    expect(blue.business).toBe(0);
+  });
+
+  // 順序依存ケース（Python版テストと同一）: 不動産10万 → 事業65万、合計最大75万
+  test("順序(i) 不動産30万・事業60万 → 100,000 + 600,000 = 700,000", () => {
+    const blue = blueDeduction(300_000, 600_000);
+    expect(blue.realEstate).toBe(100_000);
+    expect(blue.business).toBe(600_000);
+    expect(blue.total).toBe(700_000);
+  });
+
+  test("順序(ii) 不動産5万・事業500万 → 50,000 + 650,000 = 700,000", () => {
+    const blue = blueDeduction(50_000, 5_000_000);
+    expect(blue.realEstate).toBe(50_000);
+    expect(blue.business).toBe(650_000);
+    expect(blue.total).toBe(700_000);
+  });
+
+  test("順序(iii) 不動産30万・事業70万 → 合計ちょうど 750,000", () => {
+    const blue = blueDeduction(300_000, 700_000);
+    expect(blue.realEstate).toBe(100_000);
+    expect(blue.business).toBe(650_000);
+    expect(blue.total).toBe(750_000);
+  });
+
+  test("順序(iv) 赤字の区分は控除ゼロ（不動産赤字・事業黒字）", () => {
+    const blue = blueDeduction(-100_000, 800_000);
+    expect(blue.realEstate).toBe(0);
+    expect(blue.business).toBe(650_000);
+  });
+
+  test("順序(iv) 両区分赤字 → 合計 0", () => {
+    expect(blueDeduction(-1, -1).total).toBe(0);
+  });
+});
+
+describe("サンプルCSV（2024年分）", () => {
+  const tx2024 = filterYear(sampleTransactions(), 2024);
+  const b = aggregateIncome(tx2024);
+
+  test("(d) 家賃収入 1,764,000 が非課税売上・課税売上は事業収入のみ", () => {
+    const rent = residentialRentTotal(tx2024);
+    const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
+    expect(nontaxable).toBe(1_764_000);
+    expect(taxable).toBe(11_400_000);
+    const r = consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, method: "standard", inputTax: estimateInputTax(tx2024) });
+    expect(r.outputTax).toBe(1_036_363);
+  });
+
+  test("集計の基本（事業所得・不動産所得）", () => {
+    expect(b.businessIncome).toBe(9_850_500);
+    expect(b.realEstateIncome).toBe(1_487_000);
+    expect(blueDeduction(b.realEstateIncome, b.businessIncome).total).toBe(750_000);
+  });
+
+  test("消費税3方式のサンプル値（本則 879,045 / 簡易 518,181 / 2割 207,272）", () => {
+    const rent = residentialRentTotal(tx2024);
+    const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
+    const inputTax = estimateInputTax(tx2024);
+    expect(inputTax).toBe(157_318);
+    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "standard" }).payable).toBe(879_045);
+    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "simplified" }).payable).toBe(518_181);
+    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "special20" }).payable).toBe(207_272);
+  });
+
+  test("内部形式CSVの再パースでも件数が一致する", () => {
+    expect(importCsvText(SAMPLE_CSV)).toHaveLength(54);
+  });
+});
+
+describe("ルールによる科目推定", () => {
+  test("摘要『AWS 利用料』→ 通信費", () => {
+    expect(suggestCategory("AWS 利用料")).toBe("通信費");
+  });
+  test("摘要『Mac mini 購入』→ 消耗品費", () => {
+    expect(suggestCategory("Mac mini 購入")).toBe("消耗品費");
+  });
+});
+
+describe("行の分類（classifyTransactionRow）", () => {
+  test("明示の勘定科目・収入区分が推定より優先される（技術書籍の行）", () => {
+    const r = classifyTransactionRow({
+      description: "技術書籍",
+      category: "新聞図書費",
+      incomeType: "business",
+    });
+    expect(r.category).toBe("新聞図書費");
+    expect(r.income_type).toBe("business");
+  });
+
+  test("明示の勘定科目はキーワード推定より優先される", () => {
+    const r = classifyTransactionRow({
+      description: "AWS 利用料",
+      category: "新聞図書費",
+      incomeType: "business",
+    });
+    expect(r.category).toBe("新聞図書費");
+  });
+
+  test("勘定科目が空欄で推定できなければ未分類、収入区分の列が無ければ区分推定で other", () => {
+    const r = classifyTransactionRow({ description: "技術書籍", category: "", incomeType: null });
+    expect(r.category).toBe("未分類");
+    expect(r.income_type).toBe("other");
+  });
+
+  test("収入区分の列自体が無い場合は区分推定（家賃まわりは不動産所得）", () => {
+    const r = classifyTransactionRow({ description: "賃貸管理費", category: null, incomeType: null });
+    expect(r.category).toBe("管理費");
+    expect(r.income_type).toBe("real_estate");
+  });
+
+  test("収入区分が空欄なら other、不正な値なら Error", () => {
+    expect(
+      classifyTransactionRow({ description: "AWS 利用料", category: "", incomeType: "" })
+        .income_type,
+    ).toBe("other");
+    expect(() =>
+      classifyTransactionRow({ description: "x", category: "", incomeType: "biz" }),
+    ).toThrow("income_type が不正です");
+  });
+
+  test("取込: サンプルCSVの技術書籍の行は 新聞図書費 / business になる", () => {
+    const tx = importCsvText(SAMPLE_CSV).find((t) => t.date === "2024-07-20");
+    expect(tx?.category).toBe("新聞図書費");
+    expect(tx?.income_type).toBe("business");
+  });
+});
+
+describe("修正申告の差分", () => {
+  const orig = {
+    year: 2024,
+    business_revenue: 13_164_000,
+    real_estate_revenue: 0,
+    housing_loan_credit: 150_000,
+    income_tax: 1_480_000,
+  };
+  const corr = {
+    year: 2024,
+    business_revenue: 11_400_000,
+    real_estate_revenue: 1_764_000,
+    housing_loan_credit: 0,
+    income_tax: 1_615_000,
+  };
+
+  test("家賃収入 +1,764,000", () => {
+    const d = amendmentDelta(orig, corr);
+    expect(d.fieldDiffs["real_estate_revenue"]?.diff).toBe(1_764_000);
+  });
+
+  test("税額 +135,000", () => {
+    const d = amendmentDelta(orig, corr);
+    expect(d.taxDelta).toBe(135_000);
+  });
+});
+
+describe("修正パイプライン（computeCorrectedFigures）", () => {
+  const tx2024 = filterYear(sampleTransactions(), 2024);
+  const figs = computeCorrectedFigures(tx2024, 2024);
+
+  test("パイプライン: 事業収入 11,400,000", () => {
+    expect(figs.business_revenue).toBe(11_400_000);
+  });
+
+  test("パイプライン: 不動産収入 1,764,000", () => {
+    expect(figs.real_estate_revenue).toBe(1_764_000);
+  });
+
+  test("パイプライン: 青色控除 750,000", () => {
+    expect(figs.blue_deduction).toBe(750_000);
+  });
+
+  test("パイプライン: 課税売上 11,400,000・非課税 1,764,000", () => {
+    expect(figs.taxable_sales).toBe(11_400_000);
+    expect(figs.nontaxable_sales).toBe(1_764_000);
+  });
+
+  test("パイプライン: 消費税 本則 879,045", () => {
+    expect(figs.consumption_tax_standard).toBe(879_045);
+  });
+
+  test("パイプライン: 消費税 簡易課税 518,181", () => {
+    expect(figs.consumption_tax_simplified).toBe(518_181);
+  });
+
+  test("パイプライン: 消費税 2割特例 207,272", () => {
+    expect(figs.consumption_tax_special20).toBe(207_272);
+  });
+
+  test("パイプライン: 控除後所得 事業 9,200,500・不動産 1,387,000", () => {
+    expect(figs._detail.business_income).toBe(9_200_500);
+    expect(figs._detail.real_estate_income).toBe(1_387_000);
+  });
+
+  test("パイプライン差分: 事業収入 -1,764,000", () => {
+    const d = amendmentDelta(SAMPLE_ORIGINAL_2024, figs);
+    expect(d.fieldDiffs["business_revenue"]?.diff).toBe(-1_764_000);
+  });
+
+  test("パイプライン差分: 青色控除 +100,000", () => {
+    const d = amendmentDelta(SAMPLE_ORIGINAL_2024, figs);
+    expect(d.fieldDiffs["blue_deduction"]?.diff).toBe(100_000);
+  });
+
+  test("パイプライン: 取引から計算できない項目（income_tax 等）は含まない（引き継ぎ前提）", () => {
+    expect("income_tax" in figs).toBe(false);
+    expect("housing_loan_credit" in figs).toBe(false);
+  });
+});

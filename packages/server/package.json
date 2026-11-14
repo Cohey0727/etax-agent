@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "@etax/shared": "workspace:*",
+    "@hono/zod-openapi": "^1.6.3",
+    "drizzle-orm": "^0.44.0",
+    "hono": "^4.6.0",
+    "postgres": "^3.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0"
+  },
+  "name": "@etax/server",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}
