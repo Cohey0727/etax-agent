@@ -20,6 +20,7 @@ import {
   deleteLedgerTransaction,
   fetchLedgerTransactions,
   ledgerRowToTransaction,
+  recordClassificationFeedback,
   updateLedgerTransaction,
 } from "@utils/api";
 import { formatYen } from "@utils/format";
@@ -135,6 +136,10 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions }: LedgerPa
       const fresh = rows.map((r) => (r.id === row.id ? updated : r));
       applyRows(fresh);
       syncParent(fresh);
+      // 科目を直したら学習履歴にも記録し、次回から同じ摘要は直した科目で判定されるようにする。
+      if (updated.category !== row.category && updated.category !== "未分類") {
+        void recordClassificationFeedback(updated.description, updated.category);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存に失敗しました");
     } finally {
@@ -184,6 +189,10 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions }: LedgerPa
       applyRows(fresh);
       syncParent(fresh);
       setDraft(emptyDraft(year));
+      // 手入力で科目を選んだ行も学習履歴に記録する（次回の判定で優先される）。
+      if (created.category !== "未分類") {
+        void recordClassificationFeedback(created.description, created.category);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "追加に失敗しました");
     } finally {
