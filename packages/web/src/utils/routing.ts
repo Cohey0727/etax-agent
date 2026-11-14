@@ -1,8 +1,9 @@
 import { AppView } from "@types";
 
 /**
- * 画面とURLパスの対応。年度を持つ画面は /<slug>/<年度>、持たない画面は /<slug>。
- * 例: 帳簿 = /accounts/2024、確定申告 = /tax/2024、設定 = /settings。
+ * 画面とURLパスの対応。年度が根元で、画面はその下にぶら下がる。
+ * 例: ダッシュボード = /2024/dashboard、帳簿 = /2024/accounts、確定申告 = /2024/tax。
+ * 設定だけは年度から独立して /settings。
  */
 const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Dashboard]: "dashboard",
@@ -15,31 +16,25 @@ const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Agent]: "agent",
 };
 
-const YEAR_VIEWS: ReadonlySet<AppView> = new Set([
-  AppView.Dashboard,
-  AppView.Ledger,
-  AppView.Filing,
-  AppView.Amend,
-]);
-
 /** 画面と年度からURLパスを作る。 */
 export const pathForView = (view: AppView, year: number): string =>
-  YEAR_VIEWS.has(view) ? `/${VIEW_SLUGS[view]}/${year}` : `/${VIEW_SLUGS[view]}`;
+  view === AppView.Settings ? "/settings" : `/${year}/${VIEW_SLUGS[view]}`;
 
-/** URLパスから画面と年度を読む。未知のパスは null。 */
+/** URLパスから画面と年度を読む。未知のパスは null。/<年度> だけならその年のダッシュボード。 */
 export const parsePath = (
   pathname: string,
 ): { view: AppView; year: number | null } | null => {
   const parts = pathname.split("/").filter((part) => part.length > 0);
   if (parts.length === 0) return null;
+  if (parts[0] === VIEW_SLUGS[AppView.Settings]) {
+    return { view: AppView.Settings, year: null };
+  }
+  const year = Number(parts[0]);
+  if (!Number.isInteger(year) || year <= 0) return null;
+  if (parts.length === 1) return { view: AppView.Dashboard, year };
   const entry = (Object.entries(VIEW_SLUGS) as [AppView, string][]).find(
-    ([, slug]) => slug === parts[0],
+    ([, slug]) => slug === parts[1],
   );
   if (!entry) return null;
-  const [view] = entry;
-  const parsedYear = parts[1] ? Number(parts[1]) : Number.NaN;
-  return {
-    view,
-    year: Number.isInteger(parsedYear) && parsedYear > 0 ? parsedYear : null,
-  };
+  return { view: entry[0], year };
 };
