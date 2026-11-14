@@ -1,138 +1,393 @@
-import { amendmentDelta, AmendmentDelta, SAMPLE_CORRECTED_2024, SAMPLE_ORIGINAL_2024 } from "@etax/shared";
-import { useState } from "react";
-import { Button, Card, Col, Row, Table, TableCell, TableHeaderCell, Text, Textarea } from "@components/atoms";
-import { AlertBox } from "@components/molecules";
+import {
+  amendmentDelta,
+  computeCorrectedFigures,
+  filterYear,
+  SAMPLE_ORIGINAL_2024,
+  Transaction,
+} from "@etax/shared";
+import { useMemo, useState } from "react";
+import { Button, Card, Col, Input, Row, Table, TableCell, TableHeaderCell, Text } from "@components/atoms";
 import { formatNumber } from "@utils";
 import styles from "./AmendDiffPanel.css";
 
-export interface AmendDiffPanelProps {}
+/** フォームで扱う金額項目（所得税額だけは未入力があり得るため別扱い）。 */
+type FigureKey =
+  | "business_revenue"
+  | "business_expenses"
+  | "real_estate_revenue"
+  | "real_estate_expenses"
+  | "blue_deduction"
+  | "housing_loan_credit";
 
-export const AmendDiffPanel = ({}: AmendDiffPanelProps) => {
-  const [originalText, setOriginalText] = useState(prettyJson(SAMPLE_ORIGINAL_2024));
-  const [correctedText, setCorrectedText] = useState(prettyJson(SAMPLE_CORRECTED_2024));
-  const [delta, setDelta] = useState<AmendmentDelta | null>(null);
-  const [error, setError] = useState<string | null>(null);
+interface FigureForm {
+  business_revenue: number;
+  business_expenses: number;
+  real_estate_revenue: number;
+  real_estate_expenses: number;
+  blue_deduction: number;
+  housing_loan_credit: number;
+  /** 所得税額。null は未入力（未計算）。 */
+  income_tax: number | null;
+}
 
-  const run = () => {
-    setError(null);
-    try {
-      const original = JSON.parse(originalText) as Record<string, unknown>;
-      const corrected = JSON.parse(correctedText) as Record<string, unknown>;
-      setDelta(amendmentDelta(original, corrected));
-    } catch (e) {
-      setError(`JSONのパースに失敗しました: ${e instanceof Error ? e.message : String(e)}`);
-      setDelta(null);
-    }
+const FIELD_SECTIONS: readonly {
+  title: string;
+  fields: readonly { key: FigureKey; label: string }[];
+}[] = [
+  {
+    title: "収入・経費",
+    fields: [
+      { key: "business_revenue", label: "事業収入" },
+      { key: "business_expenses", label: "事業経費" },
+      { key: "real_estate_revenue", label: "不動産収入" },
+      { key: "real_estate_expenses", label: "不動産経費" },
+    ],
+  },
+  {
+    title: "控除",
+    fields: [
+      { key: "blue_deduction", label: "青色申告特別控除" },
+      { key: "housing_loan_credit", label: "住宅ローン控除" },
+    ],
+  },
+];
+
+export interface AmendDiffPanelProps {
+  transactions: Transaction[];
+  year: number;
+}
+
+export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
+  const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
+  const computed = useMemo(
+    () => computeCorrectedFigures(yearTransactions, year),
+    [yearTransactions, year],
+  );
+  const [original, setOriginal] = useState<FigureForm>(() => loadOriginal(year));
+  const [correctedEdits, setCorrectedEdits] = useState<Partial<Record<FigureKey, number>>>({});
+  const [correctedTax, setCorrectedTax] = useState<number | null>(null);
+  const [diffOnly, setDiffOnly] = useState(true);
+
+  // 修正後は取引データからの自動計算が既定値。欄を書き換えた項目だけ上書きされる。
+  const corrected: FigureForm = {
+    business_revenue: correctedEdits.business_revenue ?? computed.business_revenue,
+    business_expenses: correctedEdits.business_expenses ?? computed.business_expenses,
+    real_estate_revenue: correctedEdits.real_estate_revenue ?? computed.real_estate_revenue,
+    real_estate_expenses: correctedEdits.real_estate_expenses ?? computed.real_estate_expenses,
+    blue_deduction: correctedEdits.blue_deduction ?? computed.blue_deduction,
+    housing_loan_credit: correctedEdits.housing_loan_credit ?? 0,
+    income_tax: correctedTax,
   };
+
+  const delta = amendmentDelta(toRecord(original, year), toRecord(corrected, year), year);
+  const changedCount = Object.keys(delta.fieldDiffs).length;
+
+  const updateOriginal = (key: FigureKey, value: number) => {
+    const next = { ...original, [key]: value };
+    setOriginal(next);
+    saveOriginal(year, next);
+  };
+  const updateOriginalTax = (value: number | null) => {
+    const next = { ...original, income_tax: value };
+    setOriginal(next);
+    saveOriginal(year, next);
+  };
+
+  const derivedRows: readonly { label: string; original: number; corrected: number }[] = [
+    {
+      label: "事業所得（収入−経費）",
+      original: original.business_revenue - original.business_expenses,
+      corrected: corrected.business_revenue - corrected.business_expenses,
+    },
+    {
+      label: "不動産所得（収入−経費）",
+      original: original.real_estate_revenue - original.real_estate_expenses,
+      corrected: corrected.real_estate_revenue - corrected.real_estate_expenses,
+    },
+    {
+      label: "所得合計（青色控除後）",
+      original:
+        original.business_revenue -
+        original.business_expenses +
+        (original.real_estate_revenue - original.real_estate_expenses) -
+        original.blue_deduction,
+      corrected:
+        corrected.business_revenue -
+        corrected.business_expenses +
+        (corrected.real_estate_revenue - corrected.real_estate_expenses) -
+        corrected.blue_deduction,
+    },
+  ];
 
   return (
     <Col gap="md">
       <Card>
-        <Col gap="sm">
-          <Text variant="sectionTitle">修正申告 — 申告済み vs 修正後の差分</Text>
-          <Text variant="muted">
-            申告書の主要項目をフラットなJSONで貼り付けてください。初期状態はサンプル
-            （家賃収入を事業収入に含めて申告し住宅ローン控除を適用していた状態 →
-            不動産所得へ切り分け）です。
-          </Text>
-          <Row gap="md" align="start">
-            <Col gap="sm" className={styles.flexChild}>
-              <Text variant="statLabel">申告済み（original）</Text>
-              <Textarea
-                variant="code"
-                value={originalText}
-                onChange={(e) => setOriginalText(e.target.value)}
-                spellCheck={false}
-              />
-            </Col>
-            <Col gap="sm" className={styles.flexChild}>
-              <Text variant="statLabel">修正後（corrected）</Text>
-              <Textarea
-                variant="code"
-                value={correctedText}
-                onChange={(e) => setCorrectedText(e.target.value)}
-                spellCheck={false}
-              />
-            </Col>
-          </Row>
-          <Row gap="sm">
-            <Button onClick={run}>差分を計算する</Button>
-          </Row>
-        </Col>
-      </Card>
-
-      {error && <AlertBox variant="error">{error}</AlertBox>}
-
-      {delta && (
-        <Card>
+        <Col gap="md">
           <Col gap="sm">
-            <Text variant="sectionTitle">{delta.year}年分 差分</Text>
-            {Object.keys(delta.fieldDiffs).length === 0 ? (
-              <Text>差分はありません。</Text>
-            ) : (
-              <Table>
-                <thead>
-                  <tr>
-                    <TableHeaderCell>項目</TableHeaderCell>
-                    <TableHeaderCell align="right">申告済み</TableHeaderCell>
-                    <TableHeaderCell align="right">修正後</TableHeaderCell>
-                    <TableHeaderCell align="right">差分</TableHeaderCell>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(delta.fieldDiffs).map(([field, v]) => (
-                    <tr key={field}>
-                      <TableCell>{field}</TableCell>
-                      <TableCell align="right">{formatValue(v.original)}</TableCell>
-                      <TableCell align="right">{formatValue(v.corrected)}</TableCell>
+            <Text variant="sectionTitle">{year}年分 修正申告 — 申告済み vs 修正後</Text>
+            <Text variant="muted">
+              申告済みの数字を左の欄に入力してください。修正後は現在の取引データから自動計算されます
+              （違う場合はそのまま書き換えられます）。住宅ローン控除が対象外の年は、修正後を
+              0 のままにしてください。申告済みの入力はこの端末に保存されます。
+            </Text>
+          </Col>
+
+          {delta.taxDelta !== null ? (
+            <Text variant="sectionTitle">
+              税額の増減: {formatDiff(delta.taxDelta)}円（
+              {delta.taxDelta > 0 ? "追加で納める方向" : delta.taxDelta < 0 ? "還付の方向" : "増減なし"}
+              ）・ 差分のある項目 {changedCount}件
+            </Text>
+          ) : (
+            <Text variant="muted">
+              所得税額（修正後）を入力すると、税額の増減がここに出ます。・ 差分のある項目{" "}
+              {changedCount}件
+            </Text>
+          )}
+
+          <Row gap="sm">
+            <Button variant={diffOnly ? "tab" : "tabActive"} size="sm" onClick={() => setDiffOnly(false)}>
+              すべて表示
+            </Button>
+            <Button variant={diffOnly ? "tabActive" : "tab"} size="sm" onClick={() => setDiffOnly(true)}>
+              差分のみ
+            </Button>
+          </Row>
+
+          <Table>
+            <thead>
+              <tr>
+                <TableHeaderCell>項目</TableHeaderCell>
+                <TableHeaderCell align="right">申告済み（入力）</TableHeaderCell>
+                <TableHeaderCell align="right">修正後（自動計算）</TableHeaderCell>
+                <TableHeaderCell align="right">差分</TableHeaderCell>
+              </tr>
+            </thead>
+            <tbody>
+              {FIELD_SECTIONS.map((section) => {
+                const rows = section.fields
+                  .map((field) => ({
+                    ...field,
+                    originalValue: original[field.key],
+                    correctedValue: corrected[field.key],
+                    diff: corrected[field.key] - original[field.key],
+                  }))
+                  .filter((row) => !diffOnly || row.diff !== 0);
+                if (rows.length === 0) return null;
+                return [
+                  <tr key={`section-${section.title}`}>
+                    <TableCell colSpan={4} className={styles.sectionCell}>
+                      {section.title}
+                    </TableCell>
+                  </tr>,
+                  ...rows.map((row) => (
+                    <tr key={row.key} className={row.diff !== 0 ? styles.rowChanged : undefined}>
+                      <TableCell>{row.label}</TableCell>
+                      <TableCell align="right">
+                        <Input
+                          className={styles.numberInput}
+                          type="number"
+                          value={row.originalValue}
+                          onChange={(e) => updateOriginal(row.key, toAmount(e.target.value))}
+                          aria-label={`${row.label}（申告済み）`}
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Input
+                          className={styles.numberInput}
+                          type="number"
+                          value={row.correctedValue}
+                          onChange={(e) =>
+                            setCorrectedEdits((edits) => ({
+                              ...edits,
+                              [row.key]: toAmount(e.target.value),
+                            }))
+                          }
+                          aria-label={`${row.label}（修正後）`}
+                        />
+                      </TableCell>
                       <TableCell
                         align="right"
-                        tone={
-                          v.diff !== null && v.diff > 0
-                            ? "negative"
-                            : v.diff !== null && v.diff < 0
-                              ? "positive"
-                              : "default"
-                        }
+                        tone={row.diff > 0 ? "negative" : row.diff < 0 ? "positive" : "default"}
                       >
-                        {formatDiff(v.diff)}
+                        {formatDiff(row.diff)}
                       </TableCell>
                     </tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
-            {delta.taxDelta !== null ? (
-              <Text>
-                <strong>税額の増減: {formatDiff(delta.taxDelta)}円</strong>（
-                {delta.taxDelta > 0
-                  ? "追加納付"
-                  : delta.taxDelta < 0
-                    ? "還付方向"
-                    : "増減なし"}
-                ）
-              </Text>
-            ) : (
-              <Text variant="muted">
-                税額フィールド（income_tax 等）が無いため、税額の増減は算出できません。
-              </Text>
-            )}
-          </Col>
-        </Card>
-      )}
+                  )),
+                ];
+              })}
+              {(() => {
+                const rows = derivedRows.filter(
+                  (row) => !diffOnly || row.corrected - row.original !== 0,
+                );
+                if (rows.length === 0) return null;
+                return [
+                  <tr key="section-income">
+                    <TableCell colSpan={4} className={styles.sectionCell}>
+                      所得（自動計算）
+                    </TableCell>
+                  </tr>,
+                  ...rows.map((row) => {
+                    const diff = row.corrected - row.original;
+                    return (
+                      <tr key={row.label} className={diff !== 0 ? styles.rowChanged : undefined}>
+                        <TableCell>{row.label}</TableCell>
+                        <TableCell align="right">{formatNumber(row.original)}</TableCell>
+                        <TableCell align="right">{formatNumber(row.corrected)}</TableCell>
+                        <TableCell
+                          align="right"
+                          tone={diff > 0 ? "negative" : diff < 0 ? "positive" : "default"}
+                        >
+                          {formatDiff(diff)}
+                        </TableCell>
+                      </tr>
+                    );
+                  }),
+                ];
+              })()}
+              <tr>
+                <TableCell colSpan={4} className={styles.sectionCell}>
+                  税額
+                </TableCell>
+              </tr>
+              <tr
+                className={
+                  original.income_tax !== null &&
+                  corrected.income_tax !== null &&
+                  corrected.income_tax - original.income_tax !== 0
+                    ? styles.rowChanged
+                    : undefined
+                }
+              >
+                <TableCell>所得税額</TableCell>
+                <TableCell align="right">
+                  <Input
+                    className={styles.numberInput}
+                    type="number"
+                    value={original.income_tax ?? ""}
+                    onChange={(e) =>
+                      updateOriginalTax(e.target.value === "" ? null : toAmount(e.target.value))
+                    }
+                    aria-label="所得税額（申告済み）"
+                  />
+                </TableCell>
+                <TableCell align="right">
+                  <Input
+                    className={styles.numberInput}
+                    type="number"
+                    value={corrected.income_tax ?? ""}
+                    placeholder="未計算"
+                    onChange={(e) =>
+                      setCorrectedTax(e.target.value === "" ? null : toAmount(e.target.value))
+                    }
+                    aria-label="所得税額（修正後）"
+                  />
+                </TableCell>
+                <TableCell
+                  align="right"
+                  tone={
+                    delta.taxDelta !== null && delta.taxDelta > 0
+                      ? "negative"
+                      : delta.taxDelta !== null && delta.taxDelta < 0
+                        ? "positive"
+                        : "default"
+                  }
+                >
+                  {delta.taxDelta === null ? "—" : formatDiff(delta.taxDelta)}
+                </TableCell>
+              </tr>
+            </tbody>
+          </Table>
+
+          <Text variant="muted">
+            消費税（修正後の取引から計算・参考）: 本則 {formatNumber(computed.consumption_tax_standard)}
+            円 / 簡易課税 {formatNumber(computed.consumption_tax_simplified)}円 / 2割特例{" "}
+            {formatNumber(computed.consumption_tax_special20)}円
+          </Text>
+        </Col>
+      </Card>
     </Col>
   );
 };
 
-function prettyJson(o: Record<string, unknown>): string {
-  return JSON.stringify(o, null, 2);
+function toRecord(form: FigureForm, year: number): Record<string, unknown> {
+  const record: Record<string, unknown> = {
+    year,
+    business_revenue: form.business_revenue,
+    business_expenses: form.business_expenses,
+    real_estate_revenue: form.real_estate_revenue,
+    real_estate_expenses: form.real_estate_expenses,
+    blue_deduction: form.blue_deduction,
+    housing_loan_credit: form.housing_loan_credit,
+  };
+  if (form.income_tax !== null) record.income_tax = form.income_tax;
+  return record;
 }
 
-function formatValue(v: unknown): string {
-  return typeof v === "number" ? formatNumber(v) : v === null || v === undefined ? "—" : String(v);
+function toAmount(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
 }
 
-function formatDiff(d: number | null): string {
-  if (d === null) return "—";
+function storageKey(year: number): string {
+  return `etax-amend-original-${year}`;
+}
+
+function num(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
+}
+
+function loadOriginal(year: number): FigureForm {
+  try {
+    const raw = localStorage.getItem(storageKey(year));
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      return {
+        business_revenue: num(parsed.business_revenue),
+        business_expenses: num(parsed.business_expenses),
+        real_estate_revenue: num(parsed.real_estate_revenue),
+        real_estate_expenses: num(parsed.real_estate_expenses),
+        blue_deduction: num(parsed.blue_deduction),
+        housing_loan_credit: num(parsed.housing_loan_credit),
+        income_tax:
+          typeof parsed.income_tax === "number" && Number.isFinite(parsed.income_tax)
+            ? Math.trunc(parsed.income_tax)
+            : null,
+      };
+    }
+  } catch {
+    // 保存値が読めない場合は初期値にフォールバックする。
+  }
+  if (year === 2024) {
+    return {
+      business_revenue: num(SAMPLE_ORIGINAL_2024.business_revenue),
+      business_expenses: num(SAMPLE_ORIGINAL_2024.business_expenses),
+      real_estate_revenue: num(SAMPLE_ORIGINAL_2024.real_estate_revenue),
+      real_estate_expenses: num(SAMPLE_ORIGINAL_2024.real_estate_expenses),
+      blue_deduction: num(SAMPLE_ORIGINAL_2024.blue_deduction),
+      housing_loan_credit: num(SAMPLE_ORIGINAL_2024.housing_loan_credit),
+      income_tax: num(SAMPLE_ORIGINAL_2024.income_tax),
+    };
+  }
+  return {
+    business_revenue: 0,
+    business_expenses: 0,
+    real_estate_revenue: 0,
+    real_estate_expenses: 0,
+    blue_deduction: 0,
+    housing_loan_credit: 0,
+    income_tax: null,
+  };
+}
+
+function saveOriginal(year: number, form: FigureForm): void {
+  try {
+    localStorage.setItem(storageKey(year), JSON.stringify(form));
+  } catch {
+    // 保存できない環境ではそのまま編集を続ける。
+  }
+}
+
+function formatDiff(d: number): string {
   return `${d > 0 ? "+" : ""}${formatNumber(d)}`;
 }

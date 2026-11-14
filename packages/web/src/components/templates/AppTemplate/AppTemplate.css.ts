@@ -24,21 +24,24 @@ const bob = keyframes({
 const panelTransition = `width ${theme.animation.durationSlow} ${theme.animation.springSoft}`;
 
 const styles = {
+  // アプリシェル: 画面全体を 100dvh に固定し、スクロールは main だけが担う。
+  // サイドバー/パネルは sticky に頼らず、シェルの高さいっぱいに伸びて自前で
+  // スクロールする（overflow: hidden な祖先があると sticky は効かないため）。
   root: style({
     display: "flex",
     flexDirection: "column",
-    minHeight: "100vh",
-    paddingBottom: theme.component.actionBarHeight,
+    height: "100dvh",
+    overflow: "hidden",
   }),
   shell: style({
     flex: 1,
+    minHeight: 0,
     "@media": {
       "(max-width: 900px)": { flexDirection: "column" },
     },
   }),
   // 左サイドバー。レイアウトを占有し、幅で開閉する（内側は固定幅で潰れない）。
-  // alignSelf: stretch で行の高さいっぱいに伸ばし、内側の sticky を効かせる
-  // （伸ばさないと親の高さ=内側の高さになり、一緒にスクロールしてしまう）。
+  // alignSelf: stretch で行の高さいっぱいに伸ばす。
   sidebar: style({
     width: theme.component.sidebarWidth,
     flexShrink: 0,
@@ -60,9 +63,8 @@ const styles = {
     flexDirection: "column",
     gap: theme.space.lg,
     width: theme.component.sidebarWidth,
-    height: "100vh",
-    position: "sticky",
-    top: 0,
+    height: "100%",
+    overflowY: "auto",
     padding: `${theme.space.lg} ${theme.space.md}`,
     background: theme.color.surface,
     borderRight: `1px solid ${theme.color.border}`,
@@ -71,7 +73,7 @@ const styles = {
       "(max-width: 900px)": {
         width: "100%",
         height: "auto",
-        position: "static",
+        overflowY: "visible",
         borderRight: "none",
         borderBottom: `1px solid ${theme.color.border}`,
       },
@@ -102,12 +104,17 @@ const styles = {
     borderRadius: theme.borderRadius.md,
     padding: `${theme.space.sm} ${theme.space.md}`,
   }),
+  // 本体はここだけがスクロールする。
   main: style({
     flex: 1,
     minWidth: 0,
+    minHeight: 0,
+    alignSelf: "stretch",
+    overflowY: "auto",
     padding: `${theme.space.lg} ${theme.space.xl} ${theme.space.xxl}`,
     "@media": {
       "(max-width: 900px)": {
+        width: "100%",
         padding: `${theme.space.md} ${theme.space.md} ${theme.space.xl}`,
       },
     },
@@ -147,9 +154,7 @@ const styles = {
     flexDirection: "column",
     gap: theme.space.md,
     width: theme.component.agentPanelWidth,
-    height: "100vh",
-    position: "sticky",
-    top: 0,
+    height: "100%",
     padding: theme.space.md,
     background: theme.color.surface,
     borderLeft: `1px solid ${theme.color.border}`,
@@ -158,7 +163,6 @@ const styles = {
       "(max-width: 900px)": {
         width: "100%",
         height: "auto",
-        position: "static",
         borderLeft: "none",
         borderTop: `1px solid ${theme.color.border}`,
       },
@@ -170,16 +174,13 @@ const styles = {
     minHeight: 0,
   }),
   // 画面下部の細いアクションバー（VS Code のステータスバー相当）。
+  // fixed ではなくシェルの一部として置く（root が 100dvh のため最下部に残る）。
   // 左右パネルの開閉トグルを置く。
   actionBar: style({
-    position: "fixed",
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flexShrink: 0,
     height: theme.component.actionBarHeight,
     background: theme.color.surface,
     borderTop: `1px solid ${theme.color.border}`,
-    zIndex: theme.zIndex.actionBar,
     display: "flex",
     alignItems: "center",
     padding: `0 ${theme.space.md}`,

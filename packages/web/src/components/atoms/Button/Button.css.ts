@@ -87,9 +87,11 @@ const styles = {
       },
     },
     // サイドバーのナビ。アイコン+ラベルを左寄せで並べ、選択中は淡いアクセント地に色字。
+    // base の justifyContent: center が残ると中央寄せになるため、明示的に上書きする。
     nav: {
       display: "flex",
       alignItems: "center",
+      justifyContent: "flex-start",
       gap: "10px",
       width: "100%",
       background: "transparent",
@@ -110,6 +112,7 @@ const styles = {
     navActive: {
       display: "flex",
       alignItems: "center",
+      justifyContent: "flex-start",
       gap: "10px",
       width: "100%",
       background: theme.color.accentSoft,
