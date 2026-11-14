@@ -7,11 +7,57 @@ services:
       POSTGRES_PASSWORD: etax
       POSTGRES_DB: etaxagent
     ports:
+      # ホスト側は 5433（5432 は queryfi-v2-postgres が 127.0.0.1 で使用中）。
+      # コンテナ間通信では db:5432 のまま使う。
       - "127.0.0.1:5433:5432"
     volumes:
       # Postgres 18 の公式イメージはデータ配置が /var/lib/postgresql 配下に
       # 変わったため、ボリュームは /data ではなくこちらへマウントする。
       - etax-pgdata:/var/lib/postgresql
 
+  # ファイルサーバー（S3互換オブジェクトストレージ）。
+  # 領収書画像などを、署名付きURLでブラウザから直接アップロードするために使う。
+  # 設定ファイル garage.toml は秘密（rpc_secret / admin_token）を含むため
+  # Git管理せず、ホスト側に置く（garage.toml.example を参照）。
+  garage:
+    image: dxflrs/garage:v2.5.0
+    container_name: etax-garage
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    ports:
+      # S3 API。Cloudflare Tunnel の files サービスがこのポートへ流す。
+      - "127.0.0.1:3900:3900"
+
+  app:
+    build: .
+    container_name: etax-agent-app
+    depends_on:
+      - db
+      - garage
+    # AGENT_API_KEY など秘密はホスト側の .env から読む（Git管理外）。
+    env_file:
+      - packages/server/.env
+    environment:
+      PORT: "43107"
+      # コンテナ間通信ではサービス名で引く。
+      DATABASE_URL: postgres://etax:etax@db:5432/etaxagent
+      # SystemOne（Ollama）はホスト側で動くため、ホストゲートウェイ経由で引く。
+      SYSTEMONE_BASE_URL: http://host.docker.internal:11434
+      # ストレージ取得はコンテナ間通信、署名付きURLは公開URLで発行する。
+      S3_INTERNAL_ENDPOINT: http://garage:3900
+      S3_PUBLIC_ENDPOINT: https://mini-files.spaghetti-monster.com
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      # Cloudflare Tunnel の etax サービスがこのポートへ流す。
+      - "127.0.0.1:43107:43107"
+    volumes:
+      # サーバー運用データ（freee試算表・科目判定の学習履歴）はホスト側に残す。
+      - ./packages/server/data:/app/packages/server/data
+
 volumes:
   etax-pgdata:
+  garage-meta:
+  garage-data:

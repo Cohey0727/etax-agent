@@ -51,6 +51,13 @@ export interface AnalyzeReceiptResponse {
   classification: AccountClassification;
 }
 
+/** 署名付きアップロードURLの発行結果。ファイルIDで解析を依頼する。 */
+export interface PresignUploadFileResponse {
+  fileId: string;
+  uploadUrl: string;
+  expiresInSeconds: number;
+}
+
 export interface FreeeTrialBalanceAccount {
   name: string;
   category: string;

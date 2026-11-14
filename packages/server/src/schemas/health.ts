@@ -10,6 +10,7 @@ export const HealthResponseSchema = z
     dbConfigured: z.boolean(),
     agentConfigured: z.boolean(),
     agentSchema: z.string().nullable(),
+    storageConfigured: z.boolean(),
   })
   .openapi("Health");
 

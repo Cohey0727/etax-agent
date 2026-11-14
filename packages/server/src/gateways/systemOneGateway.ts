@@ -119,7 +119,10 @@ class SystemOneHttpClient implements SystemOneClient {
           ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30_000),
+        // 判定モデル（Ollama の tev1 等）はアイドル後にアンロードされ、
+        // 初回はモデルの読み込み＋24候補の推論で 30 秒を超えることがある。
+        // コールドスタートでも失敗にしないよう長めに取る。
+        signal: AbortSignal.timeout(120_000),
       });
     } catch (e) {
       throw new SystemOneError(

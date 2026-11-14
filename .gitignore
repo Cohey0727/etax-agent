@@ -4,3 +4,5 @@ dist/
 *.log
 .DS_Store
 packages/server/data/
+# Garage の実設定（rpc_secret / admin_token を含むため管理しない）
+garage.toml

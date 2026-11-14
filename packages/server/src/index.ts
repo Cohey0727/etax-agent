@@ -27,6 +27,7 @@
  *   POST   /api/classify/batch      勘定科目の一括判定（カード明細等）
  *   POST   /api/classify/feedback   確定した科目を学習履歴に記録
  *   POST   /api/receipts/analyze    領収書画像の読み取り＋科目判定（要 AGENT_API_KEY）
+ *   POST   /api/files/presign-upload ストレージ（Garage）直アップロード用の署名付きURL発行
  *   GET    /api/freee/trial-balance freee試算表（データディレクトリの取り込み済み実績）
  *
  * DATABASE_URL 未設定でも起動し、DB不要のエンドポイントはそのまま動く。
@@ -40,10 +41,14 @@ import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
+import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { ensureTables, isDatabaseConfigured } from "./lib/db";
+import { createSystemOneClient } from "./gateways/systemOneGateway";
+import { loadSystemOneConfig } from "./lib/config";
 import agentRoutes from "./routes/agent";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
+import filesRoutes from "./routes/files";
 import freeeRoutes from "./routes/freee";
 import healthRoutes from "./routes/health";
 import importsRoutes from "./routes/imports";
@@ -60,6 +65,7 @@ app.route("/", importsRoutes);
 app.route("/", agentRoutes);
 app.route("/", classifyRoutes);
 app.route("/", receiptsRoutes);
+app.route("/", filesRoutes);
 app.route("/", freeeRoutes);
 
 // 画面（React のビルド成果物）を API と同一ポートで配信する。
@@ -95,16 +101,42 @@ const port = Number(process.env.PORT ?? 3001);
 console.log(`eTaxAgent server listening on http://localhost:${port}`);
 
 // 帳簿（DB）を使う場合は、起動時にテーブルを自己修復しておく。
-// 失敗してもサーバー自体は起動を続け、DB必須の処理だけが 503 になる。
-void ensureTables()
-  .then(() => {
-    if (isDatabaseConfigured()) console.log("帳簿DBのテーブルを確認しました");
-  })
-  .catch((e) => {
+// DBコンテナの初期化完了を待てるよう、しばらくリトライする。
+// 最後まで失敗してもサーバー自体は起動を続け、DB必須の処理だけが 503 になる。
+void (async () => {
+  const maxAttempts = 15;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await ensureTables();
+      if (isDatabaseConfigured()) console.log("帳簿DBのテーブルを確認しました");
+      return;
+    } catch (e) {
+      if (attempt === maxAttempts) {
+        console.warn(
+          `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+})();
+
+// SystemOne の判定モデル（Ollama）はアイドルが続くとアンロードされ、
+// 初回の科目判定がコールドスタートで遅くなる。起動時に一度ダミー判定を
+// 投げてモデルを読み込ませておく。失敗しても起動は続行する
+// （判定自体は履歴→ルールへフォールバックする）。
+void (async () => {
+  try {
+    const systemOne = createSystemOneClient(loadSystemOneConfig());
+    await systemOne.judgeAccount("コーヒー 打ち合わせ", ACCOUNT_CRITERIA);
+    console.log("SystemOne の判定モデルをウォームアップしました");
+  } catch (e) {
     console.warn(
-      `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      `SystemOne のウォームアップに失敗しました: ${e instanceof Error ? e.message : String(e)}`,
     );
-  });
+  }
+})();
 
 export default {
   port,

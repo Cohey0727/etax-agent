@@ -9,6 +9,7 @@ import {
   LedgerTransaction,
   LedgerTransactionInput,
   ListLedgerTransactionsResponse,
+  PresignUploadFileResponse,
 } from "@types";
 
 /** サーバーAPIの型つきラッパー。/api は Vite プロキシで localhost:3001 へ。 */
@@ -82,8 +83,24 @@ export async function recordClassificationFeedback(
   }).catch(() => undefined);
 }
 
-/** 領収書画像を読み取り、科目判定まで済んだ帳簿ドラフトを返す。 */
+const UPLOADABLE_IMAGE_TYPES: readonly string[] = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+/**
+ * 領収書画像を読み取り、科目判定まで済んだ帳簿ドラフトを返す。
+ * 基本フロー: 署名付きURLでストレージ（Garage）へ直接アップロードし、
+ * ファイルIDで解析を依頼する。ストレージが使えない場合は、画像を
+ * Base64で直接渡す従来経路にフォールバックする。
+ */
 export async function analyzeReceiptImage(file: File): Promise<AnalyzeReceiptResponse> {
+  if (UPLOADABLE_IMAGE_TYPES.includes(file.type)) {
+    const viaStorage = await analyzeReceiptViaStorage(file).catch(() => null);
+    if (viaStorage) return viaStorage;
+  }
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
@@ -95,6 +112,30 @@ export async function analyzeReceiptImage(file: File): Promise<AnalyzeReceiptRes
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
+  });
+  return parseJson<AnalyzeReceiptResponse>(resp);
+}
+
+/** 署名付きURLでアップロードし、ファイルIDで解析を依頼する経路。 */
+async function analyzeReceiptViaStorage(file: File): Promise<AnalyzeReceiptResponse> {
+  const presignResp = await fetch("/api/files/presign-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType: file.type }),
+  });
+  const presign = await parseJson<PresignUploadFileResponse>(presignResp);
+  const uploadResp = await fetch(presign.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!uploadResp.ok) {
+    throw new Error(`ファイルのアップロードに失敗しました (HTTP ${uploadResp.status})`);
+  }
+  const resp = await fetch("/api/receipts/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileId: presign.fileId }),
   });
   return parseJson<AnalyzeReceiptResponse>(resp);
 }

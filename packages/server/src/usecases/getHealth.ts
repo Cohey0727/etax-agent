@@ -2,7 +2,7 @@
  * getHealth.ts — 疎通確認ユースケース（usecases）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { loadAgentConfig } from "../lib/config";
+import { loadAgentConfig, loadStorageConfig } from "../lib/config";
 import { isDatabaseConfigured } from "../lib/db";
 import { HealthResponse, HealthResponseSchema } from "../schemas/health";
 
@@ -36,6 +36,7 @@ export const getHealthHandler: RouteHandler<typeof getHealthRoute> = (c) => {
     dbConfigured: isDatabaseConfigured(),
     agentConfigured,
     agentSchema,
+    storageConfigured: loadStorageConfig().configured,
   };
   return c.json(response, 200);
 };

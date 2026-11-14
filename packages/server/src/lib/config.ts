@@ -18,6 +18,14 @@
  *                        （デフォルト: http://127.0.0.1:11434 = ローカルの Ollama）
  *   SYSTEMONE_API_KEY  : 任意。クラウドの判定API（TypeSafe Jev / Liquid d1 等）用
  *   SYSTEMONE_MODEL    : 任意。判定モデル名の上書き
+ *
+ * ファイルストレージ（Garage / S3互換）用の環境変数:
+ *   S3_PUBLIC_ENDPOINT   : 署名付きURLの発行先（ブラウザから到達できる公開URL）
+ *   S3_INTERNAL_ENDPOINT : サーバー内部からの取得先（未指定なら公開URLを使う）
+ *   S3_BUCKET            : バケット名（デフォルト: etax-files）
+ *   S3_REGION            : リージョン（デフォルト: garage）
+ *   S3_ACCESS_KEY_ID     : アクセスキー
+ *   S3_SECRET_ACCESS_KEY : シークレットキー
  */
 import { join } from "node:path";
 
@@ -98,4 +106,39 @@ export function loadSystemOneConfig(): SystemOneConfig {
  */
 export function serverDataDir(): string {
   return join(import.meta.dir, "../../data");
+}
+
+// ---------------------------------------------------------------------------
+// ファイルストレージ（Garage / S3互換）の設定
+// ---------------------------------------------------------------------------
+
+export interface StorageConfig {
+  /** 署名付きURLの発行に使う公開エンドポイント（ブラウザから到達できるURL）。 */
+  publicEndpoint: string | null;
+  /** サーバー内部からオブジェクトを取得するエンドポイント。 */
+  internalEndpoint: string | null;
+  bucket: string;
+  region: string;
+  accessKeyId: string | null;
+  secretAccessKey: string | null;
+  /** URL発行と取得に必要な設定が揃っているか。 */
+  configured: boolean;
+}
+
+/** 環境変数からファイルストレージの設定を読み込む。 */
+export function loadStorageConfig(): StorageConfig {
+  const publicEndpoint = (process.env.S3_PUBLIC_ENDPOINT || "").replace(/\/+$/, "") || null;
+  const internalEndpoint =
+    (process.env.S3_INTERNAL_ENDPOINT || "").replace(/\/+$/, "") || publicEndpoint;
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID || null;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || null;
+  return {
+    publicEndpoint,
+    internalEndpoint,
+    bucket: process.env.S3_BUCKET || "etax-files",
+    region: process.env.S3_REGION || "garage",
+    accessKeyId,
+    secretAccessKey,
+    configured: Boolean(publicEndpoint && internalEndpoint && accessKeyId && secretAccessKey),
+  };
 }
