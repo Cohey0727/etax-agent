@@ -2,7 +2,6 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
       "@configs": ["./src/configs"],
       "@components/*": ["./src/components/*"],

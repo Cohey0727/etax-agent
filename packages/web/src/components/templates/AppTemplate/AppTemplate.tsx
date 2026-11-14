@@ -40,7 +40,9 @@ export const AppTemplate = ({
         <aside className={clsx(styles.sidebar, !sidebarOpen && styles.sidebarClosed)}>
           <div className={styles.sidebarInner}>
             <Row gap="sm" align="center">
-              <div className={styles.brandMark}>e</div>
+              <div className={styles.brandMark}>
+                <Icon name="bill" size={21} />
+              </div>
               <Col gap="sm">
                 <Text variant="sectionTitle">eTaxAgent</Text>
                 <Text variant="caption">確定申告 準備ツール</Text>

@@ -1,15 +1,17 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     container_name: etax-agent-db
     environment:
       POSTGRES_USER: etax
       POSTGRES_PASSWORD: etax
       POSTGRES_DB: etaxagent
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
-      - etax-pgdata:/var/lib/postgresql/data
+      # Postgres 18 の公式イメージはデータ配置が /var/lib/postgresql 配下に
+      # 変わったため、ボリュームは /data ではなくこちらへマウントする。
+      - etax-pgdata:/var/lib/postgresql
 
 volumes:
   etax-pgdata:

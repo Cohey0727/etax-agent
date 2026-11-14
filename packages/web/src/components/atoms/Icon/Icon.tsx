@@ -14,7 +14,8 @@ export type IconName =
   | "receipt"
   | "settings"
   | "book"
-  | "plus";
+  | "plus"
+  | "bill";
 
 // 線画アイコンのパス集。色は currentColor で呼び出し側に委ねる。
 const ICON_PATHS: Record<IconName, ReactNode> = {
@@ -103,6 +104,14 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M12 5v14" />
       <path d="M5 12h14" />
+    </>
+  ),
+  bill: (
+    <>
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M6 12h.01" />
+      <path d="M18 12h.01" />
     </>
   ),
 };
