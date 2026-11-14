@@ -4,7 +4,7 @@
  * SystemOne は文章を生成するLLMではなく、文章（state）と型つきの質問を渡すと
  * 選択肢ごとの校正された確率を返す「判定モデル」のAPI形式:
  *   POST {baseUrl}/v1/systemone
- *   { state, questions: { <名前>: { type: "choice", options, criteria } }, model? }
+ *   { state, questions: { <名前>: { type: "choice", instructions, criteria } }, model? }
  * 接続先は差し替え可能（TypeSafe Jev / Liquid d1 / Ollama の判定モデル /
  * sokudan の互換サーバー等）。公式SDKは接続先ごとに存在しないため、
  * llmGateway と同じく規約の第3選択肢「fetch＋zod検証」を採用する。
@@ -30,6 +30,23 @@ export interface SystemOneClient {
 }
 
 const USER_AGENT = "etax-agent/0.1";
+
+/**
+ * choice 質問の候補数の上限。判定モデル側の制約（tev1 は最大24候補で、
+ * 超えると 400 になる）。科目一覧がこれを超える場合は、領収書や明細行の
+ * 摘要には現れない仕訳専用の科目（減価償却費・貸倒金）から外して収める。
+ * 科目一覧そのもの（画面の選択肢）は削らない。
+ */
+const MAX_CHOICE_CANDIDATES = 24;
+const JOURNAL_ONLY_ACCOUNTS: readonly string[] = ["減価償却費", "貸倒金"];
+
+function capCandidates(
+  accounts: readonly AccountCriterion[],
+): readonly AccountCriterion[] {
+  if (accounts.length <= MAX_CHOICE_CANDIDATES) return accounts;
+  const trimmed = accounts.filter((a) => !JOURNAL_ONLY_ACCOUNTS.includes(a.account));
+  return trimmed.slice(0, MAX_CHOICE_CANDIDATES);
+}
 
 /** 応答エンベロープ（実装差を吸収するため使う部分だけをゆるく検証する）。 */
 const systemOneResponseSchema = z.looseObject({
@@ -79,7 +96,7 @@ class SystemOneHttpClient implements SystemOneClient {
     accounts: readonly AccountCriterion[],
   ): Promise<AccountJudgement> {
     const criteria: Record<string, string> = {};
-    for (const { account, criteria: text } of accounts) criteria[account] = text;
+    for (const { account, criteria: text } of capCandidates(accounts)) criteria[account] = text;
     const payload: Record<string, unknown> = {
       state,
       questions: {

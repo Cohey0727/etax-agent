@@ -91,8 +91,12 @@ export async function classifyAccount(
           candidates,
         };
       }
-    } catch {
-      // SystemOne に繋がらない環境ではキーワードルールへフォールバックする
+    } catch (e) {
+      // SystemOne に繋がらない環境ではキーワードルールへフォールバックする。
+      // ただし理由はサーバーログに残す（無言だと設定ミスに気づけないため）。
+      console.warn(
+        `[classify] SystemOne判定に失敗しフォールバックします: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
   const ruled = suggestCategory(description);
