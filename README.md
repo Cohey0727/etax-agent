@@ -150,6 +150,7 @@ DB（SQLite）が開けない場合でもサーバーは起動し、計算・CSV
 | `AGENT_API_KEY` | APIキー。CSVのAIマッピングと対話エージェントでのみ使用 |
 | `AGENT_BASE_URL` | 任意。エンドポイントの上書き（既定: OpenRouter `https://openrouter.ai/api/v1` ／ claude 時は `https://api.anthropic.com`） |
 | `AGENT_MODEL` | 任意。モデル名の上書き（既定: openai `openai/gpt-4o-mini` ／ claude `claude-sonnet-4-5`） |
+| `MCP_TOKEN` | 任意。設定すると `/mcp`（MCP連携）に Bearer 認証を必須にする。公開時は必須 |
 
 OpenCode Go 等の OpenAI 互換エンドポイントも `AGENT_BASE_URL` 差し替えで使えます。
 （LLM送信時は `User-Agent: etax-agent/0.1` と `x-opencode-session` ヘッダーを送ります。
@@ -213,6 +214,26 @@ bun run cli -- amend --year 2024 --original examples/original_2024.json --correc
 | GET | `/api/imports` | 取込履歴（DB必須） |
 | POST | `/api/import/csv` | CSV取込（生バイト or JSON `{filename, content}` / `{filename, contentBase64}`） |
 | POST | `/api/agent/chat` | `{messages, transactions}` → エージェント応答（要 `AGENT_API_KEY`） |
+| ALL | `/mcp` | MCP（外部エージェント連携。下記） |
+
+### MCP（外部エージェント連携）
+
+`/mcp` は MCP（Model Context Protocol）の Streamable HTTP エンドポイント（ステートレス）。
+Muse・Grok 等の MCP クライアントから、サーバーの帳簿DBに対して
+集計（aggregate_year）・消費税3方式比較（consumption_tax）・所得税計算（income_tax）・
+修正申告の差分（amendment_delta）・取引CRUD（list/add/update/delete_transaction）・
+勘定科目の判定と学習（classify_account / classify_feedback）・
+XTX出力（export_xtx）・申告ステータス（get/set_filing_status）が使える。
+数字の計算は REST API と同じ決定的な関数のみで行う。e-Tax への提出は行わない。
+
+クライアント設定例（Claude Code）:
+
+```bash
+claude mcp add --transport http etax-agent http://localhost:3001/mcp \
+  --header "Authorization: Bearer <MCP_TOKEN>"
+```
+
+`MCP_TOKEN` 未設定の場合は `--header` は不要（ローカル前提）。
 
 ## 検証
 

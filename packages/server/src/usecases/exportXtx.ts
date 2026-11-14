@@ -51,8 +51,9 @@ export const exportXtxRoute = createRoute({
 /**
  * 決算書の経費欄に渡す科目別合計を作る。支出は正の金額（絶対値）に揃え、
  * 不動産の家賃収入だけは収入として正のまま残す。
+ * MCP の export_xtx ツールからも使うため export する。
  */
-function statementCategoryTotals(
+export function statementCategoryTotals(
   transactions: Transaction[],
   incomeType: Transaction["income_type"],
 ): Record<string, number> {
@@ -68,8 +69,8 @@ function statementCategoryTotals(
   return result;
 }
 
-function toTaxpayer(body: ExportXtxRequest): XtxTaxpayer {
-  const t = body.taxpayer;
+/** ワイヤ形式の納税者情報を XTX ビルダーの形式へ変換する。MCP からも使う。 */
+export function toTaxpayer(t: ExportXtxRequest["taxpayer"]): XtxTaxpayer {
   return {
     name: t.name,
     nameKana: t.name_kana,
@@ -103,7 +104,7 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
       year: body.year,
       amendment: body.amendment,
       submissionDate: body.submission_date,
-      taxpayer: toTaxpayer(body),
+      taxpayer: toTaxpayer(body.taxpayer),
       figures,
       deductionInputs: body.deductions,
       tax,

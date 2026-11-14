@@ -3,6 +3,7 @@
     "@etax/shared": "workspace:*",
     "@hono/node-server": "^2.1.8",
     "@hono/zod-openapi": "^1.6.3",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "better-sqlite3": "^13.1.1",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.18",

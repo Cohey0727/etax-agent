@@ -30,6 +30,7 @@
  *   POST   /api/files/presign-upload アップロード受け口URLの発行（ローカル保存）
  *   GET    /api/freee/trial-balance freee試算表（データディレクトリの取り込み済み実績）
  *   POST   /api/etax/export-xtx     e-Tax 申告等データ（XTX）の出力（DB不要・ステートレス）
+ *   ALL    /mcp                     MCP（外部エージェント連携。MCP_TOKEN 設定時は Bearer 認証）
  *
  * DB はデータフォルダ内の SQLite ファイルで、起動時にテーブルを自己修復する。
  * 起動時は packages/web のビルド成果物（dist）も同一ポートで配信する
@@ -54,6 +55,7 @@ import filingStatusRoutes from "./routes/filingStatus";
 import freeeRoutes from "./routes/freee";
 import healthRoutes from "./routes/health";
 import importsRoutes from "./routes/imports";
+import mcpRoutes from "./routes/mcp";
 import receiptsRoutes from "./routes/receipts";
 import transactionsRoutes from "./routes/transactions";
 
@@ -71,6 +73,7 @@ app.route("/", filesRoutes);
 app.route("/", freeeRoutes);
 app.route("/", filingStatusRoutes);
 app.route("/", etaxRoutes);
+app.route("/", mcpRoutes);
 
 // 画面（React のビルド成果物）を API と同一ポートで配信する。
 // API ルートより後に登録するので、/api/* は上のルートが先に処理する。

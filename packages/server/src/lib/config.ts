@@ -125,3 +125,20 @@ export function loadStorageConfig(): StorageConfig {
     configured: true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// MCP（外部エージェント連携）の設定
+// ---------------------------------------------------------------------------
+
+export interface McpConfig {
+  /**
+   * /mcp エンドポイントの Bearer トークン。MCP_TOKEN で設定する。
+   * 未設定なら認証なしで受ける（ローカル前提。公開する場合は必ず設定する）。
+   */
+  token: string;
+}
+
+/** MCP エンドポイントの設定を返す。 */
+export function loadMcpConfig(): McpConfig {
+  return { token: process.env.MCP_TOKEN ?? "" };
+}
