@@ -2,6 +2,7 @@ import { IncomeType, Transaction } from "@etax/shared";
 import {
   AccountClassification,
   AgentChatResponse,
+  AgentConnectionConfig,
   AnalyzeReceiptResponse,
   ChatMessage,
   ExportXtxRequest,
@@ -42,11 +43,22 @@ export async function importCsvFile(file: File): Promise<ImportCsvResponse> {
 export async function agentChat(
   messages: ChatMessage[],
   transactions: Transaction[],
+  connection?: AgentConnectionConfig,
 ): Promise<AgentChatResponse> {
+  // 設定画面の外部接続は、入っている項目だけを上書きとして送る（空はサーバー設定）。
+  const agentConfig = {
+    ...(connection?.baseUrl.trim() ? { baseUrl: connection.baseUrl.trim() } : {}),
+    ...(connection?.model.trim() ? { model: connection.model.trim() } : {}),
+    ...(connection?.apiKey.trim() ? { apiKey: connection.apiKey.trim() } : {}),
+  };
   const resp = await fetch("/api/agent/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, transactions }),
+    body: JSON.stringify({
+      messages,
+      transactions,
+      ...(Object.keys(agentConfig).length > 0 ? { agentConfig } : {}),
+    }),
   });
   return parseJson<AgentChatResponse>(resp);
 }

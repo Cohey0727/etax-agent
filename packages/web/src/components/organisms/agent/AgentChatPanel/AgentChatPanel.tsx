@@ -7,15 +7,13 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Button, Col, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { AppView, ChatMessage, ChatRole, SendKeyMode } from "@types";
-import { agentChat } from "@utils";
+import { AppView, AgentConnectionConfig, ChatMessage, ChatRole, SendKeyMode, ThemeMode } from "@types";
 import {
-  archiveChatSession,
+  agentChat,
   ChatSession,
-  loadChatSessions,
   loadCurrentMessages,
   saveCurrentMessages,
-} from "./chatStorage";
+} from "@utils";
 import styles from "./AgentChatPanel.css";
 
 /**
@@ -25,13 +23,23 @@ import styles from "./AgentChatPanel.css";
  */
 export type AgentUiAction =
   | { type: "setYear"; year: number }
-  | { type: "navigate"; view: AppView };
+  | { type: "navigate"; view: AppView }
+  | { type: "setTheme"; mode: ThemeMode };
 
 export interface AgentChatPanelProps {
   transactions: Transaction[];
   onUiAction?: (action: AgentUiAction) => void;
   /** チャットの送信キー（設定画面で切替、AppPage が保持） */
   sendKeyMode: SendKeyMode;
+  /** 外部接続（AI）の上書き設定（設定画面で入力、AppPage が保持） */
+  agentConnection: AgentConnectionConfig;
+  /** 保存済みの過去の会話（履歴の状態は AppPage が保持し、見出し横のボタンと共有する） */
+  sessions: ChatSession[];
+  historyOpen: boolean;
+  viewing: ChatSession | null;
+  onSelectSession: (session: ChatSession) => void;
+  /** クリア時に現在の会話を履歴へ保存する。 */
+  onArchive: (messages: ChatMessage[]) => void;
 }
 
 // ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。
@@ -53,6 +61,11 @@ const deriveUiActions = (toolCalls: { name: string; arguments: Record<string, un
       push({ type: "navigate", view: AppView.Dashboard });
     } else if (tc.name === "amendment_delta") {
       push({ type: "navigate", view: AppView.Amend });
+    } else if (tc.name === "set_theme") {
+      const mode = tc.arguments.mode;
+      if (mode === "light" || mode === "dark" || mode === "system") {
+        push({ type: "setTheme", mode });
+      }
     }
   }
   return actions;
@@ -64,12 +77,19 @@ const MOD_KEY_LABEL =
     ? "⌘"
     : "Ctrl";
 
-export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentChatPanelProps) => {
+export const AgentChatPanel = ({
+  transactions,
+  onUiAction,
+  sendKeyMode,
+  agentConnection,
+  sessions,
+  historyOpen,
+  viewing,
+  onSelectSession,
+  onArchive,
+}: AgentChatPanelProps) => {
   // 会話は端末に保存し、再読み込みしても続きから使えるようにする。
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadCurrentMessages());
-  const [sessions, setSessions] = useState<ChatSession[]>(() => loadChatSessions());
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [viewing, setViewing] = useState<ChatSession | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +113,7 @@ export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentC
     setLoading(true);
     setError(null);
     try {
-      const res = await agentChat(next, transactions);
+      const res = await agentChat(next, transactions, agentConnection);
       const answered: ChatMessage[] = [...next, { role: ChatRole.Assistant, content: res.reply }];
       setMessages(answered);
       saveCurrentMessages(answered);
@@ -116,14 +136,9 @@ export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentC
   // クリア = いまの会話を履歴へ保存してから空にする（履歴から後で見返せる）。
   const clearChat = () => {
     if (messages.length === 0) return;
-    setSessions(archiveChatSession(messages));
+    onArchive(messages);
     setMessages([]);
     saveCurrentMessages([]);
-  };
-
-  const backToChat = () => {
-    setViewing(null);
-    setHistoryOpen(false);
   };
 
   return (
@@ -132,27 +147,13 @@ export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentC
         質問や、集計・計算などの処理を頼めます。例:
         「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
       </Text>
-      <Row gap="sm" align="center" justify="spaceBetween">
-        {inHistory ? (
-          <Button variant="ghost" size="sm" onClick={backToChat}>
-            ← チャットに戻る
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={sessions.length === 0}
-            onClick={() => setHistoryOpen(true)}
-          >
-            履歴{sessions.length > 0 ? `（${sessions.length}）` : ""}
-          </Button>
-        )}
-        {!inHistory && messages.length > 0 ? (
+      {!inHistory && messages.length > 0 ? (
+        <Row gap="sm" align="center" justify="end">
           <Button variant="ghost" size="sm" onClick={clearChat} disabled={loading}>
             クリア
           </Button>
-        ) : null}
-      </Row>
+        </Row>
+      ) : null}
 
       {viewing ? (
         <div className={styles.chatLog} ref={logRef}>
@@ -170,7 +171,7 @@ export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentC
                 variant="ghost"
                 size="sm"
                 className={styles.sessionItem}
-                onClick={() => setViewing(session)}
+                onClick={() => onSelectSession(session)}
               >
                 <Col gap="none">
                   <Text variant="caption">

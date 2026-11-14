@@ -1,4 +1,5 @@
 import { Transaction } from "@etax/shared";
+import { AgentConnectionConfig } from "./AgentConnection";
 import { AppView } from "./AppView";
 import { SendKeyMode } from "./Chat";
 import { ThemeMode } from "./Theme";
@@ -23,4 +24,7 @@ export interface ViewPageProps {
   /** チャットの送信キー。設定画面だけが使うが、テーマと同じく共通の形で配る。 */
   sendKeyMode: SendKeyMode;
   onSendKeyModeChange: (mode: SendKeyMode) => void;
+  /** 外部接続（AI）の上書き設定。設定画面だけが使うが、共通の形で配る。 */
+  agentConnection: AgentConnectionConfig;
+  onAgentConnectionChange: (config: AgentConnectionConfig) => void;
 }

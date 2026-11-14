@@ -6,6 +6,8 @@ export const SettingsPage = ({
   onThemeModeChange,
   sendKeyMode,
   onSendKeyModeChange,
+  agentConnection,
+  onAgentConnectionChange,
 }: ViewPageProps) => {
   return (
     <SettingsPanel
@@ -13,6 +15,8 @@ export const SettingsPage = ({
       onThemeModeChange={onThemeModeChange}
       sendKeyMode={sendKeyMode}
       onSendKeyModeChange={onSendKeyModeChange}
+      agentConnection={agentConnection}
+      onAgentConnectionChange={onAgentConnectionChange}
     />
   );
 };

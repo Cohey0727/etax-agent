@@ -1,5 +1,5 @@
-import { Button, Card, Col, Icon, IconName, Text } from "@components/atoms";
-import { SendKeyMode, ThemeMode } from "@types";
+import { Button, Card, Col, Icon, IconName, Input, Text } from "@components/atoms";
+import { AgentConnectionConfig, SendKeyMode, ThemeMode } from "@types";
 import styles from "./SettingsPanel.css";
 
 export interface SettingsPanelProps {
@@ -7,6 +7,8 @@ export interface SettingsPanelProps {
   onThemeModeChange: (mode: ThemeMode) => void;
   sendKeyMode: SendKeyMode;
   onSendKeyModeChange: (mode: SendKeyMode) => void;
+  agentConnection: AgentConnectionConfig;
+  onAgentConnectionChange: (config: AgentConnectionConfig) => void;
 }
 
 const THEME_OPTIONS: readonly {
@@ -45,6 +47,8 @@ export const SettingsPanel = ({
   onThemeModeChange,
   sendKeyMode,
   onSendKeyModeChange,
+  agentConnection,
+  onAgentConnectionChange,
 }: SettingsPanelProps) => {
   const activeOption = THEME_OPTIONS.find((option) => option.mode === themeMode);
   const activeSendKeyOption = SEND_KEY_OPTIONS.find((option) => option.mode === sendKeyMode);
@@ -98,6 +102,48 @@ export const SettingsPanel = ({
               日本語入力の変換確定（Enter）では、どちらの設定でも送信しません。
             </Text>
           </Col>
+        </Col>
+      </Card>
+      <Card>
+        <Col gap="md">
+          <Text variant="sectionTitle">外部接続（AI）</Text>
+          <Col gap="sm">
+            <Text variant="statLabel">ベースURL</Text>
+            <Input
+              value={agentConnection.baseUrl}
+              onChange={(e) =>
+                onAgentConnectionChange({ ...agentConnection, baseUrl: e.target.value })
+              }
+              placeholder="https://opencode.ai/zen/go/v1"
+              autoComplete="off"
+            />
+          </Col>
+          <Col gap="sm">
+            <Text variant="statLabel">モデル</Text>
+            <Input
+              value={agentConnection.model}
+              onChange={(e) =>
+                onAgentConnectionChange({ ...agentConnection, model: e.target.value })
+              }
+              placeholder="glm-5.2"
+              autoComplete="off"
+            />
+          </Col>
+          <Col gap="sm">
+            <Text variant="statLabel">APIキー</Text>
+            <Input
+              type="password"
+              value={agentConnection.apiKey}
+              onChange={(e) =>
+                onAgentConnectionChange({ ...agentConnection, apiKey: e.target.value })
+              }
+              placeholder="未入力ならサーバーの設定を使います"
+              autoComplete="off"
+            />
+          </Col>
+          <Text variant="caption">
+            入力した項目だけがサーバーの設定より優先されます。APIキーはこの端末にだけ保存され、チャット送信時にのみサーバーへ送られます。
+          </Text>
         </Col>
       </Card>
       <Card>
