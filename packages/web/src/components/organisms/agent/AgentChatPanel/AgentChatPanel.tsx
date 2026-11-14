@@ -7,7 +7,7 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Button, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { AppView, ChatMessage, ChatRole } from "@types";
+import { AppView, ChatMessage, ChatRole, SendKeyMode } from "@types";
 import { agentChat } from "@utils";
 import styles from "./AgentChatPanel.css";
 
@@ -23,17 +23,9 @@ export type AgentUiAction =
 export interface AgentChatPanelProps {
   transactions: Transaction[];
   onUiAction?: (action: AgentUiAction) => void;
+  /** チャットの送信キー（設定画面で切替、AppPage が保持） */
+  sendKeyMode: SendKeyMode;
 }
-
-const viewLabels: Record<string, string> = {
-  [AppView.Dashboard]: "ダッシュボード",
-  [AppView.Import]: "取引・CSV取込",
-  [AppView.Receipt]: "領収書から帳簿",
-  [AppView.Amend]: "修正申告",
-  [AppView.Ledger]: "帳簿",
-  [AppView.Filing]: "確定申告",
-  [AppView.Settings]: "設定",
-};
 
 // ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。
 const deriveUiActions = (toolCalls: { name: string; arguments: Record<string, unknown> }[]) => {
@@ -59,16 +51,14 @@ const deriveUiActions = (toolCalls: { name: string; arguments: Record<string, un
   return actions;
 };
 
-const describeUiAction = (action: AgentUiAction) => {
-  return action.type === "setYear"
-    ? `年度を${action.year}年に切り替えました`
-    : `${viewLabels[action.view] ?? action.view}を開きました`;
-};
+// 送信キーの修飾キー表示。Mac は ⌘、それ以外（Windows 等）は Ctrl。
+const MOD_KEY_LABEL =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform ?? "")
+    ? "⌘"
+    : "Ctrl";
 
-export const AgentChatPanel = ({ transactions, onUiAction }: AgentChatPanelProps) => {
+export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentChatPanelProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [toolLog, setToolLog] = useState<string[]>([]);
-  const [actionLog, setActionLog] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,14 +82,10 @@ export const AgentChatPanel = ({ transactions, onUiAction }: AgentChatPanelProps
       const res = await agentChat(next, transactions);
       setMessages([...next, { role: ChatRole.Assistant, content: res.reply }]);
       if (res.toolCalls.length > 0) {
-        setToolLog((prev) => [
-          ...prev,
-          ...res.toolCalls.map((tc) => `${tc.name}(${JSON.stringify(tc.arguments)})`),
-        ]);
+        // 画面操作は裏でだけ行い、ログとしては表示しない（会話の邪魔になるため）。
         const actions = deriveUiActions(res.toolCalls);
         if (onUiAction && actions.length > 0) {
           actions.forEach((action) => onUiAction(action));
-          setActionLog((prev) => [...prev, ...actions.map(describeUiAction)]);
         }
       }
     } catch (e) {
@@ -113,10 +99,7 @@ export const AgentChatPanel = ({ transactions, onUiAction }: AgentChatPanelProps
 
   return (
     <div className={styles.root}>
-      <Text variant="muted">
-        表示中の取引データ（{transactions.length}件）を添付して質問します。集計・計算はツールが
-        実行し、年度切替や画面遷移も代行します。金額はLLMが作らず、決定的な計算で出します。
-      </Text>
+      <Text variant="muted">質問や、集計・計算などの処理を頼めます。</Text>
       <div className={styles.chatLog} ref={logRef}>
         {messages.length === 0 && (
           <Text variant="muted">
@@ -151,25 +134,28 @@ export const AgentChatPanel = ({ transactions, onUiAction }: AgentChatPanelProps
         )}
       </div>
       {error && <AlertBox variant="error">{error}</AlertBox>}
-      {actionLog.length > 0 && (
-        <Text variant="muted">画面操作: {actionLog.slice(-3).join(" ／ ")}</Text>
-      )}
-      {toolLog.length > 0 && (
-        <Text variant="muted">実行したツール: {toolLog.slice(-5).join(" / ")}</Text>
-      )}
       <Row gap="sm" align="end" className={styles.inputRow}>
         <Textarea
           className={styles.inputFlex}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            // Enterで送信、Shift+Enterで改行。日本語入力の変換確定Enterでは送らない。
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            if (e.key !== "Enter") return;
+            // 日本語入力の変換確定Enterでは絶対に送らない。
+            if (e.nativeEvent.isComposing) return;
+            const modPressed = e.metaKey || e.ctrlKey;
+            const shouldSend =
+              sendKeyMode === "modEnter" ? modPressed : !e.shiftKey && !modPressed;
+            if (shouldSend) {
               e.preventDefault();
               void send();
             }
           }}
-          placeholder="質問を入力（Enterで送信・Shift+Enterで改行）"
+          placeholder={
+            sendKeyMode === "modEnter"
+              ? `質問を入力（${MOD_KEY_LABEL}+Enterで送信・Enterで改行）`
+              : "質問を入力（Enterで送信・Shift+Enterで改行）"
+          }
           rows={2}
           disabled={loading}
         />
