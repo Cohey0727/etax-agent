@@ -40,42 +40,65 @@ export const AppTemplate = ({
     <div className={styles.root}>
       <Row gap="none" align="start" className={styles.shell}>
         <aside className={clsx(styles.sidebar, !sidebarOpen && styles.sidebarClosed)}>
-          <div className={styles.sidebarInner}>
-            <Row gap="sm" align="center">
+          {sidebarOpen ? (
+            <div className={styles.sidebarInner}>
+              <Row gap="sm" align="center">
+                <div className={styles.brandMark}>
+                  <Icon name="bill" size={21} />
+                </div>
+                <Col gap="sm">
+                  <Text variant="sectionTitle">eTaxAgent</Text>
+                  <Text variant="caption">確定申告 準備ツール</Text>
+                </Col>
+              </Row>
+              <Col gap="sm">
+                <Text variant="statLabel">年度</Text>
+                <Select
+                  className={styles.yearSelect}
+                  value={selectedYear}
+                  onChange={(e) => onYearChange(Number(e.target.value))}
+                  aria-label="年度"
+                >
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}年
+                    </option>
+                  ))}
+                </Select>
+              </Col>
+              <Tabs items={navViews} activeId={activeView} onChange={onViewChange} orientation="vertical" />
+              <div className={styles.spacer} />
+              <div className={styles.dataPanel}>
+                <Col gap="sm">
+                  <Text variant="statLabel">表示中のデータ</Text>
+                  <Text variant="body">
+                    {dataSource}（{transactionCount}件）
+                  </Text>
+                </Col>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.railInner}>
               <div className={styles.brandMark}>
                 <Icon name="bill" size={21} />
               </div>
-              <Col gap="sm">
-                <Text variant="sectionTitle">eTaxAgent</Text>
-                <Text variant="caption">確定申告 準備ツール</Text>
-              </Col>
-            </Row>
-            <Col gap="sm">
-              <Text variant="statLabel">年度</Text>
-              <Select
-                className={styles.yearSelect}
-                value={selectedYear}
-                onChange={(e) => onYearChange(Number(e.target.value))}
-                aria-label="年度"
-              >
-                {years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}年
-                  </option>
+              <div className={styles.railNav}>
+                {navViews.map((view) => (
+                  <Button
+                    key={view.id}
+                    variant={view.id === activeView ? "navActive" : "nav"}
+                    size="sm"
+                    onClick={() => onViewChange(view.id)}
+                    title={view.label}
+                    aria-label={view.label}
+                    aria-current={view.id === activeView ? "page" : undefined}
+                  >
+                    <Icon name={view.icon} size={19} />
+                  </Button>
                 ))}
-              </Select>
-            </Col>
-            <Tabs items={navViews} activeId={activeView} onChange={onViewChange} orientation="vertical" />
-            <div className={styles.spacer} />
-            <div className={styles.dataPanel}>
-              <Col gap="sm">
-                <Text variant="statLabel">表示中のデータ</Text>
-                <Text variant="body">
-                  {dataSource}（{transactionCount}件）
-                </Text>
-              </Col>
+              </div>
             </div>
-          </div>
+          )}
         </aside>
         <main className={styles.main}>
           <div className={styles.mainInner}>

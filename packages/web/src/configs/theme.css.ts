@@ -55,6 +55,7 @@ export const theme = createThemeContract({
   // コンポーネント固有の寸法。複数箇所で共有するものだけ置く。
   component: {
     sidebarWidth: null,
+    sidebarRailWidth: null,
     contentMaxWidth: null,
     agentPanelWidth: null,
     actionBarHeight: null,
@@ -89,6 +90,7 @@ const baseTokens = {
   zIndex: { actionBar: "20" },
   component: {
     sidebarWidth: "252px",
+    sidebarRailWidth: "60px",
     contentMaxWidth: "1180px",
     agentPanelWidth: "420px",
     actionBarHeight: "42px",

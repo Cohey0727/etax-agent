@@ -52,11 +52,32 @@ const styles = {
       "(max-width: 900px)": { width: "100%" },
     },
   }),
+  // 閉じた状態は完全には隠さず、アイコンだけの細いレールにする。
   sidebarClosed: style({
-    width: "0px",
+    width: theme.component.sidebarRailWidth,
     "@media": {
       "(max-width: 900px)": { display: "none" },
     },
+  }),
+  // レール内側。ブランドマークとナビのアイコンボタンだけを縦に並べる。
+  railInner: style({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: theme.space.lg,
+    width: theme.component.sidebarRailWidth,
+    height: "100%",
+    overflowY: "auto",
+    padding: `${theme.space.lg} 0`,
+    background: theme.color.surface,
+    borderRight: `1px solid ${theme.color.border}`,
+    boxSizing: "border-box",
+  }),
+  railNav: style({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: theme.space.sm,
   }),
   sidebarInner: style({
     display: "flex",
