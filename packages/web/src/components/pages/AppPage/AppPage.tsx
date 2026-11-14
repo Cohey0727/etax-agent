@@ -3,7 +3,7 @@ import { ComponentType, useEffect, useMemo, useState } from "react";
 import { IconName } from "@components/atoms";
 import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
 import { AppTemplate } from "@components/templates";
-import { AppView, ThemeMode, ViewPageProps } from "@types";
+import { AppView, SendKeyMode, ThemeMode, ViewPageProps } from "@types";
 import {
   fetchLedgerTransactions,
   ledgerRowToTransaction,
@@ -55,6 +55,17 @@ const applyThemeMode = (mode: ThemeMode) => {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
 };
 
+const SEND_KEY_STORAGE_KEY = "etax-send-key";
+
+const readStoredSendKeyMode = (): SendKeyMode => {
+  try {
+    if (localStorage.getItem(SEND_KEY_STORAGE_KEY) === "modEnter") return "modEnter";
+  } catch {
+    // 保存値が読めない環境では Enter 送信を既定にする
+  }
+  return "enter";
+};
+
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);
   const [transactions, setTransactions] = useState<Transaction[]>(sample);
@@ -62,6 +73,7 @@ export const AppPage = () => {
   const [activeView, setActiveView] = useState<AppView>(AppView.Dashboard);
   const [selectedYear, setSelectedYear] = useState<number>(0);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
+  const [sendKeyMode, setSendKeyMode] = useState<SendKeyMode>(() => readStoredSendKeyMode());
 
   const years = useMemo(
     () => [...new Set(transactions.map((t) => t.year))].sort((a, b) => b - a),
@@ -117,6 +129,14 @@ export const AppPage = () => {
       // 保存できなくても切替自体は有効にする
     }
   };
+  const handleSendKeyModeChange = (mode: SendKeyMode) => {
+    setSendKeyMode(mode);
+    try {
+      localStorage.setItem(SEND_KEY_STORAGE_KEY, mode);
+    } catch {
+      // 保存できなくても切替自体は有効にする
+    }
+  };
   const handleUiAction = (action: AgentUiAction) => {
     if (action.type === "setYear") {
       setSelectedYear(action.year);
@@ -137,7 +157,13 @@ export const AppPage = () => {
       onYearChange={setSelectedYear}
       dataSource={dataSource}
       transactionCount={transactions.length}
-      agentPanel={<AgentChatPanel transactions={transactions} onUiAction={handleUiAction} />}
+      agentPanel={
+        <AgentChatPanel
+          transactions={transactions}
+          onUiAction={handleUiAction}
+          sendKeyMode={sendKeyMode}
+        />
+      }
       onViewChange={setActiveView}
     >
       <ActiveComponent
@@ -149,6 +175,8 @@ export const AppPage = () => {
         onNavigate={setActiveView}
         themeMode={themeMode}
         onThemeModeChange={handleThemeModeChange}
+        sendKeyMode={sendKeyMode}
+        onSendKeyModeChange={handleSendKeyModeChange}
       />
     </AppTemplate>
   );

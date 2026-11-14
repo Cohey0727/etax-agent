@@ -1,5 +1,6 @@
 import { Transaction } from "@etax/shared";
 import { AppView } from "./AppView";
+import { SendKeyMode } from "./Chat";
 import { ThemeMode } from "./Theme";
 
 /**
@@ -19,4 +20,7 @@ export interface ViewPageProps {
   onNavigate?: (view: AppView) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
+  /** チャットの送信キー。設定画面だけが使うが、テーマと同じく共通の形で配る。 */
+  sendKeyMode: SendKeyMode;
+  onSendKeyModeChange: (mode: SendKeyMode) => void;
 }

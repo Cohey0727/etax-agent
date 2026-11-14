@@ -1,10 +1,12 @@
 import { Button, Card, Col, Icon, IconName, Text } from "@components/atoms";
-import { ThemeMode } from "@types";
+import { SendKeyMode, ThemeMode } from "@types";
 import styles from "./SettingsPanel.css";
 
 export interface SettingsPanelProps {
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
+  sendKeyMode: SendKeyMode;
+  onSendKeyModeChange: (mode: SendKeyMode) => void;
 }
 
 const THEME_OPTIONS: readonly {
@@ -23,14 +25,29 @@ const THEME_OPTIONS: readonly {
   { mode: "dark", label: "ダーク", icon: "moon", caption: "常に暗いテーマで表示します" },
 ];
 
+const SEND_KEY_OPTIONS: readonly { mode: SendKeyMode; label: string; caption: string }[] = [
+  { mode: "enter", label: "Enter", caption: "Enterで送信します（Shift+Enterで改行）" },
+  {
+    mode: "modEnter",
+    label: "⌘ + Enter",
+    caption: "⌘+Enter（WindowsはCtrl+Enter）で送信します（Enterで改行）",
+  },
+];
+
 const INFO_ROWS: readonly { label: string; value: string }[] = [
   { label: "アプリ", value: "eTaxAgent — 確定申告 準備ツール" },
   { label: "データの保存先", value: "このブラウザとホームサーバー（帳簿・学習履歴）" },
   { label: "申告の提出", value: "e-Tax での最終提出は納税者本人が行います" },
 ];
 
-export const SettingsPanel = ({ themeMode, onThemeModeChange }: SettingsPanelProps) => {
+export const SettingsPanel = ({
+  themeMode,
+  onThemeModeChange,
+  sendKeyMode,
+  onSendKeyModeChange,
+}: SettingsPanelProps) => {
   const activeOption = THEME_OPTIONS.find((option) => option.mode === themeMode);
+  const activeSendKeyOption = SEND_KEY_OPTIONS.find((option) => option.mode === sendKeyMode);
   return (
     <Col gap="lg">
       <Card>
@@ -53,6 +70,33 @@ export const SettingsPanel = ({ themeMode, onThemeModeChange }: SettingsPanelPro
               ))}
             </div>
             {activeOption ? <Text variant="caption">{activeOption.caption}</Text> : null}
+          </Col>
+        </Col>
+      </Card>
+      <Card>
+        <Col gap="md">
+          <Text variant="sectionTitle">チャット</Text>
+          <Col gap="sm">
+            <Text variant="statLabel">送信キー</Text>
+            <div className={styles.optionRow}>
+              {SEND_KEY_OPTIONS.map((option) => (
+                <Button
+                  key={option.mode}
+                  variant={option.mode === sendKeyMode ? "primary" : "ghost"}
+                  size="sm"
+                  onClick={() => onSendKeyModeChange(option.mode)}
+                  aria-pressed={option.mode === sendKeyMode}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+            {activeSendKeyOption ? (
+              <Text variant="caption">{activeSendKeyOption.caption}</Text>
+            ) : null}
+            <Text variant="caption">
+              日本語入力の変換確定（Enter）では、どちらの設定でも送信しません。
+            </Text>
           </Col>
         </Col>
       </Card>
