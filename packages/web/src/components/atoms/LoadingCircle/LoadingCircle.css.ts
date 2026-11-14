@@ -9,12 +9,12 @@ const spin = keyframes({
 const styles = {
   root: style({
     display: "inline-block",
-    width: "16px",
-    height: "16px",
+    width: theme.component.spinnerSize,
+    height: theme.component.spinnerSize,
     borderRadius: "50%",
-    border: `2px solid ${theme.color.accentSoft}`,
+    border: `2px solid ${theme.color.border}`,
     borderTopColor: theme.color.accent,
-    animation: `${spin} 0.8s linear infinite`,
+    animation: `${spin} 0.9s linear infinite`,
   }),
 };
 

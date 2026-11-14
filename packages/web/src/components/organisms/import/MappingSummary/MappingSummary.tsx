@@ -1,5 +1,6 @@
 import { Transaction } from "@etax/shared";
 import { Badge, Button, Card, Col, Row, Table, TableCell, TableHeaderCell, Text } from "@components/atoms";
+import styles from "./MappingSummary.css";
 import { AlertBox } from "@components/molecules";
 import { CsvMapping, ImportCsvResponse } from "@types";
 
@@ -44,7 +45,7 @@ export const MappingSummary = ({ result, onUseTransactions }: MappingSummaryProp
           <tbody>
             {mappingRows.map(({ key, label }) => (
               <tr key={key}>
-                <TableHeaderCell style={{ width: 180 }}>{label}</TableHeaderCell>
+                <TableHeaderCell className={styles.labelCell}>{label}</TableHeaderCell>
                 <TableCell>{result.mapping[key] ?? "—（なし）"}</TableCell>
               </tr>
             ))}

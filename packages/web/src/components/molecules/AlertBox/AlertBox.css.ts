@@ -1,12 +1,19 @@
-import { style, styleVariants } from "@vanilla-extract/css";
+import { keyframes, style, styleVariants } from "@vanilla-extract/css";
 import { theme } from "@configs";
+
+// 通知はぽよんと弾んで現れる。
+const popIn = keyframes({
+  "0%": { opacity: 0, transform: "scale(0.94) translateY(4px)" },
+  "100%": { opacity: 1, transform: "scale(1) translateY(0)" },
+});
 
 const styles = {
   root: style({
     border: "1px solid",
-    borderRadius: theme.borderRadius.sm,
-    padding: "10px 12px",
+    borderRadius: theme.borderRadius.md,
+    padding: `${theme.space.sm} ${theme.space.md}`,
     fontSize: theme.fontSizes.sm,
+    animation: `${popIn} 0.4s ${theme.animation.spring} both`,
   }),
   variant: styleVariants({
     notice: {

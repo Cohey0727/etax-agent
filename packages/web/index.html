@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>eTaxAgent — 確定申告 準備ツール</title>
+    <script>
+      // 描画前にテーマを確定させ、ライト/ダークのちらつきを防ぐ。
+      try {
+        var saved = localStorage.getItem("etax-theme");
+        if (saved === "dark" || saved === "light") {
+          document.documentElement.dataset.theme = saved;
+        } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          document.documentElement.dataset.theme = "dark";
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

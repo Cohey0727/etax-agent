@@ -9,28 +9,20 @@ import {
   taxableSalesFromBreakdown,
   Transaction,
 } from "@etax/shared";
-import { useMemo, useState } from "react";
-import { Card, Col, Row, Select, Text } from "@components/atoms";
+import { useMemo } from "react";
+import { Col, Text } from "@components/atoms";
 import { ConsumptionTaxComparison, ConsumptionTaxRow } from "../ConsumptionTaxComparison";
 import { IncomeSummary } from "../IncomeSummary";
 
 export interface DashboardPanelProps {
   transactions: Transaction[];
+  /** 左上の年度切替で選ばれている年 */
+  year: number;
 }
 
 const methodOrder: readonly ConsumptionMethod[] = ["standard", "simplified", "special20"];
 
-export const DashboardPanel = ({ transactions }: DashboardPanelProps) => {
-  const years = useMemo(
-    () => [...new Set(transactions.map((t) => t.year))].sort((a, b) => b - a),
-    [transactions],
-  );
-  const [selectedYear, setSelectedYear] = useState<number>(
-    years[0] ?? new Date().getFullYear(),
-  );
-  // 選択中の年がデータに無い場合は、state を直さず描画時点で最新の年に詰める
-  const year = years.includes(selectedYear) ? selectedYear : (years[0] ?? selectedYear);
-
+export const DashboardPanel = ({ transactions, year }: DashboardPanelProps) => {
   const tx = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const breakdown = useMemo(() => aggregateIncome(tx), [tx]);
   const blue = useMemo(
@@ -64,23 +56,9 @@ export const DashboardPanel = ({ transactions }: DashboardPanelProps) => {
 
   return (
     <Col gap="md">
-      <Card>
-        <Row gap="md" align="center" wrap>
-          <label>
-            対象年{" "}
-            <Select value={year} onChange={(e) => setSelectedYear(Number(e.target.value))}>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}年
-                </option>
-              ))}
-            </Select>
-          </label>
-          <Text variant="muted">
-            取引 {tx.length} 件（全 {transactions.length} 件）／ 税込経理
-          </Text>
-        </Row>
-      </Card>
+      <Text variant="muted">
+        {year}年の集計 ／ 取引 {tx.length} 件（全 {transactions.length} 件）／ 税込経理
+      </Text>
       <IncomeSummary breakdown={breakdown} blue={blue} />
       <ConsumptionTaxComparison
         year={year}

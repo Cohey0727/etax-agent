@@ -1,6 +1,7 @@
 export * from "./Row";
 export * from "./Col";
 export * from "./Button";
+export * from "./Icon";
 export * from "./Input";
 export * from "./Select";
 export * from "./Textarea";

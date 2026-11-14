@@ -1,0 +1,59 @@
+# eTaxAgent Web デザインシステム
+
+画面の見た目はこの文書と `src/configs/theme.css.ts` のデザイントークンで統一する。
+スタイルは Atomic Design の各コンポーネントが自分の `<Component>.css.ts` に持ち、
+トークン経由でだけ値を引く。コンポーネント間・画面間での見た目のばらつきはバグとして扱う。
+
+## デザイントークン（`configs/theme.css.ts`）
+
+| グループ | 内容 | 使い方 |
+| --- | --- | --- |
+| `color` | 意味で命名した色（地 `bg`、面 `surface`、文字 `text`/`textSubtle`/`muted`、アクセント `accent` 系、増減 `positive`/`negative`、警告・エラー、バー3色） | 色リテラルを直書きしない。彩色は意味のある場所だけ |
+| `space` | 余白の段階（xs 4 / sm 8 / md 16 / lg 24 / xl 32 / xxl 48） | コンポーネント間・内部の間隔はこの段階から選ぶ |
+| `borderRadius` | sm 10 / md 14 / lg 20 / pill | 角丸はこの4種だけ |
+| `fontSizes` | xs 12 〜 xxl 26 | 文字サイズは `Text` のバリアント経由を基本にする |
+| `fontWeight` | regular / medium / semibold / bold | 数値を直書きしない |
+| `lineHeight` / `letterSpacing` | tight / snug / normal、tight / snug / wide | `Text` のバリアントに集約 |
+| `shadow` | card / cardHover / button | 影はこの3種だけ。新規の影は作らない |
+| `animation` | イージング `spring` / `springSoft` / `springHard` と長さ `durationFast` / `durationBase` / `durationSlow` | 動きはバウンス系イージングで統一（下記） |
+| `component` | サイドバー幅、コンテンツ最大幅、カード余白、入力欄余白、表セル余白、バー高さ等、複数箇所で共有する寸法 | 共有寸法はここに足す。1箇所だけの寸法はそのコンポーネントの css.ts に置く |
+
+## 色の方針
+
+- 地はごく淡いラベンダーグレー（`bg`）、面は白（`surface`）、アクセントはインディゴ（`accent`）1色。
+- グラデーションはブランドマークのみ（`gradientStart` → `accent`）。
+- 増減は `positive` / `negative`、注意は `warn*`、異常は `error*`。意味のない装飾色を増やさない。
+
+## アニメーションの方針
+
+- 既定の動きはバウンス（`spring` 系イージング＋小さなオーバーシュート）。登場・選択・ホバー・押下に使う。
+- 登場: カードはポップ（`Card` に内蔵、並び順の遅延は親の `globalStyle` で付ける）、画面切替はスプリングライズ（`AppTemplate`）。
+- 状態変化: 選択中タブ／ナビはポップ、ボタンはホバーで僅かに拡大、押下で縮小、ナビはホバーで右へスライド。
+- チャートのバーはバネで伸ばす。チャットの吹き出し・通知・バッジもポップで出す。
+- `prefers-reduced-motion` の利用者には `configs/global.css.ts` が一律で動きを止める。新規アニメーションもこの対象になるよう、CSS アニメーション／トランジションで実装する。
+
+## ダークモード
+
+- トークンはコントラクト（`createThemeContract`）化し、ライトを `:root`、ダークを `:root[data-theme="dark"]` に割り当てる。コンポーネントは変数経由でしか色を見ないので、切替は変数の差し替えだけで全画面に効く。
+- 切替はヘッダ右上のトグル（太陽/月アイコン）。選択は localStorage（`etax-theme`）に保存し、未保存時は OS の `prefers-color-scheme` に従う。初期値は `index.html` の先行スクリプトが描画前に確定させる。
+- ダークで差し替えるのは `color` と `shadow` のみ。余白・角丸・文字・アニメーションは共通。
+
+## レイアウト
+
+- 左サイドバー: ブランド、年度切替（全画面共通の単一の出所は AppPage の状態）、ナビ、表示中データ。
+- 年度は左上のサイドバーで切り替える。各画面は props で受け取るだけで、独自の年度状態を持たない。
+- エージェントは右ドロワー（`AppTemplate` が骨格を持つ）。ヘッダの「エージェント」ボタンで開閉し、閉じている間もマウントしたままにして会話状態を保つ。左ナビには載せない。
+
+## エージェントの画面操作
+
+- エージェントは質問への回答に加え、画面操作を代行する。ツール実行結果（`aggregate_year` / `consumption_tax` / `amendment_delta`）から `AgentUiAction`（年度切替・画面遷移）を導き、`AgentChatPanel` の `onUiAction` 経由で AppPage が実際の状態変更を行う。
+- 代行した操作はパネル内に「画面操作: …」として表示する。新しい代行操作を足すときは、ツールと操作の対応を `deriveUiActions` に追加する。
+
+## Atomic Design の置き場所
+
+- atoms: `Button` `Card` `Text` `Badge` `Input` `Select` `Textarea` `Table` 系 `Row` `Col` `Icon` `LoadingCircle`。ドメインを持たない。
+- molecules: `Tabs`（向きで横タブ／サイドバーナビに切替）、`AlertBox`。
+- organisms: 画面領域ごとの機能部品（dashboard / import / amend / agent 配下）。
+- templates: `AppTemplate`（サイドバー＋ヘッダの骨格）。pages: 画面ごとの配線。
+- スタイルの例外は2つだけ: データ由来の値（バーの幅 % など）のインライン指定と、
+  子要素への遅延付けなど親から子を狙う `globalStyle`（vanilla-extract の制約による）。
