@@ -13,6 +13,14 @@ const styles = {
     width: "100%",
     minWidth: "92px",
   }),
+  // 操作列は保存・削除を必ず横並びにする。表の列幅計算で潰れてボタンが
+  // 縦に積まれるのを防ぐため、セルは折り返し禁止、行は内容幅に固定する。
+  actionsCell: style({
+    whiteSpace: "nowrap",
+  }),
+  actionsRow: style({
+    width: "max-content",
+  }),
   descriptionInput: style({
     width: "100%",
     minWidth: "180px",

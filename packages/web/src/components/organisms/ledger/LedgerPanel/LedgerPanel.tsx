@@ -384,8 +384,8 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
                           aria-label="出所"
                         />
                       </TableCell>
-                      <TableCell>
-                        <Row gap="sm" align="center">
+                      <TableCell className={styles.actionsCell}>
+                        <Row gap="sm" align="center" className={styles.actionsRow}>
                           <Button
                             variant="primary"
                             size="sm"
