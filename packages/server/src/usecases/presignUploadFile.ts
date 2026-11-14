@@ -1,9 +1,9 @@
 /**
- * presignUploadFile.ts — アップロード用署名付きURLの発行ユースケース（usecases）。
+ * presignUploadFile.ts — アップロード受け口URLの発行ユースケース（usecases）。
  *
- * フロー: 画面がこのURLへ直接ファイルを PUT する → 画面はファイルIDを
- * 解析依頼（/api/receipts/analyze）に渡す → サーバーがストレージから取得する。
- * ファイル実体はこのサーバーを経由しない。
+ * フロー: 画面が返されたURL（このサーバーの PUT /api/files/content/<key>）へ
+ * 直接ファイルを送る → 画面はファイルIDを解析依頼（/api/receipts/analyze）に
+ * 渡す → サーバーがローカルフォルダから取得する。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
@@ -47,15 +47,9 @@ export const presignUploadFileRoute = createRoute({
 
 export const presignUploadFileHandler: RouteHandler<typeof presignUploadFileRoute> = async (c) => {
   const body = c.req.valid("json");
-  const storageConfig = loadStorageConfig();
-  if (!storageConfig.configured) {
-    throw new HTTPException(503, {
-      message: "ファイルストレージ（Garage）が設定されていないため、アップロードできません",
-    });
-  }
   const fileId = crypto.randomUUID();
   try {
-    const storage = createStorageClient(storageConfig);
+    const storage = createStorageClient(loadStorageConfig());
     const uploadUrl = await storage.presignUpload(
       receiptObjectKey(fileId),
       body.contentType,

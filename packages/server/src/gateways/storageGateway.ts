@@ -1,22 +1,25 @@
 /**
- * storageGateway.ts — ファイルストレージ（Garage / S3互換）への接続（gateways）。
+ * storageGateway.ts — ファイルストレージ（ローカルフォルダ）への接続（gateways）。
  *
- * 役割は2つだけ:
- *   1. ブラウザが直接アップロードするための署名付きURL（PUT）を発行する。
- *      発行には公開エンドポイント（ブラウザから到達できるURL）を使う。
- *   2. アップロード済みオブジェクトをサーバー内部エンドポイントから取得する。
- *      （コンテナ間通信など、内部向けURLで引く）
+ * アップロードされたファイルはデータフォルダ配下（files/）に保存する。
+ * 同梱アプリ前提のため外部ストレージ（S3互換）は使わない。
  *
- * 認証情報は署名にのみ使い、URL自体にはキーIDしか現れない（有効期限つき）。
+ * 役割は3つ:
+ *   1. ブラウザが直接アップロードするための受け口URLを返す
+ *      （このサーバー自身の PUT /api/files/content/<key> を指す相対URL）。
+ *   2. アップロード実体を受け取って保存する（save）。
+ *   3. 保存済みファイルを取得する（download）。
+ *
+ * MIMEタイプは本体ファイルの隣に <key>.meta（テキスト）として保存する。
  */
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve, sep } from "node:path";
 import { StorageConfig } from "../lib/config";
 
 /** ストレージ操作の失敗を表す例外。 */
 export class StorageError extends Error {}
 
-/** 指定したオブジェクトが存在しない場合の例外。 */
+/** 指定したファイルが存在しない場合の例外。 */
 export class StorageObjectNotFoundError extends StorageError {}
 
 export interface DownloadedObject {
@@ -25,9 +28,14 @@ export interface DownloadedObject {
 }
 
 export interface StorageClient {
-  /** ブラウザ直アップロード用の署名付きURL（PUT）を発行する。 */
+  /**
+   * ブラウザ直アップロード用の受け口URLを返す。
+   * このサーバーの PUT エンドポイントを指す相対URL（同一オリジン）。
+   */
   presignUpload(key: string, contentType: string, expiresInSeconds: number): Promise<string>;
-  /** オブジェクトを取得して Base64 で返す。 */
+  /** アップロード実体を保存する。 */
+  save(key: string, data: Uint8Array, contentType: string): Promise<void>;
+  /** ファイルを取得して Base64 で返す。 */
   download(key: string): Promise<DownloadedObject>;
 }
 
@@ -36,69 +44,54 @@ export function receiptObjectKey(fileId: string): string {
   return `receipts/${fileId}`;
 }
 
-function createS3Client(endpoint: string, config: StorageConfig): S3Client {
-  return new S3Client({
-    endpoint,
-    region: config.region,
-    credentials: {
-      accessKeyId: config.accessKeyId ?? "",
-      secretAccessKey: config.secretAccessKey ?? "",
-    },
-    // Garage はパス形式（endpoint/bucket/key）を基本とする。
-    forcePathStyle: true,
-    // 署名付きURLにチェックサム計算（CRC32）を混ぜない。SDK 既定のままだと
-    // 空ボディ前提のチェックサムが URL に入り、実ファイルのアップロードが
-    // InvalidDigest で弾かれる。必要時だけ計算する設定にする。
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-  });
+/** キーが保存先フォルダの外を指していないか検証し、実パスを返す。 */
+function resolveKeyPath(filesDir: string, key: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(key) || key.includes("..")) {
+    throw new StorageError(`不正なファイルキーです: ${key}`);
+  }
+  const root = resolve(filesDir);
+  const path = resolve(join(root, key));
+  if (path !== root && !path.startsWith(root + sep)) {
+    throw new StorageError(`不正なファイルキーです: ${key}`);
+  }
+  return path;
 }
 
 export function createStorageClient(config: StorageConfig): StorageClient {
-  if (!config.configured || !config.publicEndpoint || !config.internalEndpoint) {
-    throw new StorageError(
-      "ファイルストレージ（Garage）が設定されていません。" +
-        "S3_PUBLIC_ENDPOINT / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY を設定してください",
-    );
-  }
-  const publicClient = createS3Client(config.publicEndpoint, config);
-  const internalClient = createS3Client(config.internalEndpoint, config);
+  const filesDir = config.filesDir;
   return {
-    async presignUpload(key, contentType, expiresInSeconds) {
+    async presignUpload(key) {
+      resolveKeyPath(filesDir, key);
+      return `/api/files/content/${key}`;
+    },
+    async save(key, data, contentType) {
+      const path = resolveKeyPath(filesDir, key);
       try {
-        return await getSignedUrl(
-          publicClient,
-          new PutObjectCommand({ Bucket: config.bucket, Key: key, ContentType: contentType }),
-          { expiresIn: expiresInSeconds },
-        );
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, data);
+        await writeFile(`${path}.meta`, contentType || "application/octet-stream", "utf8");
       } catch (e) {
         throw new StorageError(
-          `アップロード用URLの発行に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+          `ファイルの保存に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     },
     async download(key) {
+      const path = resolveKeyPath(filesDir, key);
+      let bytes: Buffer;
       try {
-        const object = await internalClient.send(
-          new GetObjectCommand({ Bucket: config.bucket, Key: key }),
-        );
-        if (!object.Body) {
-          throw new StorageObjectNotFoundError(`ファイルが見つかりません: ${key}`);
-        }
-        const bytes = await object.Body.transformToByteArray();
-        return {
-          dataBase64: Buffer.from(bytes).toString("base64"),
-          mimeType: object.ContentType || "application/octet-stream",
-        };
-      } catch (e) {
-        if (e instanceof StorageError) throw e;
-        if (e instanceof Error && e.name === "NoSuchKey") {
-          throw new StorageObjectNotFoundError(`ファイルが見つかりません: ${key}`);
-        }
-        throw new StorageError(
-          `ファイルの取得に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        bytes = await readFile(path);
+      } catch {
+        throw new StorageObjectNotFoundError(`ファイルが見つかりません: ${key}`);
       }
+      let mimeType = "application/octet-stream";
+      try {
+        const meta = (await readFile(`${path}.meta`, "utf8")).trim();
+        if (meta) mimeType = meta;
+      } catch {
+        // メタが無ければ既定のMIMEを使う。
+      }
+      return { dataBase64: bytes.toString("base64"), mimeType };
     },
   };
 }

@@ -4,7 +4,7 @@
  * 判定して「帳簿ドラフト」を返す。帳簿への追加は画面側の確定操作で行う。
  *
  * 画像の受け取りは2経路:
- *   1. fileId: 署名付きURLでストレージ（Garage）へ直アップロード済みのもの。
+ *   1. fileId: アップロード受け口URLでローカル保存済みのもの。
  *      サーバーが内部エンドポイントから取得する。
  *   2. imageBase64 + mimeType: 従来経路（ストレージ未設定時のフォールバック）。
  */
@@ -77,11 +77,6 @@ async function resolveReceiptImage(body: {
   }
   if (body.fileId) {
     const storageConfig = loadStorageConfig();
-    if (!storageConfig.configured) {
-      throw new HTTPException(503, {
-        message: "ファイルストレージ（Garage）が設定されていないため、ファイルを取得できません",
-      });
-    }
     try {
       const storage = createStorageClient(storageConfig);
       const downloaded = await storage.download(receiptObjectKey(body.fileId));

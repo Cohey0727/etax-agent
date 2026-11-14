@@ -130,23 +130,21 @@ docker-compose.yml  Postgres 16（ユーザーの Mac 上で使用）
 cd ~/workspace/etax-agent
 bun install
 
-# （任意）DBを使う場合: Postgres を起動してマイグレーションを当てる
-docker compose up -d db
-cp .env.example .env   # DATABASE_URL が compose の設定と一致している
-bun run db:migrate
+# DB は SQLite（packages/server/data/etax.db）で、起動時に自動で用意される
+cp .env.example .env
 
 # 開発サーバー（API: 3001 / Web: 5173、Web は /api を API へプロキシ）
 bun run dev
 ```
 
-DBが無くてもサーバーは起動し、計算・CSV取込（プレビュー）・画面はそのまま使えます。
+DB（SQLite）が開けない場合でもサーバーは起動し、計算・CSV取込（プレビュー）・画面はそのまま使えます。
 取引の保存などDBが必要な API は 503 で理由を返します。
 
 ### 環境変数
 
 | 変数 | 意味 |
 |---|---|
-| `DATABASE_URL` | Postgres 接続文字列。未設定ならDB機能のみ無効 |
+| `ETAX_DATA_DIR` | 運用データ（SQLite DB・アップロードファイル）の置き場。既定は `packages/server/data` |
 | `PORT` | APIサーバーのポート（既定 3001） |
 | `AGENT_SCHEMA` | `openai`（OpenAI互換）または `claude`（Anthropic）。既定は `openai` |
 | `AGENT_API_KEY` | APIキー。CSVのAIマッピングと対話エージェントでのみ使用 |

@@ -1,34 +1,52 @@
 /**
- * db.ts — Drizzle + postgres.js の遅延初期化（lib: 共通インスタンス）。
+ * db.ts — Drizzle + better-sqlite3（lib: 共通インスタンス）。
  *
- * import 時点では接続しない。DATABASE_URL が未設定でも
- * サーバーは起動し、DB不要のエンドポイント（health / calc / 取込プレビュー等）は
- * そのまま動く。DB が必要な処理は getDb() が null のとき 503 を返す。
+ * DB はアプリのデータフォルダ内の SQLite ファイル（既定: <data>/etax.db、
+ * ETAX_DB_FILE で上書き可）。同梱アプリ前提のため DB は常時利用可能で、
+ * getDb() が null を返すのはファイルを開けなかった場合のみ。
+ * import 時点では開かない（初回利用時に遅延オープンする）。
  */
-import { drizzle, PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import Database from "better-sqlite3";
+import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { sql } from "drizzle-orm";
-import postgres from "postgres";
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { serverDataDir } from "./config";
 import * as schema from "../repositories/schema";
 
-export type Db = PostgresJsDatabase<typeof schema>;
+export type Db = BetterSQLite3Database<typeof schema>;
 
 let cached: Db | null = null;
 let attempted = false;
 
-/** DATABASE_URL が設定されているか。 */
-export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+/** SQLite ファイルのパス。 */
+export function databaseFilePath(): string {
+  return process.env.ETAX_DB_FILE || join(serverDataDir(), "etax.db");
 }
 
-/** DBインスタンスを返す。未設定なら null（接続はここで初めて張る）。 */
+/** DB が利用可能か（ローカルファイルのため通常は常に true）。 */
+export function isDatabaseConfigured(): boolean {
+  return true;
+}
+
+/** DBインスタンスを返す。開けなければ null（接続はここで初めて張る）。 */
 export function getDb(): Db | null {
-  if (!process.env.DATABASE_URL) return null;
-  if (!cached) {
-    const client = postgres(process.env.DATABASE_URL, { max: 5, connect_timeout: 5 });
+  if (cached) return cached;
+  attempted = true;
+  try {
+    const filePath = databaseFilePath();
+    mkdirSync(dirname(filePath), { recursive: true });
+    const client = new Database(filePath);
+    client.pragma("journal_mode = WAL");
+    client.pragma("foreign_keys = ON");
     cached = drizzle(client, { schema });
-    attempted = true;
+    return cached;
+  } catch (e) {
+    console.warn(
+      `帳簿DBを開けませんでした: ${e instanceof Error ? e.message : String(e)}`,
+    );
+    return null;
   }
-  return cached;
 }
 
 /** DB接続を試みたことがあるか。 */
@@ -41,42 +59,41 @@ let tablesEnsured = false;
 /**
  * テーブルが無ければ作る（冪等）。drizzle-kit のマイグレーションを持ち込まず、
  * 起動時にスキーマを自己修復するための最小DDL（schema.ts と一致させる）。
- * DATABASE_URL 未設定なら何もしない。
  */
 export async function ensureTables(): Promise<void> {
   if (tablesEnsured) return;
   const db = getDb();
   if (!db) return;
-  await db.execute(sql`
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS imports (
-      id serial PRIMARY KEY,
+      id integer PRIMARY KEY AUTOINCREMENT,
       filename text,
       source_name text,
-      mapping jsonb,
+      mapping text,
       row_count integer NOT NULL DEFAULT 0,
-      created_at timestamp NOT NULL DEFAULT now()
+      created_at integer NOT NULL
     )
   `);
-  await db.execute(sql`
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS transactions (
-      id serial PRIMARY KEY,
-      date varchar(10) NOT NULL,
+      id integer PRIMARY KEY AUTOINCREMENT,
+      date text NOT NULL,
       description text NOT NULL DEFAULT '',
       amount integer NOT NULL,
       account text NOT NULL DEFAULT '',
       category text NOT NULL DEFAULT '未分類',
       income_type text NOT NULL DEFAULT 'other',
       import_id integer REFERENCES imports(id),
-      created_at timestamp NOT NULL DEFAULT now()
+      created_at integer NOT NULL
     )
   `);
-  await db.execute(sql`
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS filing_status (
       year integer PRIMARY KEY,
-      confirmed_at timestamp,
-      calculated_at timestamp,
-      submitted_at timestamp,
-      updated_at timestamp NOT NULL DEFAULT now()
+      confirmed_at integer,
+      calculated_at integer,
+      submitted_at integer,
+      updated_at integer NOT NULL
     )
   `);
   tablesEnsured = true;

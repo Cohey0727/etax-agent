@@ -98,15 +98,18 @@ export async function replaceYearTransactionRows(
     incomeType: string;
   }[],
 ): Promise<TransactionRow[]> {
-  return db.transaction(async (tx) => {
-    await tx
-      .delete(transactionsTable)
-      .where(like(transactionsTable.date, `${year}-%`));
+  // better-sqlite3 ドライバではトランザクションのコールバックは同期実行する
+  // （await を挟むと "Transaction function cannot return a promise" になる）。
+  return db.transaction((tx) => {
+    tx.delete(transactionsTable)
+      .where(like(transactionsTable.date, `${year}-%`))
+      .run();
     if (values.length === 0) return [];
-    const inserted = await tx
+    const inserted = tx
       .insert(transactionsTable)
       .values([...values])
-      .returning();
+      .returning()
+      .all();
     return inserted.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
   });
 }

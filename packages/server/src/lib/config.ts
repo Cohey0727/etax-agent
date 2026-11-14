@@ -19,13 +19,10 @@
  *   SYSTEMONE_API_KEY  : 任意。クラウドの判定API（TypeSafe Jev / Liquid d1 等）用
  *   SYSTEMONE_MODEL    : 任意。判定モデル名の上書き
  *
- * ファイルストレージ（Garage / S3互換）用の環境変数:
- *   S3_PUBLIC_ENDPOINT   : 署名付きURLの発行先（ブラウザから到達できる公開URL）
- *   S3_INTERNAL_ENDPOINT : サーバー内部からの取得先（未指定なら公開URLを使う）
- *   S3_BUCKET            : バケット名（デフォルト: etax-files）
- *   S3_REGION            : リージョン（デフォルト: garage）
- *   S3_ACCESS_KEY_ID     : アクセスキー
- *   S3_SECRET_ACCESS_KEY : シークレットキー
+ * データフォルダの環境変数:
+ *   ETAX_DATA_DIR : 運用データ（SQLite DB・アップロードファイル・学習履歴・
+ *                   freee試算表）の置き場。未指定なら packages/server/data。
+ *   ETAX_DB_FILE  : 任意。SQLite ファイルのパスの上書き。
  */
 import { join } from "node:path";
 
@@ -100,45 +97,31 @@ export function loadSystemOneConfig(): SystemOneConfig {
 }
 
 /**
- * サーバー側データファイルの置き場（packages/server/data）。
+ * サーバー側データファイルの置き場。
+ * 既定は packages/server/data。ETAX_DATA_DIR があればそちらを使う
+ * （デスクトップ同梱時はアプリのデータフォルダを指す）。
  * freee試算表の実績データや科目判定の学習履歴など、Git管理しない
  * 運用データを置く（.gitignore 対象）。
  */
 export function serverDataDir(): string {
-  return join(import.meta.dir, "../../data");
+  return process.env.ETAX_DATA_DIR || join(import.meta.dirname, "../../data");
 }
 
 // ---------------------------------------------------------------------------
-// ファイルストレージ（Garage / S3互換）の設定
+// ファイルストレージ（ローカルフォルダ）の設定
 // ---------------------------------------------------------------------------
 
 export interface StorageConfig {
-  /** 署名付きURLの発行に使う公開エンドポイント（ブラウザから到達できるURL）。 */
-  publicEndpoint: string | null;
-  /** サーバー内部からオブジェクトを取得するエンドポイント。 */
-  internalEndpoint: string | null;
-  bucket: string;
-  region: string;
-  accessKeyId: string | null;
-  secretAccessKey: string | null;
-  /** URL発行と取得に必要な設定が揃っているか。 */
+  /** アップロードファイルの保存先フォルダ（データフォルダ配下の files）。 */
+  filesDir: string;
+  /** ローカル保存のため常時 true（将来の外部ストレージ再導入に備えた形）。 */
   configured: boolean;
 }
 
-/** 環境変数からファイルストレージの設定を読み込む。 */
+/** ファイルストレージの設定を返す。保存先はデータフォルダ配下に固定する。 */
 export function loadStorageConfig(): StorageConfig {
-  const publicEndpoint = (process.env.S3_PUBLIC_ENDPOINT || "").replace(/\/+$/, "") || null;
-  const internalEndpoint =
-    (process.env.S3_INTERNAL_ENDPOINT || "").replace(/\/+$/, "") || publicEndpoint;
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID || null;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || null;
   return {
-    publicEndpoint,
-    internalEndpoint,
-    bucket: process.env.S3_BUCKET || "etax-files",
-    region: process.env.S3_REGION || "garage",
-    accessKeyId,
-    secretAccessKey,
-    configured: Boolean(publicEndpoint && internalEndpoint && accessKeyId && secretAccessKey),
+    filesDir: join(serverDataDir(), "files"),
+    configured: true,
   };
 }

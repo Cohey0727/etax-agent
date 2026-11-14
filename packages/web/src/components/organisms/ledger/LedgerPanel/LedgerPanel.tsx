@@ -238,8 +238,8 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   if (status === "unavailable") {
     return (
       <AlertBox variant="notice">
-        帳簿データベースに接続できません。サーバーの DATABASE_URL が未設定か、データベースが
-        起動していません。接続されると、この画面で取引の保存・編集ができるようになります。
+        帳簿データベースに接続できません。サーバー側でDB（SQLite）を開けていない可能性があります。
+        接続されると、この画面で取引の保存・編集ができるようになります。
       </AlertBox>
     );
   }

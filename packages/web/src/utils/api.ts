@@ -95,8 +95,8 @@ const UPLOADABLE_IMAGE_TYPES: readonly string[] = [
 
 /**
  * 領収書画像を読み取り、科目判定まで済んだ帳簿ドラフトを返す。
- * 基本フロー: 署名付きURLでストレージ（Garage）へ直接アップロードし、
- * ファイルIDで解析を依頼する。ストレージが使えない場合は、画像を
+ * 基本フロー: 受け口URLでサーバーへアップロードし、
+ * ファイルIDで解析を依頼する。アップロードが使えない場合は、画像を
  * Base64で直接渡す従来経路にフォールバックする。
  */
 export async function analyzeReceiptImage(file: File): Promise<AnalyzeReceiptResponse> {

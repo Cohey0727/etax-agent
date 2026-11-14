@@ -6,9 +6,9 @@
  * 既存クライアント互換のため本プロジェクトでは `error` を正とする）。
  */
 
-/** DATABASE_URL 未設定時に DB 必須エンドポイントが返す文言。 */
+/** DB を開けなかった時に DB 必須エンドポイントが返す文言。 */
 export const databaseUnavailableMessage =
-  "DATABASE_URL が未設定のためDB機能は利用できません。docker compose up -d db で Postgres を起動し、DATABASE_URL を設定してください。";
+  "データフォルダ内のDB（SQLite）を開けないためDB機能は利用できません。ETAX_DATA_DIR の書き込み権限を確認してください。";
 
 /** 未知の例外から表示用メッセージを取り出す。 */
 export function errorMessage(e: unknown): string {

@@ -27,14 +27,13 @@
  *   POST   /api/classify/batch      勘定科目の一括判定（カード明細等）
  *   POST   /api/classify/feedback   確定した科目を学習履歴に記録
  *   POST   /api/receipts/analyze    領収書画像の読み取り＋科目判定（要 AGENT_API_KEY）
- *   POST   /api/files/presign-upload ストレージ（Garage）直アップロード用の署名付きURL発行
+ *   POST   /api/files/presign-upload アップロード受け口URLの発行（ローカル保存）
  *   GET    /api/freee/trial-balance freee試算表（データディレクトリの取り込み済み実績）
  *   POST   /api/etax/export-xtx     e-Tax 申告等データ（XTX）の出力（DB不要・ステートレス）
  *
- * DATABASE_URL 未設定でも起動し、DB不要のエンドポイントはそのまま動く。
- * Bun で起動した場合は packages/web のビルド成果物（dist）も同一ポートで配信する
+ * DB はデータフォルダ内の SQLite ファイルで、起動時にテーブルを自己修復する。
+ * 起動時は packages/web のビルド成果物（dist）も同一ポートで配信する
  * （React は静的ファイルなので、公開するポートはこの1つで足りる）。
- * Cloudflare Workers では worker.ts が ASSETS バインディングで配信する。
  * 最終提出（e-Tax）は本サーバーでは行わない（納税者本人の操作）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
@@ -105,25 +104,16 @@ app.notFound(async (c) => {
 const port = Number(process.env.PORT ?? 3001);
 console.log(`eTaxAgent server listening on http://localhost:${port}`);
 
-// 帳簿（DB）を使う場合は、起動時にテーブルを自己修復しておく。
-// DBコンテナの初期化完了を待てるよう、しばらくリトライする。
-// 最後まで失敗してもサーバー自体は起動を続け、DB必須の処理だけが 503 になる。
+// 起動時に帳簿DB（SQLite）のテーブルを自己修復しておく。
+// 失敗してもサーバー自体は起動を続け、DB必須の処理だけが 503 になる。
 void (async () => {
-  const maxAttempts = 15;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      await ensureTables();
-      if (isDatabaseConfigured()) console.log("帳簿DBのテーブルを確認しました");
-      return;
-    } catch (e) {
-      if (attempt === maxAttempts) {
-        console.warn(
-          `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
-        );
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+  try {
+    await ensureTables();
+    console.log("帳簿DBのテーブルを確認しました");
+  } catch (e) {
+    console.warn(
+      `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 })();
 
