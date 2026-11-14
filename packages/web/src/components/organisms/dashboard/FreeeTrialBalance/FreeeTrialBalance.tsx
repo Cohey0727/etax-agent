@@ -10,7 +10,7 @@ export interface FreeeTrialBalanceProps {
 }
 
 /**
- * freee試算表（実績）の表示。サーバーに取り込み済みデータが無い場合は
+ * 損益計算書（実績）の表示。サーバーに取り込み済みデータが無い場合は
  * 何も表示しない（サンプル集計の画面を邪魔しないため）。
  */
 export const FreeeTrialBalance = ({ year }: FreeeTrialBalanceProps) => {
@@ -32,10 +32,9 @@ export const FreeeTrialBalance = ({ year }: FreeeTrialBalanceProps) => {
   return (
     <Card>
       <Col gap="sm">
-        <Text variant="sectionTitle">freee試算表（実績）— {year}年</Text>
+        <Text variant="sectionTitle">損益計算書（実績）— {year}年</Text>
         <Text variant="muted">
-          {data.source}の取り込み済み実績です（税込経理）。上の集計（サンプル／取込CSV）とは別の、
-          freeeに記録された実際の金額です。
+          取り込み済みの実際の金額です（税込経理）。上の集計（サンプル／取込CSV）とは別の数字です。
         </Text>
         <div className={styles.scroll}>
           <Table>
