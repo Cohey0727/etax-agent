@@ -24,7 +24,6 @@ export const theme = createThemeContract({
     accentText: null,
     gradientStart: null,
     focusRing: null,
-    scrim: null,
     positive: null,
     negative: null,
     barStandard: null,
@@ -42,7 +41,7 @@ export const theme = createThemeContract({
   fontWeight: { regular: null, medium: null, semibold: null, bold: null },
   lineHeight: { tight: null, snug: null, normal: null },
   letterSpacing: { tight: null, snug: null, wide: null },
-  shadow: { card: null, cardHover: null, button: null, drawer: null },
+  shadow: { card: null, cardHover: null, button: null },
   // バウンス系イージングと標準の長さ。spring は強めのオーバーシュート、springSoft は控えめ。
   animation: {
     spring: null,
@@ -52,12 +51,13 @@ export const theme = createThemeContract({
     durationBase: null,
     durationSlow: null,
   },
-  zIndex: { scrim: null, drawer: null },
+  zIndex: { actionBar: null },
   // コンポーネント固有の寸法。複数箇所で共有するものだけ置く。
   component: {
     sidebarWidth: null,
     contentMaxWidth: null,
-    drawerWidth: null,
+    agentPanelWidth: null,
+    actionBarHeight: null,
     brandMarkSize: null,
     cardPadding: null,
     controlPaddingY: null,
@@ -86,11 +86,12 @@ const baseTokens = {
     durationBase: "0.3s",
     durationSlow: "0.45s",
   },
-  zIndex: { scrim: "30", drawer: "40" },
+  zIndex: { actionBar: "20" },
   component: {
     sidebarWidth: "252px",
     contentMaxWidth: "1180px",
-    drawerWidth: "420px",
+    agentPanelWidth: "420px",
+    actionBarHeight: "42px",
     brandMarkSize: "38px",
     cardPadding: "20px",
     controlPaddingY: "10px",
@@ -123,7 +124,6 @@ createGlobalTheme(":root", theme, {
     accentText: "#4a3aff",
     gradientStart: "#6a5cff",
     focusRing: "rgba(74, 58, 255, 0.18)",
-    scrim: "rgba(23, 23, 60, 0.35)",
     positive: "#1f9d66",
     negative: "#e5484d",
     barStandard: "#c7c3f7",
@@ -138,7 +138,6 @@ createGlobalTheme(":root", theme, {
     card: "0 1px 3px rgba(23, 23, 60, 0.04), 0 12px 32px rgba(23, 23, 60, 0.06)",
     cardHover: "0 2px 4px rgba(23, 23, 60, 0.05), 0 16px 40px rgba(23, 23, 60, 0.09)",
     button: "0 6px 20px rgba(74, 58, 255, 0.3)",
-    drawer: "-24px 0 64px rgba(23, 23, 60, 0.18)",
   },
 });
 
@@ -162,7 +161,6 @@ createGlobalTheme(":root[data-theme=\"dark\"]", theme, {
     accentText: "#b3a8ff",
     gradientStart: "#8d80ff",
     focusRing: "rgba(122, 108, 255, 0.32)",
-    scrim: "rgba(0, 0, 0, 0.55)",
     positive: "#4cc38a",
     negative: "#f0876f",
     barStandard: "#4c4a6e",
@@ -177,6 +175,5 @@ createGlobalTheme(":root[data-theme=\"dark\"]", theme, {
     card: "inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 40px rgba(0, 0, 0, 0.45)",
     cardHover: "inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 20px 48px rgba(0, 0, 0, 0.55)",
     button: "0 6px 20px rgba(122, 108, 255, 0.35)",
-    drawer: "-24px 0 64px rgba(0, 0, 0, 0.5)",
   },
 });

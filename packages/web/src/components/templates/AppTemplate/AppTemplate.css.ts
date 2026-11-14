@@ -20,22 +20,50 @@ const bob = keyframes({
   "50%": { transform: "translateY(-2.5px)" },
 });
 
+// 左右パネルの幅アニメーション（VS Code のサイドバー開閉と同じ考え方）。
+const panelTransition = `width ${theme.animation.durationSlow} ${theme.animation.springSoft}`;
+
 const styles = {
-  shell: style({
+  root: style({
+    display: "flex",
+    flexDirection: "column",
     minHeight: "100vh",
+    paddingBottom: theme.component.actionBarHeight,
+  }),
+  shell: style({
+    flex: 1,
     "@media": {
       "(max-width: 900px)": { flexDirection: "column" },
     },
   }),
+  // 左サイドバー。レイアウトを占有し、幅で開閉する（内側は固定幅で潰れない）。
   sidebar: style({
     width: theme.component.sidebarWidth,
     flexShrink: 0,
-    background: theme.color.surface,
-    borderRight: `1px solid ${theme.color.border}`,
-    padding: `${theme.space.lg} ${theme.space.md}`,
+    overflow: "hidden",
+    transition: panelTransition,
+    "@media": {
+      "(max-width: 900px)": { width: "100%" },
+    },
+  }),
+  sidebarClosed: style({
+    width: "0px",
+    "@media": {
+      "(max-width: 900px)": { display: "none" },
+    },
+  }),
+  sidebarInner: style({
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.space.lg,
+    width: theme.component.sidebarWidth,
+    height: "100vh",
     position: "sticky",
     top: 0,
-    height: "100vh",
+    padding: `${theme.space.lg} ${theme.space.md}`,
+    background: theme.color.surface,
+    borderRight: `1px solid ${theme.color.border}`,
+    boxSizing: "border-box",
     "@media": {
       "(max-width: 900px)": {
         width: "100%",
@@ -45,12 +73,6 @@ const styles = {
         borderBottom: `1px solid ${theme.color.border}`,
       },
     },
-  }),
-  sidebarInner: style({
-    display: "flex",
-    flexDirection: "column",
-    gap: theme.space.lg,
-    height: "100%",
   }),
   brandMark: style({
     display: "flex",
@@ -99,50 +121,67 @@ const styles = {
     paddingTop: theme.space.md,
     marginTop: theme.space.lg,
   }),
-  // エージェントの右ドロワー。閉じている間もマウントしたままにして会話状態を保つ。
-  scrim: style({
-    position: "fixed",
-    inset: 0,
-    background: theme.color.scrim,
-    opacity: 0,
-    pointerEvents: "none",
-    transition: `opacity ${theme.animation.durationBase} ease`,
-    zIndex: theme.zIndex.scrim,
+  // 右のエージェントパネル。ドロワーではなくレイアウトを占有し、メイン画面と
+  // 同時に操作できる。閉じている間もマウントしたままにして会話状態を保つ。
+  agentPanel: style({
+    width: "0px",
+    flexShrink: 0,
+    overflow: "hidden",
+    transition: panelTransition,
+    "@media": {
+      "(max-width: 900px)": { width: "0px" },
+    },
   }),
-  scrimOpen: style({
-    opacity: 1,
-    pointerEvents: "auto",
+  agentPanelOpen: style({
+    width: theme.component.agentPanelWidth,
+    "@media": {
+      "(max-width: 900px)": { width: "100%" },
+    },
   }),
-  drawer: style({
-    position: "fixed",
-    top: 0,
-    right: 0,
-    width: theme.component.drawerWidth,
-    maxWidth: "92vw",
-    height: "100dvh",
-    background: theme.color.surface,
-    borderLeft: `1px solid ${theme.color.border}`,
-    boxShadow: theme.shadow.drawer,
-    transform: "translateX(105%)",
-    transition: `transform 0.5s ${theme.animation.springSoft}`,
-    zIndex: theme.zIndex.drawer,
-    visibility: "hidden",
-  }),
-  drawerOpen: style({
-    transform: "translateX(0)",
-    visibility: "visible",
-  }),
-  drawerInner: style({
+  panelInner: style({
     display: "flex",
     flexDirection: "column",
     gap: theme.space.md,
-    height: "100%",
-    padding: `${theme.space.md}`,
+    width: theme.component.agentPanelWidth,
+    height: "100vh",
+    position: "sticky",
+    top: 0,
+    padding: theme.space.md,
+    background: theme.color.surface,
+    borderLeft: `1px solid ${theme.color.border}`,
+    boxSizing: "border-box",
+    "@media": {
+      "(max-width: 900px)": {
+        width: "100%",
+        height: "auto",
+        position: "static",
+        borderLeft: "none",
+        borderTop: `1px solid ${theme.color.border}`,
+      },
+    },
   }),
-  drawerBody: style({
+  panelBody: style({
     flex: 1,
     overflowY: "auto",
     minHeight: 0,
+  }),
+  // 画面下部の細いアクションバー（VS Code のステータスバー相当）。
+  // 左右パネルの開閉トグルを置く。
+  actionBar: style({
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: theme.component.actionBarHeight,
+    background: theme.color.surface,
+    borderTop: `1px solid ${theme.color.border}`,
+    zIndex: theme.zIndex.actionBar,
+    display: "flex",
+    alignItems: "center",
+    padding: `0 ${theme.space.md}`,
+  }),
+  barInner: style({
+    flex: 1,
   }),
 };
 

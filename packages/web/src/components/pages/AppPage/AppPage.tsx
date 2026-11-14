@@ -25,7 +25,6 @@ export const AppPage = () => {
   const [dataSource, setDataSource] = useState("サンプルデータ");
   const [activeView, setActiveView] = useState<AppView>(AppView.Dashboard);
   const [selectedYear, setSelectedYear] = useState<number>(0);
-  const [agentOpen, setAgentOpen] = useState(false);
   const [darkMode, setDarkMode] = useState<boolean>(
     () =>
       typeof document !== "undefined" && document.documentElement.dataset.theme === "dark",
@@ -77,9 +76,6 @@ export const AppPage = () => {
       onYearChange={setSelectedYear}
       dataSource={dataSource}
       transactionCount={transactions.length}
-      agentOpen={agentOpen}
-      onToggleAgent={() => setAgentOpen((open) => !open)}
-      onCloseAgent={() => setAgentOpen(false)}
       darkMode={darkMode}
       onToggleDarkMode={handleToggleDarkMode}
       agentPanel={<AgentChatPanel transactions={transactions} onUiAction={handleUiAction} />}

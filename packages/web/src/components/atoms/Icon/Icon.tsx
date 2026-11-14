@@ -1,7 +1,16 @@
 import { ReactNode } from "react";
 import styles from "./Icon.css";
 
-export type IconName = "grid" | "import" | "amend" | "agent" | "sun" | "moon" | "close";
+export type IconName =
+  | "grid"
+  | "import"
+  | "amend"
+  | "agent"
+  | "sun"
+  | "moon"
+  | "close"
+  | "panelLeft"
+  | "panelRight";
 
 // 線画アイコンのパス集。色は currentColor で呼び出し側に委ねる。
 const ICON_PATHS: Record<IconName, ReactNode> = {
@@ -53,6 +62,18 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </>
+  ),
+  panelLeft: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9.5 4v16" />
+    </>
+  ),
+  panelRight: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M14.5 4v16" />
     </>
   ),
 };
