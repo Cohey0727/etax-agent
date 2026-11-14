@@ -16,6 +16,10 @@ import {
   calculateConsumptionHandler,
   calculateConsumptionRoute,
 } from "../usecases/calculateConsumption";
+import {
+  calculateIncomeTaxHandler,
+  calculateIncomeTaxRoute,
+} from "../usecases/calculateIncomeTax";
 
 const app = new OpenAPIHono();
 app.openapi(
@@ -32,6 +36,11 @@ app.openapi(
   calculateAmendmentRoute,
   calculateAmendmentHandler,
   legacyValidationHook(calculateAmendmentValidationMessage),
+);
+app.openapi(
+  calculateIncomeTaxRoute,
+  calculateIncomeTaxHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
 );
 
 export default app;

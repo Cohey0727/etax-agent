@@ -1,12 +1,22 @@
 import {
   amendmentDelta,
   computeCorrectedFigures,
+  computeIncomeTax,
+  DeductionInputs,
   filterYear,
   SAMPLE_ORIGINAL_2024,
+  TaxCreditInputs,
   Transaction,
 } from "@etax/shared";
 import { useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Table, TableCell, TableHeaderCell, Text } from "@components/atoms";
+import { DeductionPanel } from "../DeductionPanel";
+import {
+  DeductionState,
+  loadDeductionState,
+  saveDeductionState,
+} from "../DeductionPanel/deductionStorage";
+import { TaxCreditPanel } from "../TaxCreditPanel";
 import { formatNumber } from "@utils";
 import styles from "./AmendDiffPanel.css";
 
@@ -67,6 +77,33 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
   const [correctedEdits, setCorrectedEdits] = useState<Partial<Record<FigureKey, number>>>({});
   const [correctedTax, setCorrectedTax] = useState<number | null>(null);
   const [diffOnly, setDiffOnly] = useState(true);
+  const [deductionState, setDeductionState] = useState<DeductionState>(() =>
+    loadDeductionState(year),
+  );
+
+  const updateDeductions = (next: DeductionInputs) => {
+    const state = { ...deductionState, deductions: next };
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
+  const updateTaxCredits = (next: TaxCreditInputs) => {
+    const state = { ...deductionState, taxCredits: next };
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
+
+  // 所得税額（修正後）は、青色控除後の所得合計に控除・税額控除を適用して自動計算する。
+  const totalIncome = computed._detail.business_income + computed._detail.real_estate_income;
+  const taxResult = useMemo(
+    () =>
+      computeIncomeTax({
+        year,
+        totalIncome,
+        deductions: deductionState.deductions,
+        taxCredits: deductionState.taxCredits,
+      }),
+    [year, totalIncome, deductionState],
+  );
 
   // 修正後は取引データからの自動計算が既定値。欄を書き換えた項目だけ上書きされる。
   const corrected: FigureForm = {
@@ -75,8 +112,8 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
     real_estate_revenue: correctedEdits.real_estate_revenue ?? computed.real_estate_revenue,
     real_estate_expenses: correctedEdits.real_estate_expenses ?? computed.real_estate_expenses,
     blue_deduction: correctedEdits.blue_deduction ?? computed.blue_deduction,
-    housing_loan_credit: correctedEdits.housing_loan_credit ?? 0,
-    income_tax: correctedTax,
+    housing_loan_credit: correctedEdits.housing_loan_credit ?? taxResult.taxCredits.housingLoan,
+    income_tax: correctedTax ?? taxResult.finalTax,
   };
 
   const delta = amendmentDelta(toRecord(original, year), toRecord(corrected, year), year);
@@ -127,8 +164,10 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
             <Text variant="sectionTitle">{year}年分 修正申告 — 申告済み vs 修正後</Text>
             <Text variant="muted">
               申告済みの数字を左の欄に入力してください。修正後は現在の取引データから自動計算されます
-              （違う場合はそのまま書き換えられます）。住宅ローン控除が対象外の年は、修正後を
-              0 のままにしてください。申告済みの入力はこの端末に保存されます。
+              （違う場合はそのまま書き換えられます）。所得控除・税額控除はこの下のパネルで入力し、
+              所得税額（修正後）と住宅ローン控除（修正後）はそこから自動計算されます。住宅ローン控除が
+              対象外の年は、税額控除パネルの住宅借入金等特別控除を空欄（0）のままにしてください。
+              入力内容はこの端末に保存されます。
             </Text>
           </Col>
 
@@ -140,7 +179,7 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
             </Text>
           ) : (
             <Text variant="muted">
-              所得税額（修正後）を入力すると、税額の増減がここに出ます。・ 差分のある項目{" "}
+              所得税額（申告済み）を入力すると、税額の増減がここに出ます。・ 差分のある項目{" "}
               {changedCount}件
             </Text>
           )}
@@ -276,7 +315,6 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
                     className={styles.numberInput}
                     type="number"
                     value={corrected.income_tax ?? ""}
-                    placeholder="未計算"
                     onChange={(e) =>
                       setCorrectedTax(e.target.value === "" ? null : toAmount(e.target.value))
                     }
@@ -306,6 +344,18 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
           </Text>
         </Col>
       </Card>
+
+      <DeductionPanel
+        year={year}
+        deductions={deductionState.deductions}
+        breakdown={taxResult.deductions}
+        onChange={updateDeductions}
+      />
+      <TaxCreditPanel
+        taxCredits={deductionState.taxCredits}
+        result={taxResult}
+        onChange={updateTaxCredits}
+      />
     </Col>
   );
 };
