@@ -109,3 +109,40 @@ export interface LedgerTransactionInput {
   category: string;
   income_type: string;
 }
+
+/** e-Tax XTX出力の納税者情報。サーバーAPIのワイヤ形式（snake_case）。 */
+export interface XtxTaxpayerInput {
+  name: string;
+  name_kana: string;
+  zip_code: string;
+  address: string;
+  address_line2: string;
+  birth_date: string;
+  phone: string;
+  tax_office_name: string;
+  tax_office_code: string;
+  my_number: string;
+  occupation: string;
+  shop_name: string;
+  jan1_address: string;
+}
+
+/** e-Tax 申告等データ（XTX）出力のリクエスト。 */
+export interface ExportXtxRequest {
+  year: number;
+  amendment: boolean;
+  submission_date: string;
+  taxpayer: XtxTaxpayerInput;
+  transactions: Transaction[];
+  deductions: unknown;
+  tax_credits: unknown;
+  withholding_tax: number;
+  prepaid_tax: number;
+  original_third_period_tax: number | null;
+}
+
+/** e-Tax 申告等データ（XTX）出力のレスポンス。 */
+export interface ExportXtxResponse {
+  filename: string;
+  xtx: string;
+}

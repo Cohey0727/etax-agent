@@ -4,6 +4,8 @@ import {
   AgentChatResponse,
   AnalyzeReceiptResponse,
   ChatMessage,
+  ExportXtxRequest,
+  ExportXtxResponse,
   FilingStatus,
   FreeeTrialBalance,
   ImportCsvResponse,
@@ -181,6 +183,16 @@ export async function updateFilingStatus(
   } catch {
     return null;
   }
+}
+
+/** e-Tax 申告等データ（XTX）を生成する。失敗時はサーバーのエラー文言で例外。 */
+export async function exportXtxFile(request: ExportXtxRequest): Promise<ExportXtxResponse> {
+  const resp = await fetch("/api/etax/export-xtx", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJson<ExportXtxResponse>(resp);
 }
 
 // ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ import {
   saveDeductionState,
 } from "../DeductionPanel/deductionStorage";
 import { TaxCreditPanel } from "../TaxCreditPanel";
+import { TaxpayerPanel } from "../TaxpayerPanel";
 import { formatNumber } from "@utils";
 import styles from "./AmendDiffPanel.css";
 
@@ -355,6 +356,13 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
         taxCredits={deductionState.taxCredits}
         result={taxResult}
         onChange={updateTaxCredits}
+      />
+      <TaxpayerPanel
+        year={year}
+        transactions={yearTransactions}
+        deductions={deductionState.deductions}
+        taxCredits={deductionState.taxCredits}
+        originalIncomeTax={original.income_tax}
       />
     </Col>
   );

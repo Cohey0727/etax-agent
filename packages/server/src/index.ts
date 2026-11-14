@@ -29,6 +29,7 @@
  *   POST   /api/receipts/analyze    領収書画像の読み取り＋科目判定（要 AGENT_API_KEY）
  *   POST   /api/files/presign-upload ストレージ（Garage）直アップロード用の署名付きURL発行
  *   GET    /api/freee/trial-balance freee試算表（データディレクトリの取り込み済み実績）
+ *   POST   /api/etax/export-xtx     e-Tax 申告等データ（XTX）の出力（DB不要・ステートレス）
  *
  * DATABASE_URL 未設定でも起動し、DB不要のエンドポイントはそのまま動く。
  * Bun で起動した場合は packages/web のビルド成果物（dist）も同一ポートで配信する
@@ -48,6 +49,7 @@ import { loadSystemOneConfig } from "./lib/config";
 import agentRoutes from "./routes/agent";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
+import etaxRoutes from "./routes/etax";
 import filesRoutes from "./routes/files";
 import filingStatusRoutes from "./routes/filingStatus";
 import freeeRoutes from "./routes/freee";
@@ -69,6 +71,7 @@ app.route("/", receiptsRoutes);
 app.route("/", filesRoutes);
 app.route("/", freeeRoutes);
 app.route("/", filingStatusRoutes);
+app.route("/", etaxRoutes);
 
 // 画面（React のビルド成果物）を API と同一ポートで配信する。
 // API ルートより後に登録するので、/api/* は上のルートが先に処理する。
