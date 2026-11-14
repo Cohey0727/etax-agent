@@ -18,18 +18,21 @@ import { LedgerPage } from "../LedgerPage";
 import { ReceiptPage } from "../ReceiptPage";
 import { SettingsPage } from "../SettingsPage";
 
+// nav: サイドバーに出す画面。取込・領収書は帳簿の「追加」からの遷移専用、
+// 修正申告は提出済みになった年だけ出る導線専用（サイドバーには出さない）。
 const appViews = [
-  { id: AppView.Dashboard, label: "ダッシュボード", icon: "grid", Component: DashboardPage },
-  { id: AppView.Import, label: "取引・CSV取込", icon: "import", Component: ImportPage },
-  { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", Component: ReceiptPage },
-  { id: AppView.Amend, label: "修正申告", icon: "amend", Component: AmendPage },
-  { id: AppView.Ledger, label: "帳簿", icon: "book", Component: LedgerPage },
-  { id: AppView.Filing, label: "確定申告", icon: "fileCheck", Component: FilingPage },
-  { id: AppView.Settings, label: "設定", icon: "settings", Component: SettingsPage },
+  { id: AppView.Dashboard, label: "ダッシュボード", icon: "grid", nav: true, Component: DashboardPage },
+  { id: AppView.Import, label: "取引・CSV取込", icon: "import", nav: false, Component: ImportPage },
+  { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", nav: false, Component: ReceiptPage },
+  { id: AppView.Amend, label: "修正申告", icon: "amend", nav: false, Component: AmendPage },
+  { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
+  { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
+  { id: AppView.Settings, label: "設定", icon: "settings", nav: true, Component: SettingsPage },
 ] as const satisfies readonly {
   id: AppView;
   label: string;
   icon: IconName;
+  nav: boolean;
   Component: ComponentType<ViewPageProps>;
 }[];
 

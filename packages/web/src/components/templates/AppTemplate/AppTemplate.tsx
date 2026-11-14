@@ -6,7 +6,8 @@ import { AppView } from "@types";
 import styles from "./AppTemplate.css";
 
 export interface AppTemplateProps {
-  views: readonly { id: AppView; label: string; icon: IconName }[];
+  /** 全画面の登録。nav が false の画面はサイドバーに出さず、他画面からの遷移専用。 */
+  views: readonly { id: AppView; label: string; icon: IconName; nav: boolean }[];
   activeView: AppView;
   years: readonly number[];
   selectedYear: number;
@@ -34,6 +35,7 @@ export const AppTemplate = ({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const activeLabel = views.find((view) => view.id === activeView)?.label ?? "";
+  const navViews = views.filter((view) => view.nav);
   return (
     <div className={styles.root}>
       <Row gap="none" align="start" className={styles.shell}>
@@ -63,7 +65,7 @@ export const AppTemplate = ({
                 ))}
               </Select>
             </Col>
-            <Tabs items={views} activeId={activeView} onChange={onViewChange} orientation="vertical" />
+            <Tabs items={navViews} activeId={activeView} onChange={onViewChange} orientation="vertical" />
             <div className={styles.spacer} />
             <div className={styles.dataPanel}>
               <Col gap="sm">
