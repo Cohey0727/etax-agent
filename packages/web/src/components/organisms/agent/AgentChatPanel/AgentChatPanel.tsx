@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { Button, Input, LoadingCircle, Row, Text } from "@components/atoms";
+import { Button, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { AppView, ChatMessage, ChatRole } from "@types";
 import { agentChat } from "@utils";
@@ -157,15 +157,20 @@ export const AgentChatPanel = ({ transactions, onUiAction }: AgentChatPanelProps
       {toolLog.length > 0 && (
         <Text variant="muted">実行したツール: {toolLog.slice(-5).join(" / ")}</Text>
       )}
-      <Row gap="sm" className={styles.inputRow}>
-        <Input
+      <Row gap="sm" align="end" className={styles.inputRow}>
+        <Textarea
           className={styles.inputFlex}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") void send();
+            // Enterで送信、Shift+Enterで改行。日本語入力の変換確定Enterでは送らない。
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void send();
+            }
           }}
-          placeholder="質問を入力（Enterで送信）"
+          placeholder="質問を入力（Enterで送信・Shift+Enterで改行）"
+          rows={2}
           disabled={loading}
         />
         <Button onClick={() => void send()} disabled={loading}>
