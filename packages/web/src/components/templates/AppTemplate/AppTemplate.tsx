@@ -78,8 +78,10 @@ export const AppTemplate = ({
       loadPanelOpen(SIDEBAR_OPEN_KEY, true) &&
       !(typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches),
   );
-  const [agentPanelOpen, setAgentPanelOpen] = useState(() =>
-    loadPanelOpen(AGENT_OPEN_KEY, false),
+  const [agentPanelOpen, setAgentPanelOpen] = useState(
+    () =>
+      loadPanelOpen(AGENT_OPEN_KEY, false) &&
+      !(typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches),
   );
 
   const toggleSidebar = () => {
@@ -192,6 +194,9 @@ export const AppTemplate = ({
             </Col>
           </div>
         </main>
+        {isNarrow && agentPanelOpen ? (
+          <div className={styles.backdrop} onClick={toggleAgentPanel} aria-hidden="true" />
+        ) : null}
         <aside
           className={clsx(styles.agentPanel, agentPanelOpen && styles.agentPanelOpen)}
           aria-hidden={!agentPanelOpen}

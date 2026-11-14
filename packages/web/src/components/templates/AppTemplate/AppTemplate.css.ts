@@ -182,13 +182,27 @@ const styles = {
     overflow: "hidden",
     transition: panelTransition,
     "@media": {
-      "(max-width: 900px)": { width: "0px" },
+      // 狭い画面では右からせり出すフルドロワーにする（サイドバーと同じ）。
+      "(max-width: 900px)": {
+        position: "fixed",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: "min(420px, 100vw)",
+        zIndex: 50,
+        transform: "translateX(105%)",
+        transition: `transform ${theme.animation.durationSlow} ${theme.animation.springSoft}`,
+        boxShadow: theme.shadow.cardHover,
+      },
     },
   }),
   agentPanelOpen: style({
     width: theme.component.agentPanelWidth,
     "@media": {
-      "(max-width: 900px)": { width: "100%" },
+      "(max-width: 900px)": {
+        width: "min(420px, 100vw)",
+        transform: "translateX(0)",
+      },
     },
   }),
   panelInner: style({
@@ -202,11 +216,10 @@ const styles = {
     borderLeft: `1px solid ${theme.color.border}`,
     boxSizing: "border-box",
     "@media": {
+      // ドロワー内は全高。会話ログが伸びて入力欄が下端に残る。
       "(max-width: 900px)": {
         width: "100%",
-        height: "auto",
-        borderLeft: "none",
-        borderTop: `1px solid ${theme.color.border}`,
+        height: "100%",
       },
     },
   }),

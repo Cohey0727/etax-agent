@@ -25,11 +25,6 @@ const styles = {
     minHeight: 0,
     overflowY: "auto",
     paddingRight: theme.space.xs,
-    "@media": {
-      "(max-width: 900px)": {
-        maxHeight: "55vh",
-      },
-    },
   }),
   bubble: style({
     padding: "10px 14px",
