@@ -184,6 +184,15 @@ export const AppTemplate = ({
         <Row gap="sm" align="center" justify="spaceBetween" className={styles.barInner}>
           <Row gap="sm" align="center">
             <Button
+              variant={sidebarOpen ? "tabActive" : "ghost"}
+              size="sm"
+              onClick={toggleSidebar}
+              aria-pressed={sidebarOpen}
+              aria-label="メニュー（左サイドバー）の開閉"
+            >
+              <Icon name="panelLeft" size={17} />
+            </Button>
+            <Button
               variant={activeView === AppView.Settings ? "tabActive" : "ghost"}
               size="sm"
               onClick={() => onViewChange(AppView.Settings)}
@@ -192,15 +201,6 @@ export const AppTemplate = ({
               title="設定"
             >
               <Icon name="settings" size={17} />
-            </Button>
-            <Button
-              variant={sidebarOpen ? "tabActive" : "ghost"}
-              size="sm"
-              onClick={toggleSidebar}
-              aria-pressed={sidebarOpen}
-              aria-label="メニュー（左サイドバー）の開閉"
-            >
-              <Icon name="panelLeft" size={17} />
             </Button>
           </Row>
           <Button
