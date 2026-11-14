@@ -80,7 +80,7 @@ export const AppTemplate = ({
                 <div className={styles.brandMark}>
                   <Icon name="bill" size={21} />
                 </div>
-                <Col gap="sm">
+                <Col gap="none">
                   <Text variant="sectionTitle">eTaxAgent</Text>
                   <Text variant="caption">確定申告 準備ツール</Text>
                 </Col>
