@@ -5,6 +5,8 @@ services:
   app:
     build: .
     container_name: etax-agent-app
+    # 再起動後も自動で戻る（Docker Desktop が起動していれば）。
+    restart: unless-stopped
     # AGENT_API_KEY など秘密はホスト側の .env から読む（Git管理外）。
     env_file:
       - packages/server/.env
