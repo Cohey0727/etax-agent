@@ -1,9 +1,23 @@
 import { sampleTransactions, Transaction } from "@etax/shared";
-import { ComponentType, useEffect, useMemo, useState } from "react";
-import { IconName } from "@components/atoms";
+import { ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button, IconName } from "@components/atoms";
 import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
 import { AppTemplate } from "@components/templates";
-import { AppView, SendKeyMode, ThemeMode, ViewPageProps } from "@types";
+import {
+  AgentConnectionConfig,
+  AppView,
+  ChatMessage,
+  SendKeyMode,
+  ThemeMode,
+  ViewPageProps,
+} from "@types";
+import {
+  archiveChatSession,
+  ChatSession,
+  loadChatSessions,
+  parsePath,
+  pathForView,
+} from "@utils";
 import {
   fetchLedgerTransactions,
   ledgerRowToTransaction,
@@ -20,6 +34,7 @@ import { SettingsPage } from "../SettingsPage";
 
 // nav: サイドバーに出す画面。取込・領収書は帳簿の「追加」からの遷移専用、
 // 修正申告は提出済みになった年だけ出る導線専用（サイドバーには出さない）。
+// 設定は下部アクションバー左下のボタン専用。
 const appViews = [
   { id: AppView.Dashboard, label: "ダッシュボード", icon: "grid", nav: true, Component: DashboardPage },
   { id: AppView.Import, label: "取引・CSV取込", icon: "import", nav: false, Component: ImportPage },
@@ -27,7 +42,7 @@ const appViews = [
   { id: AppView.Amend, label: "修正申告", icon: "amend", nav: false, Component: AmendPage },
   { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
   { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
-  { id: AppView.Settings, label: "設定", icon: "settings", nav: true, Component: SettingsPage },
+  { id: AppView.Settings, label: "設定", icon: "settings", nav: false, Component: SettingsPage },
 ] as const satisfies readonly {
   id: AppView;
   label: string;
@@ -77,14 +92,48 @@ const readStoredYear = (): number => {
   }
 };
 
+const CONNECTION_STORAGE_KEY = "etax-agent-connection";
+
+const readStoredAgentConnection = (): AgentConnectionConfig => {
+  try {
+    const raw = localStorage.getItem(CONNECTION_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<AgentConnectionConfig>;
+      return {
+        baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
+        model: typeof parsed.model === "string" ? parsed.model : "",
+        apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+      };
+    }
+  } catch {
+    // 読めない環境では未設定として扱う
+  }
+  return { baseUrl: "", model: "", apiKey: "" };
+};
+
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);
+  // 起動時のURL（/<画面>/<年度>）があれば、保存値より優先して初期状態にする。
+  const initialRoute = useMemo(() => parsePath(window.location.pathname), []);
+  const initialView =
+    initialRoute && appViews.some((view) => view.id === initialRoute.view)
+      ? initialRoute.view
+      : AppView.Dashboard;
   const [transactions, setTransactions] = useState<Transaction[]>(sample);
   const [dataSource, setDataSource] = useState("サンプルデータ");
-  const [activeView, setActiveView] = useState<AppView>(AppView.Dashboard);
-  const [selectedYear, setSelectedYear] = useState<number>(() => readStoredYear());
+  const [activeView, setActiveView] = useState<AppView>(initialView);
+  const [selectedYear, setSelectedYear] = useState<number>(
+    () => initialRoute?.year ?? readStoredYear(),
+  );
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const [sendKeyMode, setSendKeyMode] = useState<SendKeyMode>(() => readStoredSendKeyMode());
+  const [agentConnection, setAgentConnection] = useState<AgentConnectionConfig>(() =>
+    readStoredAgentConnection(),
+  );
+  // エージェント会話の履歴。見出し横の履歴ボタンとパネルで状態を共有する。
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewingSession, setViewingSession] = useState<ChatSession | null>(null);
 
   const years = useMemo(
     () => [...new Set(transactions.map((t) => t.year))].sort((a, b) => b - a),
@@ -149,17 +198,61 @@ export const AppPage = () => {
     }
   };
   // 年度の切替は端末に保存し、次回も同じ年度から始める。
-  const handleYearChange = (nextYear: number) => {
+  const handleYearChange = useCallback((nextYear: number) => {
     setSelectedYear(nextYear);
     try {
       localStorage.setItem(YEAR_STORAGE_KEY, String(nextYear));
     } catch {
       // 保存できなくても切替自体は有効にする
     }
+  }, []);
+
+  // 画面・年度の状態をURL（/<画面>/<年度>）へ反映する。初回だけ履歴を汚さず置き換える。
+  const firstUrlSyncRef = useRef(true);
+  useEffect(() => {
+    const path = pathForView(activeView, year);
+    if (window.location.pathname !== path) {
+      if (firstUrlSyncRef.current) {
+        window.history.replaceState(null, "", path);
+      } else {
+        window.history.pushState(null, "", path);
+      }
+    }
+    firstUrlSyncRef.current = false;
+  }, [activeView, year]);
+
+  // ブラウザの戻る/進むに合わせて画面・年度を復元する。
+  useEffect(() => {
+    const onPopState = () => {
+      const route = parsePath(window.location.pathname);
+      if (!route || !appViews.some((view) => view.id === route.view)) return;
+      setActiveView(route.view);
+      if (route.year) handleYearChange(route.year);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [handleYearChange]);
+
+  const handleAgentConnectionChange = (config: AgentConnectionConfig) => {
+    setAgentConnection(config);
+    try {
+      localStorage.setItem(CONNECTION_STORAGE_KEY, JSON.stringify(config));
+    } catch {
+      // 保存できなくてもこのセッションでは有効にする
+    }
+  };
+  const handleArchiveChat = (messages: ChatMessage[]) => {
+    setChatSessions(archiveChatSession(messages));
+  };
+  const handleBackToChat = () => {
+    setViewingSession(null);
+    setHistoryOpen(false);
   };
   const handleUiAction = (action: AgentUiAction) => {
     if (action.type === "setYear") {
       handleYearChange(action.year);
+    } else if (action.type === "setTheme") {
+      handleThemeModeChange(action.mode);
     } else if (appViews.some((view) => view.id === action.view)) {
       setActiveView(action.view);
     }
@@ -182,7 +275,29 @@ export const AppPage = () => {
           transactions={transactions}
           onUiAction={handleUiAction}
           sendKeyMode={sendKeyMode}
+          agentConnection={agentConnection}
+          sessions={chatSessions}
+          historyOpen={historyOpen}
+          viewing={viewingSession}
+          onSelectSession={setViewingSession}
+          onArchive={handleArchiveChat}
         />
+      }
+      agentHeaderExtra={
+        historyOpen || viewingSession ? (
+          <Button variant="ghost" size="sm" onClick={handleBackToChat}>
+            ← チャットに戻る
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={chatSessions.length === 0}
+            onClick={() => setHistoryOpen(true)}
+          >
+            履歴{chatSessions.length > 0 ? `（${chatSessions.length}）` : ""}
+          </Button>
+        )
       }
       onViewChange={setActiveView}
     >
@@ -197,6 +312,8 @@ export const AppPage = () => {
         onThemeModeChange={handleThemeModeChange}
         sendKeyMode={sendKeyMode}
         onSendKeyModeChange={handleSendKeyModeChange}
+        agentConnection={agentConnection}
+        onAgentConnectionChange={handleAgentConnectionChange}
       />
     </AppTemplate>
   );

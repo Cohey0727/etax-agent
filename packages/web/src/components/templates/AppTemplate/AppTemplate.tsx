@@ -15,6 +15,8 @@ export interface AppTemplateProps {
   dataSource: string;
   transactionCount: number;
   agentPanel: ReactNode;
+  /** エージェント見出しの右に置く追加ボタン（履歴ボタンなど）。 */
+  agentHeaderExtra?: ReactNode;
   onViewChange: (view: AppView) => void;
   children?: ReactNode;
 }
@@ -49,6 +51,7 @@ export const AppTemplate = ({
   dataSource,
   transactionCount,
   agentPanel,
+  agentHeaderExtra,
   onViewChange,
   children,
 }: AppTemplateProps) => {
@@ -160,11 +163,14 @@ export const AppTemplate = ({
         >
           <div className={styles.panelInner}>
             <Row gap="md" align="center" justify="spaceBetween">
-              <Text variant="sectionTitle">エージェント</Text>
+              <Row gap="sm" align="center">
+                <Text variant="sectionTitle">エージェント</Text>
+                {agentHeaderExtra}
+              </Row>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setAgentPanelOpen(false)}
+                onClick={toggleAgentPanel}
                 aria-label="エージェントパネルを閉じる"
               >
                 <Icon name="close" size={16} />
@@ -176,15 +182,27 @@ export const AppTemplate = ({
       </Row>
       <footer className={styles.actionBar}>
         <Row gap="sm" align="center" justify="spaceBetween" className={styles.barInner}>
-          <Button
-            variant={sidebarOpen ? "tabActive" : "ghost"}
-            size="sm"
-            onClick={toggleSidebar}
-            aria-pressed={sidebarOpen}
-            aria-label="メニュー（左サイドバー）の開閉"
-          >
-            <Icon name="panelLeft" size={17} />
-          </Button>
+          <Row gap="sm" align="center">
+            <Button
+              variant={activeView === AppView.Settings ? "tabActive" : "ghost"}
+              size="sm"
+              onClick={() => onViewChange(AppView.Settings)}
+              aria-pressed={activeView === AppView.Settings}
+              aria-label="設定"
+              title="設定"
+            >
+              <Icon name="settings" size={17} />
+            </Button>
+            <Button
+              variant={sidebarOpen ? "tabActive" : "ghost"}
+              size="sm"
+              onClick={toggleSidebar}
+              aria-pressed={sidebarOpen}
+              aria-label="メニュー（左サイドバー）の開閉"
+            >
+              <Icon name="panelLeft" size={17} />
+            </Button>
+          </Row>
           <Button
             variant={agentPanelOpen ? "tabActive" : "ghost"}
             size="sm"
