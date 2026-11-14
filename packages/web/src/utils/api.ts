@@ -258,6 +258,22 @@ export async function fetchLedgerTransactions(
   }
 }
 
+/** 帳簿PDFをダウンロードする（サーバーで生成されたPDFをそのまま保存する）。 */
+export async function downloadLedgerPdf(year: number): Promise<void> {
+  const resp = await fetch(`/api/transactions/pdf?year=${year}`);
+  if (!resp.ok) {
+    const data = (await resp.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error ?? `HTTP ${resp.status}`);
+  }
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `帳簿_${year}.pdf`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 /** 帳簿に取引を1件追加する。 */
 export async function createLedgerTransaction(
   input: LedgerTransactionInput,

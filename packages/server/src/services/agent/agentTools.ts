@@ -1,5 +1,7 @@
 /**
- * agentTools.ts — 対話エージェントが使うツール定義と実行（services/agent）。
+ * agentTools.ts — 対話エージェントのシステムプロンプトとツールの実処理（services/agent）。
+ * ツールの宣言（AI SDK形式のスキーマと説明文）は agentAiTools が持ち、
+ * 実処理はここの dispatchTool が担う。
  *
  * 役割分担:
  *   - お金の計算は全部 @etax/shared の決定的な関数が行う。
@@ -23,7 +25,6 @@ import {
   ConsumptionMethod,
   Transaction,
 } from "@etax/shared";
-import { ToolDef } from "../../gateways/llmGateway";
 
 export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリーランス）向けの確定申告「準備」アシスタントです。
 
@@ -41,77 +42,6 @@ export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリー�
 
 画面操作:
 - 画面のテーマ（ダークモード/ライトモード/端末に合わせる）の変更を頼まれたら、set_theme ツールで切り替えてください。「私ではできません」と断らないでください。`;
-
-export const agentTools: ToolDef[] = [
-  {
-    type: "function",
-    function: {
-      name: "import_csv_info",
-      description:
-        "会話に添付されている取引データの概要（件数・年・年ごとの件数）を返す。データの有無の確認に使う。",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "aggregate_year",
-      description: "指定年の事業所得・不動産所得を集計し、青色申告特別控除も計算する。",
-      parameters: {
-        type: "object",
-        properties: { year: { type: "integer", description: "対象年（西暦）" } },
-        required: ["year"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "consumption_tax",
-      description:
-        "指定年の消費税を計算する。method は standard（本則）/ simplified（簡易課税）/ special20（2割特例）。",
-      parameters: {
-        type: "object",
-        properties: {
-          year: { type: "integer" },
-          method: { type: "string", enum: ["standard", "simplified", "special20"] },
-        },
-        required: ["year", "method"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "set_theme",
-      description:
-        "画面のテーマ（表示モード）を切り替える。ダークモードにして、明るくして、端末設定に合わせて、等の依頼に使う。mode は light（ライト）/ dark（ダーク）/ system（端末に合わせる）。",
-      parameters: {
-        type: "object",
-        properties: {
-          mode: { type: "string", enum: ["light", "dark", "system"] },
-        },
-        required: ["mode"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "amendment_delta",
-      description:
-        "申告済みJSON（original）と修正後JSON（corrected）を比較し、項目ごとの差分と税額の増減を返す。ユーザーが両方のJSONを提示した場合に使う。",
-      parameters: {
-        type: "object",
-        properties: {
-          original: { type: "object", description: "申告済み内容のフラットなJSON" },
-          corrected: { type: "object", description: "修正後内容のフラットなJSON" },
-        },
-        required: ["original", "corrected"],
-      },
-    },
-  },
-];
 
 export interface AgentContext {
   transactions: Transaction[];

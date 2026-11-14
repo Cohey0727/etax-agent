@@ -10,6 +10,10 @@ import {
   deleteTransactionHandler,
   deleteTransactionRoute,
 } from "../usecases/deleteTransaction";
+import {
+  exportLedgerPdfHandler,
+  exportLedgerPdfRoute,
+} from "../usecases/exportLedgerPdf";
 import { listTransactionsHandler, listTransactionsRoute } from "../usecases/listTransactions";
 import {
   replaceYearTransactionsHandler,
@@ -22,6 +26,7 @@ import {
 
 const app = new OpenAPIHono();
 app.openapi(listTransactionsRoute, listTransactionsHandler);
+app.openapi(exportLedgerPdfRoute, exportLedgerPdfHandler);
 app.openapi(createTransactionRoute, createTransactionHandler);
 app.openapi(replaceYearTransactionsRoute, replaceYearTransactionsHandler);
 app.openapi(updateTransactionRoute, updateTransactionHandler);

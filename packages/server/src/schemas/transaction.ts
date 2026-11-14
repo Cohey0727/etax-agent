@@ -41,6 +41,14 @@ export const ListTransactionsQuerySchema = z
 
 export type ListTransactionsQuery = z.infer<typeof ListTransactionsQuerySchema>;
 
+export const LedgerPdfQuerySchema = z
+  .object({
+    year: z.string().optional(),
+  })
+  .openapi("LedgerPdfQuery");
+
+export type LedgerPdfQuery = z.infer<typeof LedgerPdfQuerySchema>;
+
 export const ListTransactionsResponseSchema = z
   .object({
     count: z.number(),

@@ -9,7 +9,6 @@
 import { normalizeTransactions } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { LLMError } from "../gateways/llmGateway";
 import { AgentConfig, ConfigError, loadAgentConfig } from "../lib/config";
 import { errorMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
@@ -98,7 +97,7 @@ export const runAgentChatHandler: RouteHandler<typeof runAgentChatRoute> = async
     return c.json(response, 200);
   } catch (e) {
     if (e instanceof ConfigError) throw new HTTPException(503, { message: errorMessage(e) });
-    if (e instanceof LLMError) throw new HTTPException(502, { message: errorMessage(e) });
-    throw new HTTPException(500, { message: errorMessage(e) });
+    // AI SDK 経由の LLM 呼び出し失敗（HTTPエラー・接続失敗・応答形式異常）は 502。
+    throw new HTTPException(502, { message: errorMessage(e) });
   }
 };
