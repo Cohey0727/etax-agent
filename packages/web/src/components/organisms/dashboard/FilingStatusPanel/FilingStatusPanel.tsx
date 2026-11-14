@@ -1,5 +1,5 @@
 import { filterYear, Transaction } from "@etax/shared";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { AppView, FilingStatus } from "@types";
 import { fetchFilingStatuses } from "@utils/api";
@@ -18,6 +18,12 @@ const MANUAL_STEPS: readonly ManualStep[] = [
   { key: "submitted", label: "提出" },
 ];
 
+interface StatusStep {
+  label: string;
+  done: boolean;
+  state: string;
+}
+
 export interface FilingStatusPanelProps {
   transactions: Transaction[];
   /** 左上の年度切替で選ばれている年 */
@@ -28,7 +34,8 @@ export interface FilingStatusPanelProps {
 
 /**
  * 申告ステータス（帳簿 → 確認 → 控除・計算 → 提出）の進捗表示（表示専用）。
- * ステータスの変更は確定申告画面で行い、ここからはリンクで遷移するだけ。
+ * 確定申告画面のステッパーと同じく横一列で示す。ステータスの変更は
+ * 確定申告画面で行い、ここからはリンクで遷移するだけ。
  * DB未接続の環境では何も表示しない。
  */
 export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStatusPanelProps) => {
@@ -50,6 +57,24 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
 
   if (statuses === null) return null;
 
+  const steps: StatusStep[] = [
+    {
+      label: "帳簿",
+      done: yearTransactions.length > 0,
+      state: `取引 ${yearTransactions.length} 件${unclassifiedCount > 0 ? ` ・ 未分類 ${unclassifiedCount} 件` : ""}`,
+    },
+    ...MANUAL_STEPS.map((step) => {
+      const done = status[step.key];
+      const doneAt = status[`${step.key}_at`];
+      return {
+        label: step.label,
+        done,
+        state: done && doneAt ? `${formatDate(doneAt)} 済み` : "未",
+      };
+    }),
+  ];
+  const currentIndex = steps.findIndex((step) => !step.done);
+
   return (
     <Card>
       <Col gap="md">
@@ -61,34 +86,55 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
           </Text>
         </Col>
 
-        <Row align="center" gap="sm">
-          <span className={yearTransactions.length > 0 ? `${styles.dot} ${styles.dotDone}` : styles.dot}>
-            ✓
-          </span>
-          <Text className={styles.stepLabel}>帳簿</Text>
-          <Text variant="muted">
-            取引 {yearTransactions.length} 件
-            {unclassifiedCount > 0 ? ` ・ 未分類 ${unclassifiedCount} 件` : ""}
-          </Text>
-        </Row>
-
-        {MANUAL_STEPS.map((step) => {
-          const done = status[step.key];
-          const doneAt = status[`${step.key}_at`];
-          return (
-            <Row key={step.key} align="center" gap="sm">
-              <span className={done ? `${styles.dot} ${styles.dotDone}` : styles.dot}>✓</span>
-              <Text className={styles.stepLabel}>{step.label}</Text>
-              <Text variant="muted">{done && doneAt ? `${formatDate(doneAt)} 済み` : "未"}</Text>
-            </Row>
-          );
-        })}
+        <div className={styles.stepper}>
+          {steps.map((step, index) => (
+            <Fragment key={step.label}>
+              {index > 0 ? (
+                <span
+                  className={
+                    steps[index - 1]?.done
+                      ? `${styles.connector} ${styles.connectorDone}`
+                      : styles.connector
+                  }
+                />
+              ) : null}
+              <div className={styles.step}>
+                <span
+                  className={
+                    step.done
+                      ? `${styles.circle} ${styles.circleDone}`
+                      : index === currentIndex
+                        ? `${styles.circle} ${styles.circleCurrent}`
+                        : styles.circle
+                  }
+                >
+                  {step.done ? "✓" : index + 1}
+                </span>
+                <span
+                  className={
+                    step.done || index === currentIndex
+                      ? `${styles.stepLabel} ${styles.stepLabelActive}`
+                      : styles.stepLabel
+                  }
+                >
+                  {step.label}
+                </span>
+                <span className={styles.stepState}>{step.state}</span>
+              </div>
+            </Fragment>
+          ))}
+        </div>
 
         {onNavigate ? (
-          <Row>
+          <Row gap="sm">
             <Button variant="ghost" size="sm" onClick={() => onNavigate(AppView.Filing)}>
               確定申告画面で進める →
             </Button>
+            {status.submitted ? (
+              <Button variant="ghost" size="sm" onClick={() => onNavigate(AppView.Amend)}>
+                修正申告を行う →
+              </Button>
+            ) : null}
           </Row>
         ) : null}
       </Col>

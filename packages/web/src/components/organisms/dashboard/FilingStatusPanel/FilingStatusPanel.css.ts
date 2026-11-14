@@ -2,36 +2,75 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
-  // ステップ左側（丸印＋ラベル＋詳細）を伸ばして、ボタンを右端へ寄せる。
-  grow: style({
+  // ステッパー全体（丸印の列＋連結線）。ダッシュボードの要約なので横一列に広げる。
+  stepper: style({
+    display: "flex",
+    alignItems: "flex-start",
+    width: "100%",
+  }),
+  // 1ステップ分（丸印＋ラベル＋状態）。表示専用なのでクリックはさせない。
+  step: style({
+    flex: "0 0 auto",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: theme.space.xs,
+    color: theme.color.textSubtle,
+  }),
+  // ステップ間の連結線。丸印の中心の高さに合わせる。
+  connector: style({
     flex: "1 1 auto",
+    minWidth: "16px",
+    height: "3px",
+    marginTop: "15px",
+    borderRadius: theme.borderRadius.pill,
+    backgroundColor: theme.color.border,
+    transition: "background-color 0.3s ease",
+  }),
+  connectorDone: style({
+    backgroundColor: theme.color.accent,
   }),
   // ステップの丸印。済みはアクセント色で塗り、チェックを表示する。
-  dot: style({
-    flex: "0 0 auto",
-    width: "24px",
-    height: "24px",
+  circle: style({
+    width: "32px",
+    height: "32px",
     borderRadius: theme.borderRadius.pill,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "13px",
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeight.semibold,
     border: `2px solid ${theme.color.borderStrong}`,
-    color: "transparent",
-    backgroundColor: "transparent",
-    transition: "background-color 0.25s ease, border-color 0.25s ease, transform 0.25s ease",
+    backgroundColor: theme.color.surface,
+    color: theme.color.textSubtle,
+    transition:
+      "background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease",
   }),
-  dotDone: style({
+  circleDone: style({
     backgroundColor: theme.color.accent,
     borderColor: theme.color.accent,
     color: theme.color.onAccent,
-    transform: "scale(1.05)",
   }),
-  // ステップ名。幅を固定して詳細の左端を揃える。
+  // いま取り組むステップ（最初の未完了）。淡い面＋リングで示す。
+  circleCurrent: style({
+    borderColor: theme.color.accent,
+    backgroundColor: theme.color.accentSoft,
+    color: theme.color.accentText,
+    boxShadow: `0 0 0 4px ${theme.color.accentSoft}`,
+  }),
   stepLabel: style({
-    flex: "0 0 92px",
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeight.medium,
+    whiteSpace: "nowrap",
+  }),
+  stepLabelActive: style({
+    color: theme.color.text,
     fontWeight: theme.fontWeight.semibold,
+  }),
+  stepState: style({
+    fontSize: theme.fontSizes.xs,
+    color: theme.color.muted,
+    whiteSpace: "nowrap",
   }),
 };
 
