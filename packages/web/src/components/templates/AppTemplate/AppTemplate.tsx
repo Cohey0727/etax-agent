@@ -19,6 +19,27 @@ export interface AppTemplateProps {
   children?: ReactNode;
 }
 
+const SIDEBAR_OPEN_KEY = "etax-sidebar-open";
+const AGENT_OPEN_KEY = "etax-agent-open";
+
+/** 開閉状態の復元。未保存なら既定値（左は開く、右は閉じる）。 */
+const loadPanelOpen = (key: string, fallback: boolean): boolean => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw === null ? fallback : raw === "1";
+  } catch {
+    return fallback;
+  }
+};
+
+const savePanelOpen = (key: string, open: boolean): void => {
+  try {
+    localStorage.setItem(key, open ? "1" : "0");
+  } catch {
+    // 保存できなくても開閉自体は効く
+  }
+};
+
 export const AppTemplate = ({
   views,
   activeView,
@@ -31,9 +52,22 @@ export const AppTemplate = ({
   onViewChange,
   children,
 }: AppTemplateProps) => {
-  // 左右パネルの開閉はレイアウト側の状態（下部アクションバーとヘッダから切り替える）。
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  // 左右パネルの開閉はレイアウト側の状態で、端末に保存して次回も引き継ぐ。
+  const [sidebarOpen, setSidebarOpen] = useState(() => loadPanelOpen(SIDEBAR_OPEN_KEY, true));
+  const [agentPanelOpen, setAgentPanelOpen] = useState(() =>
+    loadPanelOpen(AGENT_OPEN_KEY, false),
+  );
+
+  const toggleSidebar = () => {
+    const next = !sidebarOpen;
+    setSidebarOpen(next);
+    savePanelOpen(SIDEBAR_OPEN_KEY, next);
+  };
+  const toggleAgentPanel = () => {
+    const next = !agentPanelOpen;
+    setAgentPanelOpen(next);
+    savePanelOpen(AGENT_OPEN_KEY, next);
+  };
   const activeLabel = views.find((view) => view.id === activeView)?.label ?? "";
   const navViews = views.filter((view) => view.nav);
   return (
@@ -145,7 +179,7 @@ export const AppTemplate = ({
           <Button
             variant={sidebarOpen ? "tabActive" : "ghost"}
             size="sm"
-            onClick={() => setSidebarOpen((open) => !open)}
+            onClick={toggleSidebar}
             aria-pressed={sidebarOpen}
             aria-label="メニュー（左サイドバー）の開閉"
           >
@@ -154,7 +188,7 @@ export const AppTemplate = ({
           <Button
             variant={agentPanelOpen ? "tabActive" : "ghost"}
             size="sm"
-            onClick={() => setAgentPanelOpen((open) => !open)}
+            onClick={toggleAgentPanel}
             aria-pressed={agentPanelOpen}
             aria-label="エージェントパネルの開閉"
           >
