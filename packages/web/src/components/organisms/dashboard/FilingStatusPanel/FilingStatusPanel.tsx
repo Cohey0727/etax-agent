@@ -18,6 +18,12 @@ const MANUAL_STEPS: readonly ManualStep[] = [
   { key: "submitted", label: "提出" },
 ];
 
+// スケルトン表示用のステップ名（実データと同じ並び）。
+const SKELETON_LABELS: readonly string[] = [
+  "帳簿",
+  ...MANUAL_STEPS.map((step) => step.label),
+];
+
 interface StatusStep {
   label: string;
   done: boolean;
@@ -36,15 +42,18 @@ export interface FilingStatusPanelProps {
  * 申告ステータス（帳簿 → 確認 → 控除・計算 → 提出）の進捗表示（表示専用）。
  * 確定申告画面のステッパーと同じく横一列で示す。ステータスの変更は
  * 確定申告画面で行い、ここからはリンクで遷移するだけ。
- * DB未接続の環境では何も表示しない。
+ * 読み込み中は同じ形のスケルトンを出し、DB未接続の環境では何も表示しない。
  */
 export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStatusPanelProps) => {
   const [statuses, setStatuses] = useState<FilingStatus[] | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void fetchFilingStatuses().then((result) => {
-      if (!cancelled) setStatuses(result);
+      if (cancelled) return;
+      setStatuses(result);
+      setLoaded(true);
     });
     return () => {
       cancelled = true;
@@ -54,6 +63,38 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
   const status = statuses?.find((s) => s.year === year) ?? EMPTY_STATUS;
+
+  // 読み込み中は最終レイアウトと同じ形のスケルトンを出す（出現時のレイアウトシフト防止）。
+  if (!loaded) {
+    return (
+      <Card>
+        <Col gap="md">
+          <Col gap="sm">
+            <Text variant="sectionTitle">申告ステータス — {year}年分</Text>
+            <Text variant="muted">
+              帳簿 → 確認 → 控除・計算 → 提出 の順に進めます。ステータスの変更は確定申告画面で行います。
+              提出は e-Tax で行い、ここは進捗の表示用です。
+            </Text>
+          </Col>
+          <div className={styles.stepper} aria-hidden="true">
+            {SKELETON_LABELS.map((label, index) => (
+              <Fragment key={label}>
+                {index > 0 ? <span className={styles.connector} /> : null}
+                <div className={styles.step}>
+                  <span className={`${styles.circle} ${styles.circleSkeleton}`}>{index + 1}</span>
+                  <span className={styles.stepLabel}>{label}</span>
+                  <span className={styles.stepState}>
+                    <span className={styles.skeletonBar} />
+                  </span>
+                </div>
+              </Fragment>
+            ))}
+          </div>
+          {onNavigate ? <div className={styles.skeletonFooter} aria-hidden="true" /> : null}
+        </Col>
+      </Card>
+    );
+  }
 
   if (statuses === null) return null;
 

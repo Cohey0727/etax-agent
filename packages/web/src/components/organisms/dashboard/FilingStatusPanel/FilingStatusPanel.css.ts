@@ -1,5 +1,11 @@
-import { style } from "@vanilla-extract/css";
+import { keyframes, style } from "@vanilla-extract/css";
 import { theme } from "@configs";
+
+// スケルトンの明滅（読み込み中であることを静かに示す）。
+const skeletonPulse = keyframes({
+  "0%, 100%": { opacity: 1 },
+  "50%": { opacity: 0.45 },
+});
 
 const styles = {
   // ステッパー全体（丸印の列＋連結線）。端から端まで広げず、確定申告画面と
@@ -74,6 +80,34 @@ const styles = {
     fontSize: theme.fontSizes.xs,
     color: theme.color.muted,
     whiteSpace: "nowrap",
+    // スケルトンと高さを揃え、読み込み完了でレイアウトが動かないようにする。
+    display: "flex",
+    alignItems: "center",
+    height: "18px",
+  }),
+  // 読み込み中の丸印。中身は確定情報（番号）だけ先に出し、面を淡く塗る。
+  circleSkeleton: style({
+    backgroundColor: theme.color.lineSoft,
+    borderColor: theme.color.border,
+    animation: `${skeletonPulse} 1.4s ease-in-out infinite`,
+  }),
+  // 読み込み中の状態欄のバー。stepState と同じ高さの箱に入れて出す。
+  skeletonBar: style({
+    display: "block",
+    width: "44px",
+    height: "10px",
+    borderRadius: theme.borderRadius.pill,
+    backgroundColor: theme.color.lineSoft,
+    animation: `${skeletonPulse} 1.4s ease-in-out infinite`,
+  }),
+  // 読み込み中のフッター（確定申告画面へのリンクボタン）の placeholder。
+  // 実ボタンの行と同じ高さを確保して、出現時のずれをなくす。
+  skeletonFooter: style({
+    width: "190px",
+    height: "32px",
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.color.lineSoft,
+    animation: `${skeletonPulse} 1.4s ease-in-out infinite`,
   }),
 };
 
