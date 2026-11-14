@@ -2,11 +2,14 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
-  // ステッパー全体（丸印の列＋連結線）。ダッシュボードの要約なので横一列に広げる。
+  // ステッパー全体（丸印の列＋連結線）。端から端まで広げず、確定申告画面と
+  // 同じく中央に寄せて余裕を持たせる。
   stepper: style({
     display: "flex",
     alignItems: "flex-start",
     width: "100%",
+    maxWidth: "560px",
+    margin: "0 auto",
   }),
   // 1ステップ分（丸印＋ラベル＋状態）。表示専用なのでクリックはさせない。
   step: style({
