@@ -12,6 +12,10 @@ import {
 } from "../usecases/deleteTransaction";
 import { listTransactionsHandler, listTransactionsRoute } from "../usecases/listTransactions";
 import {
+  replaceYearTransactionsHandler,
+  replaceYearTransactionsRoute,
+} from "../usecases/replaceYearTransactions";
+import {
   updateTransactionHandler,
   updateTransactionRoute,
 } from "../usecases/updateTransaction";
@@ -19,6 +23,7 @@ import {
 const app = new OpenAPIHono();
 app.openapi(listTransactionsRoute, listTransactionsHandler);
 app.openapi(createTransactionRoute, createTransactionHandler);
+app.openapi(replaceYearTransactionsRoute, replaceYearTransactionsHandler);
 app.openapi(updateTransactionRoute, updateTransactionHandler);
 app.openapi(deleteTransactionRoute, deleteTransactionHandler);
 

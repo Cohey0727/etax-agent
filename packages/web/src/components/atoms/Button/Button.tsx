@@ -7,7 +7,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    * ボタンの見た目のバリエーション
    * @default "primary"
    */
-  variant?: "primary" | "ghost" | "tab" | "tabActive" | "nav" | "navActive";
+  variant?: "primary" | "ghost" | "tab" | "tabActive" | "nav" | "navActive" | "danger";
   /**
    * ボタンのサイズ
    * @default "sm"

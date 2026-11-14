@@ -10,3 +10,12 @@ createRoot(el).render(
     <AppPage />
   </React.StrictMode>,
 );
+
+// PWA: 本番ビルドでのみサービスワーカーを登録する（開発時はキャッシュが邪魔になるため）。
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // 登録に失敗してもアプリ自体は通常通り使える
+    });
+  });
+}

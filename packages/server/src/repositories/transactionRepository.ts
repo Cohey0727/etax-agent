@@ -4,7 +4,7 @@
  * 行 → API 形式への変換もここで行う（created_at は ISO 文字列にする。
  * Date のまま JSON 化しても同一文字列になるため、ワイヤ形式は変わらない）。
  */
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, like } from "drizzle-orm";
 import { Db } from "../lib/db";
 import { TransactionResponse } from "../schemas/transaction";
 import { TransactionRow, transactionsTable } from "./schema";
@@ -80,4 +80,33 @@ export async function deleteTransactionRow(
     .where(eq(transactionsTable.id, id))
     .returning();
   return row;
+}
+
+/**
+ * 指定年の取引を丸ごと置き換える（画面側の確定状態を帳簿の正とする）。
+ * 取込リンク（import_id）は外れる。削除と挿入は1トランザクションで行う。
+ */
+export async function replaceYearTransactionRows(
+  db: Db,
+  year: number,
+  values: readonly {
+    date: string;
+    description: string;
+    amount: number;
+    account: string;
+    category: string;
+    incomeType: string;
+  }[],
+): Promise<TransactionRow[]> {
+  return db.transaction(async (tx) => {
+    await tx
+      .delete(transactionsTable)
+      .where(like(transactionsTable.date, `${year}-%`));
+    if (values.length === 0) return [];
+    const inserted = await tx
+      .insert(transactionsTable)
+      .values([...values])
+      .returning();
+    return inserted.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+  });
 }

@@ -25,6 +25,15 @@ const styles = {
     },
   }),
   variant: styleVariants({
+    danger: {
+      background: theme.color.negative,
+      borderColor: theme.color.negative,
+      color: theme.color.onAccent,
+      fontWeight: theme.fontWeight.semibold,
+      selectors: {
+        "&:hover": { opacity: 0.88 },
+      },
+    },
     primary: {
       background: theme.color.accent,
       borderColor: theme.color.accent,

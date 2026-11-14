@@ -6,6 +6,7 @@
  * そのまま動く。DB が必要な処理は getDb() が null のとき 503 を返す。
  */
 import { drizzle, PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { sql } from "drizzle-orm";
 import postgres from "postgres";
 import * as schema from "../repositories/schema";
 
@@ -33,4 +34,41 @@ export function getDb(): Db | null {
 /** DB接続を試みたことがあるか。 */
 export function dbWasAttempted(): boolean {
   return attempted;
+}
+
+let tablesEnsured = false;
+
+/**
+ * テーブルが無ければ作る（冪等）。drizzle-kit のマイグレーションを持ち込まず、
+ * 起動時にスキーマを自己修復するための最小DDL（schema.ts と一致させる）。
+ * DATABASE_URL 未設定なら何もしない。
+ */
+export async function ensureTables(): Promise<void> {
+  if (tablesEnsured) return;
+  const db = getDb();
+  if (!db) return;
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS imports (
+      id serial PRIMARY KEY,
+      filename text,
+      source_name text,
+      mapping jsonb,
+      row_count integer NOT NULL DEFAULT 0,
+      created_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS transactions (
+      id serial PRIMARY KEY,
+      date varchar(10) NOT NULL,
+      description text NOT NULL DEFAULT '',
+      amount integer NOT NULL,
+      account text NOT NULL DEFAULT '',
+      category text NOT NULL DEFAULT '未分類',
+      income_type text NOT NULL DEFAULT 'other',
+      import_id integer REFERENCES imports(id),
+      created_at timestamp NOT NULL DEFAULT now()
+    )
+  `);
+  tablesEnsured = true;
 }

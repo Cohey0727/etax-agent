@@ -1,4 +1,4 @@
-import { Transaction } from "@etax/shared";
+import { IncomeType, Transaction } from "@etax/shared";
 import {
   AccountClassification,
   AgentChatResponse,
@@ -6,6 +6,9 @@ import {
   ChatMessage,
   FreeeTrialBalance,
   ImportCsvResponse,
+  LedgerTransaction,
+  LedgerTransactionInput,
+  ListLedgerTransactionsResponse,
 } from "@types";
 
 /** サーバーAPIの型つきラッパー。/api は Vite プロキシで localhost:3001 へ。 */
@@ -105,4 +108,104 @@ export async function fetchFreeeTrialBalance(): Promise<FreeeTrialBalance | null
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 帳簿（DB保存の取引）
+// ---------------------------------------------------------------------------
+
+/** 帳簿の行を画面共通の Transaction へ変換する。 */
+export function ledgerRowToTransaction(row: LedgerTransaction): Transaction {
+  const incomeType: IncomeType =
+    row.income_type === "business" || row.income_type === "real_estate"
+      ? row.income_type
+      : "other";
+  return {
+    date: row.date,
+    year: Number(row.date.slice(0, 4)),
+    description: row.description,
+    amount: row.amount,
+    account: row.account,
+    category: row.category,
+    income_type: incomeType,
+  };
+}
+
+/** 画面共通の Transaction を帳簿保存用の入力へ変換する。 */
+export function transactionToLedgerInput(tx: Transaction): LedgerTransactionInput {
+  return {
+    date: tx.date,
+    description: tx.description,
+    amount: tx.amount,
+    account: tx.account,
+    category: tx.category,
+    income_type: tx.income_type,
+  };
+}
+
+/**
+ * 帳簿の取引を取得する。year 省略時は全件。
+ * 帳簿DBが未接続（503）の場合は null を返す（呼び出し側で未接続表示にする）。
+ */
+export async function fetchLedgerTransactions(
+  year?: number,
+): Promise<LedgerTransaction[] | null> {
+  try {
+    const query = year ? `?year=${year}` : "";
+    const resp = await fetch(`/api/transactions${query}`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as ListLedgerTransactionsResponse;
+    return data.transactions;
+  } catch {
+    return null;
+  }
+}
+
+/** 帳簿に取引を1件追加する。 */
+export async function createLedgerTransaction(
+  input: LedgerTransactionInput,
+): Promise<LedgerTransaction> {
+  const resp = await fetch("/api/transactions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson<{ transaction: LedgerTransaction | null }>(resp);
+  if (!data.transaction) throw new Error("取引の登録に失敗しました");
+  return data.transaction;
+}
+
+/** 帳簿の取引を1件更新する。 */
+export async function updateLedgerTransaction(
+  id: number,
+  input: LedgerTransactionInput,
+): Promise<LedgerTransaction> {
+  const resp = await fetch(`/api/transactions/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson<{ transaction: LedgerTransaction | null }>(resp);
+  if (!data.transaction) throw new Error("取引の更新に失敗しました");
+  return data.transaction;
+}
+
+/** 帳簿の取引を1件削除する。 */
+export async function deleteLedgerTransaction(id: number): Promise<void> {
+  const resp = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+  await parseJson(resp);
+}
+
+/** 1年分の取引を丸ごと帳簿へ保存する（画面の確定状態で置き換える）。 */
+export async function replaceYearLedgerTransactions(
+  year: number,
+  inputs: LedgerTransactionInput[],
+): Promise<LedgerTransaction[]> {
+  const resp = await fetch("/api/transactions/replace-year", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ year, transactions: inputs }),
+  });
+  const data = await parseJson<ListLedgerTransactionsResponse>(resp);
+  return data.transactions;
 }

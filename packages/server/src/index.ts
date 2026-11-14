@@ -17,6 +17,7 @@
  *   POST   /api/calc/amend          修正申告の差分（DB不要・ステートレス）
  *   GET    /api/transactions        取引一覧（DB）
  *   POST   /api/transactions        取引登録（DB）
+ *   POST   /api/transactions/replace-year 1年分の取引を置き換え保存（DB）
  *   PUT    /api/transactions/{id}   取引更新（DB）
  *   DELETE /api/transactions/{id}   取引削除（DB）
  *   GET    /api/imports             取込履歴（DB）
@@ -39,6 +40,7 @@ import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
+import { ensureTables, isDatabaseConfigured } from "./lib/db";
 import agentRoutes from "./routes/agent";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
@@ -91,6 +93,18 @@ app.notFound(async (c) => {
 
 const port = Number(process.env.PORT ?? 3001);
 console.log(`eTaxAgent server listening on http://localhost:${port}`);
+
+// 帳簿（DB）を使う場合は、起動時にテーブルを自己修復しておく。
+// 失敗してもサーバー自体は起動を続け、DB必須の処理だけが 503 になる。
+void ensureTables()
+  .then(() => {
+    if (isDatabaseConfigured()) console.log("帳簿DBのテーブルを確認しました");
+  })
+  .catch((e) => {
+    console.warn(
+      `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  });
 
 export default {
   port,

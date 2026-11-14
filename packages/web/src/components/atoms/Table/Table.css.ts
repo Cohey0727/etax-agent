@@ -6,6 +6,14 @@ const styles = {
     width: "100%",
     borderCollapse: "collapse",
     fontSize: theme.fontSizes.sm,
+    "@media": {
+      // 狭い画面では表を横スクロール可能にして、ページ全体の崩れを防ぐ。
+      "(max-width: 900px)": {
+        display: "block",
+        overflowX: "auto",
+        whiteSpace: "nowrap",
+      },
+    },
   }),
 };
 

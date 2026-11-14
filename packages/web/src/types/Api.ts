@@ -63,3 +63,31 @@ export interface FreeeTrialBalance {
   source: string;
   years: Array<{ year: number; accounts: FreeeTrialBalanceAccount[] }>;
 }
+
+/** 帳簿（DB）に保存された取引1件。サーバーAPIのワイヤ形式（snake_case）。 */
+export interface LedgerTransaction {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  account: string;
+  category: string;
+  income_type: string;
+  import_id: number | null;
+  created_at: string;
+}
+
+export interface ListLedgerTransactionsResponse {
+  count: number;
+  transactions: LedgerTransaction[];
+}
+
+/** 帳簿へ保存するときの取引入力（id を持たない形）。 */
+export interface LedgerTransactionInput {
+  date: string;
+  description: string;
+  amount: number;
+  account: string;
+  category: string;
+  income_type: string;
+}

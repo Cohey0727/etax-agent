@@ -91,3 +91,19 @@ export const UpdateTransactionRequestSchema = z
   .openapi("UpdateTransactionRequest");
 
 export type UpdateTransactionRequest = z.infer<typeof UpdateTransactionRequestSchema>;
+
+/**
+ * 1年分の取引の置き換えリクエスト（帳簿の確定保存）。
+ * 項目の検証は CreateTransactionRequest と同じ緩さで受け、
+ * date / amount の厳格チェックはハンドラ側で行う。
+ */
+export const ReplaceYearTransactionsRequestSchema = z
+  .object({
+    year: z.number(),
+    transactions: z.array(CreateTransactionRequestSchema),
+  })
+  .openapi("ReplaceYearTransactionsRequest");
+
+export type ReplaceYearTransactionsRequest = z.infer<
+  typeof ReplaceYearTransactionsRequestSchema
+>;

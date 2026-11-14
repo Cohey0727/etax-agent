@@ -13,8 +13,6 @@ export interface AppTemplateProps {
   onYearChange: (year: number) => void;
   dataSource: string;
   transactionCount: number;
-  darkMode: boolean;
-  onToggleDarkMode: () => void;
   agentPanel: ReactNode;
   onViewChange: (view: AppView) => void;
   children?: ReactNode;
@@ -28,8 +26,6 @@ export const AppTemplate = ({
   onYearChange,
   dataSource,
   transactionCount,
-  darkMode,
-  onToggleDarkMode,
   agentPanel,
   onViewChange,
   children,
@@ -82,26 +78,7 @@ export const AppTemplate = ({
             <Col gap="lg">
               <Row gap="md" align="center" justify="spaceBetween">
                 <Text variant="title">{activeLabel}</Text>
-                <Row gap="sm" align="center">
-                  <Badge>下書き・準備専用</Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onToggleDarkMode}
-                    aria-label={darkMode ? "ライトモードに切り替え" : "ダークモードに切り替え"}
-                  >
-                    <Icon name={darkMode ? "sun" : "moon"} size={16} />
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setAgentPanelOpen((open) => !open)}
-                    aria-pressed={agentPanelOpen}
-                  >
-                    <Icon name="agent" size={16} />
-                    エージェント
-                  </Button>
-                </Row>
+                <Badge>下書き・準備専用</Badge>
               </Row>
               <div key={activeView} className={styles.view}>
                 {children}
@@ -143,10 +120,9 @@ export const AppTemplate = ({
             size="sm"
             onClick={() => setSidebarOpen((open) => !open)}
             aria-pressed={sidebarOpen}
-            aria-label="左サイドバーの開閉"
+            aria-label="メニュー（左サイドバー）の開閉"
           >
-            <Icon name="panelLeft" size={16} />
-            メニュー
+            <Icon name="panelLeft" size={17} />
           </Button>
           <Button
             variant={agentPanelOpen ? "tabActive" : "ghost"}
@@ -155,8 +131,7 @@ export const AppTemplate = ({
             aria-pressed={agentPanelOpen}
             aria-label="エージェントパネルの開閉"
           >
-            <Icon name="panelRight" size={16} />
-            エージェント
+            <Icon name="panelRight" size={17} />
           </Button>
         </Row>
       </footer>

@@ -37,9 +37,12 @@ const styles = {
     },
   }),
   // 左サイドバー。レイアウトを占有し、幅で開閉する（内側は固定幅で潰れない）。
+  // alignSelf: stretch で行の高さいっぱいに伸ばし、内側の sticky を効かせる
+  // （伸ばさないと親の高さ=内側の高さになり、一緒にスクロールしてしまう）。
   sidebar: style({
     width: theme.component.sidebarWidth,
     flexShrink: 0,
+    alignSelf: "stretch",
     overflow: "hidden",
     transition: panelTransition,
     "@media": {
@@ -126,6 +129,7 @@ const styles = {
   agentPanel: style({
     width: "0px",
     flexShrink: 0,
+    alignSelf: "stretch",
     overflow: "hidden",
     transition: panelTransition,
     "@media": {
