@@ -146,3 +146,30 @@ export interface ExportXtxResponse {
   filename: string;
   xtx: string;
 }
+
+/** 消費税申告書（本則）XTX出力のリクエスト。金額は税込・確定値で渡す。 */
+export interface ExportConsumptionXtxRequest {
+  taxpayer: XtxTaxpayerInput;
+  period_from: string;
+  period_to: string;
+  submission_date: string;
+  filing_kind: 1 | 3;
+  base_period_sales_thousands: number;
+  sales_incl_10: number;
+  sales_incl_8: number;
+  nontaxable_sales: number;
+  exempt_sales: number;
+  purchases_incl_10: number;
+  purchases_incl_8: number;
+  interim_national: number;
+  interim_local: number;
+  original_national: number | null;
+  original_local: number | null;
+}
+
+/** 消費税申告書（本則）XTX出力のレスポンス。 */
+export interface ExportConsumptionXtxResponse {
+  filename: string;
+  xtx: string;
+  total_payable: number;
+}

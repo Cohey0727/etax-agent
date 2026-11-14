@@ -130,6 +130,41 @@ describe("buildXtxFiling", () => {
     expect(xtx).toContain('<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>1</kubun_CD></SHINKOKU_KBN>');
   });
 
+  test("医療費控除の区分（ABB00435）は単純型として内容に直接書く", () => {
+    const transactions: Transaction[] = [
+      tx({ date: "2025-06-15", year: 2025, description: "事業売上", amount: 12_000_000, category: "売上高", income_type: "business" }),
+    ];
+    const figures = computeCorrectedFigures(transactions, 2025);
+    const deductions = { ...EMPTY_DEDUCTION_INPUTS, medicalExpensesPaid: 528_000 };
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: true,
+      submissionDate: "2026-11-20",
+      taxpayer: {
+        name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "",
+        myNumber: "", occupation: "システムエンジニア", shopName: "", jan1Address: "",
+      },
+      figures,
+      deductionInputs: deductions,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: 1_000_000,
+    });
+    expect(xtx).toContain("<ABB00435>1</ABB00435>");
+    expect(xtx).not.toContain("<ABB00435><kubun_CD>");
+    expect(xtx).toContain("<ABB00440>428000</ABB00440>");
+  });
+
   test("対応外の年分は例外", () => {
     const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
     const tax = computeIncomeTax({

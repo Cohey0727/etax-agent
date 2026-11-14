@@ -1,11 +1,12 @@
 import { IncomeTaxResult, TaxCreditBreakdown, TaxCreditInputs } from "@etax/shared";
-import { Card, Col, Input, Row, Text } from "@components/atoms";
+import { Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { formatNumber } from "@utils";
 import styles from "./TaxCreditPanel.css";
 
 /** 税額控除の内訳表示ラベル（エンジンの内訳キー → 正式名称）。 */
 const CREDIT_LABELS: readonly { key: keyof TaxCreditBreakdown; label: string }[] = [
   { key: "housingLoan", label: "住宅借入金等特別控除" },
+  { key: "flatReduction", label: "定額減税（令和6年分）" },
   { key: "dividend", label: "配当控除" },
   { key: "politicalDonations", label: "政党等寄附金特別控除" },
   { key: "certifiedNpoDonations", label: "認定NPO法人等寄附金特別控除" },
@@ -46,6 +47,25 @@ export const TaxCreditPanel = ({ taxCredits, result, onChange }: TaxCreditPanelP
           label="控除限度額（住宅の区分に応じた上限）"
           value={taxCredits.housingLoanLimit}
           onChange={(v) => set({ housingLoanLimit: v })}
+        />
+        <Row gap="sm">
+          <div className={styles.fieldLabel}>
+            <Text variant="muted">控除率（居住年で決まります）</Text>
+          </div>
+          <Select
+            value={String(taxCredits.housingLoanRate)}
+            onChange={(e) => set({ housingLoanRate: Number(e.target.value) })}
+          >
+            <option value="0.007">0.7%（2022年以降に居住）</option>
+            <option value="0.01">1%（2021年以前に居住）</option>
+          </Select>
+        </Row>
+
+        <Text className={styles.subhead}>定額減税（令和6年分のみ）</Text>
+        <AmountField
+          label="定額減税額（本人・配偶者・扶養親族の人数 × 30,000円）"
+          value={taxCredits.flatReduction}
+          onChange={(v) => set({ flatReduction: v })}
         />
 
         <Text className={styles.subhead}>配当控除</Text>

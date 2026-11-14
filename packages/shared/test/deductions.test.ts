@@ -202,6 +202,22 @@ describe("税額控除", () => {
   test("住宅ローン: 限度額が上限（限度14万円 → 14万円）", () => {
     expect(housingLoanCredit(30_000_000, 140_000)).toBe(140_000);
   });
+  test("住宅ローン: 2021年以前の居住は1%（残高22,131,745円・限度40万円 → 221,300円）", () => {
+    expect(housingLoanCredit(22_131_745, 400_000, 0.01)).toBe(221_300);
+  });
+  test("住宅ローン: 1%でも限度額が上限（限度20万円 → 20万円）", () => {
+    expect(housingLoanCredit(22_131_745, 200_000, 0.01)).toBe(200_000);
+  });
+  test("定額減税: 税額控除の合計に算入される", () => {
+    const result = computeIncomeTax({
+      year: 2024,
+      totalIncome: 5_446_922,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, flatReduction: 30_000 },
+    });
+    expect(result.taxCredits.flatReduction).toBe(30_000);
+    expect(result.taxCreditsTotal).toBe(30_000);
+  });
   test("配当控除: 課税総所得1,000万円以下なら配当20万円 → 2万円", () => {
     expect(dividendCredit(200_000, 0, 7_854_000)).toBe(20_000);
   });

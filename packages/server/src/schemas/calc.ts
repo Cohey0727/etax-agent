@@ -181,6 +181,7 @@ export const TaxCreditInputsSchema = z
   .object({
     housingLoanBalance: z.number(),
     housingLoanLimit: z.number(),
+    housingLoanRate: z.number(),
     dividendCorporate: z.number(),
     dividendTrust: z.number(),
     politicalDonations: z.number(),
@@ -189,6 +190,7 @@ export const TaxCreditInputsSchema = z
     seismicRetrofitOtherCost: z.number(),
     foreignTaxPaid: z.number(),
     foreignIncome: z.number(),
+    flatReduction: z.number(),
   })
   .openapi("TaxCreditInputs");
 
@@ -228,6 +230,7 @@ export const IncomeDeductionBreakdownSchema = z
 export const TaxCreditBreakdownSchema = z
   .object({
     housingLoan: z.number(),
+    flatReduction: z.number(),
     dividend: z.number(),
     politicalDonations: z.number(),
     certifiedNpoDonations: z.number(),

@@ -54,3 +54,36 @@ export const ExportXtxResponseSchema = z
   .openapi("ExportXtxResponse");
 
 export type ExportXtxResponse = z.infer<typeof ExportXtxResponseSchema>;
+
+export const ExportConsumptionXtxRequestSchema = z
+  .object({
+    taxpayer: XtxTaxpayerSchema,
+    period_from: z.string(),
+    period_to: z.string(),
+    submission_date: z.string(),
+    filing_kind: z.union([z.literal(1), z.literal(3)]),
+    base_period_sales_thousands: z.number(),
+    sales_incl_10: z.number(),
+    sales_incl_8: z.number(),
+    nontaxable_sales: z.number(),
+    exempt_sales: z.number(),
+    purchases_incl_10: z.number(),
+    purchases_incl_8: z.number(),
+    interim_national: z.number(),
+    interim_local: z.number(),
+    original_national: z.number().nullable(),
+    original_local: z.number().nullable(),
+  })
+  .openapi("ExportConsumptionXtxRequest");
+
+export type ExportConsumptionXtxRequest = z.infer<typeof ExportConsumptionXtxRequestSchema>;
+
+export const ExportConsumptionXtxResponseSchema = z
+  .object({
+    filename: z.string(),
+    xtx: z.string(),
+    total_payable: z.number(),
+  })
+  .openapi("ExportConsumptionXtxResponse");
+
+export type ExportConsumptionXtxResponse = z.infer<typeof ExportConsumptionXtxResponseSchema>;

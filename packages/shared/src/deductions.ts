@@ -512,8 +512,10 @@ export function computeIncomeDeductions(
 export interface TaxCreditInputs {
   /** 住宅借入金等の年末残高 */
   housingLoanBalance: number;
-  /** 住宅借入金等特別控除の限度額（住宅の区分・居住年で決まる上限） */
+  /** 住宅借入金等特別控除の限度額（控除額の上限） */
   housingLoanLimit: number;
+  /** 住宅借入金等特別控除の率（2022年以降の居住は 0.007、2021年以前の居住は 0.01） */
+  housingLoanRate: number;
   /** 総合課税の配当等の金額（剰余金の配当・利益の配当等） */
   dividendCorporate: number;
   /** 総合課税の証券投資信託の収益の分配の金額 */
@@ -530,11 +532,14 @@ export interface TaxCreditInputs {
   foreignTaxPaid: number;
   /** 調整国外所得金額 */
   foreignIncome: number;
+  /** 定額減税額（令和6年分のみ。本人と同一生計配偶者・扶養親族の人数 × ¥30,000） */
+  flatReduction: number;
 }
 
 export const EMPTY_TAX_CREDIT_INPUTS: TaxCreditInputs = {
   housingLoanBalance: 0,
   housingLoanLimit: 0,
+  housingLoanRate: 0.007,
   dividendCorporate: 0,
   dividendTrust: 0,
   politicalDonations: 0,
@@ -543,14 +548,19 @@ export const EMPTY_TAX_CREDIT_INPUTS: TaxCreditInputs = {
   seismicRetrofitOtherCost: 0,
   foreignTaxPaid: 0,
   foreignIncome: 0,
+  flatReduction: 0,
 };
 
-/** 住宅借入金等特別控除: 年末残高 × 0.7%（100円未満切捨て）、限度額が上限。 */
-export function housingLoanCredit(balance: number, limit: number): number {
+/**
+ * 住宅借入金等特別控除: 年末残高 × 率（100円未満切捨て）、限度額が上限。
+ * 率は居住年で決まる（2022年以降 0.7% / 2021年以前 1%）。
+ */
+export function housingLoanCredit(balance: number, limit: number, rate = 0.007): number {
   const b = amount(balance);
   const l = amount(limit);
+  const r = rate > 0 ? rate : 0.007;
   if (b <= 0 || l <= 0) return 0;
-  return Math.min(floor100(b * 0.007), l);
+  return Math.min(floor100(b * r), l);
 }
 
 /**
@@ -614,6 +624,8 @@ export function foreignTaxCredit(
 
 export interface TaxCreditBreakdown {
   housingLoan: number;
+  /** 定額減税（令和6年分のみ） */
+  flatReduction: number;
   dividend: number;
   politicalDonations: number;
   certifiedNpoDonations: number;
@@ -636,7 +648,12 @@ export function computeTaxCredits(
   totalIncome: number,
 ): TaxCreditBreakdown {
   const breakdown: TaxCreditBreakdown = {
-    housingLoan: housingLoanCredit(inputs.housingLoanBalance, inputs.housingLoanLimit),
+    housingLoan: housingLoanCredit(
+      inputs.housingLoanBalance,
+      inputs.housingLoanLimit,
+      inputs.housingLoanRate,
+    ),
+    flatReduction: amount(inputs.flatReduction),
     dividend: dividendCredit(inputs.dividendCorporate, inputs.dividendTrust, taxableIncome),
     politicalDonations: politicalDonationCredit(inputs.politicalDonations, baseIncomeTax),
     certifiedNpoDonations: certifiedNpoDonationCredit(inputs.certifiedNpoDonations, baseIncomeTax),
@@ -649,6 +666,7 @@ export function computeTaxCredits(
   };
   breakdown.total =
     breakdown.housingLoan +
+    breakdown.flatReduction +
     breakdown.dividend +
     breakdown.politicalDonations +
     breakdown.certifiedNpoDonations +

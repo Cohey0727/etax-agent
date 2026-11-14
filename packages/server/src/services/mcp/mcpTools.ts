@@ -20,8 +20,10 @@ import {
   aggregateIncome,
   amendmentDelta,
   blueDeduction,
+  buildConsumptionXtx,
   buildXtxFiling,
   categoryTotals,
+  computeConsumptionReturn,
   computeCorrectedFigures,
   computeIncomeTax,
   consumptionTax,
@@ -219,6 +221,47 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
   {
+    name: "export_consumption_xtx",
+    description:
+      "消費税申告書（一般用・本則）の e-Tax 申告等データ（XTX）を生成する。金額は税区分まで確定した税込金額で渡すこと（帳簿の概算は使わない）。課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算する。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        taxpayer: {
+          type: "object",
+          description:
+            "納税者情報（snake_case）: name, name_kana, zip_code, address, birth_date, tax_office_name, tax_office_code 等。",
+        },
+        period_from: { type: "string", description: "課税期間の開始日（YYYY-MM-DD）" },
+        period_to: { type: "string", description: "課税期間の終了日（YYYY-MM-DD）" },
+        submission_date: { type: "string", description: "提出日（YYYY-MM-DD、任意）" },
+        filing_kind: { type: "integer", description: "申告の種類: 1=確定（期限後申告も1）、3=修正確定（任意、既定1）" },
+        base_period_sales_thousands: {
+          type: "number",
+          description: "基準期間の課税売上高（千円単位）",
+        },
+        sales_incl_10: { type: "number", description: "課税売上（税込）・税率10%分" },
+        sales_incl_8: { type: "number", description: "課税売上（税込）・軽減税率8%分（任意）" },
+        nontaxable_sales: { type: "number", description: "非課税売上（対価の額、任意）" },
+        exempt_sales: { type: "number", description: "免税売上（対価の額、任意）" },
+        purchases_incl_10: { type: "number", description: "課税仕入の支払対価（税込）・税率10%分" },
+        purchases_incl_8: { type: "number", description: "課税仕入の支払対価（税込）・軽減税率8%分（任意）" },
+        interim_national: { type: "number", description: "中間納付税額（国税、任意）" },
+        interim_local: { type: "number", description: "中間納付譲渡割額（任意）" },
+        original_national: { type: "number", description: "修正申告のときの既確定税額（国税、任意）" },
+        original_local: { type: "number", description: "修正申告のときの既確定譲渡割額（任意）" },
+      },
+      required: [
+        "taxpayer",
+        "period_from",
+        "period_to",
+        "base_period_sales_thousands",
+        "sales_incl_10",
+        "purchases_incl_10",
+      ],
+    },
+  },
+  {
     name: "get_filing_status",
     description: "申告ステータス（確認・控除計算・提出の済み状態）を全年度分返す。",
     inputSchema: { type: "object", properties: {} },
@@ -294,6 +337,26 @@ function parseIncomeType(value: unknown): IncomeType {
   if (value === undefined || value === null) return "business";
   if (typeof value === "string" && VALID_INCOME_TYPES.has(value)) return value as IncomeType;
   throw new Error(`income_type が不正です: ${String(value)}`);
+}
+
+/** 数値引数。未指定なら fallback、不正な型はエラーにする。 */
+function numArg(args: Record<string, unknown>, key: string, fallback = 0): number {
+  const value = args[key];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${key} は数値で渡してください`);
+  }
+  return Math.trunc(value);
+}
+
+/** 数値引数（nullable）。未指定は null。 */
+function nullableNumArg(args: Record<string, unknown>, key: string): number | null {
+  const value = args[key];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${key} は数値で渡してください`);
+  }
+  return Math.trunc(value);
 }
 
 /** 今日の日付（日本時間、YYYY-MM-DD）。 */
@@ -496,6 +559,51 @@ export async function dispatchMcpTool(
         });
         return textResult({
           filename: `etax-shotoku-${year}${amendment ? "-shusei" : "-kakutei"}.xtx`,
+          xtx,
+        });
+      }
+      case "export_consumption_xtx": {
+        const taxpayerArg = args["taxpayer"];
+        if (typeof taxpayerArg !== "object" || taxpayerArg === null) {
+          throw new Error("taxpayer（納税者情報）が必要です");
+        }
+        const periodFrom = String(args["period_from"] ?? "");
+        const periodTo = String(args["period_to"] ?? "");
+        if (!periodFrom || !periodTo) throw new Error("period_from と period_to が必要です");
+        const filingKind = numArg(args, "filing_kind", 1);
+        if (filingKind !== 1 && filingKind !== 3) {
+          throw new Error("filing_kind は 1（確定）か 3（修正確定）で渡してください");
+        }
+        const input = {
+          salesIncl10: numArg(args, "sales_incl_10"),
+          salesIncl8: numArg(args, "sales_incl_8"),
+          nontaxableSales: numArg(args, "nontaxable_sales"),
+          exemptSales: numArg(args, "exempt_sales"),
+          purchasesIncl10: numArg(args, "purchases_incl_10"),
+          purchasesIncl8: numArg(args, "purchases_incl_8"),
+          interimNational: numArg(args, "interim_national"),
+          interimLocal: numArg(args, "interim_local"),
+        };
+        const result = computeConsumptionReturn(input);
+        const xtx = buildConsumptionXtx({
+          taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
+          periodFrom,
+          periodTo,
+          submissionDate: typeof args["submission_date"] === "string"
+            ? args["submission_date"]
+            : todayInTokyo(),
+          filingKind: filingKind as 1 | 3,
+          basePeriodSalesThousands: numArg(args, "base_period_sales_thousands"),
+          input,
+          result,
+          originalNational: nullableNumArg(args, "original_national"),
+          originalLocal: nullableNumArg(args, "original_local"),
+        });
+        return textResult({
+          filename: `etax-shohi-${periodFrom.slice(0, 4)}${filingKind === 3 ? "-shusei" : "-kakutei"}.xtx`,
+          total_payable: result.totalPayable,
+          ratio: result.ratio,
+          full_deduction: result.fullDeduction,
           xtx,
         });
       }

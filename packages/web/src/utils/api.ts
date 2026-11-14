@@ -5,6 +5,8 @@ import {
   AgentConnectionConfig,
   AnalyzeReceiptResponse,
   ChatMessage,
+  ExportConsumptionXtxRequest,
+  ExportConsumptionXtxResponse,
   ExportXtxRequest,
   ExportXtxResponse,
   FilingStatus,
@@ -205,6 +207,18 @@ export async function exportXtxFile(request: ExportXtxRequest): Promise<ExportXt
     body: JSON.stringify(request),
   });
   return parseJson<ExportXtxResponse>(resp);
+}
+
+/** 消費税申告書（本則）のXTXを生成する。失敗時はサーバーのエラー文言で例外。 */
+export async function exportConsumptionXtxFile(
+  request: ExportConsumptionXtxRequest,
+): Promise<ExportConsumptionXtxResponse> {
+  const resp = await fetch("/api/etax/export-consumption-xtx", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJson<ExportConsumptionXtxResponse>(resp);
 }
 
 // ---------------------------------------------------------------------------

@@ -122,7 +122,7 @@ export function xtxSupportedYears(): number[] {
 // 小物
 // ---------------------------------------------------------------------------
 
-function esc(value: string): string {
+export function esc(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -131,24 +131,29 @@ function esc(value: string): string {
 }
 
 /** 金額要素。0以下なら出力しない（任意項目のため）。負の所得はそのまま出す。 */
-function amount(tag: string, value: number): string {
+export function amount(tag: string, value: number): string {
   if (!value) return "";
   return `<${tag}>${Math.trunc(value)}</${tag}>`;
 }
 
 /** 金額要素（0でも必ず出す。合計欄など）。 */
-function amountAlways(tag: string, value: number): string {
+export function amountAlways(tag: string, value: number): string {
   return `<${tag}>${Math.trunc(value)}</${tag}>`;
 }
 
 /** IT部参照（空要素 + IDREF）。 */
-function ref(tag: string, idref: string): string {
+export function ref(tag: string, idref: string): string {
   return `<${tag} IDREF="${idref}"/>`;
 }
 
 /** 区分（kubun複合型: kubun_CD 子要素）。 */
-function kubun(tag: string, code: number): string {
+export function kubun(tag: string, code: number): string {
   return `<${tag}><kubun_CD>${code}</kubun_CD></${tag}>`;
+}
+
+/** 区分を要素の内容として直接書く形式（ABB00435 等、単純型の区分フィールド用）。 */
+export function kubunValue(tag: string, code: number): string {
+  return `<${tag}>${code}</${tag}>`;
 }
 
 interface EraDate {
@@ -159,7 +164,7 @@ interface EraDate {
 }
 
 /** 西暦日付 "YYYY-MM-DD" を元号付きに分解する。 */
-function toEraDate(iso: string): EraDate | null {
+export function toEraDate(iso: string): EraDate | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return null;
   const year = Number(m[1]);
@@ -172,19 +177,19 @@ function toEraDate(iso: string): EraDate | null {
 }
 
 /** 年分（yy複合型: era + yy）の IT部要素とその中身。子要素は general 名前空間。 */
-function eraYearXml(year: number): string {
+export function eraYearXml(year: number): string {
   // 2019年分以降は令和。令和元年 = 2019年。
   return `<gen:era>5</gen:era><gen:yy>${year - 2018}</gen:yy>`;
 }
 
-function yymmddXml(iso: string): string {
+export function yymmddXml(iso: string): string {
   const d = toEraDate(iso);
   if (!d) return "";
   return `<gen:era>${d.era}</gen:era><gen:yy>${d.yy}</gen:yy><gen:mm>${d.mm}</gen:mm><gen:dd>${d.dd}</gen:dd>`;
 }
 
 /** 電話番号を tel1/tel2/tel3 に分ける。ハイフン区切り優先。 */
-function phoneXml(phone: string): string {
+export function phoneXml(phone: string): string {
   const parts = phone.split("-").filter((p) => p !== "");
   let tel: string[] = [];
   if (parts.length === 3) {
@@ -204,7 +209,7 @@ function phoneXml(phone: string): string {
 }
 
 /** 郵便番号を zip1/zip2 に分ける。 */
-function zipXml(zipCode: string): string {
+export function zipXml(zipCode: string): string {
   const digits = zipCode.replace(/\D/g, "");
   if (digits.length !== 7) return "";
   return `<gen:zip1>${digits.slice(0, 3)}</gen:zip1><gen:zip2>${digits.slice(3)}</gen:zip2>`;
@@ -317,18 +322,18 @@ function buildKoa020Face1(data: XtxFilingData): string {
   // 所得から差し引かれる金額
   const ded: string[] = [];
   ded.push(amount("ABB00430", d.casualtyLoss));
-  if (d.medical > 0) ded.push(kubun("ABB00435", 1) + amountAlways("ABB00440", d.medical));
+  if (d.medical > 0) ded.push(kubunValue("ABB00435", 1) + amountAlways("ABB00440", d.medical));
   ded.push(amount("ABB00450", d.socialInsurance));
   ded.push(amount("ABB00460", d.smallBusinessMutualAid));
   ded.push(amount("ABB00470", d.lifeInsurance));
   ded.push(amount("ABB00480", d.earthquakeInsurance));
   ded.push(amount("ABB00490", d.donations));
   const widowSingle = d.widow + d.singleParent;
-  if (widowSingle > 0) ded.push(kubun("ABB00495", 1) + amountAlways("ABB00500", widowSingle));
+  if (widowSingle > 0) ded.push(kubunValue("ABB00495", 1) + amountAlways("ABB00500", widowSingle));
   ded.push(amount("ABB00510", d.workingStudent + d.disability));
   const spouseTotal = d.spouse + d.spouseSpecial;
   if (spouseTotal > 0) {
-    ded.push((d.spouse > 0 ? kubun("ABB00515", 1) : "") + amountAlways("ABB00520", spouseTotal));
+    ded.push((d.spouse > 0 ? kubunValue("ABB00515", 1) : "") + amountAlways("ABB00520", spouseTotal));
   }
   ded.push(amount("ABB00540", d.dependents + d.specialRelative));
   ded.push(amountAlways("ABB00550", d.basic));
