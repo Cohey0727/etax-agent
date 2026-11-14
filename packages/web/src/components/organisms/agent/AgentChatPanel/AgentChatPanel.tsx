@@ -128,7 +128,10 @@ export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentC
 
   return (
     <div className={styles.root}>
-      <Text variant="muted">質問や、集計・計算などの処理を頼めます。</Text>
+      <Text variant="muted">
+        質問や、集計・計算などの処理を頼めます。例:
+        「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
+      </Text>
       <Row gap="sm" align="center" justify="spaceBetween">
         {inHistory ? (
           <Button variant="ghost" size="sm" onClick={backToChat}>
@@ -182,11 +185,6 @@ export const AgentChatPanel = ({ transactions, onUiAction, sendKeyMode }: AgentC
       ) : (
         <>
           <div className={styles.chatLog} ref={logRef}>
-            {messages.length === 0 && (
-              <Text variant="muted">
-                例: 「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
-              </Text>
-            )}
             <MessageBubbles items={messages} />
             {loading && (
               <div className={clsx(styles.bubble, styles.role[ChatRole.Assistant])}>
