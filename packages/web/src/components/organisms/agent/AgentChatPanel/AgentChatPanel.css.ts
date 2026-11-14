@@ -64,6 +64,14 @@ const styles = {
   inputFlex: style({
     flex: 1,
   }),
+  // 履歴一覧の1行。幅いっぱいに広げて左寄せにする。
+  sessionItem: style({
+    width: "100%",
+    justifyContent: "flex-start",
+    textAlign: "left",
+    height: "auto",
+    padding: `${theme.space.sm} ${theme.space.md}`,
+  }),
 };
 
 // マークダウン本文の要素スタイル（子孫セレクタは globalStyle で付ける）。
