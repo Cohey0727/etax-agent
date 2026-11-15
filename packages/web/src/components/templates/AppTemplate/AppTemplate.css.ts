@@ -174,11 +174,6 @@ const styles = {
   view: style({
     animation: `${springRise} 0.5s ${theme.animation.springSoft} both`,
   }),
-  footer: style({
-    borderTop: `1px solid ${theme.color.lineSoft}`,
-    paddingTop: theme.space.md,
-    marginTop: theme.space.lg,
-  }),
   // 右のエージェントパネル。ドロワーではなくレイアウトを占有し、メイン画面と
   // 同時に操作できる。閉じている間もマウントしたままにして会話状態を保つ。
   agentPanel: style({

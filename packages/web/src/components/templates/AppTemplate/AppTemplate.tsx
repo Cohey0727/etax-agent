@@ -1,6 +1,6 @@
 import { Fragment, ReactNode, useEffect, useState } from "react";
 import { clsx } from "clsx";
-import { Badge, Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
+import { Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
 
@@ -240,17 +240,9 @@ export const AppTemplate = ({
             <Col gap="lg">
               <Row gap="md" align="center" justify="spaceBetween">
                 <Text variant="title">{activeLabel}</Text>
-                <Badge>下書き・準備専用</Badge>
               </Row>
               <div key={activeView} className={styles.view}>
                 {children}
-              </div>
-              <div className={styles.footer}>
-                <Text variant="caption">
-                  本ツールは計算と下書きの準備専用です。e-Tax への最終提出は納税者本人が行ってください
-                  （税務代理は税理士の独占業務です）。表示される金額は概算を含むため、
-                  実際の申告前に税務署・税理士への確認を推奨します。
-                </Text>
               </div>
             </Col>
           </div>
