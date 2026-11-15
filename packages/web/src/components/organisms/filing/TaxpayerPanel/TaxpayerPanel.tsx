@@ -11,6 +11,7 @@ import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportReturnPdfFile, exportXtxFile } from "@utils/api";
+import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingSection } from "../FilingPanel";
 import { emptyTaxpayer, loadTaxpayer } from "../TaxpayerProfilePanel";
 import styles from "./TaxpayerPanel.css";
@@ -256,16 +257,7 @@ export const TaxpayerPanel = ({
           提出は e-Tax サイト（e-Taxソフト（WEB版））で行います。出力したXTXを取り込み、
           内容を確認して送信してください。送信にはマイナンバーカードが必要です。
         </Text>
-        <Row gap="sm">
-          <a
-            className={styles.etaxLink}
-            href="https://www.e-tax.nta.go.jp"
-            target="_blank"
-            rel="noreferrer"
-          >
-            e-Taxサイトを開く
-          </a>
-        </Row>
+        <EtaxSubmitActions />
       </Col>
     </Card>
   );

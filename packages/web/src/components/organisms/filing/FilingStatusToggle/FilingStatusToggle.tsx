@@ -46,7 +46,7 @@ export const FilingStatusToggle = ({
           disabled={!available || savingKey === statusKey}
           onClick={() => void toggle(statusKey)}
         >
-          {done ? "戻す" : "確定する"}
+          {done ? "確定解除" : "確定する"}
         </Button>
       </Row>
     </Card>

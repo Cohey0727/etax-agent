@@ -32,24 +32,6 @@ const styles = {
     fontWeight: theme.fontWeight.semibold,
     color: theme.color.textSubtle,
   }),
-  // e-Taxサイトへのリンク。ボタン状にして提出の動線として目立たせる。
-  etaxLink: style({
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "8px 16px",
-    borderRadius: theme.borderRadius.md,
-    background: theme.color.accentSoft,
-    color: theme.color.accentText,
-    fontWeight: theme.fontWeight.semibold,
-    textDecoration: "none",
-    transition: `background 0.2s ease, transform 0.25s ${theme.animation.spring}`,
-    selectors: {
-      "&:hover": {
-        background: theme.color.hover,
-        transform: "translateY(-1px)",
-      },
-    },
-  }),
 };
 
 export default styles;

@@ -1,6 +1,7 @@
 import { BlueDeductionOptions, IncomeTaxResult, MiscIncomeInput, Transaction } from "@etax/shared";
 import { Fragment } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
+import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
 import { IncomeSummary } from "@components/organisms/filing/IncomeSummary";
 import { TaxSummary } from "@components/organisms/filing/TaxSummary";
@@ -21,14 +22,16 @@ interface ManualItem {
   key: FilingStatusKey;
   label: string;
   description: string;
-  /** その項目の作業をするタブ。提出だけは総合タブ内で完結するので無し。 */
-  section?: FilingSection;
+  /** その項目の作業をするタブ。 */
+  section: FilingSection;
 }
 
 /**
  * 手動で「確定」を付けられる項目。どれも独立していて、順番は問わない。
  * 各項目の行の直下に、その項目の結果の数字（帳簿→所得、控除・計算→税額）を
  * 並べ、見直してそのまま「確定」にできるようにする。
+ * 提出はこのアプリでは行えない（e-Tax で本人が送信する）ため、確定を付ける
+ * 項目には含めず、下に提出先への動線として別に置く。
  */
 const MANUAL_ITEMS: readonly ManualItem[] = [
   {
@@ -42,11 +45,6 @@ const MANUAL_ITEMS: readonly ManualItem[] = [
     label: "控除・計算",
     description: "所得控除・税額控除を入力すると所得税額が自動計算されます。入力は控除タブで行います。",
     section: "deductions",
-  },
-  {
-    key: "submitted",
-    label: "提出",
-    description: "e-Tax 用データ（XTX）を出力し、e-Tax ソフト／WEB版に取り込んで送信します。出力はこのタブの下のパネルで行います。送信はマイナンバーカードで本人が行う操作です。",
   },
 ];
 
@@ -80,7 +78,6 @@ export const FilingPanel = ({
   onOpenSection,
 }: FilingPanelProps) => {
   const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
-  const allSubmitted = status.submitted;
 
   return (
     <Col gap="lg">
@@ -89,28 +86,10 @@ export const FilingPanel = ({
           <Col gap="sm">
             <Text variant="sectionTitle">{year}年分の確定申告</Text>
             <Text variant="muted">
-              帳簿・確認・控除・提出はそれぞれ独立した項目です。どの順番でも入力でき、
+              帳簿と控除・計算はそれぞれ独立した項目です。どの順番でも入力でき、
               いつでも行き来して直せます。確定した項目には印を付けておけます（ダッシュボードの
-              申告ステータスと共有）。
+              申告ステータスと共有）。提出は e-Tax で行います。
             </Text>
-            {allSubmitted ? (
-              <Col gap="sm">
-                <Text>この年の申告は提出済みになっています。</Text>
-                <Text variant="muted">
-                  提出後に内容の誤りに気づいた場合は、修正申告で訂正します。
-                </Text>
-                <Row>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={!onNavigate}
-                    onClick={() => onNavigate?.(AppView.Amend)}
-                  >
-                    修正申告を開く →
-                  </Button>
-                </Row>
-              </Col>
-            ) : null}
           </Col>
 
           {MANUAL_ITEMS.map((item) => {
@@ -129,23 +108,21 @@ export const FilingPanel = ({
                     <Text variant="muted">{item.description}</Text>
                   </Col>
                   <Row gap="sm" className={styles.itemActions}>
-                    {item.section ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={!onOpenSection}
-                        onClick={() => item.section && onOpenSection?.(item.section)}
-                      >
-                        {SECTION_OPEN_LABELS[item.section]}
-                      </Button>
-                    ) : null}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!onOpenSection}
+                      onClick={() => onOpenSection?.(item.section)}
+                    >
+                      {SECTION_OPEN_LABELS[item.section]}
+                    </Button>
                     <Button
                       variant={done ? "ghost" : "primary"}
                       size="sm"
                       disabled={savingKey === item.key || !available}
                       onClick={() => void toggle(item.key)}
                     >
-                      {done ? "戻す" : "確定する"}
+                      {done ? "確定解除" : "確定する"}
                     </Button>
                   </Row>
                 </div>
@@ -162,6 +139,30 @@ export const FilingPanel = ({
               </Fragment>
             );
           })}
+
+          <div className={styles.statusRow}>
+            <Col gap="sm" className={styles.itemMain}>
+              <Text className={styles.itemLabel}>提出</Text>
+              <Text variant="muted">
+                e-Tax 用データ（XTX）を出力し、e-Tax に取り込んで送信します。出力は
+                この画面の下の提出パネルで行います。提出後に内容の誤りに気づいた
+                場合は、修正申告で訂正します。
+              </Text>
+            </Col>
+            <Row gap="sm" className={styles.itemActions}>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!onNavigate}
+                onClick={() => onNavigate?.(AppView.Amend)}
+              >
+                修正申告を開く →
+              </Button>
+            </Row>
+          </div>
+          <div className={styles.figuresBlock}>
+            <EtaxSubmitActions />
+          </div>
 
           <div className={styles.statusRow}>
             <Col gap="sm" className={styles.itemMain}>
