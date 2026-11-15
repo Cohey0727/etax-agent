@@ -4,7 +4,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { createSystemOneClient } from "../gateways/systemOneGateway";
-import { loadSystemOneConfig } from "../lib/config";
+import { getJevPromptOverride, loadSystemOneConfig } from "../lib/config";
 import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import {
   AccountClassificationSchema,
@@ -41,6 +41,6 @@ export const classifyAccountHandler: RouteHandler<typeof classifyAccountRoute> =
   const body = c.req.valid("json");
   const history = await loadClassificationHistory();
   const systemOne = createSystemOneClient(loadSystemOneConfig());
-  const result = await classifyAccount(body.description, { history, systemOne });
+  const result = await classifyAccount(body.description, { history, systemOne, jevPromptOverride: getJevPromptOverride() });
   return c.json(result, 200);
 };

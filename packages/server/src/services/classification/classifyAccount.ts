@@ -9,7 +9,8 @@
  *   3. SystemOne: 判定モデルAPI（/v1/systemone）に choice 質問として投げ、
  *      科目ごとの確率分布を得る。その際、生成ルールと確定例を文章化した
  *      プロンプト（generateRules の jevPrompt）を判定プロンプトに組み込む。
- *      接続できない/未設定なら静かに次へ落ちる。
+ *      設定画面で手編集されたプロンプト（jevPromptOverride）があれば、
+ *      自動生成よりそちらを優先する。接続できない/未設定なら静かに次へ落ちる。
  *   4. キーワードルール: shared の CATEGORY_RULES による決定的な推定。
  *   5. どれにも当たらなければ「未分類」。
  *
@@ -45,6 +46,8 @@ export interface ClassifyAccountDeps {
   systemOne: SystemOneClient | null;
   /** 判定モデルへ渡す state の前に付ける文脈（例: 「三井住友銀行・出金」）。 */
   stateHint?: string;
+  /** 設定画面で手編集された jev 用プロンプト。非空なら自動生成より優先する。 */
+  jevPromptOverride?: string;
 }
 
 /**
@@ -176,10 +179,12 @@ export async function classifyAccount(
   if (deps.systemOne) {
     try {
       const state = deps.stateHint ? `【${deps.stateHint}】${description}` : description;
+      // 手編集されたプロンプトがあれば、自動生成よりそちらを優先する。
+      const jevPrompt = deps.jevPromptOverride?.trim() ? deps.jevPromptOverride : generated.jevPrompt;
       const judgement = await deps.systemOne.judgeAccount(
         state,
         ACCOUNT_CRITERIA,
-        generated.jevPrompt || undefined,
+        jevPrompt || undefined,
       );
       const candidates = Object.entries(judgement.probabilities)
         .map(([account, probability]) => ({ account, probability }))

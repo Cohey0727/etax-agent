@@ -8,6 +8,7 @@ import {
   ChatMessage,
   ClassificationHistory,
   GeneratedRules,
+  JevPromptInfo,
   ExportConsumptionXtxRequest,
   ExportConsumptionXtxResponse,
   ExportDomicilePdfRequest,
@@ -158,44 +159,20 @@ export async function fetchGeneratedRules(): Promise<GeneratedRules> {
   return parseJson<GeneratedRules>(resp);
 }
 
-/** AIのメモリーに「摘要 → 科目」の対応を1件追加する（既存なら回数が増える）。 */
-export async function addClassificationHistoryEntry(
-  description: string,
-  account: string,
-): Promise<void> {
-  const resp = await fetch("/api/classify/feedback", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ description, account }),
-  });
-  await parseJson<unknown>(resp);
+/** jev用プロンプト一式（カスタム／自動生成／実効）を取得する。 */
+export async function fetchJevPrompt(): Promise<JevPromptInfo> {
+  const resp = await fetch("/api/classify/jev-prompt");
+  return parseJson<JevPromptInfo>(resp);
 }
 
-/** AIのメモリーの対応の科目を変更する。変更後の履歴一覧が返る。 */
-export async function updateClassificationHistoryEntry(
-  description: string,
-  account: string,
-  newAccount: string,
-): Promise<ClassificationHistory> {
-  const resp = await fetch("/api/classify/history", {
+/** jev用プロンプトを保存する（空文字でカスタムを消して自動生成に戻る）。 */
+export async function updateJevPrompt(prompt: string): Promise<JevPromptInfo> {
+  const resp = await fetch("/api/classify/jev-prompt", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ description, account, newAccount }),
+    body: JSON.stringify({ prompt }),
   });
-  return parseJson<ClassificationHistory>(resp);
-}
-
-/** AIのメモリーの対応を1件削除する。削除後の履歴一覧が返る。 */
-export async function deleteClassificationHistoryEntry(
-  description: string,
-  account: string,
-): Promise<ClassificationHistory> {
-  const resp = await fetch("/api/classify/history", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ description, account }),
-  });
-  return parseJson<ClassificationHistory>(resp);
+  return parseJson<JevPromptInfo>(resp);
 }
 
 /** SystemOne（jev）への接続テスト。フォームの未保存の値でも試せる。 */

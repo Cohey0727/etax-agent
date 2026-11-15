@@ -97,39 +97,3 @@ export async function recordClassification(
   }
   return saveClassificationHistory(records);
 }
-
-/**
- * 学習した対応の科目を変更する（AIのメモリーの編集）。
- * 変更先の科目で同じ摘要の対応が既にあれば、回数を合算して1件にまとめる。
- * 対象が無ければ null。
- */
-export async function updateClassificationAccount(
-  description: string,
-  account: string,
-  newAccount: string,
-): Promise<ClassificationHistoryRecord[] | null> {
-  const records = await loadClassificationHistory();
-  const target = findRecord(records, description, account);
-  if (!target) return null;
-  if (account === newAccount) return records;
-  const mergeInto = findRecord(records, description, newAccount);
-  if (mergeInto && mergeInto !== target) {
-    mergeInto.count += target.count;
-    mergeInto.updatedAt = new Date().toISOString();
-    return saveClassificationHistory(records.filter((r) => r !== target));
-  }
-  target.account = newAccount;
-  target.updatedAt = new Date().toISOString();
-  return saveClassificationHistory(records);
-}
-
-/** 学習した対応を1件削除する（AIのメモリーの編集）。対象が無ければ null。 */
-export async function deleteClassification(
-  description: string,
-  account: string,
-): Promise<ClassificationHistoryRecord[] | null> {
-  const records = await loadClassificationHistory();
-  const target = findRecord(records, description, account);
-  if (!target) return null;
-  return saveClassificationHistory(records.filter((r) => r !== target));
-}

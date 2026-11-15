@@ -107,6 +107,22 @@ export function getSystemOneOverrides(): SystemOneOverrides {
 }
 
 /**
+ * 設定画面で編集された jev 用プロンプトの上書き（空文字＝未設定）。
+ * 設定がある間は、学習履歴から自動生成されるプロンプトより優先される。
+ */
+let jevPromptOverride = "";
+
+/** 保存済みの jev 用プロンプト上書きを差し替える（jevPromptRepository が使う）。 */
+export function setJevPromptOverride(prompt: string): void {
+  jevPromptOverride = prompt;
+}
+
+/** 現在の jev 用プロンプト上書きを読む（未設定なら空文字）。 */
+export function getJevPromptOverride(): string {
+  return jevPromptOverride;
+}
+
+/**
  * SystemOne 互換エンドポイントの設定を読み込む。
  * 設定画面で保存された値があれば、環境変数より優先する。
  */

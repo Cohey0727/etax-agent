@@ -18,7 +18,12 @@ import {
   StorageObjectNotFoundError,
 } from "../gateways/storageGateway";
 import { createSystemOneClient } from "../gateways/systemOneGateway";
-import { loadAgentConfig, loadStorageConfig, loadSystemOneConfig } from "../lib/config";
+import {
+  getJevPromptOverride,
+  loadAgentConfig,
+  loadStorageConfig,
+  loadSystemOneConfig,
+} from "../lib/config";
 import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import { ErrorSchema } from "../schemas/common";
 import { AnalyzeReceiptRequestSchema, AnalyzeReceiptResponseSchema } from "../schemas/receipt";
@@ -135,6 +140,7 @@ export const analyzeReceiptHandler: RouteHandler<typeof analyzeReceiptRoute> = a
   const classification = await classifyAccount(state || extracted.description, {
     history,
     systemOne,
+    jevPromptOverride: getJevPromptOverride(),
   });
   return c.json({ ...extracted, classification }, 200);
 };

@@ -78,6 +78,13 @@ export interface GeneratedRules {
   jevPrompt: string;
 }
 
+/** jev用プロンプト一式（カスタム／自動生成／実効）。 */
+export interface JevPromptInfo {
+  customPrompt: string;
+  generatedPrompt: string;
+  effectivePrompt: string;
+}
+
 export interface AccountClassification {
   account: string;
   confidence: number | null;

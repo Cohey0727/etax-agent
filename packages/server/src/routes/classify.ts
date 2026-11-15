@@ -20,14 +20,8 @@ import {
   getClassificationHistoryHandler,
   getClassificationHistoryRoute,
 } from "../usecases/getClassificationHistory";
-import {
-  updateClassificationHistoryHandler,
-  updateClassificationHistoryRoute,
-} from "../usecases/updateClassificationHistory";
-import {
-  deleteClassificationHistoryHandler,
-  deleteClassificationHistoryRoute,
-} from "../usecases/deleteClassificationHistory";
+import { getJevPromptHandler, getJevPromptRoute } from "../usecases/getJevPrompt";
+import { updateJevPromptHandler, updateJevPromptRoute } from "../usecases/updateJevPrompt";
 
 const app = new OpenAPIHono();
 app.openapi(
@@ -47,14 +41,10 @@ app.openapi(
 );
 app.openapi(getGeneratedRulesRoute, getGeneratedRulesHandler);
 app.openapi(getClassificationHistoryRoute, getClassificationHistoryHandler);
+app.openapi(getJevPromptRoute, getJevPromptHandler);
 app.openapi(
-  updateClassificationHistoryRoute,
-  updateClassificationHistoryHandler,
-  legacyValidationHook(() => "JSONボディが必要です"),
-);
-app.openapi(
-  deleteClassificationHistoryRoute,
-  deleteClassificationHistoryHandler,
+  updateJevPromptRoute,
+  updateJevPromptHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 

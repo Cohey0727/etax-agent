@@ -103,17 +103,22 @@ export const ClassificationHistoryResponseSchema = z
 
 export type ClassificationHistoryResponse = z.infer<typeof ClassificationHistoryResponseSchema>;
 
-export const UpdateClassificationHistoryRequestSchema = z
+export const JevPromptResponseSchema = z
   .object({
-    description: z.string().min(1),
-    account: z.string().min(1),
-    newAccount: z.string().min(1),
+    /** 設定画面で手編集されたプロンプト（未設定なら空文字）。 */
+    customPrompt: z.string(),
+    /** 学習履歴から自動生成されるプロンプト。 */
+    generatedPrompt: z.string(),
+    /** 実際に判定へ使われるプロンプト（カスタムがあればそちら）。 */
+    effectivePrompt: z.string(),
   })
-  .openapi("UpdateClassificationHistoryRequest");
+  .openapi("JevPromptResponse");
 
-export const DeleteClassificationHistoryRequestSchema = z
+export type JevPromptResponse = z.infer<typeof JevPromptResponseSchema>;
+
+export const UpdateJevPromptRequestSchema = z
   .object({
-    description: z.string().min(1),
-    account: z.string().min(1),
+    /** 空文字で保存するとカスタムを消して自動生成に戻る。 */
+    prompt: z.string().max(8000),
   })
-  .openapi("DeleteClassificationHistoryRequest");
+  .openapi("UpdateJevPromptRequest");
