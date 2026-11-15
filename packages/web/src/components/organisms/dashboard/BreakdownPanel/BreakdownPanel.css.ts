@@ -1,9 +1,21 @@
 import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
-// 円グラフ（ドーナツ）のスライス色。収入はアクセント（インディゴ）の濃淡、
-// 支出は支出色（赤）の濃淡で並べ、凡例の順とスライスの順を一致させる。
-const SLICE_OPACITIES: readonly number[] = [1, 0.78, 0.6, 0.45, 0.33, 0.24];
+// 円グラフ（ドーナツ）のスライス色。科目ごとに別の色を割り当てて
+// 見分けられるようにする（濃淡グラデーションは隣同士が判別しにくい）。
+// 「その他」は残余の受け皿なので常にグレー。
+const SLICE_COLORS: readonly string[] = [
+  "#4a3aff", // インディゴ（アクセント）
+  "#0d9488", // ティール
+  "#d97706", // アンバー
+  "#0284c7", // スカイ
+  "#9333ea", // パープル
+  "#db2777", // ピンク
+  "#16a34a", // グリーン
+  "#ea580c", // オレンジ
+];
+
+const OTHER_COLOR = "#9ca3af";
 
 const sliceBase = {
   fill: "none",
@@ -31,12 +43,8 @@ const styles = {
     width: "176px",
     height: "176px",
   }),
-  sliceIncome: SLICE_OPACITIES.map((opacity) =>
-    style({ ...sliceBase, stroke: theme.color.accent, strokeOpacity: opacity }),
-  ),
-  sliceExpense: SLICE_OPACITIES.map((opacity) =>
-    style({ ...sliceBase, stroke: theme.color.negative, strokeOpacity: opacity }),
-  ),
+  slicePalette: SLICE_COLORS.map((color) => style({ ...sliceBase, stroke: color })),
+  sliceOther: style({ ...sliceBase, stroke: OTHER_COLOR }),
   centerLabel: style({
     fill: theme.color.muted,
     fontSize: "10px",
@@ -48,27 +56,23 @@ const styles = {
     fontWeight: theme.fontWeight.semibold,
     textAnchor: "middle",
   }),
-  // 凡例の色見本。スライスと同じ色・濃さにする。
-  swatchIncome: SLICE_OPACITIES.map((opacity) =>
+  // 凡例の色見本。スライスと同じ色にする。
+  swatchPalette: SLICE_COLORS.map((color) =>
     style({
       flex: "0 0 auto",
       width: "10px",
       height: "10px",
       borderRadius: "3px",
-      backgroundColor: theme.color.accent,
-      opacity,
+      backgroundColor: color,
     }),
   ),
-  swatchExpense: SLICE_OPACITIES.map((opacity) =>
-    style({
-      flex: "0 0 auto",
-      width: "10px",
-      height: "10px",
-      borderRadius: "3px",
-      backgroundColor: theme.color.negative,
-      opacity,
-    }),
-  ),
+  swatchOther: style({
+    flex: "0 0 auto",
+    width: "10px",
+    height: "10px",
+    borderRadius: "3px",
+    backgroundColor: OTHER_COLOR,
+  }),
   rowName: style({
     flex: "1 1 auto",
     minWidth: 0,

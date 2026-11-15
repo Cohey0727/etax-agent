@@ -45,8 +45,8 @@ export const BreakdownPanel = ({ transactions, year }: BreakdownPanelProps) => {
       <Col gap="md">
         <Text variant="sectionTitle">収入・支出の内訳 — {year}年</Text>
         <div className={styles.grid}>
-          <BreakdownColumn title="収入の内訳" rows={income} total={incomeTotal} kind="income" />
-          <BreakdownColumn title="支出の内訳" rows={expenses} total={expenseTotal} kind="expense" />
+          <BreakdownColumn title="収入の内訳" rows={income} total={incomeTotal} />
+          <BreakdownColumn title="支出の内訳" rows={expenses} total={expenseTotal} />
         </div>
       </Col>
     </Card>
@@ -57,19 +57,17 @@ interface BreakdownColumnProps {
   title: string;
   rows: readonly CategoryAmount[];
   total: number;
-  kind: "income" | "expense";
 }
 
-const BreakdownColumn = ({ title, rows, total, kind }: BreakdownColumnProps) => {
+const BreakdownColumn = ({ title, rows, total }: BreakdownColumnProps) => {
   const slices = groupSlices(rows);
-  const sliceClasses = kind === "income" ? styles.sliceIncome : styles.sliceExpense;
-  const swatchClasses = kind === "income" ? styles.swatchIncome : styles.swatchExpense;
+  const colorIndexes = assignColorIndexes(slices);
   let accumulated = 0;
-  const arcs = slices.map((slice) => {
+  const arcs = slices.map((slice, index) => {
     const share = total > 0 ? (slice.amount / total) * 100 : 0;
     const start = accumulated;
     accumulated += share;
-    return { ...slice, share, start };
+    return { ...slice, share, start, colorIndex: colorIndexes[index] ?? -1 };
   });
 
   return (
@@ -82,10 +80,12 @@ const BreakdownColumn = ({ title, rows, total, kind }: BreakdownColumnProps) => 
           <div className={styles.chartWrap}>
             <svg className={styles.donut} viewBox="0 0 120 120" role="img" aria-label={title}>
               <g transform="rotate(-90 60 60)">
-                {arcs.map((arc, index) => (
+                {arcs.map((arc) => (
                   <circle
                     key={arc.category}
-                    className={sliceClasses[index]}
+                    className={
+                      arc.colorIndex < 0 ? styles.sliceOther : styles.slicePalette[arc.colorIndex]
+                    }
                     cx="60"
                     cy="60"
                     r="46"
@@ -105,9 +105,13 @@ const BreakdownColumn = ({ title, rows, total, kind }: BreakdownColumnProps) => 
               </text>
             </svg>
           </div>
-          {arcs.map((arc, index) => (
+          {arcs.map((arc) => (
             <Row key={arc.category} gap="sm" align="center">
-              <span className={swatchClasses[index]} />
+              <span
+                className={
+                  arc.colorIndex < 0 ? styles.swatchOther : styles.swatchPalette[arc.colorIndex]
+                }
+              />
               <Text className={styles.rowName}>{arc.category}</Text>
               <Text className={styles.rowAmount}>{formatYen(arc.amount)}</Text>
               <Text variant="muted" className={styles.rowShare}>
@@ -131,6 +135,43 @@ function sumByCategory(transactions: Transaction[], absolute: boolean): Category
   return [...totals.entries()]
     .map(([category, amount]) => ({ category, amount }))
     .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * 主要科目の固定色（パレットのインデックス）。収入・支出の両方で同じ科目は
+ * 同じ色にする。「その他」はグレー固定なのでここには含めない（-1 で表す）。
+ */
+const CATEGORY_COLOR_INDEX: Record<string, number> = {
+  売上高: 0,
+  家賃収入: 1,
+  雑費: 2,
+  消耗品費: 3,
+  旅費交通費: 4,
+  通信費: 5,
+};
+
+/**
+ * スライスへ色を割り当てる。固定色のある科目はその色、無い科目は
+ * 空いているパレット色を順に使う。「その他」は -1（グレー）。
+ */
+function assignColorIndexes(slices: readonly CategoryAmount[]): number[] {
+  const used = new Set<number>();
+  const result = slices.map((slice) => {
+    if (slice.category === "その他") return -1;
+    const fixed = CATEGORY_COLOR_INDEX[slice.category];
+    if (fixed !== undefined && !used.has(fixed)) {
+      used.add(fixed);
+      return fixed;
+    }
+    return -2; // 後で空き色を割り当てる
+  });
+  let next = 0;
+  return result.map((index) => {
+    if (index !== -2) return index;
+    while (used.has(next)) next += 1;
+    used.add(next);
+    return next;
+  });
 }
 
 // スライス上限を超えた科目は「その他」に合算する。
