@@ -55,14 +55,6 @@ const TAX_CATEGORY_OPTIONS: readonly { value: string; label: string }[] = [
   ...TAX_CATEGORIES.map((name) => ({ value: name, label: name })),
 ];
 
-const PERIOD_MONTH_OPTIONS: readonly { value: string; label: string }[] = [
-  { value: "", label: "全期間" },
-  ...Array.from({ length: 12 }, (_, i) => ({
-    value: String(i + 1),
-    label: `${i + 1}月`,
-  })),
-];
-
 // 1行にセレクトや入力が並ぶため、全件を一度に描画すると画面が重くなる。
 // 1ページこの件数だけ描画するページネーションにする（集計は全件のまま）。
 const PAGE_SIZE = 100;
@@ -74,7 +66,7 @@ const PAGE_SIZE = 100;
  */
 type LedgerFilter =
   | { field: "year"; value: string }
-  | { field: "period"; month: string; from: string; to: string }
+  | { field: "period"; from: string; to: string }
   | { field: "amount"; min: string; max: string }
   | { field: "category"; values: string[] }
   | { field: "incomeType"; values: string[] }
@@ -108,7 +100,7 @@ const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
     case "year":
       return { field, value: "" };
     case "period":
-      return { field, month: "", from: "", to: "" };
+      return { field, from: "", to: "" };
     case "amount":
       return { field, min: "", max: "" };
     case "category":
@@ -486,15 +478,12 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
     setPageState({ signature: filterSignature, page: Math.min(Math.max(1, page), totalPages) });
   // 年度の選択肢はデータにある割り当て年度から作る（新しい順）。
   const yearOptions = [...new Set(rows.map((row) => row.fiscal_year))].sort((a, b) => b - a);
-  const activeYear = activeYearOf(filters);
-  // 期間チップの月選択は、年度フィルターがあればその年、無ければ最新の年度で範囲を作る。
-  const periodYear = activeYear ?? yearOptions[0] ?? new Date().getFullYear();
   // 期間フィルターは常設で、検索の左に置く。それ以外は下の段に並べる。
   const periodFilter = filters.find((f) => f.field === "period");
   const otherFilters = filters.filter((f) => f.field !== "period");
   const periodActive =
     periodFilter?.field === "period" &&
-    (periodFilter.month !== "" || periodFilter.from !== "" || periodFilter.to !== "");
+    (periodFilter.from !== "" || periodFilter.to !== "");
   const hasActiveFilters = Boolean(normalizedQuery) || otherFilters.length > 0 || periodActive;
 
   // 統計は表示中（絞り込み後）の取引で集計する。期間を絞れば、その期間の合計が見える。
@@ -616,9 +605,9 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
           <Row gap="sm" align="center" wrap>
             {periodFilter ? (
               <FilterChip
+                bare
                 filter={periodFilter}
                 years={yearOptions}
-                periodYear={periodYear}
                 onChange={updateFilter}
               />
             ) : null}
@@ -637,7 +626,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
             {hasActiveFilters ? (
               <>
                 <Text variant="muted">{visibleRows.length}件ヒット</Text>
-                <Button variant="ghost" size="sm" className={styles.rowButton} onClick={clearFilters}>
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
                   クリア
                 </Button>
               </>
@@ -649,7 +638,6 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                 key={filter.field}
                 filter={filter}
                 years={yearOptions}
-                periodYear={periodYear}
                 onChange={updateFilter}
                 onRemove={() => removeFilter(filter.field)}
               />
@@ -1014,22 +1002,22 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
 const FilterChip = ({
   filter,
   years,
-  periodYear,
   onChange,
   onRemove,
+  bare = false,
 }: {
   filter: LedgerFilter;
   /** 年度フィルターの選択肢（データにある割り当て年度）。 */
   years: readonly number[];
-  /** 期間フィルターの月選択が範囲を作る基準年。 */
-  periodYear: number;
   onChange: (next: LedgerFilter) => void;
   /** 削除ボタン。無いフィルター（期間）は常設なので渡さない。 */
   onRemove?: () => void;
+  /** 枠もラベルも付けない（検索の左に置く期間フィルター用）。 */
+  bare?: boolean;
 }) => {
   return (
-    <div className={styles.filterChip}>
-      <Text variant="caption">{FILTER_FIELD_LABELS[filter.field]}</Text>
+    <div className={bare ? styles.filterBare : styles.filterChip}>
+      {bare ? null : <Text variant="caption">{FILTER_FIELD_LABELS[filter.field]}</Text>}
       {filter.field === "year" ? (
         <Select
           className={styles.chipSelect}
@@ -1049,27 +1037,11 @@ const FilterChip = ({
         </Select>
       ) : filter.field === "period" ? (
         <>
-          <Select
-            className={styles.chipSelect}
-            value={filter.month}
-            onChange={(e) => {
-              const month = e.target.value;
-              const range = monthRange(periodYear, month);
-              onChange({ ...filter, month, from: range.from, to: range.to });
-            }}
-            aria-label="月で絞り込み"
-          >
-            {PERIOD_MONTH_OPTIONS.map((option) => (
-              <option key={option.label} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
           <Input
             type="date"
             className={styles.chipInput}
             value={filter.from}
-            onChange={(e) => onChange({ ...filter, month: "", from: e.target.value })}
+            onChange={(e) => onChange({ ...filter, from: e.target.value })}
             aria-label="開始日"
           />
           <Text variant="muted">〜</Text>
@@ -1077,7 +1049,7 @@ const FilterChip = ({
             type="date"
             className={styles.chipInput}
             value={filter.to}
-            onChange={(e) => onChange({ ...filter, month: "", to: e.target.value })}
+            onChange={(e) => onChange({ ...filter, to: e.target.value })}
             aria-label="終了日"
           />
         </>
@@ -1138,15 +1110,6 @@ const FilterChip = ({
   );
 };
 
-/** 月選択から、その月の開始日・終了日を作る。"" なら範囲なし。 */
-function monthRange(year: number, month: string): { from: string; to: string } {
-  if (!month) return { from: "", to: "" };
-  const m = Number(month);
-  const mm = String(m).padStart(2, "0");
-  const lastDay = new Date(year, m, 0).getDate();
-  return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(lastDay).padStart(2, "0")}` };
-}
-
 /** 取引がフィルター1件に一致するか。金額は符号付きで比べる（支出はマイナス）。 */
 function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
   switch (filter.field) {
@@ -1197,7 +1160,6 @@ function parseFiltersFromSearch(search: string): { query: string; filters: Ledge
         const to = params.get("to") ?? "";
         return {
           field,
-          month: params.get("month") ?? "",
           from: /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : "",
           to: /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : "",
         };
@@ -1232,7 +1194,6 @@ function buildFilterSearch(query: string, filters: LedgerFilter[]): string {
           if (filter.value) params.set("year", filter.value);
           break;
         case "period":
-          if (filter.month) params.set("month", filter.month);
           if (filter.from) params.set("from", filter.from);
           if (filter.to) params.set("to", filter.to);
           break;

@@ -66,12 +66,17 @@ const styles = {
   searchInput: style({
     width: "100%",
     paddingLeft: "34px",
-    // 検索の左に並ぶ期間チップと高さを揃える。
-    height: FILTER_ROW_HEIGHT,
   }),
-  // 検索・フィルター行のボタン（クリア／フィルター追加）。チップと高さを揃える。
+  // フィルター追加ボタン。チップと高さを揃える。
   rowButton: style({
     height: FILTER_ROW_HEIGHT,
+  }),
+  // 枠なしフィルター（期間）。検索の左に、コントロールだけを並べる。
+  filterBare: style({
+    display: "flex",
+    alignItems: "center",
+    gap: theme.space.xs,
+    flexWrap: "wrap",
   }),
   descriptionInput: style({
     width: "100%",
