@@ -14,6 +14,7 @@ import {
   ConsumptionTaxPanel,
   DeductionPanel,
   FilingPanel,
+  FilingStatusToggle,
   TaxCreditPanel,
   TaxpayerPanel,
   TaxpayerProfilePanel,
@@ -126,12 +127,20 @@ const FilingWorkspace = ({
       </>
     ),
     ledger: (
-      <Card>
-        <Col gap="md">
-          <Text variant="sectionTitle">帳簿の確認</Text>
-          <ConfirmSummary transactions={transactions} year={year} />
-        </Col>
-      </Card>
+      <>
+        <Card>
+          <Col gap="md">
+            <Text variant="sectionTitle">帳簿の確認</Text>
+            <ConfirmSummary transactions={transactions} year={year} />
+          </Col>
+        </Card>
+        <FilingStatusToggle
+          year={year}
+          statusKey="confirmed"
+          label="帳簿の確認"
+          description="帳簿の金額・科目・区分に誤りがないか見直したら、ここで済みにできます（総合・ダッシュボードと共有）。"
+        />
+      </>
     ),
     deductions: (
       <>
@@ -145,6 +154,12 @@ const FilingWorkspace = ({
           taxCredits={deductionState.taxCredits}
           result={taxResult}
           onChange={updateTaxCredits}
+        />
+        <FilingStatusToggle
+          year={year}
+          statusKey="calculated"
+          label="控除・計算"
+          description="所得控除・税額控除の入力が終わったら、ここで済みにできます（総合・ダッシュボードと共有）。"
         />
       </>
     ),

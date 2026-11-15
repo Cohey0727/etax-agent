@@ -1,11 +1,8 @@
-import { filterYear, Transaction } from "@etax/shared";
-import { useEffect, useMemo, useState } from "react";
+import { Transaction } from "@etax/shared";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
-import { AppView, FilingStatus, FilingTab } from "@types";
-import { fetchFilingStatuses, updateFilingStatus } from "@utils/api";
+import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
+import { AppView, FilingTab } from "@types";
 import styles from "./FilingPanel.css";
-
-type ManualKey = "confirmed" | "calculated" | "submitted";
 
 /** 確定申告画面のタブのうち、総合から遷移できる先（総合自身を除くタブ）。 */
 export type FilingSection = Exclude<FilingTab, "overview">;
@@ -18,7 +15,7 @@ const SECTION_OPEN_LABELS: Record<FilingSection, string> = {
 };
 
 interface ManualItem {
-  key: ManualKey;
+  key: FilingStatusKey;
   label: string;
   description: string;
   /** その項目の作業をするタブ。提出だけは総合タブ内で完結するので無し。 */
@@ -63,41 +60,9 @@ export interface FilingPanelProps {
  * 行ったり来たりできる（ステッパーは置かない）。
  * ステータスはダッシュボードの表示とサーバー保存を共有する。
  */
-export const FilingPanel = ({ transactions, year, onNavigate, onOpenSection }: FilingPanelProps) => {
-  const [statuses, setStatuses] = useState<FilingStatus[] | null>(null);
-  const [loadDone, setLoadDone] = useState(false);
-  const [savingKey, setSavingKey] = useState<ManualKey | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchFilingStatuses().then((result) => {
-      if (cancelled) return;
-      setStatuses(result);
-      setLoadDone(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
-  const status = statuses?.find((s) => s.year === year) ?? EMPTY_STATUS;
+export const FilingPanel = ({ year, onNavigate, onOpenSection }: FilingPanelProps) => {
+  const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
   const allSubmitted = status.submitted;
-
-  const toggle = async (key: ManualKey, done: boolean) => {
-    setSavingKey(key);
-    const patch: { confirmed?: boolean; calculated?: boolean; submitted?: boolean } = {};
-    patch[key] = !done;
-    const updated = await updateFilingStatus(year, patch);
-    setSavingKey(null);
-    if (!updated) return;
-    setStatuses((prev) =>
-      prev === null
-        ? prev
-        : [...prev.filter((s) => s.year !== year), updated].sort((a, b) => a.year - b.year),
-    );
-  };
 
   return (
     <Col gap="lg">
@@ -130,35 +95,6 @@ export const FilingPanel = ({ transactions, year, onNavigate, onOpenSection }: F
             ) : null}
           </Col>
 
-          <div className={styles.statusRow}>
-            <Col gap="sm">
-              <Text className={styles.itemLabel}>帳簿</Text>
-              <Text variant="muted">
-                取引 {yearTransactions.length} 件
-                {unclassifiedCount > 0 ? ` ・ 未分類 ${unclassifiedCount} 件` : " ・ 未分類なし"}
-                （取引があれば自動で用意済みになります）
-              </Text>
-            </Col>
-            <Row gap="sm">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!onNavigate}
-                onClick={() => onNavigate?.(AppView.Ledger)}
-              >
-                帳簿を開く
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!onNavigate}
-                onClick={() => onNavigate?.(AppView.Import)}
-              >
-                取引・CSV取込
-              </Button>
-            </Row>
-          </div>
-
           {MANUAL_ITEMS.map((item) => {
             const done = status[item.key];
             const doneAt = status[`${item.key}_at`];
@@ -187,8 +123,8 @@ export const FilingPanel = ({ transactions, year, onNavigate, onOpenSection }: F
                   <Button
                     variant={done ? "ghost" : "primary"}
                     size="sm"
-                    disabled={savingKey === item.key || statuses === null}
-                    onClick={() => void toggle(item.key, done)}
+                    disabled={savingKey === item.key || !available}
+                    onClick={() => void toggle(item.key)}
                   >
                     {done ? "戻す" : "済みにする"}
                   </Button>
@@ -217,7 +153,7 @@ export const FilingPanel = ({ transactions, year, onNavigate, onOpenSection }: F
             </Row>
           </div>
 
-          {loadDone && statuses === null ? (
+          {loaded && !available ? (
             <Text variant="muted">
               ステータスを保存するサーバーに接続できていません。「済みにする」は接続時に使えます。
             </Text>
@@ -226,16 +162,6 @@ export const FilingPanel = ({ transactions, year, onNavigate, onOpenSection }: F
       </Card>
     </Col>
   );
-};
-
-const EMPTY_STATUS: FilingStatus = {
-  year: 0,
-  confirmed: false,
-  confirmed_at: null,
-  calculated: false,
-  calculated_at: null,
-  submitted: false,
-  submitted_at: null,
 };
 
 function formatDate(iso: string): string {
