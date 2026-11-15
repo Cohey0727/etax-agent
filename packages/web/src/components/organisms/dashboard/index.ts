@@ -1,4 +1,5 @@
 export * from "./DashboardPanel";
+export * from "./YearlyTrendPanel";
 export * from "./BreakdownPanel";
 export * from "./FilingStatusPanel";
 export * from "./IncomeSummary";
