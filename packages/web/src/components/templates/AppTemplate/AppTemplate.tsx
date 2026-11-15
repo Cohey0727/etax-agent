@@ -145,31 +145,35 @@ export const AppTemplate = ({
                 </Col>
               </Row>
               <Col gap="sm">
-                <Text variant="statLabel">年度</Text>
-                <Select
-                  className={styles.yearSelect}
-                  value={selectedYear}
-                  onChange={(e) => handleYearSelect(e.target.value)}
-                  aria-label="年度"
-                >
-                  {onAddYear ? <option value={`add:${nextYear}`}>{nextYear}年度を追加</option> : null}
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}年度
-                    </option>
-                  ))}
-                  {onAddYear && prevYear !== null ? (
-                    <option value={`add:${prevYear}`}>{prevYear}年度を追加</option>
-                  ) : null}
-                </Select>
-              </Col>
-              <Col gap="sm">
                 {navViews.map((view) => {
                   const children = (navChildren ?? []).filter(
                     (child) => child.view === view.id,
                   );
                   return (
                     <Fragment key={view.id}>
+                      {view.id === AppView.Filing ? (
+                        <Col gap="sm">
+                          <Text variant="statLabel">年度</Text>
+                          <Select
+                            className={styles.yearSelect}
+                            value={selectedYear}
+                            onChange={(e) => handleYearSelect(e.target.value)}
+                            aria-label="年度"
+                          >
+                            {onAddYear ? (
+                              <option value={`add:${nextYear}`}>{nextYear}年度を追加</option>
+                            ) : null}
+                            {years.map((year) => (
+                              <option key={year} value={year}>
+                                {year}年度
+                              </option>
+                            ))}
+                            {onAddYear && prevYear !== null ? (
+                              <option value={`add:${prevYear}`}>{prevYear}年度を追加</option>
+                            ) : null}
+                          </Select>
+                        </Col>
+                      ) : null}
                       <Button
                         variant={view.id === activeView ? "navActive" : "nav"}
                         size="md"
