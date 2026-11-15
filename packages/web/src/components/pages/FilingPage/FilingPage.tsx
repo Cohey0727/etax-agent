@@ -13,6 +13,7 @@ import { ReactNode, useMemo, useState } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import { Tabs } from "@components/molecules";
 import {
+  BalanceRecords,
   BalanceSummary,
   ConsumptionTaxPanel,
   DeductionPanel,
@@ -206,6 +207,7 @@ const FilingWorkspace = ({
             />
           </Col>
         </Card>
+        <BalanceRecords key={year} transactions={yearTransactions} />
         <FilingStatusToggle
           year={year}
           statusKey="confirmed"

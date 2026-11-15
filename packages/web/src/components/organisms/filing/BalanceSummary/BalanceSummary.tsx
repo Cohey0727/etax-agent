@@ -8,7 +8,6 @@ import {
 import { useMemo } from "react";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { BalanceRecords } from "../BalanceRecords";
 import { formatYen } from "@utils";
 import styles from "./BalanceSummary.css";
 
@@ -38,9 +37,9 @@ export interface BalanceSummaryProps {
 /**
  * 確定申告の「収支」タブの中身。その年の帳簿を収支として見直せるように、
  * 収入・支出・差引（収支）を中心に置き、事業／不動産ごとの収支、
- * そこから所得合計への内訳、月別の収支と累計、勘定科目ごとの内訳を出し、
- * 末尾に集計の対象になっている帳簿レコードそのものも並べる。
- * 未分類が残っていれば注意も出す。
+ * そこから所得合計への内訳、月別の収支と累計、勘定科目ごとの内訳を出す。
+ * 集計の対象になっている帳簿レコードそのものは、隣の BalanceRecords が
+ * 別カードで並べる。未分類が残っていれば注意も出す。
  */
 export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }: BalanceSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
@@ -139,8 +138,6 @@ export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }
         <CategoryList title="収入の内訳" rows={income} tone="income" />
         <CategoryList title="支出の内訳" rows={expenses} tone="expense" />
       </div>
-
-      <BalanceRecords key={year} transactions={yearTransactions} />
 
       {unclassifiedCount > 0 ? (
         <AlertBox variant="notice">
