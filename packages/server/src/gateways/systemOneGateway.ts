@@ -41,6 +41,18 @@ export interface SystemOneClient {
 const USER_AGENT = "etax-agent/0.1";
 
 /**
+ * 判定時の固定の注意書き（プロンプトの指示文に常時含める）。
+ * 判定モデルは店舗名を地代家賃に寄せる偏りがあるため、科目の使い分けを
+ * 明示する。学習履歴から生成するプロンプトより前に置き、常に効かせる。
+ */
+const JUDGE_GUIDANCE = [
+  "判定の注意:",
+  "- コンビニ・スーパー・飲食店・小売店などの店舗名は、地代家賃にしない。店舗での買い物や飲食は、内容に応じて消耗品費・会議費・交際費・雑費などにする。",
+  "- 地代家賃は、家賃・賃料・駐車場代など不動産の賃借料のときだけ使う。",
+  "- 外注費は業務委託・外注先への支払いのときだけ、仕入高は販売目的の商品仕入れのときだけ、管理費は賃貸物件の管理費・共益費のときだけ使う。",
+].join("\n");
+
+/**
  * choice 質問の候補数の上限。判定モデル側の制約（tev1 は最大24候補で、
  * 超えると 400 になる）。科目一覧がこれを超える場合は、領収書や明細行の
  * 摘要には現れない仕訳専用の科目（減価償却費・貸倒金）から外して収める。
@@ -107,7 +119,7 @@ class SystemOneHttpClient implements SystemOneClient {
   ): Promise<AccountJudgement> {
     const criteria: Record<string, string> = {};
     for (const { account, criteria: text } of capCandidates(accounts)) criteria[account] = text;
-    const baseInstructions = "この支出または収入は、どの勘定科目に該当しますか？";
+    const baseInstructions = `この支出または収入は、どの勘定科目に該当しますか？\n${JUDGE_GUIDANCE}`;
     const instructions = learnedPrompt
       ? `${baseInstructions}\n${learnedPrompt}`
       : baseInstructions;

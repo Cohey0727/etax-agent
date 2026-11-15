@@ -95,6 +95,30 @@ export async function deleteTransactionRow(
 }
 
 /**
+ * 重複判定用の指紋項目だけを全件取得する（CSV再取込の二重計上防止用）。
+ * 科目や収入区分は後から変わるため含めない。
+ */
+export async function listTransactionFingerprintRows(db: Db): Promise<
+  {
+    date: string;
+    amount: number;
+    description: string;
+    account: string;
+    taxCategory: string;
+  }[]
+> {
+  return db
+    .select({
+      date: transactionsTable.date,
+      amount: transactionsTable.amount,
+      description: transactionsTable.description,
+      account: transactionsTable.account,
+      taxCategory: transactionsTable.taxCategory,
+    })
+    .from(transactionsTable);
+}
+
+/**
  * 指定した割り当て年度の取引を丸ごと置き換える（画面側の確定状態を帳簿の正とする）。
  * 削除対象は日付ではなく割り当て年度で決める（日付が他年の取引も含む）。
  * 取込リンク（import_id）は外れる。削除と挿入は1トランザクションで行う。

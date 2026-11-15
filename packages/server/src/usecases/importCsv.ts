@@ -19,7 +19,13 @@ import {
   ImportCsvResponse,
   ImportCsvResponseSchema,
 } from "../schemas/importCsv";
+import { listTransactionFingerprintRows } from "../repositories/transactionRepository";
 import { decodeCsvBytes } from "../services/csvImport/csvDecoding";
+import {
+  buildFingerprintCounts,
+  excludeAlreadyImported,
+  transactionFingerprint,
+} from "../services/csvImport/importDedupe";
 import { resolveMapping } from "../services/csvImport/csvMapping";
 import { ParseResult, parseWithMapping } from "../services/csvImport/csvParsing";
 
@@ -113,18 +119,38 @@ export const importCsvHandler: RouteHandler<typeof importCsvRoute> = async (c) =
   }
 
   // DBがあれば永続化する。無ければプレビューとして返す（取込自体は成立）。
+  // 永続化の前に、既にDBにある取引と指紋で突き合わせて重複分を除く。
+  // これで同じCSVを何回取り込んでも二重計上されない（件数ベースの
+  // 突き合わせなので、同日・同額・同名の別取引が複数ある場合も壊れない）。
   let persisted = false;
   let importId: number | undefined;
   let persistWarning: string | undefined;
+  let effectiveTransactions = parsed.transactions;
+  let alreadyImported = 0;
   const db = getDb();
   if (db) {
     try {
+      const existing = await listTransactionFingerprintRows(db);
+      const deduped = excludeAlreadyImported(
+        parsed.transactions,
+        (t) =>
+          transactionFingerprint({
+            date: t.date,
+            amount: t.amount,
+            description: t.description,
+            account: t.account,
+            taxCategory: t.tax_category,
+          }),
+        buildFingerprintCounts(existing),
+      );
       importId = await createImportWithTransactions(db, {
         filename,
         sourceName,
         mapping,
-        transactions: parsed.transactions,
+        transactions: deduped.fresh,
       });
+      effectiveTransactions = deduped.fresh;
+      alreadyImported = deduped.duplicates;
       persisted = true;
     } catch (e) {
       persistWarning = `DBへの保存に失敗しました（プレビューとして返します）: ${errorMessage(e)}`;
@@ -136,14 +162,14 @@ export const importCsvHandler: RouteHandler<typeof importCsvRoute> = async (c) =
     mappingSource: source,
     encoding,
     filename,
-    count: parsed.transactions.length,
+    count: effectiveTransactions.length,
     totalRows: parsed.totalRows,
     skippedRows: parsed.skippedRows,
-    duplicatesSkipped: parsed.duplicatesSkipped,
+    duplicatesSkipped: parsed.duplicatesSkipped + alreadyImported,
     persisted,
     importId: importId ?? null,
     persistWarning: persistWarning ?? null,
-    transactions: parsed.transactions.slice(0, 500),
+    transactions: effectiveTransactions.slice(0, 500),
   };
   return c.json(response, 200);
 };

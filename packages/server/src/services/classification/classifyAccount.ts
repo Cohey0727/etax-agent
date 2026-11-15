@@ -50,6 +50,9 @@ export interface ClassifyAccountDeps {
 /**
  * 学習履歴から摘要に合う対応を探す。
  * 完全一致を最優先し、次に「キーを含む/キーに含まれる」部分一致を回数順で拾う。
+ * 部分一致は、同じ対応が2回以上確定した「傾向」だけを対象にする。
+ * 1回だけの確定を部分一致で広げると、短い摘要（店名など）が無関係な
+ * 取引にまで伝播してしまうため。
  */
 export function matchHistory(
   description: string,
@@ -62,9 +65,80 @@ export function matchHistory(
     .sort((a, b) => b.count - a.count)[0];
   if (exact) return exact;
   const partial = history
-    .filter((r) => r.key.length >= 2 && (key.includes(r.key) || r.key.includes(key)))
+    .filter(
+      (r) =>
+        r.count >= 2 &&
+        r.key.length >= 2 &&
+        (key.includes(r.key) || r.key.includes(key)),
+    )
     .sort((a, b) => b.count - a.count || b.key.length - a.key.length)[0];
   return partial ?? null;
+}
+
+/**
+ * 店舗らしい摘要か（店名・業態のキーワードで判定する）。
+ * 判定モデルは店舗名を地代家賃に寄せる偏りがあり、プロンプトの注意書き
+ * だけでは止めきれないため、決定的な歯止めとして使う。
+ */
+const STORE_LIKE_KEYS: readonly string[] = [
+  "セブン-イレブン",
+  "セブンイレブン",
+  "ローソン",
+  "ファミリーマート",
+  "ミニストップ",
+  "デイリーヤマザキ",
+  "ハローズ",
+  "イオン",
+  "ゆめタウン",
+  "エブリイ",
+  "ユーホー",
+  "ザグザグ",
+  "ダイレックス",
+  "ウエルシア",
+  "サンドラッグ",
+  "ドラッグ",
+  "ドン・キホーテ",
+  "ダイソー",
+  "ユニクロ",
+  "アウトレット",
+  "デパート",
+  "ショッピング",
+  "マート",
+  "ストア",
+  "マクドナルド",
+  "スターバックス",
+  "ガスト",
+  "一蘭",
+  "居酒屋",
+  "焼肉",
+  "レストラン",
+  "食堂",
+  "カフェ",
+  "珈琲",
+  "コーヒー",
+  "寿司",
+  "すし",
+  "ラーメン",
+  "うどん",
+  "そば",
+  "パスタ",
+  "ピザ",
+  "バーガー",
+  "ドーナツ",
+];
+
+export function isStoreLikeDescription(description: string): boolean {
+  return STORE_LIKE_KEYS.some((k) => description.includes(k));
+}
+
+/**
+ * 判定結果の補正: 店舗名を「地代家賃」にするのは科目としてあり得ない
+ * （地代家賃は不動産の賃借料だけ）ため、店舗らしい摘要で地代家賃に
+ * なった場合は雑費に寄せる。
+ */
+export function guardStoreRent(account: string, description: string): string {
+  if (account === "地代家賃" && isStoreLikeDescription(description)) return "雑費";
+  return account;
 }
 
 /** 1件の摘要について勘定科目を判定する。 */
@@ -109,7 +183,7 @@ export async function classifyAccount(
       const top = candidates[0];
       if (top) {
         return {
-          account: judgement.top ?? top.account,
+          account: guardStoreRent(judgement.top ?? top.account, description),
           confidence: top.probability,
           source: "systemone",
           candidates,
