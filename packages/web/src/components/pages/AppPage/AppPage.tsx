@@ -49,8 +49,8 @@ const appViews = [
   { id: AppView.Import, label: "取引・CSV取込", icon: "import", nav: false, Component: ImportPage },
   { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", nav: false, Component: ReceiptPage },
   { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
-  { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
   { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },
+  { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
   { id: AppView.Settings, label: "設定", icon: "settings", nav: false, Component: SettingsPage },
 ] as const satisfies readonly {
   id: AppView;
