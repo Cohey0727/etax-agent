@@ -8,6 +8,7 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { normalizeSearchText } from "@etax/shared";
 import { serverDataDir } from "../lib/config";
 
 export interface ClassificationHistoryRecord {
@@ -25,9 +26,13 @@ export interface ClassificationHistoryRecord {
 
 const HISTORY_FILENAME = "classification-history.json";
 
-/** 摘要の照合キーを作る（前後空白・連続空白・英字大小を吸収する）。 */
+/**
+ * 摘要の照合キーを作る（全角半角・半角カタカナ・英字大小・空白の揺れを吸収する）。
+ * 保存済みキーは形式が古い場合があるため、照合時はこの関数で摘要から
+ * 作り直したキー同士で比べる（保存値そのものは信用しない）。
+ */
 export function normalizeDescriptionKey(description: string): string {
-  return description.trim().replace(/\s+/g, " ").toLowerCase();
+  return normalizeSearchText(description).trim().replace(/\s+/g, " ");
 }
 
 function historyPath(): string {
@@ -60,8 +65,11 @@ export async function recordClassification(
   const records = await loadClassificationHistory();
   const key = normalizeDescriptionKey(description);
   const now = new Date().toISOString();
-  const existing = records.find((r) => r.key === key && r.account === account);
+  const existing = records.find(
+    (r) => normalizeDescriptionKey(r.description) === key && r.account === account,
+  );
   if (existing) {
+    existing.key = key;
     existing.count += 1;
     existing.updatedAt = now;
     existing.description = description;

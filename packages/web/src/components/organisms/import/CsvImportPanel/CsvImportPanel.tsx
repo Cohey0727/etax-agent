@@ -59,7 +59,7 @@ export const CsvImportPanel = ({ onUseTransactions, onLoadSample }: CsvImportPan
                 e.target.value = "";
               }}
             />
-            <Button disabled={loading} onClick={() => fileRef.current?.click()}>
+            <Button disabled={loading} disabledReason="取込中です" onClick={() => fileRef.current?.click()}>
               {loading ? "取込中…" : "CSVファイルを選ぶ"}
             </Button>
             <Button variant="ghost" onClick={onLoadSample}>

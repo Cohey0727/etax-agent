@@ -14,7 +14,7 @@
  *   - 科目を付け替えた場合は分類の学習（recordClassification）にも反映する
  *     （MCP の add/update_transaction と同じ扱い）。
  */
-import { IncomeType, Transaction } from "@etax/shared";
+import { IncomeType, Transaction, normalizeSearchText } from "@etax/shared";
 import { getDb } from "../../lib/db";
 import { recordClassification } from "../../repositories/classificationHistoryRepository";
 import {
@@ -29,11 +29,6 @@ import { TransactionRow } from "../../repositories/schema";
 
 /** 一括変更の上限件数（誤った条件での大量変更を防ぐ）。 */
 const MAX_BULK_UPDATE = 500;
-
-/** 検索用に文字列を正規化する（全角半角・英字ケースを吸収、search_transactions と同じ）。 */
-function normalizeForSearch(value: string): string {
-  return value.normalize("NFKC").toLowerCase();
-}
 
 export interface UpdateTransactionsArgs {
   /** 摘要・口座名・科目への部分一致キーワード。 */
@@ -54,16 +49,16 @@ export interface UpdateTransactionsArgs {
 
 /** 一括変更の対象行を選ぶ（読み取り系の検索と同じ正規化・一致ルール）。 */
 function matchRows(rows: TransactionRow[], args: UpdateTransactionsArgs): TransactionRow[] {
-  const needle = args.keyword ? normalizeForSearch(args.keyword) : null;
+  const needle = args.keyword ? normalizeSearchText(args.keyword) : null;
   return rows.filter((row) => {
     if (args.year !== undefined && effectiveFiscalYear(row) !== args.year) return false;
     if (args.category !== undefined && row.category !== args.category) return false;
     if (args.incomeType !== undefined && row.incomeType !== args.incomeType) return false;
     if (needle) {
       const hit =
-        normalizeForSearch(row.description).includes(needle) ||
-        normalizeForSearch(row.account).includes(needle) ||
-        normalizeForSearch(row.category).includes(needle);
+        normalizeSearchText(row.description).includes(needle) ||
+        normalizeSearchText(row.account).includes(needle) ||
+        normalizeSearchText(row.category).includes(needle);
       if (!hit) return false;
     }
     return true;

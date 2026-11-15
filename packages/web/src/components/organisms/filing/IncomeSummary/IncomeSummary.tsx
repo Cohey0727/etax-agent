@@ -30,14 +30,11 @@ export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }:
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
     [yearTransactions, year, filingOptions?.filingType, filingOptions?.realEstateBusinessScale],
   );
-  const incomeTotal = useMemo(
-    () => yearTransactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
-    [yearTransactions],
-  );
-  const expenseTotal = useMemo(
-    () => yearTransactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
-    [yearTransactions],
-  );
+  // 収入・支出の見出しは事業＋不動産だけを数える（収支タブの
+  // BalanceSummary と同じ）。口座の生の出入り（チャージ・振替・投資・
+  // カード決済などの「その他」区分）まで合計すると実態とかけ離れる。
+  const incomeTotal = figures.business_revenue + figures.real_estate_revenue;
+  const expenseTotal = figures.business_expenses + figures.real_estate_expenses;
 
   if (yearTransactions.length === 0) {
     return (

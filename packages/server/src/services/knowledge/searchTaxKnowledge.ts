@@ -32,7 +32,9 @@ export interface TaxKnowledgeSearchResult {
 
 /** クエリを検索語に分解する（空白区切り、句読点や記号は落とす）。 */
 function splitTerms(query: string): string[] {
+  // 全角英数（例: ２０７２）や半角カタカナで入力されても本文に当たるよう正規化する。
   return query
+    .normalize("NFKC")
     .split(/[\s　]+/)
     .map((term) => term.replace(/["'「」『』（）()、。・:：/／]/g, "").trim())
     .filter((term) => term.length >= 2);

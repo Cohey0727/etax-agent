@@ -76,6 +76,7 @@ export const BalanceRecords = ({ transactions }: BalanceRecordsProps) => {
             variant="ghost"
             size="sm"
             disabled={currentPage <= 1}
+            disabledReason="最初のページです"
             onClick={() => setPage(currentPage - 1)}
           >
             前へ
@@ -100,6 +101,7 @@ export const BalanceRecords = ({ transactions }: BalanceRecordsProps) => {
             variant="ghost"
             size="sm"
             disabled={currentPage >= totalPages}
+            disabledReason="最後のページです"
             onClick={() => setPage(currentPage + 1)}
           >
             次へ

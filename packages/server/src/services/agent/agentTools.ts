@@ -20,6 +20,7 @@ import {
   estimateInputTax,
   filterYear,
   importCsvText,
+  normalizeSearchText,
   residentialRentTotal,
   taxableSalesFromBreakdown,
   ConsumptionMethod,
@@ -58,11 +59,6 @@ export interface ToolCallLog {
   name: string;
   arguments: Record<string, unknown>;
   result: unknown;
-}
-
-/** 検索用に文字列を正規化する（全角半角・英字ケースを吸収する）。 */
-function normalizeForSearch(value: string): string {
-  return value.normalize("NFKC").toLowerCase();
 }
 
 /** 対象年の取引を取り出す。添付データ自体が無ければエラーを投げる（LLMへ返す）。 */
@@ -113,16 +109,16 @@ export function dispatchTool(
           args["direction"] === "expense" || args["direction"] === "income"
             ? args["direction"]
             : "all";
-        const needle = normalizeForSearch(keyword);
+        const needle = normalizeSearchText(keyword);
         const matched = ctx.transactions
           .filter((t) => {
             if (year !== null && Number(t.date.slice(0, 4)) !== year) return false;
             if (direction === "expense" && t.amount >= 0) return false;
             if (direction === "income" && t.amount <= 0) return false;
             return (
-              normalizeForSearch(t.description).includes(needle) ||
-              normalizeForSearch(t.account).includes(needle) ||
-              normalizeForSearch(t.category).includes(needle)
+              normalizeSearchText(t.description).includes(needle) ||
+              normalizeSearchText(t.account).includes(needle) ||
+              normalizeSearchText(t.category).includes(needle)
             );
           })
           .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));

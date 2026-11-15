@@ -12,6 +12,10 @@ import {
   testSystemOneSettingsRoute,
 } from "../usecases/testSystemOneSettings";
 import {
+  testAgentSettingsHandler,
+  testAgentSettingsRoute,
+} from "../usecases/testAgentSettings";
+import {
   updateSystemOneSettingsHandler,
   updateSystemOneSettingsRoute,
 } from "../usecases/updateSystemOneSettings";
@@ -26,6 +30,11 @@ app.openapi(
 app.openapi(
   testSystemOneSettingsRoute,
   testSystemOneSettingsHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
+app.openapi(
+  testAgentSettingsRoute,
+  testAgentSettingsHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 

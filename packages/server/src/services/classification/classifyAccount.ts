@@ -60,19 +60,24 @@ export function matchHistory(
 ): ClassificationHistoryRecord | null {
   const key = normalizeDescriptionKey(description);
   if (!key) return null;
-  const exact = history
-    .filter((r) => r.key === key)
-    .sort((a, b) => b.count - a.count)[0];
-  if (exact) return exact;
-  const partial = history
+  // 保存済みキーは正規化の形式が古い場合があるため、摘要から作り直して比べる。
+  const keyed = history.map((record) => ({
+    record,
+    key: normalizeDescriptionKey(record.description),
+  }));
+  const exact = keyed
+    .filter((entry) => entry.key === key)
+    .sort((a, b) => b.record.count - a.record.count)[0];
+  if (exact) return exact.record;
+  const partial = keyed
     .filter(
-      (r) =>
-        r.count >= 2 &&
-        r.key.length >= 2 &&
-        (key.includes(r.key) || r.key.includes(key)),
+      (entry) =>
+        entry.record.count >= 2 &&
+        entry.key.length >= 2 &&
+        (key.includes(entry.key) || entry.key.includes(key)),
     )
-    .sort((a, b) => b.count - a.count || b.key.length - a.key.length)[0];
-  return partial ?? null;
+    .sort((a, b) => b.record.count - a.record.count || b.key.length - a.key.length)[0];
+  return partial?.record ?? null;
 }
 
 /**

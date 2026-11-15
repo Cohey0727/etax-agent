@@ -16,6 +16,10 @@ import {
   getGeneratedRulesHandler,
   getGeneratedRulesRoute,
 } from "../usecases/getGeneratedRules";
+import {
+  getClassificationHistoryHandler,
+  getClassificationHistoryRoute,
+} from "../usecases/getClassificationHistory";
 
 const app = new OpenAPIHono();
 app.openapi(
@@ -34,5 +38,6 @@ app.openapi(
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 app.openapi(getGeneratedRulesRoute, getGeneratedRulesHandler);
+app.openapi(getClassificationHistoryRoute, getClassificationHistoryHandler);
 
 export default app;

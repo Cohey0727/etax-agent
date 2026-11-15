@@ -43,6 +43,28 @@ describe("matchHistory", () => {
   test("履歴が無ければ null", () => {
     expect(matchHistory("何か", [])).toBeNull();
   });
+
+  test("全角英数の履歴に半角の摘要でも当たる", () => {
+    const hit = matchHistory("casy", [record("ＣａＳｙ", "雑費", 1)]);
+    expect(hit?.account).toBe("雑費");
+  });
+
+  test("半角カタカナの履歴に全角カタカナの摘要でも当たる", () => {
+    const hit = matchHistory("カタリス", [record("ｶﾀﾘｽ", "通信費", 1)]);
+    expect(hit?.account).toBe("通信費");
+  });
+
+  test("保存キーが旧形式でも摘要から作り直して当たる", () => {
+    const legacy: ClassificationHistoryRecord = {
+      key: "ｃａｓｙ",
+      description: "ＣａＳｙ",
+      account: "雑費",
+      count: 1,
+      updatedAt: "2026-11-15T00:00:00.000Z",
+    };
+    const hit = matchHistory("CASY", [legacy]);
+    expect(hit?.account).toBe("雑費");
+  });
 });
 
 describe("guardStoreRent", () => {

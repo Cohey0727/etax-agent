@@ -99,7 +99,7 @@ export const AccountClassificationPanel = ({
         )}
         {!suggestions && (
           <Row gap="sm" align="center">
-            <Button disabled={loading} onClick={() => void handleJudge()}>
+            <Button disabled={loading} disabledReason="判定中です" onClick={() => void handleJudge()}>
               {loading ? "判定中…" : "未分類の科目を判定する"}
             </Button>
           </Row>

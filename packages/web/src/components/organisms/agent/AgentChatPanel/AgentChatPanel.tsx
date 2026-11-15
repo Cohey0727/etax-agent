@@ -246,7 +246,7 @@ export const AgentChatPanel = ({
               rows={2}
               disabled={loading}
             />
-            <Button onClick={() => void send()} disabled={loading}>
+            <Button onClick={() => void send()} disabled={loading} disabledReason="応答中です">
               送信
             </Button>
           </Row>

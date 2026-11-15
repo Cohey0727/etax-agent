@@ -56,6 +56,9 @@ export const FilingStatusToggle = ({
         <Button
           variant={done ? "ghost" : "primary"}
           disabled={!available || savingKey === statusKey}
+          disabledReason={
+            savingKey === statusKey ? "保存中です" : "ステータス保存サーバーに接続できていません"
+          }
           onClick={() => void handleClick()}
         >
           {done ? "確定解除" : "確定する"}

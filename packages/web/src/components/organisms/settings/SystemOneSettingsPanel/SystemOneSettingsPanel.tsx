@@ -135,10 +135,10 @@ export const SystemOneSettingsPanel = () => {
           {clearKey ? <Text variant="caption">保存するとAPIキーが削除されます</Text> : null}
         </Col>
         <Row gap="sm">
-          <Button variant="primary" size="sm" onClick={handleSave} disabled={busy !== null}>
+          <Button variant="primary" size="sm" onClick={handleSave} disabled={busy !== null} disabledReason="処理中です">
             {busy === "save" ? "保存中…" : "保存"}
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleTest} disabled={busy !== null}>
+          <Button variant="ghost" size="sm" onClick={handleTest} disabled={busy !== null} disabledReason="処理中です">
             {busy === "test" ? "接続テスト中…" : "接続テスト"}
           </Button>
           {settings?.apiKeySet && !clearKey ? (

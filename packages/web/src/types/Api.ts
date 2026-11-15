@@ -51,6 +51,33 @@ export interface SystemOneTestResult {
   error: string | null;
 }
 
+/** 外部接続（AI）の接続テスト結果。 */
+export interface AgentTestResult {
+  ok: boolean;
+  model: string | null;
+  reply: string | null;
+  error: string | null;
+}
+
+/** AIのメモリー: 学習履歴の1件（摘要 → 科目の対応）。 */
+export interface ClassificationHistoryEntry {
+  description: string;
+  account: string;
+  count: number;
+  updatedAt: string;
+}
+
+export interface ClassificationHistory {
+  records: ClassificationHistoryEntry[];
+  total: number;
+}
+
+/** 学習履歴から自動生成される適用ルール。 */
+export interface GeneratedRules {
+  regexRules: Array<{ pattern: string; category: string; count: number; example: string }>;
+  jevPrompt: string;
+}
+
 export interface AccountClassification {
   account: string;
   confidence: number | null;

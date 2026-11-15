@@ -132,6 +132,7 @@ export const FilingPanel = ({
                       variant="ghost"
                       size="sm"
                       disabled={!onOpenSection}
+                      disabledReason="確定申告画面で開いてください"
                       onClick={() => onOpenSection?.(item.section)}
                     >
                       {SECTION_OPEN_LABELS[item.section]}
@@ -140,6 +141,11 @@ export const FilingPanel = ({
                       variant={done ? "ghost" : "primary"}
                       size="sm"
                       disabled={savingKey === item.key || !available}
+                      disabledReason={
+                        savingKey === item.key
+                          ? "保存中です"
+                          : "ステータス保存サーバーに接続できていません"
+                      }
                       onClick={() => void handleToggle(item)}
                     >
                       {done ? "確定解除" : "確定する"}
@@ -178,6 +184,7 @@ export const FilingPanel = ({
                 variant="ghost"
                 size="sm"
                 disabled={!onOpenSection}
+                disabledReason="確定申告画面で開いてください"
                 onClick={() => onOpenSection?.("consumption")}
               >
                 {SECTION_OPEN_LABELS.consumption}

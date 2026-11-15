@@ -337,7 +337,7 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
         {message ? <AlertBox>{message}</AlertBox> : null}
 
         <Row gap="sm">
-          <Button variant="primary" onClick={handleExport} disabled={exporting}>
+          <Button variant="primary" onClick={handleExport} disabled={exporting} disabledReason="出力中です">
             {exporting ? "出力中…" : "消費税のe-Tax用データを出力（XTX）"}
           </Button>
         </Row>

@@ -366,6 +366,7 @@ export const AppPage = () => {
               variant="ghost"
               size="sm"
               disabled={chatSessions.length === 0}
+              disabledReason="履歴がありません"
               onClick={() => setHistoryOpen(true)}
             >
               履歴{chatSessions.length > 0 ? `（${chatSessions.length}）` : ""}
@@ -374,6 +375,7 @@ export const AppPage = () => {
               variant="ghost"
               size="sm"
               disabled={!canClearChat}
+              disabledReason="クリアできる会話がありません"
               onClick={() => clearChatRef.current?.()}
             >
               クリア

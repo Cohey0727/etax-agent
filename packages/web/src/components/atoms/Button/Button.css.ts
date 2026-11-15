@@ -8,7 +8,48 @@ const popIn = keyframes({
   "100%": { transform: "scale(1)" },
 });
 
+// 無効理由ツールチップの受け皿。無効なボタンはホバーイベントを
+// 受け取れないため、ラッパー側でホバー／フォーカスを検知する。
+const tooltipWrap = style({
+  position: "relative",
+  display: "inline-flex",
+});
+
+const tooltip = style({
+  position: "absolute",
+  bottom: "calc(100% + 8px)",
+  left: "50%",
+  width: "max-content",
+  maxWidth: "260px",
+  transform: "translateX(-50%) translateY(4px) scale(0.95)",
+  background: theme.color.accent,
+  color: theme.color.onAccent,
+  fontSize: theme.fontSizes.xs,
+  fontWeight: theme.fontWeight.medium,
+  lineHeight: 1.5,
+  textAlign: "center",
+  padding: "6px 10px",
+  borderRadius: theme.borderRadius.sm,
+  boxShadow: theme.shadow.cardHover,
+  opacity: 0,
+  pointerEvents: "none",
+  transition: `opacity ${theme.animation.durationFast} ease, transform 0.25s ${theme.animation.spring}`,
+  zIndex: 60,
+  selectors: {
+    [`${tooltipWrap}:hover &`]: {
+      opacity: 1,
+      transform: "translateX(-50%) translateY(0) scale(1)",
+    },
+    [`${tooltipWrap}:focus-within &`]: {
+      opacity: 1,
+      transform: "translateX(-50%) translateY(0) scale(1)",
+    },
+  },
+});
+
 const styles = {
+  tooltipWrap,
+  tooltip,
   base: style({
     display: "inline-flex",
     alignItems: "center",

@@ -3,8 +3,11 @@ import {
   AccountClassification,
   AgentChatResponse,
   AgentConnectionConfig,
+  AgentTestResult,
   AnalyzeReceiptResponse,
   ChatMessage,
+  ClassificationHistory,
+  GeneratedRules,
   ExportConsumptionXtxRequest,
   ExportConsumptionXtxResponse,
   ExportDomicilePdfRequest,
@@ -127,6 +130,32 @@ export async function updateSystemOneSettings(input: {
     body: JSON.stringify(input),
   });
   return parseJson<SystemOneSettings>(resp);
+}
+
+/** 外部接続（AI）への接続テスト。入力中の値（未保存）でも試せる。 */
+export async function testAgentSettings(input: {
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+}): Promise<AgentTestResult> {
+  const resp = await fetch("/api/settings/agent/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson<AgentTestResult>(resp);
+}
+
+/** AIのメモリー（科目判定の学習履歴）を取得する。 */
+export async function fetchClassificationHistory(): Promise<ClassificationHistory> {
+  const resp = await fetch("/api/classify/history");
+  return parseJson<ClassificationHistory>(resp);
+}
+
+/** 学習履歴から自動生成される適用ルールを取得する。 */
+export async function fetchGeneratedRules(): Promise<GeneratedRules> {
+  const resp = await fetch("/api/classify/generated-rules");
+  return parseJson<GeneratedRules>(resp);
 }
 
 /** SystemOne（jev）への接続テスト。フォームの未保存の値でも試せる。 */

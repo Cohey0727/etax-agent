@@ -1,7 +1,15 @@
-import { Button, Card, Col, Icon, IconName, Input, Text } from "@components/atoms";
+import { useState } from "react";
+import { Button, Card, Col, Icon, IconName, Input, Row, Text } from "@components/atoms";
 import { AgentConnectionConfig, SendKeyMode, ThemeMode } from "@types";
+import { testAgentSettings } from "@utils";
+import { AiMemoryPanel } from "../AiMemoryPanel";
 import { SystemOneSettingsPanel } from "../SystemOneSettingsPanel";
 import styles from "./SettingsPanel.css";
+
+interface StatusMessage {
+  ok: boolean;
+  text: string;
+}
 
 export interface SettingsPanelProps {
   themeMode: ThemeMode;
@@ -53,6 +61,32 @@ export const SettingsPanel = ({
 }: SettingsPanelProps) => {
   const activeOption = THEME_OPTIONS.find((option) => option.mode === themeMode);
   const activeSendKeyOption = SEND_KEY_OPTIONS.find((option) => option.mode === sendKeyMode);
+  const [agentTestBusy, setAgentTestBusy] = useState(false);
+  const [agentTestMessage, setAgentTestMessage] = useState<StatusMessage | null>(null);
+
+  const handleAgentTest = async () => {
+    setAgentTestBusy(true);
+    setAgentTestMessage(null);
+    try {
+      const result = await testAgentSettings({
+        baseUrl: agentConnection.baseUrl.trim() || undefined,
+        model: agentConnection.model.trim() || undefined,
+        apiKey: agentConnection.apiKey ? agentConnection.apiKey : undefined,
+      });
+      setAgentTestMessage(
+        result.ok
+          ? {
+              ok: true,
+              text: `接続できました（モデル: ${result.model ?? "—"}、応答: ${result.reply ?? "—"}）`,
+            }
+          : { ok: false, text: `接続できませんでした: ${result.error ?? "不明なエラー"}` },
+      );
+    } catch {
+      setAgentTestMessage({ ok: false, text: "接続テストに失敗しました" });
+    } finally {
+      setAgentTestBusy(false);
+    }
+  };
   return (
     <Col gap="lg">
       <Card>
@@ -142,12 +176,30 @@ export const SettingsPanel = ({
               autoComplete="off"
             />
           </Col>
+          <Row gap="sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleAgentTest()}
+              disabled={agentTestBusy}
+              disabledReason="テスト中です"
+            >
+              {agentTestBusy ? "接続テスト中…" : "接続テスト"}
+            </Button>
+          </Row>
+          {agentTestMessage ? (
+            <Text variant="caption">
+              {agentTestMessage.ok ? "✓ " : "⚠ "}
+              {agentTestMessage.text}
+            </Text>
+          ) : null}
           <Text variant="caption">
             入力した項目だけがサーバーの設定より優先されます。APIキーはこの端末にだけ保存され、チャット送信時にのみサーバーへ送られます。
           </Text>
         </Col>
       </Card>
       <SystemOneSettingsPanel />
+      <AiMemoryPanel />
       <Card>
         <Col gap="md">
           <Text variant="sectionTitle">アプリについて</Text>

@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./text";
 export * from "./taxcalc";
 export * from "./deductions";
 export * from "./ledger";

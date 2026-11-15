@@ -104,7 +104,7 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
                 e.target.value = "";
               }}
             />
-            <Button disabled={loading} onClick={() => fileRef.current?.click()}>
+            <Button disabled={loading} disabledReason="読み取り中です" onClick={() => fileRef.current?.click()}>
               {loading ? "読み取り中…" : "画像を選ぶ"}
             </Button>
           </Row>

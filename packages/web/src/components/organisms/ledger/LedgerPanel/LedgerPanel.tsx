@@ -1,4 +1,10 @@
-import { ACCOUNT_NAMES, TAX_CATEGORIES, Transaction, taxCategorySignMismatch } from "@etax/shared";
+import {
+  ACCOUNT_NAMES,
+  TAX_CATEGORIES,
+  Transaction,
+  normalizeSearchText,
+  taxCategorySignMismatch,
+} from "@etax/shared";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -151,12 +157,13 @@ const filterRows = (
   query: string,
   filters: readonly LedgerFilter[],
 ): LedgerTransaction[] => {
-  const normalizedQuery = query.trim().toLowerCase();
+  // 全角英数・半角カタカナでも当たるよう、クエリと対象の両方を正規化する。
+  const normalizedQuery = normalizeSearchText(query.trim());
   return rows.filter((row) => {
     if (!filters.every((filter) => matchesFilter(row, filter))) return false;
     if (!normalizedQuery) return true;
     return [row.description, row.category, row.account, row.tax_category].some((value) =>
-      value.toLowerCase().includes(normalizedQuery),
+      normalizeSearchText(value).includes(normalizedQuery),
     );
   });
 };
@@ -508,6 +515,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                   variant="ghost"
                   size="sm"
                   disabled={downloading}
+                  disabledReason="ダウンロード中です"
                   onClick={() => {
                     closeMenu();
                     setDownloadMenuOpen((open) => !open);
@@ -799,6 +807,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                             variant="primary"
                             size="sm"
                             disabled={!dirty || busy}
+                            disabledReason={busy ? "処理中です" : "変更がありません"}
                             onClick={() => void handleSave(row)}
                           >
                             保存
@@ -807,6 +816,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                             variant={deleteArmedId === row.id ? "danger" : "ghost"}
                             size="sm"
                             disabled={busy}
+                            disabledReason="処理中です"
                             onClick={() => void handleDelete(row)}
                           >
                             {deleteArmedId === row.id ? "本当に削除" : "削除"}
@@ -832,6 +842,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                   variant="ghost"
                   size="sm"
                   disabled={currentPage <= 1}
+                  disabledReason="最初のページです"
                   onClick={() => goToPage(currentPage - 1)}
                 >
                   前へ
@@ -856,6 +867,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                   variant="ghost"
                   size="sm"
                   disabled={currentPage >= totalPages}
+                  disabledReason="最後のページです"
                   onClick={() => goToPage(currentPage + 1)}
                 >
                   次へ
@@ -965,7 +977,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
             </Col>
           </div>
               <Row gap="sm" align="center">
-                <Button variant="primary" size="sm" disabled={busy} onClick={() => void handleAdd()}>
+                <Button variant="primary" size="sm" disabled={busy} disabledReason="処理中です" onClick={() => void handleAdd()}>
                   帳簿に追加
                 </Button>
                 <Text variant="caption">追加・保存・削除はそのまま帳簿データベースに記録されます。</Text>

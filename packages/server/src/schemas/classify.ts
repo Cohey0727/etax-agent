@@ -84,3 +84,21 @@ export const GeneratedRulesResponseSchema = z
   .openapi("GeneratedRulesResponse");
 
 export type GeneratedRulesResponse = z.infer<typeof GeneratedRulesResponseSchema>;
+
+export const ClassificationHistoryEntrySchema = z
+  .object({
+    description: z.string(),
+    account: z.string(),
+    count: z.number(),
+    updatedAt: z.string(),
+  })
+  .openapi("ClassificationHistoryEntry");
+
+export const ClassificationHistoryResponseSchema = z
+  .object({
+    records: z.array(ClassificationHistoryEntrySchema),
+    total: z.number(),
+  })
+  .openapi("ClassificationHistoryResponse");
+
+export type ClassificationHistoryResponse = z.infer<typeof ClassificationHistoryResponseSchema>;

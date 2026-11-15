@@ -261,13 +261,18 @@ export const TaxpayerPanel = ({
         {message ? <AlertBox>{message}</AlertBox> : null}
 
         <Row gap="sm">
-          <Button variant="primary" onClick={handleExport} disabled={!supported || exporting}>
+          <Button
+            variant="primary"
+            onClick={handleExport}
+            disabled={!supported || exporting}
+            disabledReason={exporting ? "出力中です" : "この年度はXTX出力に未対応です"}
+          >
             {exporting ? "出力中…" : "e-Tax用データを出力（XTX）"}
           </Button>
-          <Button onClick={handleExportPdf} disabled={exportingPdf}>
+          <Button onClick={handleExportPdf} disabled={exportingPdf} disabledReason="出力中です">
             {exportingPdf ? "出力中…" : "申告書の紙イメージ（PDF）"}
           </Button>
-          <Button onClick={handleExportDomicilePdf} disabled={exportingDomicile}>
+          <Button onClick={handleExportDomicilePdf} disabled={exportingDomicile} disabledReason="出力中です">
             {exportingDomicile ? "出力中…" : "納税地の異動申出書（PDF）"}
           </Button>
           {!supported ? (
