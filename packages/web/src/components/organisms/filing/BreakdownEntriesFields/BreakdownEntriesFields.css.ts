@@ -7,6 +7,23 @@ const chevronBase = {
 } as const;
 
 const styles = {
+  // 見出しの開閉トグル。ボタンらしく見せない、ただのテキストとして置く
+  // （押せることだけ、矢印とホバー色で伝える）。
+  toggle: style({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    background: "none",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+    font: "inherit",
+    color: theme.color.text,
+    textAlign: "left",
+    selectors: {
+      "&:hover": { color: theme.color.accentText },
+    },
+  }),
   // 開閉の矢印。閉じているときは右向き（-90度）にして「開ける」ことを示す。
   chevron: style({
     ...chevronBase,

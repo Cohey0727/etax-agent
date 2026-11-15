@@ -68,17 +68,17 @@ export const BreakdownEntriesFields = ({
   return (
     <Col gap="sm">
       <Row gap="sm" align="center" justify="spaceBetween">
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          type="button"
+          className={styles.toggle}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
           <span className={open ? styles.chevronOpen : styles.chevron}>
             <Icon name="chevronDown" />
           </span>
-          {title}
-        </Button>
+          <Text>{title}</Text>
+        </button>
         <Row gap="sm" align="center">
           <Text variant="muted">合計</Text>
           <Text>
