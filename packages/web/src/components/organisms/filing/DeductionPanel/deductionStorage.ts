@@ -6,8 +6,10 @@
 import {
   DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
+  EMPTY_MISC_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
   FilingType,
+  MiscIncomeInput,
   TaxCreditInputs,
 } from "@etax/shared";
 
@@ -32,6 +34,8 @@ export type BreakdownEntriesKey = "donations" | "socialInsurance" | "mutualAid" 
 export interface DeductionState {
   deductions: DeductionInputs;
   taxCredits: TaxCreditInputs;
+  /** 雑所得（その他）。帳簿に載らない所得の手入力 */
+  miscIncome: MiscIncomeInput;
   /** 申告の種類（青色申告特別控除の区分） */
   filingType: FilingType;
   /** 不動産貸付けが事業的規模か */
@@ -94,6 +98,7 @@ export function freshDeductionState(): DeductionState {
       casualtyLoss: null,
     },
     taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    miscIncome: { ...EMPTY_MISC_INCOME },
     filingType: "blue65",
     realEstateBusinessScale: false,
     donationEntries: [],
@@ -105,6 +110,15 @@ export function freshDeductionState(): DeductionState {
 
 function storageKey(year: number): string {
   return `etax-amend-deductions-${year}`;
+}
+
+/** 保存済みの雑所得を取り出す。数値でない項目は 0 にする。 */
+function parseMiscIncome(raw: unknown): MiscIncomeInput {
+  if (typeof raw !== "object" || raw === null) return { ...EMPTY_MISC_INCOME };
+  const m = raw as Partial<MiscIncomeInput>;
+  const num = (v: unknown): number =>
+    typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0;
+  return { revenue: num(m.revenue), income: num(m.income), kubun: num(m.kubun) };
 }
 
 /** 保存済みの内訳を検証して取り出す。壊れた要素は捨てる。 */
@@ -150,6 +164,7 @@ export function loadDeductionState(year: number): DeductionState {
     return {
       deductions,
       taxCredits: { ...base.taxCredits, ...(parsed.taxCredits ?? {}) },
+      miscIncome: parseMiscIncome(parsed.miscIncome),
       filingType: FILING_TYPES.includes(parsed.filingType as FilingType)
         ? (parsed.filingType as FilingType)
         : "blue65",

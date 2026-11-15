@@ -3,7 +3,9 @@ import { theme } from "@configs";
 
 const styles = {
   root: style({
-    padding: `${theme.component.controlPaddingY} ${theme.component.controlPaddingX}`,
+    // 高さは Select・Button と共通の controlHeight に固定する（縦 padding は持たず、行ボックスで中央に置く）。
+    height: theme.component.controlHeight,
+    padding: `0 ${theme.component.controlPaddingX}`,
     borderRadius: theme.borderRadius.sm,
     border: `1px solid ${theme.color.border}`,
     fontSize: theme.fontSizes.sm,

@@ -3,6 +3,7 @@ export * from "./ConsumptionTaxPanel";
 export * from "./DeductionPanel";
 export * from "./FilingPanel";
 export * from "./IncomeSummary";
+export * from "./MiscIncomePanel";
 export * from "./FilingStatusToggle";
 export * from "./TaxCreditPanel";
 export * from "./TaxSummary";

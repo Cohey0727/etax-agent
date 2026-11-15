@@ -13,9 +13,11 @@ import {
   BlueDeductionOptions,
   DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
+  EMPTY_MISC_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
   FilingType,
   IncomeType,
+  MiscIncomeInput,
   TaxCreditInputs,
   Transaction,
   VALID_INCOME_TYPES,
@@ -238,6 +240,10 @@ export const MCP_TOOLS: McpToolDef[] = [
         },
         deductions: { type: "object", description: "所得控除の入力（任意）" },
         tax_credits: { type: "object", description: "税額控除の入力（任意）" },
+        misc_income: {
+          type: "object",
+          description: "雑所得（その他）の入力（任意）: revenue（収入金額）, income（所得金額）, kubun（その他区分）",
+        },
         filing_type: filingTypeProperty,
         real_estate_business_scale: realEstateScaleProperty,
         withholding_tax: { type: "number", description: "源泉徴収税額（任意）" },
@@ -403,6 +409,15 @@ function filingOptionsArg(args: Record<string, unknown>): BlueDeductionOptions {
   };
 }
 
+/** 雑所得（その他）の引数を入力形式に変換する。未指定・不正なら空。 */
+function miscIncomeArg(args: Record<string, unknown>): MiscIncomeInput {
+  const raw = args["misc_income"];
+  if (typeof raw !== "object" || raw === null) return EMPTY_MISC_INCOME;
+  const rec = raw as Record<string, unknown>;
+  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0);
+  return { revenue: num(rec["revenue"]), income: num(rec["income"]), kubun: num(rec["kubun"]) };
+}
+
 /** 今日の日付（日本時間、YYYY-MM-DD）。 */
 function todayInTokyo(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
@@ -479,7 +494,10 @@ export async function dispatchMcpTool(
         const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
         const result = computeIncomeTax({
           year,
-          totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+          totalIncome:
+            figures._detail.business_income +
+            figures._detail.real_estate_income +
+            miscIncomeArg(args).income,
           deductions: mergeDeductionInputs(args["deductions"]),
           taxCredits: mergeTaxCreditInputs(args["tax_credits"]),
         });
@@ -576,9 +594,11 @@ export async function dispatchMcpTool(
         const deductions = mergeDeductionInputs(args["deductions"]);
         const taxCredits = mergeTaxCreditInputs(args["tax_credits"]);
         const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
+        const miscIncome = miscIncomeArg(args);
         const tax = computeIncomeTax({
           year,
-          totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+          totalIncome:
+            figures._detail.business_income + figures._detail.real_estate_income + miscIncome.income,
           deductions,
           taxCredits,
         });
@@ -592,6 +612,7 @@ export async function dispatchMcpTool(
           taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
           figures,
           deductionInputs: deductions,
+          miscIncome,
           tax,
           categoryTotals: {
             business: statementCategoryTotals(tx, "business"),

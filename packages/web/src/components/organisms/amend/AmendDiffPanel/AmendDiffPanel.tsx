@@ -113,7 +113,10 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
   };
 
   // 所得税額（修正後）は、青色控除後の所得合計に控除・税額控除を適用して自動計算する。
-  const totalIncome = computed._detail.business_income + computed._detail.real_estate_income;
+  const totalIncome =
+    computed._detail.business_income +
+    computed._detail.real_estate_income +
+    deductionState.miscIncome.income;
   const taxResult = useMemo(
     () =>
       computeIncomeTax({

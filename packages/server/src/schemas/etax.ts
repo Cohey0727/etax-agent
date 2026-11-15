@@ -31,6 +31,17 @@ export const XtxTaxpayerSchema = z
 
 export type XtxTaxpayerRequest = z.infer<typeof XtxTaxpayerSchema>;
 
+/** 雑所得（その他）の入力。帳簿に載らない所得を第一表ク・⑨へ反映する。 */
+export const MiscIncomeSchema = z
+  .object({
+    revenue: z.number(),
+    income: z.number(),
+    kubun: z.number(),
+  })
+  .openapi("MiscIncome");
+
+export type MiscIncomeRequest = z.infer<typeof MiscIncomeSchema>;
+
 export const ExportXtxRequestSchema = z
   .object({
     year: z.number(),
@@ -40,6 +51,7 @@ export const ExportXtxRequestSchema = z
     transactions: z.unknown().optional(),
     deductions: DeductionInputsSchema,
     tax_credits: TaxCreditInputsSchema,
+    misc_income: MiscIncomeSchema.optional(),
     filing_type: z.enum(["blue65", "blue55", "blue10", "white"]).optional(),
     real_estate_business_scale: z.boolean().optional(),
     withholding_tax: z.number(),

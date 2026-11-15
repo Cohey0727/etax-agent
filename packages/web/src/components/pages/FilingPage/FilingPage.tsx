@@ -4,6 +4,7 @@ import {
   computeIncomeTax,
   DeductionInputs,
   FilingType,
+  MiscIncomeInput,
   filterYear,
   TaxCreditInputs,
   Transaction,
@@ -17,6 +18,7 @@ import {
   DeductionPanel,
   FilingPanel,
   FilingStatusToggle,
+  MiscIncomePanel,
   TaxCreditPanel,
   TaxpayerPanel,
   TaxpayerProfilePanel,
@@ -104,6 +106,11 @@ const FilingWorkspace = ({
     setDeductionState(state);
     saveDeductionState(year, state);
   };
+  const updateMiscIncome = (next: MiscIncomeInput) => {
+    const state = { ...deductionState, miscIncome: next };
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
   const updateFilingSettings = (filingType: FilingType, realEstateBusinessScale: boolean) => {
     const state = { ...deductionState, filingType, realEstateBusinessScale };
     setDeductionState(state);
@@ -123,7 +130,10 @@ const FilingWorkspace = ({
     onNavigate?.(AppView.Ledger);
   };
 
-  const totalIncome = computed._detail.business_income + computed._detail.real_estate_income;
+  const totalIncome =
+    computed._detail.business_income +
+    computed._detail.real_estate_income +
+    deductionState.miscIncome.income;
   const taxResult = useMemo(
     () =>
       computeIncomeTax({
@@ -143,6 +153,7 @@ const FilingWorkspace = ({
           year={year}
           taxResult={taxResult}
           filingOptions={filingOptions}
+          miscIncome={deductionState.miscIncome}
           onNavigate={onNavigate}
           onOpenSection={onTabChange}
         />
@@ -151,6 +162,7 @@ const FilingWorkspace = ({
           transactions={yearTransactions}
           deductions={deductionState.deductions}
           taxCredits={deductionState.taxCredits}
+          miscIncome={deductionState.miscIncome}
           filingType={deductionState.filingType}
           realEstateBusinessScale={deductionState.realEstateBusinessScale}
           originalIncomeTax={null}
@@ -163,7 +175,12 @@ const FilingWorkspace = ({
         <Card>
           <Col gap="md">
             <Text variant="sectionTitle">帳簿</Text>
-            <ConfirmSummary transactions={transactions} year={year} filingOptions={filingOptions} />
+            <ConfirmSummary
+              transactions={transactions}
+              year={year}
+              filingOptions={filingOptions}
+              miscIncome={deductionState.miscIncome}
+            />
           </Col>
         </Card>
         <FilingStatusToggle
@@ -176,6 +193,7 @@ const FilingWorkspace = ({
     ),
     deductions: (
       <>
+        <MiscIncomePanel miscIncome={deductionState.miscIncome} onChange={updateMiscIncome} />
         <DeductionPanel
           year={year}
           deductions={deductionState.deductions}

@@ -5,6 +5,7 @@
  * データで、送信（マイナンバーカード署名）は e-Tax 側で本人が行う。
  */
 import {
+  EMPTY_MISC_INCOME,
   Transaction,
   XtxTaxpayer,
   buildXtxFiling,
@@ -95,9 +96,11 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
     filingType: body.filing_type,
     realEstateBusinessScale: body.real_estate_business_scale,
   });
+  const miscIncome = body.misc_income ?? EMPTY_MISC_INCOME;
   const tax = computeIncomeTax({
     year: body.year,
-    totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+    totalIncome:
+      figures._detail.business_income + figures._detail.real_estate_income + miscIncome.income,
     deductions: body.deductions,
     taxCredits: body.tax_credits,
   });
@@ -110,6 +113,7 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
       taxpayer: toTaxpayer(body.taxpayer),
       figures,
       deductionInputs: body.deductions,
+      miscIncome,
       tax,
       categoryTotals: {
         business: statementCategoryTotals(transactions, "business"),

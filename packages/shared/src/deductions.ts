@@ -702,6 +702,22 @@ export function incomeTaxOnTaxableIncome(taxableIncome: number): number {
   return 0;
 }
 
+/**
+ * 雑所得（その他）の入力。帳簿（事業・不動産）には載らない所得を申告書へ
+ * 反映するための手入力で、第一表の「雑・その他」（ク・⑨）に対応する。
+ * 公的年金等・業務は対象外（必要になったら項目を足す）。
+ */
+export interface MiscIncomeInput {
+  /** 収入金額（第一表ク） */
+  revenue: number;
+  /** 所得金額（第一表⑨）。収入金額から必要経費を引いた額 */
+  income: number;
+  /** その他区分（第一表クの区分）。0 は未設定（出力しない） */
+  kubun: number;
+}
+
+export const EMPTY_MISC_INCOME: MiscIncomeInput = { revenue: 0, income: 0, kubun: 0 };
+
 export interface IncomeTaxOptions {
   year: number;
   /** 合計所得金額（青色申告特別控除後・所得控除前） */

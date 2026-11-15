@@ -6,6 +6,7 @@
  * 提出データは XTX 出力を使う（案内はクライアント側の文言で示す）。
  */
 import {
+  EMPTY_MISC_INCOME,
   computeCorrectedFigures,
   computeIncomeTax,
   filterYear,
@@ -73,9 +74,11 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     filingType: body.filing_type,
     realEstateBusinessScale: body.real_estate_business_scale,
   });
+  const miscIncome = body.misc_income ?? EMPTY_MISC_INCOME;
   const tax = computeIncomeTax({
     year: body.year,
-    totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+    totalIncome:
+      figures._detail.business_income + figures._detail.real_estate_income + miscIncome.income,
     deductions: body.deductions,
     taxCredits: body.tax_credits,
   });
@@ -86,6 +89,7 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     taxpayer: toTaxpayer(body.taxpayer),
     figures,
     tax,
+    miscIncome,
     deductionInputs: body.deductions,
     withholdingTax: body.withholding_tax,
     prepaidTax: body.prepaid_tax,

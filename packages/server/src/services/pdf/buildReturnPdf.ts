@@ -33,8 +33,11 @@ interface AmountCell {
 const AMOUNT_CELLS: Record<ReturnAmountKey, AmountCell> = {
   revBusiness: { row: 1, side: "left" },
   revRealEstate: { row: 3, side: "left" },
+  revMiscOther: { row: 8, side: "left" },
   incBusiness: { row: 12, side: "left" },
   incRealEstate: { row: 14, side: "left" },
+  incMiscOther: { row: 20, side: "left" },
+  incMiscSubtotal: { row: 21, side: "left" },
   incTotal: { row: 23, side: "left", always: true },
   dedSocial: { row: 24, side: "left" },
   dedSmall: { row: 25, side: "left" },

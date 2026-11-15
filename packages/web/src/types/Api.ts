@@ -140,6 +140,8 @@ export interface ExportXtxRequest {
   transactions: Transaction[];
   deductions: unknown;
   tax_credits: unknown;
+  /** 雑所得（その他）。帳簿に載らない所得として申告数値に含める。 */
+  misc_income?: { revenue: number; income: number; kubun: number };
   /** 申告の種類（青色申告特別控除の区分）。未指定なら青色65万円。 */
   filing_type?: FilingType;
   /** 不動産貸付けが事業的規模か */

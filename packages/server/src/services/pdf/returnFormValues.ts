@@ -10,6 +10,7 @@ import {
   CorrectedFigures,
   DeductionInputs,
   IncomeTaxResult,
+  MiscIncomeInput,
   XtxTaxpayer,
 } from "@etax/shared";
 
@@ -17,8 +18,11 @@ import {
 export type ReturnAmountKey =
   | "revBusiness"
   | "revRealEstate"
+  | "revMiscOther"
   | "incBusiness"
   | "incRealEstate"
+  | "incMiscOther"
+  | "incMiscSubtotal"
   | "incTotal"
   | "dedSocial"
   | "dedSmall"
@@ -91,6 +95,8 @@ export interface ReturnFormSource {
   taxpayer: XtxTaxpayer;
   figures: CorrectedFigures;
   tax: IncomeTaxResult;
+  /** 雑所得（その他）。第一表ク・⑨・⑩に載せる。 */
+  miscIncome: MiscIncomeInput;
   deductionInputs: DeductionInputs;
   withholdingTax: number;
   prepaidTax: number;
@@ -116,8 +122,11 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
   const amounts: Partial<Record<ReturnAmountKey, number>> = {
     revBusiness: figures.business_revenue,
     revRealEstate: figures.real_estate_revenue,
+    revMiscOther: source.miscIncome.revenue,
     incBusiness: figures._detail.business_income,
     incRealEstate: figures._detail.real_estate_income,
+    incMiscOther: source.miscIncome.income,
+    incMiscSubtotal: source.miscIncome.income,
     incTotal: tax.totalIncome,
     dedSocial: d.socialInsurance,
     dedSmall: d.smallBusinessMutualAid,

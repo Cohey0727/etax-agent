@@ -18,7 +18,7 @@
  * CATALOG（管理用部分）は仕様書の骨格のみで、帳票の中身は CONTENTS 側が正。
  * 組み込み可否の最終確認は e-Taxソフト側での取り込みテストで行う。
  */
-import { DeductionInputs, IncomeTaxResult } from "./deductions";
+import { DeductionInputs, IncomeTaxResult, MiscIncomeInput } from "./deductions";
 import { CorrectedFigures } from "./taxcalc";
 
 /** 納税者情報（XTXのIT部と申告書見出し部に入る）。すべて任意項目は空文字で省略できる。 */
@@ -80,6 +80,8 @@ export interface XtxFilingData {
   figures: CorrectedFigures;
   /** 控除の入力値（第二表の保険料明細・区分判定に使う） */
   deductionInputs: DeductionInputs;
+  /** 雑所得（その他）の入力。第一表ク・⑨・⑩に出力する。 */
+  miscIncome: MiscIncomeInput;
   /** 所得税の計算結果（控除・税額控除の内訳を含む） */
   tax: IncomeTaxResult;
   /** 勘定科目別の経費合計（決算書の経費欄に振り分ける） */
@@ -308,6 +310,12 @@ function buildKoa020Face1(data: XtxFilingData): string {
     revenues.push(`<ABB00020>${amount("ABB00030", f.business_revenue)}</ABB00020>`);
   }
   revenues.push(amount("ABB00050", f.real_estate_revenue));
+  if (data.miscIncome.revenue > 0) {
+    const misc: string[] = [];
+    if (data.miscIncome.kubun > 0) misc.push(`<ABB00107>${data.miscIncome.kubun}</ABB00107>`);
+    misc.push(amountAlways("ABB00110", data.miscIncome.revenue));
+    revenues.push(`<ABB00090>${misc.join("")}</ABB00090>`);
+  }
   if (revenues.length > 0) body.push(`<ABB00010>${revenues.join("")}</ABB00010>`);
 
   // 所得金額等
@@ -316,6 +324,12 @@ function buildKoa020Face1(data: XtxFilingData): string {
     incomes.push(`<ABB00280>${amountAlways("ABB00300", f._detail.business_income)}</ABB00280>`);
   }
   incomes.push(amountAlways("ABB00340", f._detail.real_estate_income));
+  if (data.miscIncome.income > 0) {
+    // 雑（その他）: ⑨その他 + ⑩（⑦〜⑨の計）。公的年金等・業務はないため計は⑨と同額。
+    incomes.push(
+      `<ABB01050><ABB01100>${amountAlways("ABB01120", data.miscIncome.income)}</ABB01100>${amountAlways("ABB01130", data.miscIncome.income)}</ABB01050>`,
+    );
+  }
   incomes.push(amountAlways("ABB00410", data.tax.totalIncome));
   body.push(`<ABB00270>${incomes.join("")}</ABB00270>`);
 

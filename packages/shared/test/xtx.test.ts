@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   EMPTY_DEDUCTION_INPUTS,
+  EMPTY_MISC_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
   Transaction,
   buildXtxFiling,
@@ -71,6 +72,7 @@ function buildSample(amendment: boolean) {
       jan1Address: "",
     },
     figures,
+    miscIncome: EMPTY_MISC_INCOME,
     deductionInputs: {
       ...EMPTY_DEDUCTION_INPUTS,
       socialInsurancePaid: 1_200_000,
@@ -155,6 +157,7 @@ describe("buildXtxFiling", () => {
       },
       figures,
       deductionInputs: deductions,
+      miscIncome: EMPTY_MISC_INCOME,
       tax,
       categoryTotals: { business: {}, realEstate: {} },
       withholdingTax: 0,
@@ -196,6 +199,7 @@ describe("buildXtxFiling", () => {
         },
         figures,
         deductionInputs: EMPTY_DEDUCTION_INPUTS,
+        miscIncome: EMPTY_MISC_INCOME,
         tax,
         categoryTotals: { business: {}, realEstate: {} },
         withholdingTax: 0,
@@ -203,5 +207,47 @@ describe("buildXtxFiling", () => {
         originalThirdPeriodTax: null,
       }),
     ).toThrow();
+  });
+
+  test("雑所得（その他）は収入金額ク・所得⑨・計⑩に出て、合計⑫に含まれる", () => {
+    const transactions: Transaction[] = [
+      tx({ date: "2025-06-15", year: 2025, description: "事業売上", amount: 12_000_000, category: "売上高", income_type: "business" }),
+    ];
+    const figures = computeCorrectedFigures(transactions, 2025);
+    const miscIncome = { revenue: 175_122, income: 175_122, kubun: 2 };
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome:
+        figures._detail.business_income + figures._detail.real_estate_income + miscIncome.income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: true,
+      submissionDate: "2026-11-20",
+      taxpayer: {
+        name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "",
+        myNumber: "", occupation: "システムエンジニア", shopName: "", jan1Address: "",
+      },
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: 1_000_000,
+    });
+    // 収入金額等: 雑（その他）区分2・金額
+    expect(xtx).toContain("<ABB00107>2</ABB00107>");
+    expect(xtx).toContain("<ABB00110>175122</ABB00110>");
+    // 所得金額等: ⑨その他・⑩計
+    expect(xtx).toContain("<ABB01120>175122</ABB01120>");
+    expect(xtx).toContain("<ABB01130>175122</ABB01130>");
+    // 合計⑫ = 事業所得（12,000,000 − 青色650,000）+ 雑 175,122
+    expect(xtx).toContain("<ABB00410>11525122</ABB00410>");
   });
 });

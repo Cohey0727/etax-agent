@@ -4,7 +4,9 @@ import { theme } from "@configs";
 const styles = {
   root: style({
     appearance: "none",
-    padding: `${theme.component.controlPaddingY} calc(${theme.component.controlPaddingX} + 14px) ${theme.component.controlPaddingY} ${theme.component.controlPaddingX}`,
+    // 高さは Input・Button と共通の controlHeight に固定する。
+    height: theme.component.controlHeight,
+    padding: `0 calc(${theme.component.controlPaddingX} + 14px) 0 ${theme.component.controlPaddingX}`,
     borderRadius: theme.borderRadius.sm,
     border: `1px solid ${theme.color.border}`,
     fontSize: theme.fontSizes.sm,

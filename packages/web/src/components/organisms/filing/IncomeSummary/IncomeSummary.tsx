@@ -1,5 +1,6 @@
 import {
   BlueDeductionOptions,
+  MiscIncomeInput,
   Transaction,
   computeCorrectedFigures,
   filterYear,
@@ -15,13 +16,15 @@ export interface IncomeSummaryProps {
   year: number;
   /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
   filingOptions?: BlueDeductionOptions;
+  /** 雑所得（その他）。帳簿に載らない所得として合計に含める。 */
+  miscIncome?: MiscIncomeInput;
 }
 
 /**
  * 「帳簿」行の直下に置く所得の要約。帳簿を見直したら、その結果である
  * 所得の数字を真下で確認して、そのまま「確定」にできるようにする。
  */
-export const IncomeSummary = ({ transactions, year, filingOptions }: IncomeSummaryProps) => {
+export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }: IncomeSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
@@ -36,10 +39,12 @@ export const IncomeSummary = ({ transactions, year, filingOptions }: IncomeSumma
 
   const isWhite = filingOptions?.filingType === "white";
   const suffix = isWhite ? "" : "（青色控除後）";
-  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income;
+  const misc = miscIncome?.income ?? 0;
+  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
   const statCards: readonly { label: string; value: string }[] = [
     { label: `事業所得${suffix}`, value: formatYen(figures._detail.business_income) },
     { label: `不動産所得${suffix}`, value: formatYen(figures._detail.real_estate_income) },
+    ...(misc > 0 ? [{ label: "雑所得", value: formatYen(misc) }] : []),
     { label: "所得合計", value: formatYen(totalIncome) },
   ];
   const incomeRows: readonly { label: string; amount: number }[] = [
@@ -51,6 +56,7 @@ export const IncomeSummary = ({ transactions, year, filingOptions }: IncomeSumma
       label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
       amount: figures.blue_deduction,
     },
+    ...(misc > 0 ? [{ label: "雑所得", amount: misc }] : []),
   ];
 
   return (

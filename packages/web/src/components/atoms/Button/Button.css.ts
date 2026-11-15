@@ -14,6 +14,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
+    // 高さは Input・Select と共通の controlHeight に固定する（サイズ違いは横 padding と文字サイズだけ）。
+    height: theme.component.controlHeight,
     borderRadius: theme.borderRadius.sm,
     border: "1px solid transparent",
     cursor: "pointer",
@@ -128,9 +130,9 @@ const styles = {
     },
   }),
   size: styleVariants({
-    sm: { padding: "7px 14px", fontSize: theme.fontSizes.sm },
+    sm: { padding: "0 14px", fontSize: theme.fontSizes.sm },
     md: {
-      padding: `${theme.component.controlPaddingY} ${theme.component.controlPaddingX}`,
+      padding: `0 ${theme.component.controlPaddingX}`,
       fontSize: theme.fontSizes.base,
     },
   }),

@@ -1,5 +1,6 @@
 import {
   BlueDeductionOptions,
+  MiscIncomeInput,
   computeCorrectedFigures,
   filterYear,
   Transaction,
@@ -27,6 +28,8 @@ export interface ConfirmSummaryProps {
   year: number;
   /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
   filingOptions?: BlueDeductionOptions;
+  /** 雑所得（その他）。帳簿に載らない所得として合計に含める。 */
+  miscIncome?: MiscIncomeInput;
 }
 
 /**
@@ -34,7 +37,7 @@ export interface ConfirmSummaryProps {
  * 収入・経費と青色申告特別控除の内訳、月別の推移、勘定科目ごとの内訳を
  * その場で見直せるように出す。未分類が残っていれば注意も出す。
  */
-export const ConfirmSummary = ({ transactions, year, filingOptions }: ConfirmSummaryProps) => {
+export const ConfirmSummary = ({ transactions, year, filingOptions, miscIncome }: ConfirmSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
@@ -50,7 +53,8 @@ export const ConfirmSummary = ({ transactions, year, filingOptions }: ConfirmSum
   );
   const monthly = useMemo(() => sumByMonth(yearTransactions), [yearTransactions]);
   const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
-  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income;
+  const misc = miscIncome?.income ?? 0;
+  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
 
   if (yearTransactions.length === 0) {
     return <Text variant="muted">この年の取引はまだありません。先に帳簿へ取り込んでください。</Text>;
@@ -61,6 +65,7 @@ export const ConfirmSummary = ({ transactions, year, filingOptions }: ConfirmSum
   const statCards: readonly { label: string; value: string }[] = [
     { label: `事業所得${suffix}`, value: formatYen(figures._detail.business_income) },
     { label: `不動産所得${suffix}`, value: formatYen(figures._detail.real_estate_income) },
+    ...(misc > 0 ? [{ label: "雑所得", value: formatYen(misc) }] : []),
     { label: `所得合計${suffix}`, value: formatYen(totalIncome) },
   ];
 
@@ -73,6 +78,7 @@ export const ConfirmSummary = ({ transactions, year, filingOptions }: ConfirmSum
       label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
       amount: figures.blue_deduction,
     },
+    ...(misc > 0 ? [{ label: "雑所得", amount: misc }] : []),
   ];
 
   return (
