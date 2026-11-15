@@ -99,7 +99,7 @@ export const DeductionPanel = ({
         <Text className={styles.subhead}>支払った金額</Text>
         <Col gap="sm">
           <BreakdownEntriesFields
-            title="社会保険料の内訳"
+            title="社会保険料"
             entries={breakdownEntries.socialInsurance}
             legacyTotal={deductions.socialInsurancePaid}
             onChange={(entries) => onBreakdownEntriesChange("socialInsurance", entries)}
@@ -110,7 +110,7 @@ export const DeductionPanel = ({
         </Col>
         <Col gap="sm">
           <BreakdownEntriesFields
-            title="小規模企業共済・iDeCo等の内訳"
+            title="小規模企業共済・iDeCo等"
             entries={breakdownEntries.mutualAid}
             legacyTotal={deductions.smallBusinessMutualAidPaid}
             onChange={(entries) => onBreakdownEntriesChange("mutualAid", entries)}
@@ -121,7 +121,7 @@ export const DeductionPanel = ({
         </Col>
         <Col gap="sm">
           <BreakdownEntriesFields
-            title="医療費の内訳"
+            title="医療費"
             entries={breakdownEntries.medical}
             legacyTotal={deductions.medicalExpensesPaid}
             onChange={(entries) => onBreakdownEntriesChange("medical", entries)}
@@ -137,7 +137,7 @@ export const DeductionPanel = ({
         />
         <Col gap="sm">
           <BreakdownEntriesFields
-            title="寄附金の内訳（ふるさと納税を含む）"
+            title="寄附金（ふるさと納税を含む）"
             entries={breakdownEntries.donations}
             legacyTotal={deductions.donationsTotal}
             onChange={(entries) => onBreakdownEntriesChange("donations", entries)}
