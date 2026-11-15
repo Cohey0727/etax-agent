@@ -57,6 +57,10 @@ const PERIOD_MONTH_OPTIONS: readonly { value: string; label: string }[] = [
   })),
 ];
 
+// 1行にセレクトや入力が並ぶため、全件を一度に描画すると画面が重くなる。
+// 先頭からこの件数ずつ描画し、「さらに表示」で広げる（集計は全件のまま）。
+const DISPLAY_STEP = 200;
+
 /**
  * Notion式フィルター1件。項目は1つずつ選んで追加し、同じ項目は1つだけ。
  * 条件の値はすべて文字列で持ち、URLクエリへそのまま出し入れする。
@@ -178,6 +182,12 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   );
   const [query, setQuery] = useState(initialUrlState.query);
   const [filters, setFilters] = useState<LedgerFilter[]>(initialUrlState.filters);
+  // 描画する行数の上限と、その上限が属する絞り込み条件の署名。
+  // 署名が変われば（＝絞り込みが変われば）上限は先頭に戻る。
+  const [displayWindow, setDisplayWindow] = useState<{ signature: string; limit: number }>({
+    signature: "",
+    limit: DISPLAY_STEP,
+  });
   const addFormRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = () => {
@@ -438,6 +448,13 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   // フィルターは追加した項目すべてに一致するものだけを残す。
   const normalizedQuery = query.trim().toLowerCase();
   const visibleRows = filterRows(rows, query, filters);
+  // 描画は先頭から上限まで。集計・CSVは visibleRows 全件が対象で変わらない。
+  const filterSignature = JSON.stringify({ query, filters });
+  const displayLimit =
+    displayWindow.signature === filterSignature ? displayWindow.limit : DISPLAY_STEP;
+  const displayedRows = visibleRows.slice(0, displayLimit);
+  const showMoreRows = () =>
+    setDisplayWindow({ signature: filterSignature, limit: displayLimit + DISPLAY_STEP });
   // 年度の選択肢はデータにある割り当て年度から作る（新しい順）。
   const yearOptions = [...new Set(rows.map((row) => row.fiscal_year))].sort((a, b) => b - a);
   const activeYear = activeYearOf(filters);
@@ -635,6 +652,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
           ) : visibleRows.length === 0 ? (
             <Text variant="body">条件に一致する取引はありません。</Text>
           ) : (
+            <>
             <div className={styles.tableWrap}>
             <Table>
               <thead>
@@ -651,7 +669,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map((row) => {
+                {displayedRows.map((row) => {
                   const edit = edits[row.id] ?? toInput(row);
                   const dirty = isDirty(row);
                   return (
@@ -783,6 +801,17 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
               </tbody>
             </Table>
             </div>
+            {visibleRows.length > displayedRows.length ? (
+              <Row gap="md" align="center" justify="center">
+                <Text variant="muted">
+                  {visibleRows.length}件中 {displayedRows.length}件を表示中
+                </Text>
+                <Button variant="ghost" size="sm" onClick={showMoreRows}>
+                  さらに表示（次の{DISPLAY_STEP}件）
+                </Button>
+              </Row>
+            ) : null}
+            </>
           )}
       </Col>
       {addFormOpen ? (
