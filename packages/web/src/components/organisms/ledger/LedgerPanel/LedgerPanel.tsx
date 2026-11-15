@@ -58,8 +58,8 @@ const PERIOD_MONTH_OPTIONS: readonly { value: string; label: string }[] = [
 ];
 
 // 1行にセレクトや入力が並ぶため、全件を一度に描画すると画面が重くなる。
-// 先頭からこの件数ずつ描画し、「さらに表示」で広げる（集計は全件のまま）。
-const DISPLAY_STEP = 200;
+// 1ページこの件数だけ描画するページネーションにする（集計は全件のまま）。
+const PAGE_SIZE = 100;
 
 /**
  * Notion式フィルター1件。項目は1つずつ選んで追加し、同じ項目は1つだけ。
@@ -161,6 +161,20 @@ const filterRows = (
   });
 };
 
+/** ページネーションの並び。先頭・末尾と現在ページの前後だけ出し、間は「…」で畳む。 */
+function pageList(current: number, total: number): readonly (number | "gap")[] {
+  const pages = [...new Set([1, total, current - 1, current, current + 1])]
+    .filter((page) => page >= 1 && page <= total)
+    .sort((a, b) => a - b);
+  const items: (number | "gap")[] = [];
+  for (const page of pages) {
+    const prev = items[items.length - 1];
+    if (typeof prev === "number" && page - prev > 1) items.push("gap");
+    items.push(page);
+  }
+  return items;
+}
+
 export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps) => {
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [rows, setRows] = useState<LedgerTransaction[]>([]);
@@ -182,11 +196,11 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   );
   const [query, setQuery] = useState(initialUrlState.query);
   const [filters, setFilters] = useState<LedgerFilter[]>(initialUrlState.filters);
-  // 描画する行数の上限と、その上限が属する絞り込み条件の署名。
-  // 署名が変われば（＝絞り込みが変われば）上限は先頭に戻る。
-  const [displayWindow, setDisplayWindow] = useState<{ signature: string; limit: number }>({
+  // 表示中のページと、そのページが属する絞り込み条件の署名。
+  // 署名が変われば（＝絞り込みが変われば）1ページ目に戻る。
+  const [pageState, setPageState] = useState<{ signature: string; page: number }>({
     signature: "",
-    limit: DISPLAY_STEP,
+    page: 1,
   });
   const addFormRef = useRef<HTMLDivElement>(null);
 
@@ -448,13 +462,17 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   // フィルターは追加した項目すべてに一致するものだけを残す。
   const normalizedQuery = query.trim().toLowerCase();
   const visibleRows = filterRows(rows, query, filters);
-  // 描画は先頭から上限まで。集計・CSVは visibleRows 全件が対象で変わらない。
+  // 描画は現在のページの分だけ。集計・CSVは visibleRows 全件が対象で変わらない。
   const filterSignature = JSON.stringify({ query, filters });
-  const displayLimit =
-    displayWindow.signature === filterSignature ? displayWindow.limit : DISPLAY_STEP;
-  const displayedRows = visibleRows.slice(0, displayLimit);
-  const showMoreRows = () =>
-    setDisplayWindow({ signature: filterSignature, limit: displayLimit + DISPLAY_STEP });
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const currentPage =
+    pageState.signature === filterSignature ? Math.min(pageState.page, totalPages) : 1;
+  const displayedRows = visibleRows.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+  const goToPage = (page: number) =>
+    setPageState({ signature: filterSignature, page: Math.min(Math.max(1, page), totalPages) });
   // 年度の選択肢はデータにある割り当て年度から作る（新しい順）。
   const yearOptions = [...new Set(rows.map((row) => row.fiscal_year))].sort((a, b) => b - a);
   const activeYear = activeYearOf(filters);
@@ -801,13 +819,43 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
               </tbody>
             </Table>
             </div>
-            {visibleRows.length > displayedRows.length ? (
-              <Row gap="md" align="center" justify="center">
+            {totalPages > 1 ? (
+              <Row gap="sm" align="center" justify="center">
                 <Text variant="muted">
-                  {visibleRows.length}件中 {displayedRows.length}件を表示中
+                  全{visibleRows.length}件中 {(currentPage - 1) * PAGE_SIZE + 1}–
+                  {(currentPage - 1) * PAGE_SIZE + displayedRows.length}件目
                 </Text>
-                <Button variant="ghost" size="sm" onClick={showMoreRows}>
-                  さらに表示（次の{DISPLAY_STEP}件）
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => goToPage(currentPage - 1)}
+                >
+                  前へ
+                </Button>
+                {pageList(currentPage, totalPages).map((item, index) =>
+                  item === "gap" ? (
+                    <Text key={`gap-${index}`} variant="muted">
+                      …
+                    </Text>
+                  ) : (
+                    <Button
+                      key={item}
+                      variant={item === currentPage ? "primary" : "ghost"}
+                      size="sm"
+                      onClick={() => goToPage(item)}
+                    >
+                      {item}
+                    </Button>
+                  ),
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => goToPage(currentPage + 1)}
+                >
+                  次へ
                 </Button>
               </Row>
             ) : null}
