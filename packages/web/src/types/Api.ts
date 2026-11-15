@@ -82,6 +82,25 @@ export interface FilingStatus {
   submitted_at: string | null;
 }
 
+/** 確定時点の計算結果の控え（金額はすべて円）。サーバーAPIのワイヤ形式（snake_case）。 */
+export interface FilingSnapshotFigures {
+  business_income: number;
+  real_estate_income: number;
+  misc_income: number;
+  total_income: number;
+  total_deductions: number;
+  taxable_income: number;
+  final_tax: number;
+}
+
+/** 「控除・計算」を確定した時点の計算結果スナップショット。 */
+export interface FilingSnapshot {
+  id: number;
+  year: number;
+  confirmed_at: string;
+  figures: FilingSnapshotFigures;
+}
+
 /** 帳簿（DB）に保存された取引1件。サーバーAPIのワイヤ形式（snake_case）。 */
 export interface LedgerTransaction {
   id: number;

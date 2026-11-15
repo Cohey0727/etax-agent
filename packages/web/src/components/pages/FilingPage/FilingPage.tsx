@@ -24,6 +24,11 @@ import {
   TaxpayerProfilePanel,
 } from "@components/organisms/filing";
 import {
+  ConfirmComparePanel,
+  buildSnapshotFigures,
+  useFilingSnapshots,
+} from "@components/organisms/filing/ConfirmComparePanel";
+import {
   BreakdownEntriesKey,
   BreakdownEntry,
   DeductionState,
@@ -32,6 +37,7 @@ import {
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppView, FilingTab, ViewPageProps } from "@types";
+import { createFilingSnapshot } from "@utils/api";
 import { pathForView } from "@utils/routing";
 
 /** タブの並び。総合が起点で、帳簿・控除・消費税はそれぞれ独立した作業場。 */
@@ -72,8 +78,9 @@ interface FilingWorkspaceProps {
 }
 
 /**
- * 控除入力の状態を持つ作業領域。控除の入力は年度ごとに保存され、
- * 修正申告の画面（過去の確定分との比較）と共有される。
+ * 控除入力の状態を持つ作業領域。控除の入力は年度ごとに保存される。
+ * 「控除・計算」を確定すると計算結果がスナップショットとして控えられ、
+ * 差し戻して再確定するときに前回確定との比較に使う。
  * タブの選択自体はURLが正で、ここでは保持しない。
  */
 const FilingWorkspace = ({
@@ -145,6 +152,19 @@ const FilingWorkspace = ({
     [year, totalIncome, deductionState],
   );
 
+  // 確定スナップショット（前回確定との比較用）。確定は総合タブと控除タブの
+  // どちらからでも行えるため、保存処理はここに寄せて両方から使う。
+  const { snapshots, refresh: refreshSnapshots } = useFilingSnapshots(year);
+  const currentFigures = useMemo(
+    () => buildSnapshotFigures(transactions, year, filingOptions, deductionState.miscIncome, taxResult),
+    [transactions, year, filingOptions, deductionState.miscIncome, taxResult],
+  );
+  const handleConfirmCalculation = async () => {
+    if (!currentFigures) return;
+    await createFilingSnapshot(year, currentFigures);
+    await refreshSnapshots();
+  };
+
   const tabContent: Record<FilingTab, ReactNode> = {
     overview: (
       <>
@@ -154,7 +174,6 @@ const FilingWorkspace = ({
           taxResult={taxResult}
           filingOptions={filingOptions}
           miscIncome={deductionState.miscIncome}
-          onNavigate={onNavigate}
           onOpenSection={onTabChange}
         />
         <TaxpayerPanel
@@ -215,11 +234,13 @@ const FilingWorkspace = ({
           result={taxResult}
           onChange={updateTaxCredits}
         />
+        <ConfirmComparePanel year={year} snapshots={snapshots} currentFigures={currentFigures} />
         <FilingStatusToggle
           year={year}
           statusKey="calculated"
           label="控除・計算"
-          description="所得控除・税額控除の入力が終わったら、ここで確定できます（総合・ダッシュボードと共有）。"
+          description="所得控除・税額控除の入力が終わったら、ここで確定できます（総合・ダッシュボードと共有）。確定すると計算結果が控えられ、再確定のときに前回確定との差分が出ます。"
+          onConfirm={handleConfirmCalculation}
         />
       </>
     ),

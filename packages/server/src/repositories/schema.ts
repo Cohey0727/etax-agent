@@ -9,6 +9,7 @@
  * transactions      : 取引（取込元 imports への参照つき）
  * filing_status     : 年度ごとの申告ステータス（確認・控除計算・提出の済み日時）
  * taxpayer_profiles : 年度ごとの納税者プロフィール（申告書の見出し情報）
+ * filing_snapshots  : 「控除・計算」を確定した時点の計算結果の控え（確定の履歴）
  */
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -85,8 +86,27 @@ export const taxpayerProfilesTable = sqliteTable("taxpayer_profiles", {
     .$defaultFn(() => new Date()),
 });
 
+/**
+ * 確定スナップショット（年度別・確定のたびに1行）。
+ * 「控除・計算」を確定した時点の計算結果を控えておき、差し戻して
+ * 直してから再確定したときに、直前の確定と比べられるようにする。
+ * 数字は画面側の計算結果をそのまま JSON で持つ（記録専用）。
+ */
+export const filingSnapshotsTable = sqliteTable("filing_snapshots", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** 対象年（西暦） */
+  year: integer("year").notNull(),
+  /** 確定した日時 */
+  confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  /** 確定時点の計算結果（FilingSnapshotFigures の JSON） */
+  figures: text("figures", { mode: "json" }).notNull(),
+});
+
 export type ImportRow = typeof importsTable.$inferSelect;
 export type TransactionRow = typeof transactionsTable.$inferSelect;
 export type NewTransactionRow = typeof transactionsTable.$inferInsert;
 export type FilingStatusRow = typeof filingStatusTable.$inferSelect;
 export type TaxpayerProfileRow = typeof taxpayerProfilesTable.$inferSelect;
+export type FilingSnapshotRow = typeof filingSnapshotsTable.$inferSelect;

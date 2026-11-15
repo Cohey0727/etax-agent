@@ -8,6 +8,8 @@ export interface FilingStatusToggleProps {
   statusKey: FilingStatusKey;
   label: string;
   description: string;
+  /** 未確定→確定に切り替えた直後に呼ばれる（確定スナップショットの保存など）。 */
+  onConfirm?: () => Promise<void>;
 }
 
 /**
@@ -19,10 +21,17 @@ export const FilingStatusToggle = ({
   statusKey,
   label,
   description,
+  onConfirm,
 }: FilingStatusToggleProps) => {
   const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
   const done = status[statusKey];
   const doneAt = status[`${statusKey}_at`];
+
+  const handleClick = async () => {
+    const turningOn = !done;
+    await toggle(statusKey);
+    if (turningOn && onConfirm) await onConfirm();
+  };
 
   return (
     <Card>
@@ -44,7 +53,7 @@ export const FilingStatusToggle = ({
         <Button
           variant={done ? "ghost" : "primary"}
           disabled={!available || savingKey === statusKey}
-          onClick={() => void toggle(statusKey)}
+          onClick={() => void handleClick()}
         >
           {done ? "確定解除" : "確定する"}
         </Button>

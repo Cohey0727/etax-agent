@@ -25,7 +25,6 @@ import {
   replaceYearLedgerTransactions,
   transactionToLedgerInput,
 } from "@utils/api";
-import { AmendPage } from "../AmendPage";
 import { DashboardPage } from "../DashboardPage";
 import { FilingPage } from "../FilingPage";
 import { ImportPage } from "../ImportPage";
@@ -33,14 +32,14 @@ import { LedgerPage } from "../LedgerPage";
 import { ReceiptPage } from "../ReceiptPage";
 import { SettingsPage } from "../SettingsPage";
 
-// nav: サイドバーに出す画面。取込・領収書は帳簿の「追加」からの遷移専用、
-// 修正申告は提出済みになった年だけ出る導線専用（サイドバーには出さない）。
-// 設定は下部アクションバー左下のボタン専用。
+// nav: サイドバーに出す画面。取込・領収書は帳簿の「追加」からの遷移専用
+// （サイドバーには出さない）。設定は下部アクションバー左下のボタン専用。
+// 修正は独立した画面を持たず、確定 → 差し戻し → 再確定の流れの中で
+// 前回確定との差分として確定申告画面に出す。
 const appViews = [
   { id: AppView.Dashboard, label: "ダッシュボード", icon: "grid", nav: true, Component: DashboardPage },
   { id: AppView.Import, label: "取引・CSV取込", icon: "import", nav: false, Component: ImportPage },
   { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", nav: false, Component: ReceiptPage },
-  { id: AppView.Amend, label: "修正申告", icon: "amend", nav: false, Component: AmendPage },
   { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
   { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
   { id: AppView.Settings, label: "設定", icon: "settings", nav: false, Component: SettingsPage },

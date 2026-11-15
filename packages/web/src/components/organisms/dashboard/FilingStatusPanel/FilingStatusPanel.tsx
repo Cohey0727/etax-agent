@@ -140,9 +140,6 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
             <Button variant="ghost" size="sm" onClick={() => onNavigate(AppView.Filing)}>
               確定申告画面を開く →
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate(AppView.Amend)}>
-              修正申告を行う →
-            </Button>
           </Row>
         ) : null}
       </Col>

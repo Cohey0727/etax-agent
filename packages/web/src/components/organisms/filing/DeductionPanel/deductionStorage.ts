@@ -1,6 +1,5 @@
 /**
  * deductionStorage.ts — 控除・税額控除の入力を年度ごとに端末へ保存する。
- * 申告済みの数字（AmendDiffPanel の loadOriginal）と対になる保存層。
  * 保存値が壊れていても空の入力にフォールバックする。
  */
 import {

@@ -4,7 +4,6 @@ import styles from "./Icon.css";
 export type IconName =
   | "grid"
   | "import"
-  | "amend"
   | "agent"
   | "sun"
   | "moon"
@@ -35,12 +34,6 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
       <path d="M12 3v10" />
       <path d="m8 9 4 4 4-4" />
       <path d="M4 17v1.5A2.5 2.5 0 0 0 6.5 21h11A2.5 2.5 0 0 0 20 18.5V17" />
-    </>
-  ),
-  amend: (
-    <>
-      <path d="M11 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6" />
-      <path d="M18.6 2.9a2.05 2.05 0 0 1 2.9 2.9L12 15.3l-4 1 1-4 9.6-9.4Z" />
     </>
   ),
   agent: (

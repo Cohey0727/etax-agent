@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FilingStatus } from "@types";
 import { fetchFilingStatuses, updateFilingStatus } from "@utils/api";
+
+/**
+ * ステータスがどこかで切り替わったら、開いている全インスタンスに
+ * 読み直しを伝えるためのイベント名。総合タブ・各タブ・比較パネルが
+ * それぞれ自分のインスタンスを持つため、切り替えを相互に知らせる。
+ */
+const STATUS_CHANGED_EVENT = "etax:filing-status-changed";
 
 /** 手動で「確定」を付けられる申告ステータスの項目。 */
 export type FilingStatusKey = "confirmed" | "calculated" | "submitted";
@@ -39,22 +46,24 @@ export const useFilingStatus = (year: number): UseFilingStatusResult => {
   const [available, setAvailable] = useState(false);
   const [savingKey, setSavingKey] = useState<FilingStatusKey | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchFilingStatuses().then((result) => {
-      if (cancelled) return;
-      setLoaded(true);
-      if (result === null) {
-        setAvailable(false);
-        return;
-      }
-      setStatus(result.find((s) => s.year === year) ?? EMPTY_STATUS);
-      setAvailable(true);
-    });
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(async () => {
+    const result = await fetchFilingStatuses();
+    setLoaded(true);
+    if (result === null) {
+      setAvailable(false);
+      return;
+    }
+    setStatus(result.find((s) => s.year === year) ?? EMPTY_STATUS);
+    setAvailable(true);
   }, [year]);
+
+  useEffect(() => {
+    void load();
+    // 他のインスタンス（別タブ・別パネル）での切り替えに追従する。
+    const onChanged = () => void load();
+    window.addEventListener(STATUS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(STATUS_CHANGED_EVENT, onChanged);
+  }, [load]);
 
   const toggle = async (key: FilingStatusKey) => {
     setSavingKey(key);
@@ -62,7 +71,10 @@ export const useFilingStatus = (year: number): UseFilingStatusResult => {
     patch[key] = !status[key];
     const updated = await updateFilingStatus(year, patch);
     setSavingKey(null);
-    if (updated) setStatus(updated);
+    if (updated) {
+      setStatus(updated);
+      window.dispatchEvent(new Event(STATUS_CHANGED_EVENT));
+    }
   };
 
   return { status, loaded, available, savingKey, toggle };

@@ -10,6 +10,8 @@ import {
   ExportXtxRequest,
   ExportReturnPdfResponse,
   ExportXtxResponse,
+  FilingSnapshot,
+  FilingSnapshotFigures,
   FilingStatus,
   FreeeTrialBalance,
   ImportCsvResponse,
@@ -196,6 +198,36 @@ export async function updateFilingStatus(
     if (!resp.ok) return null;
     const data = (await resp.json()) as { status: FilingStatus };
     return data.status;
+  } catch {
+    return null;
+  }
+}
+
+/** 対象年の確定スナップショット一覧（確定日時の昇順）。失敗した場合は null。 */
+export async function fetchFilingSnapshots(year: number): Promise<FilingSnapshot[] | null> {
+  try {
+    const resp = await fetch(`/api/filing-snapshots/${year}`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { snapshots: FilingSnapshot[] };
+    return data.snapshots;
+  } catch {
+    return null;
+  }
+}
+
+/** 確定スナップショットを1件追加する。失敗した場合は null。 */
+export async function createFilingSnapshot(
+  year: number,
+  figures: FilingSnapshotFigures,
+): Promise<FilingSnapshot | null> {
+  try {
+    const resp = await fetch(`/api/filing-snapshots/${year}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ figures }),
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as FilingSnapshot;
   } catch {
     return null;
   }

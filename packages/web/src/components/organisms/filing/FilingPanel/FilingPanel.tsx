@@ -1,11 +1,17 @@
 import { BlueDeductionOptions, IncomeTaxResult, MiscIncomeInput, Transaction } from "@etax/shared";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
+import {
+  ConfirmComparePanel,
+  buildSnapshotFigures,
+  useFilingSnapshots,
+} from "@components/organisms/filing/ConfirmComparePanel";
 import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
 import { IncomeSummary } from "@components/organisms/filing/IncomeSummary";
 import { TaxSummary } from "@components/organisms/filing/TaxSummary";
-import { AppView, FilingTab } from "@types";
+import { FilingTab } from "@types";
+import { createFilingSnapshot } from "@utils/api";
 import styles from "./FilingPanel.css";
 
 /** 確定申告画面のタブのうち、総合から遷移できる先（総合自身を除くタブ）。 */
@@ -43,7 +49,7 @@ const MANUAL_ITEMS: readonly ManualItem[] = [
   {
     key: "calculated",
     label: "控除・計算",
-    description: "所得控除・税額控除を入力すると所得税額が自動計算されます。入力は控除タブで行います。",
+    description: "所得控除・税額控除を入力すると所得税額が自動計算されます。入力は控除タブで行います。確定するとその時点の計算結果が控えられ、確定解除して直してから再確定すると、前回確定との差分が下に出ます。",
     section: "deductions",
   },
 ];
@@ -58,7 +64,6 @@ export interface FilingPanelProps {
   filingOptions?: BlueDeductionOptions;
   /** 雑所得（その他）。所得の要約で合計に含める。 */
   miscIncome?: MiscIncomeInput;
-  onNavigate?: (view: AppView) => void;
   /** 総合タブから各タブへ遷移する（確定申告画面内のタブ切替）。 */
   onOpenSection?: (section: FilingSection) => void;
 }
@@ -74,10 +79,25 @@ export const FilingPanel = ({
   taxResult,
   filingOptions,
   miscIncome,
-  onNavigate,
   onOpenSection,
 }: FilingPanelProps) => {
   const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
+  const { snapshots, refresh: refreshSnapshots } = useFilingSnapshots(year);
+  const currentFigures = useMemo(
+    () => buildSnapshotFigures(transactions, year, filingOptions, miscIncome, taxResult),
+    [transactions, year, filingOptions, miscIncome, taxResult],
+  );
+
+  // 「控除・計算」を確定するときは、その時点の計算結果をスナップショットとして
+  // サーバーに控える（差し戻して再確定したときに前回確定と比べるため）。
+  const handleToggle = async (item: ManualItem) => {
+    const turningOn = !status[item.key];
+    await toggle(item.key);
+    if (item.key === "calculated" && turningOn && currentFigures) {
+      await createFilingSnapshot(year, currentFigures);
+      await refreshSnapshots();
+    }
+  };
 
   return (
     <Col gap="lg">
@@ -120,7 +140,7 @@ export const FilingPanel = ({
                       variant={done ? "ghost" : "primary"}
                       size="sm"
                       disabled={savingKey === item.key || !available}
-                      onClick={() => void toggle(item.key)}
+                      onClick={() => void handleToggle(item)}
                     >
                       {done ? "確定解除" : "確定する"}
                     </Button>
@@ -136,6 +156,11 @@ export const FilingPanel = ({
                     <TaxSummary taxResult={taxResult} />
                   </div>
                 ) : null}
+                {item.key === "calculated" ? (
+                  <div className={styles.figuresBlock}>
+                    <ConfirmComparePanel year={year} snapshots={snapshots} currentFigures={currentFigures} />
+                  </div>
+                ) : null}
               </Fragment>
             );
           })}
@@ -145,20 +170,9 @@ export const FilingPanel = ({
               <Text className={styles.itemLabel}>提出</Text>
               <Text variant="muted">
                 e-Tax 用データ（XTX）を出力し、e-Tax に取り込んで送信します。出力は
-                この画面の下の提出パネルで行います。提出後に内容の誤りに気づいた
-                場合は、修正申告で訂正します。
+                この画面の下の提出パネルで行います。
               </Text>
             </Col>
-            <Row gap="sm" className={styles.itemActions}>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!onNavigate}
-                onClick={() => onNavigate?.(AppView.Amend)}
-              >
-                修正申告を開く →
-              </Button>
-            </Row>
           </div>
           <div className={styles.figuresBlock}>
             <EtaxSubmitActions />

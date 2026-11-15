@@ -12,7 +12,6 @@ const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Dashboard]: "dashboard",
   [AppView.Ledger]: "ledger",
   [AppView.Filing]: "final-tax",
-  [AppView.Amend]: "amend",
   [AppView.Import]: "import",
   [AppView.Receipt]: "receipt",
   [AppView.Settings]: "settings",

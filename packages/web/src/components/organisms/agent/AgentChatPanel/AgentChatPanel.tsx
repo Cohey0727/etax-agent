@@ -65,7 +65,8 @@ const deriveUiActions = (toolCalls: { name: string; arguments: Record<string, un
       }
       push({ type: "navigate", view: AppView.Dashboard });
     } else if (tc.name === "amendment_delta") {
-      push({ type: "navigate", view: AppView.Amend });
+      // 修正の比較は確定申告画面（前回確定との差分）に出す。
+      push({ type: "navigate", view: AppView.Filing });
     } else if (tc.name === "set_theme") {
       const mode = tc.arguments.mode;
       if (mode === "light" || mode === "dark" || mode === "system") {

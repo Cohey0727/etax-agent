@@ -122,5 +122,13 @@ export async function ensureTables(): Promise<void> {
       updated_at integer NOT NULL
     )
   `);
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS filing_snapshots (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      year integer NOT NULL,
+      confirmed_at integer NOT NULL,
+      figures text NOT NULL
+    )
+  `);
   tablesEnsured = true;
 }
