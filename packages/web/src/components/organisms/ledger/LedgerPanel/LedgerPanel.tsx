@@ -19,7 +19,7 @@ import {
   TableHeaderCell,
   Text,
 } from "@components/atoms";
-import { AlertBox } from "@components/molecules";
+import { AlertBox, MultiSelectFilter } from "@components/molecules";
 import { AppView, LedgerTransaction, LedgerTransactionInput } from "@types";
 import {
   createLedgerTransaction,
@@ -70,14 +70,15 @@ const PAGE_SIZE = 100;
 /**
  * Notion式フィルター1件。項目は1つずつ選んで追加し、同じ項目は1つだけ。
  * 条件の値はすべて文字列で持ち、URLクエリへそのまま出し入れする。
+ * 勘定科目・区分・税区分は複数選択（values が空なら「すべて」）。
  */
 type LedgerFilter =
   | { field: "year"; value: string }
   | { field: "period"; month: string; from: string; to: string }
   | { field: "amount"; min: string; max: string }
-  | { field: "category"; value: string }
-  | { field: "incomeType"; value: string }
-  | { field: "taxCategory"; value: string }
+  | { field: "category"; values: string[] }
+  | { field: "incomeType"; values: string[] }
+  | { field: "taxCategory"; values: string[] }
   | { field: "mismatch" };
 
 type LedgerFilterField = LedgerFilter["field"];
@@ -111,11 +112,11 @@ const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
     case "amount":
       return { field, min: "", max: "" };
     case "category":
-      return { field, value: "未分類" };
+      return { field, values: ["未分類"] };
     case "incomeType":
-      return { field, value: "business" };
+      return { field, values: ["business"] };
     case "taxCategory":
-      return { field, value: "" };
+      return { field, values: [] };
     case "mismatch":
       return { field };
   }
@@ -1064,64 +1065,44 @@ const FilterChip = ({
         <>
           <Input
             type="number"
-            min={0}
             className={styles.chipNumber}
             value={filter.min}
             onChange={(e) => onChange({ ...filter, min: e.target.value })}
             placeholder="最小"
-            aria-label="金額（最小・絶対値）"
+            aria-label="金額（最小・符号付き）"
           />
           <Text variant="muted">〜</Text>
           <Input
             type="number"
-            min={0}
             className={styles.chipNumber}
             value={filter.max}
             onChange={(e) => onChange({ ...filter, max: e.target.value })}
             placeholder="最大"
-            aria-label="金額（最大・絶対値）"
+            aria-label="金額（最大・符号付き）"
           />
           <Text variant="muted">円</Text>
         </>
       ) : filter.field === "category" ? (
-        <Select
-          className={styles.chipSelect}
-          value={filter.value}
-          onChange={(e) => onChange({ ...filter, value: e.target.value })}
-          aria-label="勘定科目"
-        >
-          {CATEGORY_OPTIONS.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </Select>
+        <MultiSelectFilter
+          ariaLabel="勘定科目で絞り込み"
+          options={CATEGORY_OPTIONS.map((name) => ({ value: name, label: name }))}
+          values={filter.values}
+          onChange={(values) => onChange({ ...filter, values })}
+        />
       ) : filter.field === "incomeType" ? (
-        <Select
-          className={styles.chipSelect}
-          value={filter.value}
-          onChange={(e) => onChange({ ...filter, value: e.target.value })}
-          aria-label="区分"
-        >
-          {INCOME_TYPE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
+        <MultiSelectFilter
+          ariaLabel="区分で絞り込み"
+          options={INCOME_TYPE_OPTIONS}
+          values={filter.values}
+          onChange={(values) => onChange({ ...filter, values })}
+        />
       ) : filter.field === "mismatch" ? null : (
-        <Select
-          className={styles.chipSelect}
-          value={filter.value}
-          onChange={(e) => onChange({ ...filter, value: e.target.value })}
-          aria-label="税区分"
-        >
-          {TAX_CATEGORY_OPTIONS.map((option) => (
-            <option key={option.label} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
+        <MultiSelectFilter
+          ariaLabel="税区分で絞り込み"
+          options={TAX_CATEGORY_OPTIONS}
+          values={filter.values}
+          onChange={(values) => onChange({ ...filter, values })}
+        />
       )}
       <button
         type="button"
@@ -1144,7 +1125,7 @@ function monthRange(year: number, month: string): { from: string; to: string } {
   return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(lastDay).padStart(2, "0")}` };
 }
 
-/** 取引がフィルター1件に一致するか。金額は絶対値で比べる。 */
+/** 取引がフィルター1件に一致するか。金額は符号付きで比べる（支出はマイナス）。 */
 function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
   switch (filter.field) {
     case "year":
@@ -1152,19 +1133,18 @@ function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
     case "period":
       return (!filter.from || row.date >= filter.from) && (!filter.to || row.date <= filter.to);
     case "amount": {
-      const abs = Math.abs(row.amount);
       const min = filter.min.trim() === "" ? null : Number(filter.min);
       const max = filter.max.trim() === "" ? null : Number(filter.max);
-      if (min !== null && Number.isFinite(min) && abs < min) return false;
-      if (max !== null && Number.isFinite(max) && abs > max) return false;
+      if (min !== null && Number.isFinite(min) && row.amount < min) return false;
+      if (max !== null && Number.isFinite(max) && row.amount > max) return false;
       return true;
     }
     case "category":
-      return row.category === filter.value;
+      return filter.values.length === 0 || filter.values.includes(row.category);
     case "incomeType":
-      return row.income_type === filter.value;
+      return filter.values.length === 0 || filter.values.includes(row.income_type);
     case "taxCategory":
-      return row.tax_category === filter.value;
+      return filter.values.length === 0 || filter.values.includes(row.tax_category);
     case "mismatch":
       return taxCategorySignMismatch(row);
   }
@@ -1173,6 +1153,10 @@ function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
 /** URLクエリから検索・フィルターの初期状態を読む。不正な値は落とす。 */
 function parseFiltersFromSearch(search: string): { query: string; filters: LedgerFilter[] } {
   const params = new URLSearchParams(search);
+  // フィルター指定が無い素の表示では、期間フィルターを既定で出す。
+  if (params.get("filters") === null) {
+    return { query: params.get("q") ?? "", filters: [emptyFilter("period")] };
+  }
   const requested = (params.get("filters") ?? "")
     .split(",")
     .filter(
@@ -1199,11 +1183,11 @@ function parseFiltersFromSearch(search: string): { query: string; filters: Ledge
       case "amount":
         return { field, min: params.get("amin") ?? "", max: params.get("amax") ?? "" };
       case "category":
-        return { field, value: params.get("cat") ?? "未分類" };
+        return { field, values: params.getAll("cat") };
       case "incomeType":
-        return { field, value: params.get("itype") ?? "business" };
+        return { field, values: params.getAll("itype") };
       case "taxCategory":
-        return { field, value: params.get("tax") ?? "" };
+        return { field, values: params.getAll("tax") };
       case "mismatch":
         return { field };
     }
@@ -1232,13 +1216,13 @@ function buildFilterSearch(query: string, filters: LedgerFilter[]): string {
           if (filter.max) params.set("amax", filter.max);
           break;
         case "category":
-          params.set("cat", filter.value);
+          for (const value of filter.values) params.append("cat", value);
           break;
         case "incomeType":
-          params.set("itype", filter.value);
+          for (const value of filter.values) params.append("itype", value);
           break;
         case "taxCategory":
-          params.set("tax", filter.value);
+          for (const value of filter.values) params.append("tax", value);
           break;
         case "mismatch":
           break;
