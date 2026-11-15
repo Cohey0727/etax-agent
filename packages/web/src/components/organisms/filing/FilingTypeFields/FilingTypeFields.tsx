@@ -35,7 +35,7 @@ export const FilingTypeFields = ({
   return (
     <Col gap="sm">
       <Row gap="sm" align="center" wrap>
-        <Text variant="muted">申告の種類</Text>
+        <Text variant="muted" className={styles.label}>申告の種類</Text>
         <Select
           className={styles.select}
           value={filingType}
@@ -51,7 +51,7 @@ export const FilingTypeFields = ({
       </Row>
       {showScale ? (
         <Row gap="sm" align="center" wrap>
-          <Text variant="muted">不動産貸付けの規模</Text>
+          <Text variant="muted" className={styles.label}>不動産貸付けの規模</Text>
           <Select
             className={styles.select}
             value={realEstateBusinessScale ? "scale" : "non-scale"}
