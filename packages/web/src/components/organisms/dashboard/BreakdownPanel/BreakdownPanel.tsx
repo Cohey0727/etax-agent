@@ -21,20 +21,26 @@ export interface BreakdownPanelProps {
 /**
  * 収入の内訳・支出の内訳（勘定科目ごとの円グラフ）。
  * 選択中の年の取引を科目で集計し、金額の大きい順にドーナツ＋凡例で並べる。
+ * 集計範囲は確定申告画面と合わせて事業＋不動産だけにする。口座の生の出入り
+ * （チャージ・振替・投資・カード決済などの「その他」区分＝資金の移動）は
+ * 収支ではないので混ぜず、無視する（申告の数字と食い違うため）。
  * その年の取引が無い年は表示しない。
  */
 export const BreakdownPanel = ({ transactions, year }: BreakdownPanelProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
 
-  const income = useMemo(
-    () => sumByCategory(yearTransactions.filter((t) => t.amount > 0), false),
+  const scopedTransactions = useMemo(
+    () => yearTransactions.filter((t) => t.income_type !== "other"),
     [yearTransactions],
+  );
+  const income = useMemo(
+    () => sumByCategory(scopedTransactions.filter((t) => t.amount > 0), false),
+    [scopedTransactions],
   );
   const expenses = useMemo(
-    () => sumByCategory(yearTransactions.filter((t) => t.amount < 0), true),
-    [yearTransactions],
+    () => sumByCategory(scopedTransactions.filter((t) => t.amount < 0), true),
+    [scopedTransactions],
   );
-
   if (yearTransactions.length === 0) return null;
 
   const incomeTotal = income.reduce((sum, row) => sum + row.amount, 0);
