@@ -24,6 +24,8 @@ export const XtxTaxpayerSchema = z
     occupation: z.string(),
     shop_name: z.string(),
     jan1_address: z.string(),
+    /** インボイス登録番号。XTX には含まれず、プロフィールとして保持するだけ。 */
+    invoice_number: z.string().optional(),
   })
   .openapi("XtxTaxpayer");
 
@@ -54,6 +56,16 @@ export const ExportXtxResponseSchema = z
   .openapi("ExportXtxResponse");
 
 export type ExportXtxResponse = z.infer<typeof ExportXtxResponseSchema>;
+
+/** 申告書の紙イメージ PDF 出力のレスポンス。リクエストは XTX 出力と共通。 */
+export const ExportReturnPdfResponseSchema = z
+  .object({
+    filename: z.string(),
+    pdf_base64: z.string(),
+  })
+  .openapi("ExportReturnPdfResponse");
+
+export type ExportReturnPdfResponse = z.infer<typeof ExportReturnPdfResponseSchema>;
 
 export const ExportConsumptionXtxRequestSchema = z
   .object({

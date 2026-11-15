@@ -58,7 +58,7 @@ export interface ConsumptionTaxPanelProps {
  * 課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算される。
  */
 export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelProps) => {
-  const [taxpayer] = useState(() => loadTaxpayer());
+  const [taxpayer] = useState(() => loadTaxpayer(year).taxpayer);
   const [form, setForm] = useState<ConsumptionForm>(() =>
     estimateInitialValues(transactions, year),
   );

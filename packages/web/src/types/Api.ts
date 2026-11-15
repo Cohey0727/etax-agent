@@ -125,6 +125,8 @@ export interface XtxTaxpayerInput {
   occupation: string;
   shop_name: string;
   jan1_address: string;
+  /** インボイス登録番号（T+13桁）。プロフィールとして年度別に保持する。 */
+  invoice_number: string;
 }
 
 /** e-Tax 申告等データ（XTX）出力のリクエスト。 */
@@ -145,6 +147,12 @@ export interface ExportXtxRequest {
 export interface ExportXtxResponse {
   filename: string;
   xtx: string;
+}
+
+/** 申告書の紙イメージ PDF 出力のレスポンス。リクエストは XTX 出力と共通。 */
+export interface ExportReturnPdfResponse {
+  filename: string;
+  pdf_base64: string;
 }
 
 /** 消費税申告書（本則）XTX出力のリクエスト。金額は税込・確定値で渡す。 */

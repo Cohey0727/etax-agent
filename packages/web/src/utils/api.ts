@@ -8,6 +8,7 @@ import {
   ExportConsumptionXtxRequest,
   ExportConsumptionXtxResponse,
   ExportXtxRequest,
+  ExportReturnPdfResponse,
   ExportXtxResponse,
   FilingStatus,
   FreeeTrialBalance,
@@ -207,6 +208,18 @@ export async function exportXtxFile(request: ExportXtxRequest): Promise<ExportXt
     body: JSON.stringify(request),
   });
   return parseJson<ExportXtxResponse>(resp);
+}
+
+/** 申告書の紙イメージ PDF を生成する。リクエスト形式は XTX 出力と共通。 */
+export async function exportReturnPdfFile(
+  request: ExportXtxRequest,
+): Promise<ExportReturnPdfResponse> {
+  const resp = await fetch("/api/etax/export-return-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJson<ExportReturnPdfResponse>(resp);
 }
 
 /** 消費税申告書（本則）のXTXを生成する。失敗時はサーバーのエラー文言で例外。 */

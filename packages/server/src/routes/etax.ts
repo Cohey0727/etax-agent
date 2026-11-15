@@ -7,12 +7,21 @@ import {
   exportConsumptionXtxHandler,
   exportConsumptionXtxRoute,
 } from "../usecases/exportConsumptionXtx";
+import {
+  exportReturnPdfHandler,
+  exportReturnPdfRoute,
+} from "../usecases/exportReturnPdf";
 import { exportXtxHandler, exportXtxRoute } from "../usecases/exportXtx";
 
 const app = new OpenAPIHono();
 app.openapi(
   exportXtxRoute,
   exportXtxHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
+app.openapi(
+  exportReturnPdfRoute,
+  exportReturnPdfHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 app.openapi(
