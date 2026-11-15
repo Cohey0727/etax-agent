@@ -4,7 +4,6 @@ import {
   consumptionTax,
   ConsumptionMethod,
   estimateInputTax,
-  FilingType,
   filterYear,
   residentialRentTotal,
   taxableSalesFromBreakdown,
@@ -15,7 +14,6 @@ import { Col, Text } from "@components/atoms";
 import {
   DeductionState,
   loadDeductionState,
-  saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { ConsumptionTaxComparison, ConsumptionTaxRow } from "../ConsumptionTaxComparison";
 import { IncomeSummary } from "../IncomeSummary";
@@ -31,18 +29,13 @@ const methodOrder: readonly ConsumptionMethod[] = ["standard", "simplified", "sp
 export const DashboardPanel = ({ transactions, year }: DashboardPanelProps) => {
   const tx = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const breakdown = useMemo(() => aggregateIncome(tx), [tx]);
-  // 申告の種類は控除タブと保存先を共有する。年度が替わったら読み直す。
+  // 申告の種類は納税者情報画面で管理し、保存先を共有する。年度が替わったら読み直す。
   const [deductionState, setDeductionState] = useState<DeductionState>(() =>
     loadDeductionState(year),
   );
   useEffect(() => {
     setDeductionState(loadDeductionState(year));
   }, [year]);
-  const updateFilingSettings = (filingType: FilingType, realEstateBusinessScale: boolean) => {
-    const state = { ...deductionState, filingType, realEstateBusinessScale };
-    setDeductionState(state);
-    saveDeductionState(year, state);
-  };
   const blue = useMemo(
     () =>
       blueDeduction(breakdown.realEstateIncome, breakdown.businessIncome, {
@@ -86,7 +79,6 @@ export const DashboardPanel = ({ transactions, year }: DashboardPanelProps) => {
         blue={blue}
         filingType={deductionState.filingType}
         realEstateBusinessScale={deductionState.realEstateBusinessScale}
-        onFilingSettingsChange={updateFilingSettings}
       />
       <ConsumptionTaxComparison
         year={year}

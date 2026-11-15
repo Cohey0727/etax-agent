@@ -4,4 +4,5 @@ export * from "./ImportPage";
 export * from "./ReceiptPage";
 export * from "./LedgerPage";
 export * from "./FilingPage";
+export * from "./TaxpayerPage";
 export * from "./SettingsPage";

@@ -2,7 +2,6 @@ import {
   CasualtyLossInput,
   DeductionInputs,
   EarthquakeInsurancePremiums,
-  FilingType,
   IncomeDeductionBreakdown,
   LifeInsurancePremiums,
   SpouseCategory,
@@ -10,7 +9,6 @@ import {
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { formatNumber } from "@utils";
 import { BreakdownEntriesFields } from "../BreakdownEntriesFields";
-import { FilingTypeFields } from "../FilingTypeFields";
 import { BreakdownEntriesKey, BreakdownEntry } from "./deductionStorage";
 import styles from "./DeductionPanel.css";
 
@@ -40,11 +38,6 @@ export interface DeductionPanelProps {
   /** 所得控除の内訳（自動計算済み） */
   breakdown: IncomeDeductionBreakdown;
   onChange: (next: DeductionInputs) => void;
-  /** 申告の種類（青色申告特別控除の区分） */
-  filingType: FilingType;
-  /** 不動産貸付けが事業的規模か */
-  realEstateBusinessScale: boolean;
-  onFilingSettingsChange: (filingType: FilingType, realEstateBusinessScale: boolean) => void;
   /** 内訳を持つ控除入力（寄附金・社会保険料・小規模企業共済等・医療費） */
   breakdownEntries: Record<BreakdownEntriesKey, BreakdownEntry[]>;
   onBreakdownEntriesChange: (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => void;
@@ -55,9 +48,6 @@ export const DeductionPanel = ({
   deductions,
   breakdown,
   onChange,
-  filingType,
-  realEstateBusinessScale,
-  onFilingSettingsChange,
   breakdownEntries,
   onBreakdownEntriesChange,
 }: DeductionPanelProps) => {
@@ -78,15 +68,6 @@ export const DeductionPanel = ({
   return (
     <Card>
       <Col gap="md">
-        <Col gap="sm">
-          <Text variant="sectionTitle">申告の種類</Text>
-          <FilingTypeFields
-            filingType={filingType}
-            realEstateBusinessScale={realEstateBusinessScale}
-            onChange={onFilingSettingsChange}
-          />
-        </Col>
-
         <Col gap="sm">
           <Text variant="sectionTitle">所得控除の入力</Text>
           <Text variant="muted">

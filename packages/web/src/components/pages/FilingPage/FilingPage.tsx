@@ -3,7 +3,6 @@ import {
   computeCorrectedFigures,
   computeIncomeTax,
   DeductionInputs,
-  FilingType,
   MiscIncomeInput,
   filterYear,
   TaxCreditInputs,
@@ -18,12 +17,12 @@ import {
   ConsumptionTaxPanel,
   DeductionPanel,
   FilingPanel,
+  FilingSection,
   FilingStatusToggle,
   MiscIncomePanel,
   MonthlyBalance,
   TaxCreditPanel,
   TaxpayerPanel,
-  TaxpayerProfilePanel,
 } from "@components/organisms/filing";
 import {
   ConfirmComparePanel,
@@ -42,13 +41,12 @@ import { AppView, FilingTab, ViewPageProps } from "@types";
 import { createFilingSnapshot } from "@utils/api";
 import { pathForView } from "@utils/routing";
 
-/** タブの並び。総合が起点で、収支・控除・消費税はそれぞれ独立した作業場。 */
+/** タブの並び。総合が起点で、収支・控除・消費税はそれぞれ独立した作業場。納税者情報は独立画面。 */
 const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
   { id: "overview", label: "総合" },
   { id: "balance", label: "収支" },
   { id: "deductions", label: "控除" },
   { id: "consumption", label: "消費税" },
-  { id: "taxpayer", label: "納税者情報" },
 ];
 
 export const FilingPage = ({
@@ -120,11 +118,6 @@ const FilingWorkspace = ({
     setDeductionState(state);
     saveDeductionState(year, state);
   };
-  const updateFilingSettings = (filingType: FilingType, realEstateBusinessScale: boolean) => {
-    const state = { ...deductionState, filingType, realEstateBusinessScale };
-    setDeductionState(state);
-    saveDeductionState(year, state);
-  };
   const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => {
     const state = applyBreakdownEntries(deductionState, key, entries);
     setDeductionState(state);
@@ -173,6 +166,15 @@ const FilingWorkspace = ({
     await refreshSnapshots();
   };
 
+  // 総合タブのセクションリンク。納税者情報だけはタブではなく独立画面へ遷移する。
+  const openSection = (section: FilingSection) => {
+    if (section === "taxpayer") {
+      onNavigate?.(AppView.Taxpayer);
+    } else {
+      onTabChange(section);
+    }
+  };
+
   const tabContent: Record<FilingTab, ReactNode> = {
     overview: (
       <>
@@ -182,7 +184,7 @@ const FilingWorkspace = ({
           taxResult={taxResult}
           filingOptions={filingOptions}
           miscIncome={deductionState.miscIncome}
-          onOpenSection={onTabChange}
+          onOpenSection={openSection}
         />
         <TaxpayerPanel
           year={year}
@@ -193,7 +195,7 @@ const FilingWorkspace = ({
           filingType={deductionState.filingType}
           realEstateBusinessScale={deductionState.realEstateBusinessScale}
           originalIncomeTax={null}
-          onOpenSection={onTabChange}
+          onOpenSection={openSection}
         />
       </>
     ),
@@ -230,9 +232,6 @@ const FilingWorkspace = ({
           deductions={deductionState.deductions}
           breakdown={taxResult.deductions}
           onChange={updateDeductions}
-          filingType={deductionState.filingType}
-          realEstateBusinessScale={deductionState.realEstateBusinessScale}
-          onFilingSettingsChange={updateFilingSettings}
           breakdownEntries={{
             donations: deductionState.donationEntries,
             socialInsurance: deductionState.socialInsuranceEntries,
@@ -259,7 +258,6 @@ const FilingWorkspace = ({
     consumption: (
       <ConsumptionTaxPanel transactions={transactions} year={year} onOpenLedger={openLedgerFiltered} />
     ),
-    taxpayer: <TaxpayerProfilePanel year={year} />,
   };
 
   return (

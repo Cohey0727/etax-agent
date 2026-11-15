@@ -23,7 +23,7 @@ const FILING_TYPE_NOTES: Partial<Record<FilingType, string>> = {
 
 /**
  * 申告の種類（青色申告特別控除の区分）と不動産貸付けの規模の選択。
- * 控除タブとダッシュボードの青色申告特別控除カードで共有する。
+ * 納税者情報画面で管理する（保存先は確定申告・ダッシュボードと共有）。
  */
 export const FilingTypeFields = ({
   filingType,

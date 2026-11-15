@@ -1,17 +1,15 @@
 import { BlueDeduction, FilingType, IncomeBreakdown, blueDeductionCaps } from "@etax/shared";
 import { Card, Col, Text } from "@components/atoms";
-import { FilingTypeFields } from "@components/organisms/filing/FilingTypeFields";
 import { formatYen } from "@utils";
 import styles from "./IncomeSummary.css";
 
 export interface IncomeSummaryProps {
   breakdown: IncomeBreakdown;
   blue: BlueDeduction;
-  /** 申告の種類（青色申告特別控除の区分） */
+  /** 申告の種類（青色申告特別控除の区分）。変更は納税者情報画面で行う。 */
   filingType: FilingType;
   /** 不動産貸付けが事業的規模か */
   realEstateBusinessScale: boolean;
-  onFilingSettingsChange: (filingType: FilingType, realEstateBusinessScale: boolean) => void;
 }
 
 export const IncomeSummary = ({
@@ -19,7 +17,6 @@ export const IncomeSummary = ({
   blue,
   filingType,
   realEstateBusinessScale,
-  onFilingSettingsChange,
 }: IncomeSummaryProps) => {
   const caps = blueDeductionCaps({ filingType, realEstateBusinessScale });
   // 事業・不動産を合算して上限がかかる場合は、内訳ごとの上限は出さない。
@@ -58,11 +55,6 @@ export const IncomeSummary = ({
             <Text variant="statLabel">{totalLabel}</Text>
             <Text variant="statValue">{formatYen(blue.total)}</Text>
           </Col>
-          <FilingTypeFields
-            filingType={filingType}
-            realEstateBusinessScale={realEstateBusinessScale}
-            onChange={onFilingSettingsChange}
-          />
         </Col>
       </Card>
     </div>

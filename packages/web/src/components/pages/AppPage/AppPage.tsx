@@ -38,6 +38,7 @@ import { ImportPage } from "../ImportPage";
 import { LedgerPage } from "../LedgerPage";
 import { ReceiptPage } from "../ReceiptPage";
 import { SettingsPage } from "../SettingsPage";
+import { TaxpayerPage } from "../TaxpayerPage";
 
 // nav: サイドバーに出す画面。取込・領収書は帳簿の「追加」からの遷移専用
 // （サイドバーには出さない）。設定は下部アクションバー左下のボタン専用。
@@ -49,6 +50,7 @@ const appViews = [
   { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", nav: false, Component: ReceiptPage },
   { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
   { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
+  { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },
   { id: AppView.Settings, label: "設定", icon: "settings", nav: false, Component: SettingsPage },
 ] as const satisfies readonly {
   id: AppView;
@@ -59,11 +61,11 @@ const appViews = [
 }[];
 
 // サイドバーで確定申告にぶら下げる子項目（タブへの直接遷移）。総合は親そのものなので出さない。
+// 納税者情報は独立画面になったため、ここには含めない。
 const FILING_NAV_CHILDREN: readonly { view: AppView; key: string; label: string }[] = [
   { view: AppView.Filing, key: "balance", label: "収支" },
   { view: AppView.Filing, key: "deductions", label: "控除" },
   { view: AppView.Filing, key: "consumption", label: "消費税" },
-  { view: AppView.Filing, key: "taxpayer", label: "納税者情報" },
 ];
 
 /** エージェント由来の控除パッチの内訳に、保存用の id を補う。 */

@@ -110,10 +110,16 @@ const deriveUiActions = (
         });
         push({ type: "navigate", view: AppView.Filing });
       }
-    } else if (tc.name === "set_filing_status" || tc.name === "update_taxpayer_profile") {
-      // 申告ステータス・納税者情報は確定申告画面の表示に効く。
+    } else if (tc.name === "set_filing_status") {
+      // 申告ステータスは確定申告画面の表示に効く。
       if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
         push({ type: "navigate", view: AppView.Filing });
+        push({ type: "reloadView" });
+      }
+    } else if (tc.name === "update_taxpayer_profile") {
+      // 納税者情報は独立画面で見せる。
+      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
+        push({ type: "navigate", view: AppView.Taxpayer });
         push({ type: "reloadView" });
       }
     } else if (SETTINGS_WRITE_TOOL_NAMES.has(tc.name)) {

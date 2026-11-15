@@ -13,14 +13,17 @@ import { FilingTab } from "@types";
 import { createFilingSnapshot } from "@utils/api";
 import styles from "./FilingPanel.css";
 
-/** 確定申告画面のタブのうち、総合から遷移できる先（総合自身を除くタブ）。 */
-export type FilingSection = Exclude<FilingTab, "overview">;
+/**
+ * 総合から遷移できる先。収支・控除・消費税は確定申告画面のタブ、
+ * 納税者情報は独立画面（タブではないが、総合の項目としては並べる）。
+ */
+export type FilingSection = Exclude<FilingTab, "overview"> | "taxpayer";
 
 const SECTION_OPEN_LABELS: Record<FilingSection, string> = {
   balance: "収支タブを開く",
   deductions: "控除タブを開く",
   consumption: "消費税タブを開く",
-  taxpayer: "納税者情報タブを開く",
+  taxpayer: "納税者情報を開く",
 };
 
 interface ManualItem {
