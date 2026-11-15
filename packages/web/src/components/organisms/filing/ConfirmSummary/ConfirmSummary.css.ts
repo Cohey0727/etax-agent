@@ -48,9 +48,10 @@ const styles = {
     background: theme.color.negative,
   }),
   // 月別グラフ。12か月を横に並べ、各月に収入・支出の2本のバーを立てる。
+  // バーは各月の幅いっぱいに広げ、月同士の間隔を詰めて密度を出す。
   chart: style({
     display: "flex",
-    gap: theme.space.sm,
+    gap: theme.space.xs,
   }),
   chartCol: style({
     flex: 1,
@@ -64,17 +65,17 @@ const styles = {
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "center",
-    gap: "3px",
+    gap: "2px",
     borderBottom: `1px solid ${theme.color.lineSoft}`,
   }),
   chartBarIncome: style({
-    width: "9px",
+    flex: "1 1 0",
     minHeight: "2px",
     borderRadius: "3px 3px 0 0",
     background: theme.color.accent,
   }),
   chartBarExpense: style({
-    width: "9px",
+    flex: "1 1 0",
     minHeight: "2px",
     borderRadius: "3px 3px 0 0",
     background: theme.color.negative,

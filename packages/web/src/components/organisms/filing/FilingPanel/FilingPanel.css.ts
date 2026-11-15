@@ -12,6 +12,15 @@ const styles = {
     borderTop: `1px solid ${theme.color.border}`,
     flexWrap: "wrap",
   }),
+  // 左側のテキスト列。縮められるようにして、右のボタンが改行しないようにする。
+  itemMain: style({
+    flex: 1,
+    minWidth: 0,
+  }),
+  // 右側のボタン列。縮ませない。
+  itemActions: style({
+    flexShrink: 0,
+  }),
   // 項目名。
   itemLabel: style({
     display: "flex",

@@ -2,6 +2,11 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
+  // 左側のテキスト列。縮められるようにして、右のボタンが落ちないようにする。
+  itemMain: style({
+    flex: 1,
+    minWidth: 0,
+  }),
   // 項目名。
   itemLabel: style({
     display: "flex",

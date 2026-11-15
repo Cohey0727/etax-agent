@@ -1,6 +1,7 @@
 export * from "./ConfirmSummary";
 export * from "./ConsumptionTaxPanel";
 export * from "./DeductionPanel";
+export * from "./FilingOverview";
 export * from "./FilingPanel";
 export * from "./FilingStatusToggle";
 export * from "./TaxCreditPanel";

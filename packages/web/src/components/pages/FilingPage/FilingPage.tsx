@@ -13,6 +13,7 @@ import {
   ConfirmSummary,
   ConsumptionTaxPanel,
   DeductionPanel,
+  FilingOverview,
   FilingPanel,
   FilingStatusToggle,
   TaxCreditPanel,
@@ -116,6 +117,7 @@ const FilingWorkspace = ({
           onNavigate={onNavigate}
           onOpenSection={onTabChange}
         />
+        <FilingOverview transactions={transactions} year={year} taxResult={taxResult} />
         <TaxpayerPanel
           year={year}
           transactions={yearTransactions}
@@ -130,14 +132,14 @@ const FilingWorkspace = ({
       <>
         <Card>
           <Col gap="md">
-            <Text variant="sectionTitle">帳簿の確認</Text>
+            <Text variant="sectionTitle">帳簿</Text>
             <ConfirmSummary transactions={transactions} year={year} />
           </Col>
         </Card>
         <FilingStatusToggle
           year={year}
           statusKey="confirmed"
-          label="帳簿の確認"
+          label="帳簿"
           description="帳簿の金額・科目・区分に誤りがないか見直したら、ここで済みにできます（総合・ダッシュボードと共有）。"
         />
       </>

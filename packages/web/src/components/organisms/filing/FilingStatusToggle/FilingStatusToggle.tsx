@@ -4,7 +4,7 @@ import styles from "./FilingStatusToggle.css";
 
 export interface FilingStatusToggleProps {
   year: number;
-  /** 対象のステータス項目（帳簿の確認 = confirmed、控除・計算 = calculated）。 */
+  /** 対象のステータス項目（帳簿 = confirmed、控除・計算 = calculated）。 */
   statusKey: FilingStatusKey;
   label: string;
   description: string;
@@ -27,7 +27,7 @@ export const FilingStatusToggle = ({
   return (
     <Card>
       <Row gap="md" align="center" justify="spaceBetween">
-        <Col gap="sm">
+        <Col gap="sm" className={styles.itemMain}>
           <Text className={styles.itemLabel}>
             {label}
             <span className={done ? styles.stateDone : styles.stateTodo}>

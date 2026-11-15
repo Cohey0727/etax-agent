@@ -13,7 +13,7 @@ interface ManualItem {
 }
 
 const MANUAL_ITEMS: readonly ManualItem[] = [
-  { key: "confirmed", label: "帳簿の確認" },
+  { key: "confirmed", label: "帳簿" },
   { key: "calculated", label: "控除・計算" },
   { key: "submitted", label: "提出" },
 ];

@@ -29,7 +29,7 @@ interface ManualItem {
 const MANUAL_ITEMS: readonly ManualItem[] = [
   {
     key: "confirmed",
-    label: "帳簿の確認",
+    label: "帳簿",
     description: "帳簿の金額・科目・区分に誤りがないか見直したら「済み」にします。見直しは帳簿タブで行います。",
     section: "ledger",
   },
@@ -100,7 +100,7 @@ export const FilingPanel = ({ year, onNavigate, onOpenSection }: FilingPanelProp
             const doneAt = status[`${item.key}_at`];
             return (
               <div key={item.key} className={styles.statusRow}>
-                <Col gap="sm">
+                <Col gap="sm" className={styles.itemMain}>
                   <Text className={styles.itemLabel}>
                     {item.label}
                     <span className={done ? styles.stateDone : styles.stateTodo}>
@@ -109,7 +109,7 @@ export const FilingPanel = ({ year, onNavigate, onOpenSection }: FilingPanelProp
                   </Text>
                   <Text variant="muted">{item.description}</Text>
                 </Col>
-                <Row gap="sm">
+                <Row gap="sm" className={styles.itemActions}>
                   {item.section ? (
                     <Button
                       variant="ghost"
@@ -134,14 +134,14 @@ export const FilingPanel = ({ year, onNavigate, onOpenSection }: FilingPanelProp
           })}
 
           <div className={styles.statusRow}>
-            <Col gap="sm">
+            <Col gap="sm" className={styles.itemMain}>
               <Text className={styles.itemLabel}>消費税</Text>
               <Text variant="muted">
                 消費税の申告書（3方式の比較とXTX出力）は、所得税とは別の提出物として
                 消費税タブで用意します。
               </Text>
             </Col>
-            <Row gap="sm">
+            <Row gap="sm" className={styles.itemActions}>
               <Button
                 variant="ghost"
                 size="sm"
