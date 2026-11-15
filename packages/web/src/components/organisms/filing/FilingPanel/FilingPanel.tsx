@@ -1,17 +1,27 @@
 import { filterYear, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
-import { ConfirmSummary } from "../ConfirmSummary";
 import { AppView, FilingStatus } from "@types";
 import { fetchFilingStatuses, updateFilingStatus } from "@utils/api";
 import styles from "./FilingPanel.css";
 
 type ManualKey = "confirmed" | "calculated" | "submitted";
 
+/** 確定申告画面のタブのうち、総合から遷移できる先。 */
+export type FilingSection = "ledger" | "deductions" | "consumption";
+
+const SECTION_OPEN_LABELS: Record<FilingSection, string> = {
+  ledger: "帳簿タブを開く",
+  deductions: "控除タブを開く",
+  consumption: "消費税タブを開く",
+};
+
 interface ManualItem {
   key: ManualKey;
   label: string;
   description: string;
+  /** その項目の作業をするタブ。提出だけは総合タブ内で完結するので無し。 */
+  section?: FilingSection;
 }
 
 /**
@@ -22,17 +32,19 @@ const MANUAL_ITEMS: readonly ManualItem[] = [
   {
     key: "confirmed",
     label: "帳簿の確認",
-    description: "帳簿の金額・科目・区分に誤りがないか見直したら「済み」にします。下の「帳簿の確認」欄でその場で見直せます。",
+    description: "帳簿の金額・科目・区分に誤りがないか見直したら「済み」にします。見直しは帳簿タブで行います。",
+    section: "ledger",
   },
   {
     key: "calculated",
     label: "控除・計算",
-    description: "所得控除・税額控除を入力すると所得税額が自動計算されます。入力はこの画面の下のパネルで行います。",
+    description: "所得控除・税額控除を入力すると所得税額が自動計算されます。入力は控除タブで行います。",
+    section: "deductions",
   },
   {
     key: "submitted",
     label: "提出",
-    description: "e-Tax 用データ（XTX）を出力し、e-Tax ソフト／WEB版に取り込んで送信します。出力はこの画面の下のパネルで行います。送信はマイナンバーカードで本人が行う操作です。",
+    description: "e-Tax 用データ（XTX）を出力し、e-Tax ソフト／WEB版に取り込んで送信します。出力はこのタブの下のパネルで行います。送信はマイナンバーカードで本人が行う操作です。",
   },
 ];
 
@@ -41,6 +53,8 @@ export interface FilingPanelProps {
   /** 左上の年度切替で選ばれている年 */
   year: number;
   onNavigate?: (view: AppView) => void;
+  /** 総合タブから各タブへ遷移する（確定申告画面内のタブ切替）。 */
+  onOpenSection?: (section: FilingSection) => void;
 }
 
 /**
@@ -48,7 +62,7 @@ export interface FilingPanelProps {
  * 行ったり来たりできる（ステッパーは置かない）。
  * ステータスはダッシュボードの表示とサーバー保存を共有する。
  */
-export const FilingPanel = ({ transactions, year, onNavigate }: FilingPanelProps) => {
+export const FilingPanel = ({ transactions, year, onNavigate, onOpenSection }: FilingPanelProps) => {
   const [statuses, setStatuses] = useState<FilingStatus[] | null>(null);
   const [loadDone, setLoadDone] = useState(false);
   const [savingKey, setSavingKey] = useState<ManualKey | null>(null);
@@ -159,6 +173,16 @@ export const FilingPanel = ({ transactions, year, onNavigate }: FilingPanelProps
                   <Text variant="muted">{item.description}</Text>
                 </Col>
                 <Row gap="sm">
+                  {item.section ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!onOpenSection}
+                      onClick={() => item.section && onOpenSection?.(item.section)}
+                    >
+                      {SECTION_OPEN_LABELS[item.section]}
+                    </Button>
+                  ) : null}
                   <Button
                     variant={done ? "ghost" : "primary"}
                     size="sm"
@@ -172,18 +196,31 @@ export const FilingPanel = ({ transactions, year, onNavigate }: FilingPanelProps
             );
           })}
 
+          <div className={styles.statusRow}>
+            <Col gap="sm">
+              <Text className={styles.itemLabel}>消費税</Text>
+              <Text variant="muted">
+                消費税の申告書（3方式の比較とXTX出力）は、所得税とは別の提出物として
+                消費税タブで用意します。
+              </Text>
+            </Col>
+            <Row gap="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!onOpenSection}
+                onClick={() => onOpenSection?.("consumption")}
+              >
+                {SECTION_OPEN_LABELS.consumption}
+              </Button>
+            </Row>
+          </div>
+
           {loadDone && statuses === null ? (
             <Text variant="muted">
               ステータスを保存するサーバーに接続できていません。「済みにする」は接続時に使えます。
             </Text>
           ) : null}
-        </Col>
-      </Card>
-
-      <Card>
-        <Col gap="md">
-          <Text variant="sectionTitle">帳簿の確認</Text>
-          <ConfirmSummary transactions={transactions} year={year} />
         </Col>
       </Card>
     </Col>

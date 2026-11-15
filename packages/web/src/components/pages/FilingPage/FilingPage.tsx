@@ -6,12 +6,15 @@ import {
   TaxCreditInputs,
   Transaction,
 } from "@etax/shared";
-import { useMemo, useState } from "react";
-import { Col } from "@components/atoms";
+import { ReactNode, useMemo, useState } from "react";
+import { Card, Col, Text } from "@components/atoms";
+import { Tabs } from "@components/molecules";
 import {
+  ConfirmSummary,
   ConsumptionTaxPanel,
   DeductionPanel,
   FilingPanel,
+  FilingSection,
   TaxCreditPanel,
   TaxpayerPanel,
 } from "@components/organisms/filing";
@@ -20,29 +23,36 @@ import {
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
-import { ViewPageProps } from "@types";
+import { AppView, ViewPageProps } from "@types";
+
+/** 確定申告画面のタブ。総合が起点で、帳簿・控除・消費税はそれぞれ独立した作業場。 */
+type FilingTab = "overview" | FilingSection;
+
+const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
+  { id: "overview", label: "総合" },
+  { id: "ledger", label: "帳簿" },
+  { id: "deductions", label: "控除" },
+  { id: "consumption", label: "消費税" },
+];
 
 export const FilingPage = ({ transactions, year, onNavigate }: ViewPageProps) => {
   return (
-    <Col gap="md">
-      <FilingPanel transactions={transactions} year={year} onNavigate={onNavigate} />
-      <FilingInputPanels key={year} transactions={transactions} year={year} />
-      <ConsumptionTaxPanel transactions={transactions} year={year} />
-    </Col>
+    <FilingWorkspace key={year} transactions={transactions} year={year} onNavigate={onNavigate} />
   );
 };
 
-interface FilingInputPanelsProps {
+interface FilingWorkspaceProps {
   transactions: Transaction[];
   year: number;
+  onNavigate?: (view: AppView) => void;
 }
 
 /**
- * 控除・税額控除の入力と e-Tax 出力。その時点の情報をできるだけ正しく
- * 入れるのが本体で、入力は年度ごとに保存され、修正申告の画面
- * （過去の確定分との比較）と共有される。
+ * タブと控除入力の状態を持つ作業領域。控除の入力は年度ごとに保存され、
+ * 修正申告の画面（過去の確定分との比較）と共有される。
  */
-const FilingInputPanels = ({ transactions, year }: FilingInputPanelsProps) => {
+const FilingWorkspace = ({ transactions, year, onNavigate }: FilingWorkspaceProps) => {
+  const [tab, setTab] = useState<FilingTab>("overview");
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const computed = useMemo(
     () => computeCorrectedFigures(yearTransactions, year),
@@ -75,26 +85,54 @@ const FilingInputPanels = ({ transactions, year }: FilingInputPanelsProps) => {
     [year, totalIncome, deductionState],
   );
 
+  const tabContent: Record<FilingTab, ReactNode> = {
+    overview: (
+      <>
+        <FilingPanel
+          transactions={transactions}
+          year={year}
+          onNavigate={onNavigate}
+          onOpenSection={setTab}
+        />
+        <TaxpayerPanel
+          year={year}
+          transactions={yearTransactions}
+          deductions={deductionState.deductions}
+          taxCredits={deductionState.taxCredits}
+          originalIncomeTax={null}
+        />
+      </>
+    ),
+    ledger: (
+      <Card>
+        <Col gap="md">
+          <Text variant="sectionTitle">帳簿の確認</Text>
+          <ConfirmSummary transactions={transactions} year={year} />
+        </Col>
+      </Card>
+    ),
+    deductions: (
+      <>
+        <DeductionPanel
+          year={year}
+          deductions={deductionState.deductions}
+          breakdown={taxResult.deductions}
+          onChange={updateDeductions}
+        />
+        <TaxCreditPanel
+          taxCredits={deductionState.taxCredits}
+          result={taxResult}
+          onChange={updateTaxCredits}
+        />
+      </>
+    ),
+    consumption: <ConsumptionTaxPanel transactions={transactions} year={year} />,
+  };
+
   return (
-    <>
-      <DeductionPanel
-        year={year}
-        deductions={deductionState.deductions}
-        breakdown={taxResult.deductions}
-        onChange={updateDeductions}
-      />
-      <TaxCreditPanel
-        taxCredits={deductionState.taxCredits}
-        result={taxResult}
-        onChange={updateTaxCredits}
-      />
-      <TaxpayerPanel
-        year={year}
-        transactions={yearTransactions}
-        deductions={deductionState.deductions}
-        taxCredits={deductionState.taxCredits}
-        originalIncomeTax={null}
-      />
-    </>
+    <Col gap="md">
+      <Tabs items={FILING_TABS} activeId={tab} onChange={setTab} />
+      {tabContent[tab]}
+    </Col>
   );
 };
