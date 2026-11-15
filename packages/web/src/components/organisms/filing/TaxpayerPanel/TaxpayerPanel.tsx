@@ -34,7 +34,10 @@ export interface TaxpayerPanelProps {
   transactions: Transaction[];
   deductions: DeductionInputs;
   taxCredits: TaxCreditInputs;
-  /** 申告済みの所得税額。修正申告欄（修正前の第3期分の税額）に使う。 */
+  /**
+   * 申告済みの所得税額（過去に確定した分）。入っていれば、その確定分と
+   * 比較する修正申告として出力する。null なら確定申告として出力する。
+   */
   originalIncomeTax: number | null;
 }
 
@@ -70,9 +73,13 @@ export const TaxpayerPanel = ({
     saveTaxpayer(year, next);
   };
 
+  // 申告の種類はモードとして選ぶものではなく、入力内容から決まる。
+  // 申告済みの所得税額が入っていれば過去の確定分と比較する修正申告になる。
+  const amendment = originalIncomeTax !== null;
+
   const buildRequest = (): ExportXtxRequest => ({
     year,
-    amendment: true,
+    amendment,
     submission_date: submissionDate,
     taxpayer,
     transactions,
@@ -80,7 +87,7 @@ export const TaxpayerPanel = ({
     tax_credits: taxCredits,
     withholding_tax: withholdingTax,
     prepaid_tax: prepaidTax,
-    original_third_period_tax: originalIncomeTax,
+    original_third_period_tax: amendment ? originalIncomeTax : null,
   });
 
   const handleExport = async () => {
@@ -125,8 +132,7 @@ export const TaxpayerPanel = ({
           <Text variant="muted">
             申告書の見出しに入る情報です。プロフィールは年度別に、この端末にのみ保存
             されます（個人番号は出力ファイルにだけ含まれます）。XTXは取引データ
-            （帳簿）と控除の入力から生成されるため、上の差分表で手修正した金額は
-            反映されません。
+            （帳簿）と控除の入力から生成されます。
           </Text>
           {loaded.carriedFrom !== null ? (
             <Text variant="muted">
@@ -166,6 +172,12 @@ export const TaxpayerPanel = ({
         <Text className={styles.subhead}>出力の条件</Text>
         <Row gap="sm">
           <div className={styles.fieldLabel}>
+            <Text variant="muted">申告の種類</Text>
+          </div>
+          <Text>{amendment ? "修正申告" : "確定申告"}</Text>
+        </Row>
+        <Row gap="sm">
+          <div className={styles.fieldLabel}>
             <Text variant="muted">提出日</Text>
           </div>
           <Input
@@ -201,12 +213,11 @@ export const TaxpayerPanel = ({
           />
         </Row>
 
-        {originalIncomeTax === null ? (
-          <Text variant="muted">
-            申告済みの所得税額が未入力のため、修正申告欄（修正前の第3期分の税額）は
-            出力されません。上の差分表で入力すると反映されます。
-          </Text>
-        ) : null}
+        <Text variant="muted">
+          申告の種類は入力内容から決まります。申告済みの所得税額が入っている場合は
+          その確定分と比較する修正申告として、入っていない場合は確定申告として
+          出力します。
+        </Text>
 
         {error ? <AlertBox variant="error">{error}</AlertBox> : null}
         {message ? <AlertBox>{message}</AlertBox> : null}

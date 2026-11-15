@@ -1,4 +1,4 @@
-import { keyframes, style } from "@vanilla-extract/css";
+import { globalStyle, keyframes, style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 // 「追加」ドロップダウンの出現アニメーション（小さく跳ねる）。
@@ -21,12 +21,40 @@ const styles = {
   actionsRow: style({
     width: "max-content",
   }),
-  // 表はカードに入れず、幅が足りないときはこの中で横スクロールさせる。
-  // サイドバーやエージェントパネルを開いて主領域が狭くなっても、
-  // 列が画面（旧カード）の外へはみ出さないようにするための受け皿。
+  // 表の受け皿。背景は白（カードと同じ面の色）にし、幅が足りないときは
+  // この中で横スクロールさせる。サイドバーやエージェントパネルを開いて
+  // 主領域が狭くなっても、列が外へはみ出さないようにする。
   tableWrap: style({
     width: "100%",
     overflowX: "auto",
+    background: theme.color.surface,
+    border: `1px solid ${theme.color.border}`,
+    borderRadius: theme.borderRadius.lg,
+    boxShadow: theme.shadow.card,
+  }),
+  // 件数・収入・支出・差引の統計カードの並び。
+  statGrid: style({
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+    gap: theme.space.md,
+  }),
+  searchWrap: style({
+    position: "relative",
+    flex: 1,
+    maxWidth: "420px",
+  }),
+  searchIcon: style({
+    position: "absolute",
+    left: "10px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    color: theme.color.muted,
+    pointerEvents: "none",
+    display: "flex",
+  }),
+  searchInput: style({
+    width: "100%",
+    paddingLeft: "34px",
   }),
   descriptionInput: style({
     width: "100%",
@@ -86,5 +114,10 @@ const styles = {
     },
   }),
 };
+
+// 統計カードは左から順に少しずつ遅れて弾んで現れる（Card の登場アニメーションへの遅延）。
+globalStyle(`${styles.statGrid} > *:nth-child(2)`, { animationDelay: "0.05s" });
+globalStyle(`${styles.statGrid} > *:nth-child(3)`, { animationDelay: "0.1s" });
+globalStyle(`${styles.statGrid} > *:nth-child(4)`, { animationDelay: "0.15s" });
 
 export default styles;

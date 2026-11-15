@@ -12,7 +12,6 @@ interface ManualItem {
   key: ManualKey;
   label: string;
   description: string;
-  link?: { view: AppView; label: string };
 }
 
 /**
@@ -28,14 +27,12 @@ const MANUAL_ITEMS: readonly ManualItem[] = [
   {
     key: "calculated",
     label: "控除・計算",
-    description: "所得控除・税額控除を入力すると所得税額が自動計算されます。入力は修正申告の画面のパネルで行います。",
-    link: { view: AppView.Amend, label: "控除を入力する" },
+    description: "所得控除・税額控除を入力すると所得税額が自動計算されます。入力はこの画面の下のパネルで行います。",
   },
   {
     key: "submitted",
     label: "提出",
-    description: "e-Tax 用データ（XTX）を出力し、e-Tax ソフト／WEB版に取り込んで送信します。送信はマイナンバーカードで本人が行う操作です。",
-    link: { view: AppView.Amend, label: "e-Tax出力を開く" },
+    description: "e-Tax 用データ（XTX）を出力し、e-Tax ソフト／WEB版に取り込んで送信します。出力はこの画面の下のパネルで行います。送信はマイナンバーカードで本人が行う操作です。",
   },
 ];
 
@@ -162,16 +159,6 @@ export const FilingPanel = ({ transactions, year, onNavigate }: FilingPanelProps
                   <Text variant="muted">{item.description}</Text>
                 </Col>
                 <Row gap="sm">
-                  {item.link ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={!onNavigate}
-                      onClick={() => onNavigate?.(item.link!.view)}
-                    >
-                      {item.link.label}
-                    </Button>
-                  ) : null}
                   <Button
                     variant={done ? "ghost" : "primary"}
                     size="sm"

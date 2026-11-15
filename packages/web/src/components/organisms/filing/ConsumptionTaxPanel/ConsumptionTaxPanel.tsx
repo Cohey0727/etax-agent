@@ -7,7 +7,7 @@ import {
 import { useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { loadTaxpayer } from "@components/organisms/amend/TaxpayerPanel";
+import { loadTaxpayer } from "@components/organisms/filing/TaxpayerPanel";
 import { ExportConsumptionXtxRequest } from "@types";
 import { exportConsumptionXtxFile } from "@utils/api";
 import { formatNumber } from "@utils";

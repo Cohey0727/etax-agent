@@ -10,14 +10,14 @@ import {
 } from "@etax/shared";
 import { useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Table, TableCell, TableHeaderCell, Text } from "@components/atoms";
-import { DeductionPanel } from "../DeductionPanel";
+import { DeductionPanel } from "@components/organisms/filing/DeductionPanel";
 import {
   DeductionState,
   loadDeductionState,
   saveDeductionState,
-} from "../DeductionPanel/deductionStorage";
-import { TaxCreditPanel } from "../TaxCreditPanel";
-import { TaxpayerPanel } from "../TaxpayerPanel";
+} from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import { TaxCreditPanel } from "@components/organisms/filing/TaxCreditPanel";
+import { TaxpayerPanel } from "@components/organisms/filing/TaxpayerPanel";
 import { formatNumber } from "@utils";
 import styles from "./AmendDiffPanel.css";
 

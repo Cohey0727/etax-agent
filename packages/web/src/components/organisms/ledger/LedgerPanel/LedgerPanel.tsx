@@ -77,6 +77,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   const [downloading, setDownloading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [addFormOpen, setAddFormOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const addFormRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = () => {
@@ -262,6 +263,23 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   const incomeTotal = rows.reduce((sum, row) => (row.amount > 0 ? sum + row.amount : sum), 0);
   const expenseTotal = rows.reduce((sum, row) => (row.amount < 0 ? sum - row.amount : sum), 0);
 
+  const stats: readonly { label: string; value: string }[] = [
+    { label: "取引件数", value: `${rows.length}件` },
+    { label: "収入", value: formatYen(incomeTotal) },
+    { label: "支出", value: formatYen(expenseTotal) },
+    { label: "差引", value: formatYen(incomeTotal - expenseTotal) },
+  ];
+
+  // 検索は摘要・勘定科目・出所の部分一致（大文字小文字は区別しない）。
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleRows = normalizedQuery
+    ? rows.filter((row) =>
+        [row.description, row.category, row.account].some((value) =>
+          value.toLowerCase().includes(normalizedQuery),
+        ),
+      )
+    : rows;
+
   return (
     <Col gap="lg">
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
@@ -269,9 +287,6 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
           <Row gap="md" align="center" justify="spaceBetween">
             <Text variant="sectionTitle">{year}年の帳簿</Text>
             <Row gap="md" align="center">
-              <Text variant="body">
-                {rows.length}件 ・ 収入 {formatYen(incomeTotal)} ・ 支出 {formatYen(expenseTotal)}
-              </Text>
               <Button
                 variant="ghost"
                 size="sm"
@@ -320,11 +335,45 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
               </div>
             </Row>
           </Row>
+          <div className={styles.statGrid}>
+            {stats.map((stat) => (
+              <Card key={stat.label}>
+                <Col gap="none">
+                  <Text variant="statLabel">{stat.label}</Text>
+                  <Text variant="statValue">{stat.value}</Text>
+                </Col>
+              </Card>
+            ))}
+          </div>
+          <Row gap="sm" align="center">
+            <div className={styles.searchWrap}>
+              <span className={styles.searchIcon}>
+                <Icon name="search" size={16} />
+              </span>
+              <Input
+                className={styles.searchInput}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="摘要・科目・出所で検索"
+                aria-label="取引を検索"
+              />
+            </div>
+            {normalizedQuery ? (
+              <>
+                <Text variant="muted">{visibleRows.length}件ヒット</Text>
+                <Button variant="ghost" size="sm" onClick={() => setQuery("")}>
+                  クリア
+                </Button>
+              </>
+            ) : null}
+          </Row>
           {rows.length === 0 ? (
             <Text variant="body">
               この年の取引はまだありません。右上の「追加」ボタンから追加するか、CSV取込・領収書から
               取り込むと自動で帳簿に保存されます。
             </Text>
+          ) : visibleRows.length === 0 ? (
+            <Text variant="body">「{query.trim()}」に一致する取引はありません。</Text>
           ) : (
             <div className={styles.tableWrap}>
             <Table>
@@ -340,7 +389,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
+                {visibleRows.map((row) => {
                   const edit = edits[row.id] ?? toInput(row);
                   const dirty = isDirty(row);
                   return (
