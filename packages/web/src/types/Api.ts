@@ -105,6 +105,8 @@ export interface FilingSnapshot {
 export interface LedgerTransaction {
   id: number;
   date: string;
+  /** 割り当て年度（この取引を計上する年）。既定は日付の年。 */
+  fiscal_year: number;
   description: string;
   amount: number;
   account: string;
@@ -123,6 +125,7 @@ export interface ListLedgerTransactionsResponse {
 /** 帳簿へ保存するときの取引入力（id を持たない形）。 */
 export interface LedgerTransactionInput {
   date: string;
+  fiscal_year: number;
   description: string;
   amount: number;
   account: string;

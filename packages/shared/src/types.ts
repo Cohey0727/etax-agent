@@ -12,6 +12,11 @@ export type IncomeType = "business" | "real_estate" | "other";
 export interface Transaction {
   /** YYYY-MM-DD */
   date: string;
+  /**
+   * 割り当て年度（この取引を計上する年）。既定は日付の年だが、
+   * 年末のカード利用などでは日付と違う年へ割り当てることがある。
+   * 集計（filterYear）はこの値で効く。
+   */
   year: number;
   description: string;
   /** 符号つき税込金額（収入は正、支出は負） */

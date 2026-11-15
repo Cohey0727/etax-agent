@@ -59,6 +59,14 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
   const body = parsed.data;
   const patch: Partial<TransactionRow> = {};
   if (body.date !== undefined) patch.date = body.date;
+  if (
+    typeof body.fiscal_year === "number" &&
+    Number.isInteger(body.fiscal_year) &&
+    body.fiscal_year >= 1900 &&
+    body.fiscal_year <= 2100
+  ) {
+    patch.fiscalYear = body.fiscal_year;
+  }
   if (body.description !== undefined) patch.description = body.description;
   if (typeof body.amount === "number" && Number.isFinite(body.amount)) {
     patch.amount = Math.trunc(body.amount);

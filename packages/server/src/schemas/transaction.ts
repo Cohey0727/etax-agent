@@ -12,6 +12,8 @@ export const TransactionSchema = z
   .object({
     id: z.number(),
     date: z.string(),
+    /** 割り当て年度（この取引を計上する年）。既定は日付の年。 */
+    fiscal_year: z.number(),
     description: z.string(),
     amount: z.number(),
     account: z.string(),
@@ -78,6 +80,7 @@ export type DeleteTransactionResponse = z.infer<typeof DeleteTransactionResponse
 export const CreateTransactionRequestSchema = z
   .object({
     date: z.string().optional().catch(undefined),
+    fiscal_year: z.number().optional().catch(undefined),
     description: z.string().optional().catch(undefined),
     amount: z.number().optional(),
     account: z.string().optional().catch(undefined),
@@ -92,6 +95,7 @@ export type CreateTransactionRequest = z.infer<typeof CreateTransactionRequestSc
 export const UpdateTransactionRequestSchema = z
   .object({
     date: z.string().optional().catch(undefined),
+    fiscal_year: z.number().optional().catch(undefined),
     description: z.string().optional().catch(undefined),
     amount: z.number().optional().catch(undefined),
     account: z.string().optional().catch(undefined),

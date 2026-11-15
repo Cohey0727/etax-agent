@@ -329,7 +329,8 @@ export function ledgerRowToTransaction(row: LedgerTransaction): Transaction {
       : "other";
   return {
     date: row.date,
-    year: Number(row.date.slice(0, 4)),
+    // 割り当て年度を正とする（旧サーバーの応答など fiscal_year が無い場合は日付の年）
+    year: row.fiscal_year || Number(row.date.slice(0, 4)),
     description: row.description,
     amount: row.amount,
     account: row.account,
@@ -343,6 +344,7 @@ export function ledgerRowToTransaction(row: LedgerTransaction): Transaction {
 export function transactionToLedgerInput(tx: Transaction): LedgerTransactionInput {
   return {
     date: tx.date,
+    fiscal_year: tx.year,
     description: tx.description,
     amount: tx.amount,
     account: tx.account,

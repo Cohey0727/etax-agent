@@ -61,10 +61,19 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
   if (typeof body.amount !== "number" || !Number.isFinite(body.amount)) {
     throw new HTTPException(400, { message: "amount は数値で指定してください" });
   }
+  // 割り当て年度は指定があればそれ、無ければ日付の年。
+  const fiscalYear =
+    typeof body.fiscal_year === "number" &&
+    Number.isInteger(body.fiscal_year) &&
+    body.fiscal_year >= 1900 &&
+    body.fiscal_year <= 2100
+      ? body.fiscal_year
+      : Number(date.slice(0, 4));
   let row;
   try {
     row = await insertTransactionRow(db, {
       date,
+      fiscalYear,
       description: body.description ?? "",
       amount: Math.trunc(body.amount),
       account: body.account ?? "",

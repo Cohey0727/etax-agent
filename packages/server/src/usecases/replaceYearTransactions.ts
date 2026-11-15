@@ -60,9 +60,9 @@ export const replaceYearTransactionsHandler: RouteHandler<
   }
   const values = transactions.map((body) => {
     const date = body.date ?? "";
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !date.startsWith(`${year}-`)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new HTTPException(400, {
-        message: `date は ${year} 年の YYYY-MM-DD 形式で指定してください`,
+        message: "date は YYYY-MM-DD 形式で指定してください",
       });
     }
     if (typeof body.amount !== "number" || !Number.isFinite(body.amount)) {
@@ -70,6 +70,12 @@ export const replaceYearTransactionsHandler: RouteHandler<
     }
     return {
       date,
+      // 割り当て年度は各取引の指定があればそれ、無ければ置き換え対象の年。
+      // 日付が対象年と違ってもよい（年末のカード利用など）。
+      fiscalYear:
+        typeof body.fiscal_year === "number" && Number.isInteger(body.fiscal_year)
+          ? body.fiscal_year
+          : year,
       description: body.description ?? "",
       amount: Math.trunc(body.amount),
       account: body.account ?? "",

@@ -5,7 +5,11 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import { listTransactionRows, transactionToApi } from "../repositories/transactionRepository";
+import {
+  effectiveFiscalYear,
+  listTransactionRows,
+  transactionToApi,
+} from "../repositories/transactionRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
   ListTransactionsQuerySchema,
@@ -42,8 +46,8 @@ export const listTransactionsHandler: RouteHandler<typeof listTransactionsRoute>
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
-  // 対象年の絞り込みは従来どおり日付文字列の前方一致で行う
-  if (year) rows = rows.filter((r) => r.date.startsWith(`${year}-`));
+  // 対象年の絞り込みは割り当て年度で行う（日付の年とは限らない）
+  if (year) rows = rows.filter((r) => effectiveFiscalYear(r) === Number(year));
   const response: ListTransactionsResponse = {
     count: rows.length,
     transactions: rows.map(transactionToApi),

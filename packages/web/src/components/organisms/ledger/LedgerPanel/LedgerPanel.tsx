@@ -28,9 +28,6 @@ import { formatYen } from "@utils/format";
 import styles from "./LedgerPanel.css";
 
 export interface LedgerPanelProps {
-  /** アプリ全体で保持している取引（他年分とのマージ用）。 */
-  transactions: Transaction[];
-  year: number;
   /** 帳簿の変更をアプリ全体の取引へ反映する（メモリのみ・遷移なし）。 */
   onSyncTransactions?: (transactions: Transaction[]) => void;
   /** 取込系の画面への遷移（「追加」ドロップダウンの写真から・CSVから使う）。 */
@@ -65,6 +62,7 @@ const PERIOD_MONTH_OPTIONS: readonly { value: string; label: string }[] = [
  * 条件の値はすべて文字列で持ち、URLクエリへそのまま出し入れする。
  */
 type LedgerFilter =
+  | { field: "year"; value: string }
   | { field: "period"; month: string; from: string; to: string }
   | { field: "amount"; min: string; max: string }
   | { field: "category"; value: string }
@@ -75,6 +73,7 @@ type LedgerFilter =
 type LedgerFilterField = LedgerFilter["field"];
 
 const FILTER_FIELDS: readonly LedgerFilterField[] = [
+  "year",
   "period",
   "amount",
   "category",
@@ -84,6 +83,7 @@ const FILTER_FIELDS: readonly LedgerFilterField[] = [
 ];
 
 const FILTER_FIELD_LABELS: Record<LedgerFilterField, string> = {
+  year: "年度",
   period: "期間",
   amount: "金額",
   category: "勘定科目",
@@ -94,6 +94,8 @@ const FILTER_FIELD_LABELS: Record<LedgerFilterField, string> = {
 
 const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
   switch (field) {
+    case "year":
+      return { field, value: "" };
     case "period":
       return { field, month: "", from: "", to: "" };
     case "amount":
@@ -111,6 +113,7 @@ const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
 
 const toInput = (row: LedgerTransaction): LedgerTransactionInput => ({
   date: row.date,
+  fiscal_year: row.fiscal_year,
   description: row.description,
   amount: row.amount,
   account: row.account,
@@ -119,8 +122,9 @@ const toInput = (row: LedgerTransaction): LedgerTransactionInput => ({
   tax_category: row.tax_category,
 });
 
-const emptyDraft = (year: number): LedgerTransactionInput => ({
-  date: `${year}-01-01`,
+const emptyDraft = (fiscalYear: number): LedgerTransactionInput => ({
+  date: `${fiscalYear}-01-01`,
+  fiscal_year: fiscalYear,
   description: "",
   amount: 0,
   account: "手入力",
@@ -129,11 +133,37 @@ const emptyDraft = (year: number): LedgerTransactionInput => ({
   tax_category: "",
 });
 
-export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate }: LedgerPanelProps) => {
+/** 年度フィルターで選ばれている年度（未選択・全年度なら null）。 */
+const activeYearOf = (filters: readonly LedgerFilter[]): number | null => {
+  const yearFilter = filters.find((f) => f.field === "year");
+  if (!yearFilter || yearFilter.field !== "year" || !yearFilter.value) return null;
+  const year = Number(yearFilter.value);
+  return Number.isInteger(year) ? year : null;
+};
+
+/** 検索・フィルターを適用した表示用の行を作る。 */
+const filterRows = (
+  rows: readonly LedgerTransaction[],
+  query: string,
+  filters: readonly LedgerFilter[],
+): LedgerTransaction[] => {
+  const normalizedQuery = query.trim().toLowerCase();
+  return rows.filter((row) => {
+    if (!filters.every((filter) => matchesFilter(row, filter))) return false;
+    if (!normalizedQuery) return true;
+    return [row.description, row.category, row.account, row.tax_category].some((value) =>
+      value.toLowerCase().includes(normalizedQuery),
+    );
+  });
+};
+
+export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps) => {
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [rows, setRows] = useState<LedgerTransaction[]>([]);
   const [edits, setEdits] = useState<Record<number, LedgerTransactionInput>>({});
-  const [draft, setDraft] = useState<LedgerTransactionInput>(() => emptyDraft(year));
+  const [draft, setDraft] = useState<LedgerTransactionInput>(() =>
+    emptyDraft(new Date().getFullYear()),
+  );
   const [deleteArmedId, setDeleteArmedId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -144,7 +174,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   const [addFormOpen, setAddFormOpen] = useState(false);
   // 検索とフィルターはURLクエリが初期値。共有・リロードで同じ絞り込みを再現する。
   const [initialUrlState] = useState(() =>
-    parseFiltersFromSearch(typeof window === "undefined" ? "" : window.location.search, year),
+    parseFiltersFromSearch(typeof window === "undefined" ? "" : window.location.search),
   );
   const [query, setQuery] = useState(initialUrlState.query);
   const [filters, setFilters] = useState<LedgerFilter[]>(initialUrlState.filters);
@@ -165,16 +195,6 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
     const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     if (next !== current) window.history.replaceState(null, "", next);
   }, [query, filters]);
-
-  // 年度が変わったら、期間フィルターの日付（旧年度のもの）だけ落とす。
-  const prevYearRef = useRef(year);
-  useEffect(() => {
-    if (prevYearRef.current === year) return;
-    prevYearRef.current = year;
-    setFilters((prev) =>
-      prev.map((f) => (f.field === "period" ? { ...f, month: "", from: "", to: "" } : f)),
-    );
-  }, [year]);
 
   const addFilter = (field: LedgerFilterField) => {
     setFilterMenuOpen(false);
@@ -210,12 +230,12 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
     }, 60);
   };
 
+  // 帳簿（DB）が全年度の正。変更後は全行をそのままアプリ全体の取引へ反映する。
   const syncParent = (freshRows: LedgerTransaction[]) => {
     if (!onSyncTransactions) return;
-    const others = transactions.filter((tx) => tx.year !== year);
-    const merged = [...others, ...freshRows.map(ledgerRowToTransaction)].sort((a, b) =>
-      a.date.localeCompare(b.date),
-    );
+    const merged = freshRows
+      .map(ledgerRowToTransaction)
+      .sort((a, b) => a.date.localeCompare(b.date));
     onSyncTransactions(merged);
   };
 
@@ -229,23 +249,25 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
     let cancelled = false;
     setStatus("loading");
     setError(null);
-    setDraft(emptyDraft(year));
     void (async () => {
-      const fetched = await fetchLedgerTransactions(year);
+      const fetched = await fetchLedgerTransactions();
       if (cancelled) return;
       if (!fetched) {
         setStatus("unavailable");
         return;
       }
       applyRows(fetched);
+      // 追加フォームの初期年度は、データにある最新の割り当て年度に合わせる。
+      const latestYear = fetched.reduce((max, row) => Math.max(max, row.fiscal_year), 0);
+      if (latestYear > 0) setDraft(emptyDraft(latestYear));
       setStatus("ready");
     })();
     return () => {
       cancelled = true;
     };
-    // 年が変わったら帳簿を読み直す（transactions の変化では読み直さない）
+    // 帳簿は全年度を初回に読み込むだけ（transactions の変化では読み直さない）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year]);
+  }, []);
 
   const handleEdit = (id: number, patch: Partial<LedgerTransactionInput>) => {
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -257,6 +279,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
     const original = toInput(row);
     return (
       edit.date !== original.date ||
+      edit.fiscal_year !== original.fiscal_year ||
       edit.description !== original.description ||
       edit.amount !== original.amount ||
       edit.account !== original.account ||
@@ -310,10 +333,16 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   const handleDownloadPdf = async () => {
     closeDownloadMenu();
     if (downloading) return;
+    // PDFは年度単位で作るため、年度フィルターで1つの年度に絞られているときだけ出す。
+    const pdfYear = activeYearOf(filters);
+    if (!pdfYear) {
+      setError("PDFは年度フィルターで1つの年度に絞り込んでからダウンロードしてください");
+      return;
+    }
     setDownloading(true);
     setError(null);
     try {
-      await downloadLedgerPdf(year);
+      await downloadLedgerPdf(pdfYear);
     } catch (e) {
       setError(e instanceof Error ? e.message : "PDFのダウンロードに失敗しました");
     } finally {
@@ -324,7 +353,8 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   const handleDownloadCsv = () => {
     closeDownloadMenu();
     try {
-      downloadLedgerCsv(year, rows);
+      const csvYear = activeYearOf(filters);
+      downloadLedgerCsv(filterRows(rows, query, filters), csvYear ? String(csvYear) : "all");
     } catch (e) {
       setError(e instanceof Error ? e.message : "CSVのダウンロードに失敗しました");
     }
@@ -332,8 +362,8 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
 
   const handleAdd = async () => {
     if (busy) return;
-    if (!draft.date.startsWith(`${year}-`)) {
-      setError(`日付は ${year} 年の日付にしてください`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) {
+      setError("日付を入力してください");
       return;
     }
     if (!draft.description.trim()) {
@@ -351,7 +381,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
       const fresh = [...rows, created].sort((a, b) => a.date.localeCompare(b.date));
       applyRows(fresh);
       syncParent(fresh);
-      setDraft(emptyDraft(year));
+      setDraft(emptyDraft(created.fiscal_year));
       // 手入力で科目を選んだ行も学習履歴に記録する（次回の判定で優先される）。
       if (created.category !== "未分類") {
         void recordClassificationFeedback(created.description, created.category);
@@ -407,13 +437,12 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
   // 検索は摘要・勘定科目・出所・税区分の部分一致（大文字小文字は区別しない）。
   // フィルターは追加した項目すべてに一致するものだけを残す。
   const normalizedQuery = query.trim().toLowerCase();
-  const visibleRows = rows.filter((row) => {
-    if (!filters.every((filter) => matchesFilter(row, filter))) return false;
-    if (!normalizedQuery) return true;
-    return [row.description, row.category, row.account, row.tax_category].some((value) =>
-      value.toLowerCase().includes(normalizedQuery),
-    );
-  });
+  const visibleRows = filterRows(rows, query, filters);
+  // 年度の選択肢はデータにある割り当て年度から作る（新しい順）。
+  const yearOptions = [...new Set(rows.map((row) => row.fiscal_year))].sort((a, b) => b - a);
+  const activeYear = activeYearOf(filters);
+  // 期間チップの月選択は、年度フィルターがあればその年、無ければ最新の年度で範囲を作る。
+  const periodYear = activeYear ?? yearOptions[0] ?? new Date().getFullYear();
 
   // 統計は表示中（絞り込み後）の取引で集計する。期間を絞れば、その期間の合計が見える。
   const incomeTotal = visibleRows.reduce(
@@ -437,7 +466,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
       <Col gap="md">
           <Row gap="md" align="center" justify="spaceBetween">
-            <Text variant="sectionTitle">{year}年の帳簿</Text>
+            <Text variant="sectionTitle">帳簿（全年度）</Text>
             <Row gap="md" align="center">
               <div className={styles.addMenuWrap}>
                 <Button
@@ -557,7 +586,8 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
               <FilterChip
                 key={filter.field}
                 filter={filter}
-                year={year}
+                years={yearOptions}
+                periodYear={periodYear}
                 onChange={updateFilter}
                 onRemove={() => removeFilter(filter.field)}
               />
@@ -599,7 +629,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
           </Row>
           {rows.length === 0 ? (
             <Text variant="body">
-              この年の取引はまだありません。右上の「追加」ボタンから追加するか、CSV取込・領収書から
+              まだ取引がありません。右上の「追加」ボタンから追加するか、CSV取込・領収書から
               取り込むと自動で帳簿に保存されます。
             </Text>
           ) : visibleRows.length === 0 ? (
@@ -610,6 +640,7 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
               <thead>
                 <tr>
                   <TableHeaderCell>日付</TableHeaderCell>
+                  <TableHeaderCell>年度</TableHeaderCell>
                   <TableHeaderCell>摘要</TableHeaderCell>
                   <TableHeaderCell>金額（税込）</TableHeaderCell>
                   <TableHeaderCell>勘定科目</TableHeaderCell>
@@ -633,6 +664,29 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
                           onChange={(e) => handleEdit(row.id, { date: e.target.value })}
                           aria-label="日付"
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          className={styles.cellInput}
+                          value={edit.fiscal_year}
+                          onChange={(e) =>
+                            handleEdit(row.id, { fiscal_year: Number(e.target.value) })
+                          }
+                          aria-label="割り当て年度"
+                          title={
+                            edit.fiscal_year !== Number(edit.date.slice(0, 4))
+                              ? "日付の年とは違う年度に割り当てられています"
+                              : undefined
+                          }
+                        >
+                          {[...new Set([...yearOptions, edit.fiscal_year])]
+                            .sort((a, b) => b - a)
+                            .map((optionYear) => (
+                              <option key={optionYear} value={optionYear}>
+                                {optionYear}年
+                              </option>
+                            ))}
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <Input
@@ -751,6 +805,22 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
               />
             </Col>
             <Col gap="sm">
+              <Text variant="statLabel">年度（割り当て）</Text>
+              <Select
+                value={draft.fiscal_year}
+                onChange={(e) => setDraft({ ...draft, fiscal_year: Number(e.target.value) })}
+              >
+                {[...new Set([...yearOptions, draft.fiscal_year, Number(draft.date.slice(0, 4))])]
+                  .filter((optionYear) => Number.isInteger(optionYear) && optionYear > 0)
+                  .sort((a, b) => b - a)
+                  .map((optionYear) => (
+                    <option key={optionYear} value={optionYear}>
+                      {optionYear}年
+                    </option>
+                  ))}
+              </Select>
+            </Col>
+            <Col gap="sm">
               <Text variant="statLabel">摘要</Text>
               <Input
                 value={draft.description}
@@ -830,26 +900,47 @@ export const LedgerPanel = ({ transactions, year, onSyncTransactions, onNavigate
 /** フィルター1件分のチップ。項目名＋条件の入力＋削除ボタンで構成する。 */
 const FilterChip = ({
   filter,
-  year,
+  years,
+  periodYear,
   onChange,
   onRemove,
 }: {
   filter: LedgerFilter;
-  year: number;
+  /** 年度フィルターの選択肢（データにある割り当て年度）。 */
+  years: readonly number[];
+  /** 期間フィルターの月選択が範囲を作る基準年。 */
+  periodYear: number;
   onChange: (next: LedgerFilter) => void;
   onRemove: () => void;
 }) => {
   return (
     <div className={styles.filterChip}>
       <Text variant="caption">{FILTER_FIELD_LABELS[filter.field]}</Text>
-      {filter.field === "period" ? (
+      {filter.field === "year" ? (
+        <Select
+          className={styles.chipSelect}
+          value={filter.value}
+          onChange={(e) => onChange({ ...filter, value: e.target.value })}
+          aria-label="年度で絞り込み"
+        >
+          <option value="">全年度</option>
+          {years.map((optionYear) => (
+            <option key={optionYear} value={optionYear}>
+              {optionYear}年
+            </option>
+          ))}
+          {filter.value && !years.includes(Number(filter.value)) ? (
+            <option value={filter.value}>{filter.value}年</option>
+          ) : null}
+        </Select>
+      ) : filter.field === "period" ? (
         <>
           <Select
             className={styles.chipSelect}
             value={filter.month}
             onChange={(e) => {
               const month = e.target.value;
-              const range = monthRange(year, month);
+              const range = monthRange(periodYear, month);
               onChange({ ...filter, month, from: range.from, to: range.to });
             }}
             aria-label="月で絞り込み"
@@ -864,8 +955,6 @@ const FilterChip = ({
             type="date"
             className={styles.chipInput}
             value={filter.from}
-            min={`${year}-01-01`}
-            max={`${year}-12-31`}
             onChange={(e) => onChange({ ...filter, month: "", from: e.target.value })}
             aria-label="開始日"
           />
@@ -874,8 +963,6 @@ const FilterChip = ({
             type="date"
             className={styles.chipInput}
             value={filter.to}
-            min={`${year}-01-01`}
-            max={`${year}-12-31`}
             onChange={(e) => onChange({ ...filter, month: "", to: e.target.value })}
             aria-label="終了日"
           />
@@ -967,6 +1054,8 @@ function monthRange(year: number, month: string): { from: string; to: string } {
 /** 取引がフィルター1件に一致するか。金額は絶対値で比べる。 */
 function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
   switch (filter.field) {
+    case "year":
+      return filter.value === "" || row.fiscal_year === Number(filter.value);
     case "period":
       return (!filter.from || row.date >= filter.from) && (!filter.to || row.date <= filter.to);
     case "amount": {
@@ -988,11 +1077,8 @@ function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
   }
 }
 
-/** URLクエリから検索・フィルターの初期状態を読む。不正な値や他年度の日付は落とす。 */
-function parseFiltersFromSearch(
-  search: string,
-  year: number,
-): { query: string; filters: LedgerFilter[] } {
+/** URLクエリから検索・フィルターの初期状態を読む。不正な値は落とす。 */
+function parseFiltersFromSearch(search: string): { query: string; filters: LedgerFilter[] } {
   const params = new URLSearchParams(search);
   const requested = (params.get("filters") ?? "")
     .split(",")
@@ -1003,14 +1089,18 @@ function parseFiltersFromSearch(
   const filters: LedgerFilter[] = requested.map((rawField) => {
     const field = rawField as LedgerFilterField;
     switch (field) {
+      case "year": {
+        const value = params.get("year") ?? "";
+        return { field, value: /^\d{4}$/.test(value) ? value : "" };
+      }
       case "period": {
         const from = params.get("from") ?? "";
         const to = params.get("to") ?? "";
         return {
           field,
           month: params.get("month") ?? "",
-          from: from.startsWith(`${year}-`) ? from : "",
-          to: to.startsWith(`${year}-`) ? to : "",
+          from: /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : "",
+          to: /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : "",
         };
       }
       case "amount":
@@ -1036,6 +1126,9 @@ function buildFilterSearch(query: string, filters: LedgerFilter[]): string {
     params.set("filters", filters.map((f) => f.field).join(","));
     for (const filter of filters) {
       switch (filter.field) {
+        case "year":
+          if (filter.value) params.set("year", filter.value);
+          break;
         case "period":
           if (filter.month) params.set("month", filter.month);
           if (filter.from) params.set("from", filter.from);
@@ -1062,18 +1155,28 @@ function buildFilterSearch(query: string, filters: LedgerFilter[]): string {
   return params.toString();
 }
 
-const CSV_HEADER: readonly string[] = ["日付", "摘要", "金額", "勘定科目", "区分", "税区分", "出所"];
+const CSV_HEADER: readonly string[] = [
+  "日付",
+  "年度",
+  "摘要",
+  "金額",
+  "勘定科目",
+  "区分",
+  "税区分",
+  "出所",
+];
 
 const csvCell = (value: string | number): string => {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
-/** 帳簿（その年の全取引）をCSVでダウンロードする。Excelで開けるようBOMを付ける。 */
-function downloadLedgerCsv(year: number, rows: LedgerTransaction[]): void {
+/** 表示中の取引をCSVでダウンロードする。Excelで開けるようBOMを付ける。 */
+function downloadLedgerCsv(rows: LedgerTransaction[], label: string): void {
   const lines = rows.map((row) =>
     [
       row.date,
+      row.fiscal_year,
       row.description,
       row.amount,
       row.category,
@@ -1091,7 +1194,7 @@ function downloadLedgerCsv(year: number, rows: LedgerTransaction[]): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `ledger-${year}.csv`;
+  anchor.download = `ledger-${label}.csv`;
   anchor.click();
   URL.revokeObjectURL(url);
 }

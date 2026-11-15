@@ -129,10 +129,14 @@ const FilingWorkspace = ({
     saveDeductionState(year, state);
   };
 
-  // 消費税タブの警告から、帳簿画面をフィルター付きで開く。
+  // 消費税タブの警告から、帳簿画面をこの年度＋警告種別のフィルターで開く。
   // URLにクエリを付けてから画面遷移すると、AppPage のURL同期は
   // パスが同じためクエリを消さず、帳簿側がマウント時に読み取る。
-  const openLedgerFiltered = (search: string) => {
+  const openLedgerFiltered = (kind: "mismatch" | "taxUnset") => {
+    const search =
+      kind === "mismatch"
+        ? `?filters=year,mismatch&year=${year}`
+        : `?filters=year,taxCategory&year=${year}&tax=`;
     window.history.pushState(null, "", `${pathForView(AppView.Ledger, year)}${search}`);
     onNavigate?.(AppView.Ledger);
   };

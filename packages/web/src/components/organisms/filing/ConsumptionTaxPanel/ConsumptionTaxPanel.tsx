@@ -51,10 +51,10 @@ export interface ConsumptionTaxPanelProps {
   transactions: Transaction[];
   year: number;
   /**
-   * 帳簿画面をフィルター付きで開く（税区分の警告からの遷移）。
-   * 引数は帳簿URLのクエリ文字列（例: "?filters=mismatch"）。
+   * 帳簿画面をこの年度＋警告種別のフィルターで開く（税区分の警告からの遷移）。
+   * kind: "mismatch" = 税区分と符号の不一致、"taxUnset" = 税区分が未設定。
    */
-  onOpenLedger?: (search: string) => void;
+  onOpenLedger?: (kind: "mismatch" | "taxUnset") => void;
 }
 
 /**
@@ -271,7 +271,7 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onOpenLedger("?filters=taxCategory&tax=")}
+                  onClick={() => onOpenLedger("taxUnset")}
                 >
                   帳簿で確認する →
                 </Button>
@@ -287,7 +287,7 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
                 {formatYen(summary.excludedAmount)}）あります。集計に含まれていません。
               </Text>
               {onOpenLedger ? (
-                <Button variant="ghost" size="sm" onClick={() => onOpenLedger("?filters=mismatch")}>
+                <Button variant="ghost" size="sm" onClick={() => onOpenLedger("mismatch")}>
                   帳簿で確認する →
                 </Button>
               ) : null}

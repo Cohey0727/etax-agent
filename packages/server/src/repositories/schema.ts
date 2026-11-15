@@ -29,6 +29,12 @@ export const transactionsTable = sqliteTable("transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   /** YYYY-MM-DD */
   date: text("date").notNull(),
+  /**
+   * 割り当て年度（この取引を計上する年）。既定は日付の年だが、年末の
+   * カード利用など日付と違う年へ割り当てることがある。0 は未設定
+   * （日付の年として扱う。既存DBの移行用で、起動時に日付の年で埋める）。
+   */
+  fiscalYear: integer("fiscal_year").notNull().default(0),
   description: text("description").notNull().default(""),
   /** 符号つき税込金額（収入は正、支出は負） */
   amount: integer("amount").notNull(),

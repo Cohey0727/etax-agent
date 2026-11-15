@@ -3,8 +3,9 @@ import { AppView, FilingTab } from "@types";
 /**
  * 画面とURLパスの対応。先頭は固定の名前（accounts = 帳簿ドメイン）で、
  * 年度 → 画面の順にぶら下がる。
- * 例: ダッシュボード = /accounts/2024/dashboard、帳簿 = /accounts/2024/ledger。
- * 設定だけは年度から独立して /settings。
+ * 例: ダッシュボード = /accounts/2024/dashboard。
+ * 帳簿は全年度をひとつの画面で管理するため年度から独立して /ledger、
+ * 設定も年度から独立して /settings。
  * 確定申告画面はさらにタブがぶら下がる（総合はスラッグなし）。
  * 例: 帳簿タブ = /accounts/2024/final-tax/ledger。
  */
@@ -49,6 +50,7 @@ const asYear = (part: string): number | null => {
 /** 画面と年度（と確定申告タブ）からURLパスを作る。 */
 export const pathForView = (view: AppView, year: number, filingTab?: FilingTab): string => {
   if (view === AppView.Settings) return "/settings";
+  if (view === AppView.Ledger) return "/ledger";
   const base = `/accounts/${year}/${VIEW_SLUGS[view]}`;
   if (view === AppView.Filing && filingTab) {
     const slug = FILING_TAB_SLUGS[filingTab];
@@ -70,6 +72,9 @@ export const parsePath = (pathname: string): ParsedRoute | null => {
   if (parts.length === 0) return null;
   if (parts[0] === VIEW_SLUGS[AppView.Settings]) {
     return { view: AppView.Settings, year: null, filingTab: null };
+  }
+  if (parts[0] === VIEW_SLUGS[AppView.Ledger] && parts.length === 1) {
+    return { view: AppView.Ledger, year: null, filingTab: null };
   }
   if (parts[0] !== "accounts" || parts.length < 2) return null;
   const year = asYear(parts[1]);

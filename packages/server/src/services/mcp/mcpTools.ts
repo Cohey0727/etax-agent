@@ -51,6 +51,7 @@ import {
 import { TransactionRow } from "../../repositories/schema";
 import {
   deleteTransactionRow,
+  effectiveFiscalYear,
   insertTransactionRow,
   listTransactionRows,
   transactionToApi,
@@ -167,6 +168,10 @@ export const MCP_TOOLS: McpToolDef[] = [
           type: "string",
           description: "消費税の税区分（任意。課税売上10% / 課対仕入10% / 非課売上 / 対象外 など）",
         },
+        fiscal_year: {
+          type: "integer",
+          description: "割り当て年度（任意。既定は日付の年。日付と違う年へ計上する場合に指定）",
+        },
       },
       required: ["date", "description", "amount"],
     },
@@ -179,6 +184,7 @@ export const MCP_TOOLS: McpToolDef[] = [
       properties: {
         id: { type: "integer", description: "取引ID" },
         date: { type: "string" },
+        fiscal_year: { type: "integer", description: "割り当て年度" },
         description: { type: "string" },
         amount: { type: "number" },
         account: { type: "string" },
@@ -325,10 +331,10 @@ function requireDb(): Db {
   return db;
 }
 
-/** DB行を指定年の shared 取引形式へ変換する。 */
+/** DB行を指定した割り当て年度の shared 取引形式へ変換する。 */
 function rowsToTransactions(rows: TransactionRow[], year: number): Transaction[] {
   return rows
-    .filter((row) => row.date.startsWith(`${year}-`))
+    .filter((row) => effectiveFiscalYear(row) === year)
     .map((row) => ({
       date: row.date,
       year,
@@ -522,7 +528,7 @@ export async function dispatchMcpTool(
         const db = requireDb();
         const rows = await listTransactionRows(db);
         const year = typeof args["year"] === "number" ? args["year"] : undefined;
-        const filtered = year ? rows.filter((row) => row.date.startsWith(`${year}-`)) : rows;
+        const filtered = year ? rows.filter((row) => effectiveFiscalYear(row) === year) : rows;
         return textResult({
           count: filtered.length,
           transactions: filtered.map(transactionToApi),
@@ -533,8 +539,17 @@ export async function dispatchMcpTool(
         const category = typeof args["category"] === "string" && args["category"] !== ""
           ? args["category"]
           : "未分類";
+        const date = String(args["date"]);
+        const fiscalYearArg = args["fiscal_year"];
         const row = await insertTransactionRow(db, {
-          date: String(args["date"]),
+          date,
+          fiscalYear:
+            typeof fiscalYearArg === "number" &&
+            Number.isInteger(fiscalYearArg) &&
+            fiscalYearArg >= 1900 &&
+            fiscalYearArg <= 2100
+              ? fiscalYearArg
+              : Number(date.slice(0, 4)),
           description: String(args["description"]),
           amount: Number(args["amount"]),
           account: typeof args["account"] === "string" ? args["account"] : "",
@@ -553,6 +568,14 @@ export async function dispatchMcpTool(
         const id = Number(args["id"]);
         const patch: Partial<TransactionRow> = {};
         if (typeof args["date"] === "string") patch.date = args["date"];
+        if (
+          typeof args["fiscal_year"] === "number" &&
+          Number.isInteger(args["fiscal_year"]) &&
+          args["fiscal_year"] >= 1900 &&
+          args["fiscal_year"] <= 2100
+        ) {
+          patch.fiscalYear = args["fiscal_year"];
+        }
         if (typeof args["description"] === "string") patch.description = args["description"];
         if (typeof args["amount"] === "number") patch.amount = args["amount"];
         if (typeof args["account"] === "string") patch.account = args["account"];

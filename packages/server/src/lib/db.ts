@@ -78,6 +78,7 @@ export async function ensureTables(): Promise<void> {
     CREATE TABLE IF NOT EXISTS transactions (
       id integer PRIMARY KEY AUTOINCREMENT,
       date text NOT NULL,
+      fiscal_year integer NOT NULL DEFAULT 0,
       description text NOT NULL DEFAULT '',
       amount integer NOT NULL,
       account text NOT NULL DEFAULT '',
@@ -93,6 +94,15 @@ export async function ensureTables(): Promise<void> {
   if (!txColumns.some((c) => c.name === "tax_category")) {
     db.run(sql`ALTER TABLE transactions ADD COLUMN tax_category text NOT NULL DEFAULT ''`);
   }
+  if (!txColumns.some((c) => c.name === "fiscal_year")) {
+    db.run(sql`ALTER TABLE transactions ADD COLUMN fiscal_year integer NOT NULL DEFAULT 0`);
+  }
+  // 割り当て年度が未設定（0）の行は、日付の年で埋める（冪等）。
+  db.run(sql`
+    UPDATE transactions
+    SET fiscal_year = CAST(substr(date, 1, 4) AS INTEGER)
+    WHERE fiscal_year = 0
+  `);
   db.run(sql`
     CREATE TABLE IF NOT EXISTS filing_status (
       year integer PRIMARY KEY,

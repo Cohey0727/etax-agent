@@ -9,7 +9,11 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "@hono/zod-openapi";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import { listTransactionRows, transactionToApi } from "../repositories/transactionRepository";
+import {
+  effectiveFiscalYear,
+  listTransactionRows,
+  transactionToApi,
+} from "../repositories/transactionRepository";
 import { ErrorSchema } from "../schemas/common";
 import { LedgerPdfQuerySchema } from "../schemas/transaction";
 import { buildLedgerPdf } from "../services/pdf/buildLedgerPdf";
@@ -52,7 +56,7 @@ export const exportLedgerPdfHandler: RouteHandler<typeof exportLedgerPdfRoute> =
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
-  const yearRows = rows.filter((r) => r.date.startsWith(`${year}-`)).map(transactionToApi);
+  const yearRows = rows.filter((r) => effectiveFiscalYear(r) === year).map(transactionToApi);
   const fontBytes = await loadJapaneseFont();
   if (!fontBytes) {
     throw new HTTPException(503, {
