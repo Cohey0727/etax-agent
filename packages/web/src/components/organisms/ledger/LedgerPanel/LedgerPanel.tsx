@@ -240,12 +240,15 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   };
 
   const removeFilter = (field: LedgerFilterField) => {
+    // 期間フィルターは常設で消せない。
+    if (field === "period") return;
     setFilters((prev) => prev.filter((f) => f.field !== field));
   };
 
   const clearFilters = () => {
     setQuery("");
-    setFilters([]);
+    // 期間フィルターは残し、値だけ空（全期間）に戻す。
+    setFilters([emptyFilter("period")]);
   };
 
   const handleIntakeNavigate = (view: AppView) => {
@@ -486,6 +489,13 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   const activeYear = activeYearOf(filters);
   // 期間チップの月選択は、年度フィルターがあればその年、無ければ最新の年度で範囲を作る。
   const periodYear = activeYear ?? yearOptions[0] ?? new Date().getFullYear();
+  // 期間フィルターは常設で、検索の左に置く。それ以外は下の段に並べる。
+  const periodFilter = filters.find((f) => f.field === "period");
+  const otherFilters = filters.filter((f) => f.field !== "period");
+  const periodActive =
+    periodFilter?.field === "period" &&
+    (periodFilter.month !== "" || periodFilter.from !== "" || periodFilter.to !== "");
+  const hasActiveFilters = Boolean(normalizedQuery) || otherFilters.length > 0 || periodActive;
 
   // 統計は表示中（絞り込み後）の取引で集計する。期間を絞れば、その期間の合計が見える。
   const incomeTotal = visibleRows.reduce(
@@ -603,7 +613,15 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
               </Card>
             ))}
           </div>
-          <Row gap="sm" align="center">
+          <Row gap="sm" align="center" wrap>
+            {periodFilter ? (
+              <FilterChip
+                filter={periodFilter}
+                years={yearOptions}
+                periodYear={periodYear}
+                onChange={updateFilter}
+              />
+            ) : null}
             <div className={styles.searchWrap}>
               <span className={styles.searchIcon}>
                 <Icon name="search" size={16} />
@@ -616,17 +634,17 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                 aria-label="取引を検索"
               />
             </div>
-            {normalizedQuery || filters.length > 0 ? (
+            {hasActiveFilters ? (
               <>
                 <Text variant="muted">{visibleRows.length}件ヒット</Text>
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <Button variant="ghost" size="sm" className={styles.rowButton} onClick={clearFilters}>
                   クリア
                 </Button>
               </>
             ) : null}
           </Row>
           <Row gap="sm" align="center" wrap>
-            {filters.map((filter) => (
+            {otherFilters.map((filter) => (
               <FilterChip
                 key={filter.field}
                 filter={filter}
@@ -640,6 +658,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
               <Button
                 variant="ghost"
                 size="sm"
+                className={styles.rowButton}
                 onClick={() => setFilterMenuOpen((open) => !open)}
               >
                 <Icon name="plus" size={14} />
@@ -1005,7 +1024,8 @@ const FilterChip = ({
   /** 期間フィルターの月選択が範囲を作る基準年。 */
   periodYear: number;
   onChange: (next: LedgerFilter) => void;
-  onRemove: () => void;
+  /** 削除ボタン。無いフィルター（期間）は常設なので渡さない。 */
+  onRemove?: () => void;
 }) => {
   return (
     <div className={styles.filterChip}>
@@ -1104,14 +1124,16 @@ const FilterChip = ({
           onChange={(values) => onChange({ ...filter, values })}
         />
       )}
-      <button
-        type="button"
-        className={styles.chipRemove}
-        onClick={onRemove}
-        aria-label={`${FILTER_FIELD_LABELS[filter.field]}フィルターを削除`}
-      >
-        <Icon name="close" size={12} />
-      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          className={styles.chipRemove}
+          onClick={onRemove}
+          aria-label={`${FILTER_FIELD_LABELS[filter.field]}フィルターを削除`}
+        >
+          <Icon name="close" size={12} />
+        </button>
+      ) : null}
     </div>
   );
 };
@@ -1153,7 +1175,7 @@ function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
 /** URLクエリから検索・フィルターの初期状態を読む。不正な値は落とす。 */
 function parseFiltersFromSearch(search: string): { query: string; filters: LedgerFilter[] } {
   const params = new URLSearchParams(search);
-  // フィルター指定が無い素の表示では、期間フィルターを既定で出す。
+  // 期間フィルターは常設（消せない）。指定が無くても必ず先頭に入れる。
   if (params.get("filters") === null) {
     return { query: params.get("q") ?? "", filters: [emptyFilter("period")] };
   }
@@ -1192,6 +1214,9 @@ function parseFiltersFromSearch(search: string): { query: string; filters: Ledge
         return { field };
     }
   });
+  if (!filters.some((f) => f.field === "period")) {
+    filters.unshift(emptyFilter("period"));
+  }
   return { query: params.get("q") ?? "", filters };
 }
 

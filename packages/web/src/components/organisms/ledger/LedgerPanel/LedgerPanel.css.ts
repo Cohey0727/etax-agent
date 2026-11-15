@@ -15,6 +15,10 @@ const skeletonPulse = keyframes({
   "100%": { opacity: 0.5 },
 });
 
+// 検索・フィルター行の高さ。チップの中身（controlHeight）に
+// チップの上下 padding と枠線を足したもの。行内の全要素で共有する。
+const FILTER_ROW_HEIGHT = `calc(${theme.component.controlHeight} + ${theme.space.xs} * 2 + 2px)`;
+
 const styles = {
   cellInput: style({
     width: "100%",
@@ -62,6 +66,12 @@ const styles = {
   searchInput: style({
     width: "100%",
     paddingLeft: "34px",
+    // 検索の左に並ぶ期間チップと高さを揃える。
+    height: FILTER_ROW_HEIGHT,
+  }),
+  // 検索・フィルター行のボタン（クリア／フィルター追加）。チップと高さを揃える。
+  rowButton: style({
+    height: FILTER_ROW_HEIGHT,
   }),
   descriptionInput: style({
     width: "100%",
@@ -135,6 +145,9 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: theme.space.xs,
+    // 中身（Select/Input=controlHeight）に上下 padding と枠線を足した高さで固定し、
+    // チップ同士・隣のボタンと高さがズレないようにする。
+    height: FILTER_ROW_HEIGHT,
     padding: `${theme.space.xs} ${theme.space.sm}`,
     background: theme.color.surface,
     border: `1px solid ${theme.color.border}`,

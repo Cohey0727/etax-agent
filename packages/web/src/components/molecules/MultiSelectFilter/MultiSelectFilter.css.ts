@@ -44,6 +44,8 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "4px",
+    // フィルターチップ内で Select と高さを揃える（チップ同士の高さズレ防止）。
+    height: theme.component.controlHeight,
     background: "transparent",
     border: `1px solid ${theme.color.border}`,
     borderRadius: theme.borderRadius.pill,
