@@ -1,10 +1,12 @@
-import { ReactNode } from "react";
-import { Button, Col, Input, Row, Text } from "@components/atoms";
+import { ReactNode, useState } from "react";
+import { Button, Col, Icon, Input, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
 import { BreakdownEntry } from "../DeductionPanel/deductionStorage";
 import styles from "./BreakdownEntriesFields.css";
 
 export interface BreakdownEntriesFieldsProps {
+  /** 見出し（例: 社会保険料の内訳）。見出しごと開閉できる。 */
+  title: string;
   /** 内訳（名称・金額） */
   entries: BreakdownEntry[];
   /**
@@ -19,7 +21,7 @@ export interface BreakdownEntriesFieldsProps {
   nameLabel: string;
   /** 追加ボタンの文言（例: ＋ 寄附を追加） */
   addLabel: string;
-  /** 合計の下に出す補足（控除の計算方法など） */
+  /** 開いたときに合計の下に出す補足（控除の計算方法など） */
   note?: ReactNode;
 }
 
@@ -33,9 +35,12 @@ function newEntryId(): string {
 /**
  * 「内訳があって合計が控除の元になる」入力の共通エディタ。
  * 寄附金・社会保険料・小規模企業共済等・医療費で使う。
- * 1件ずつ名称と金額を入れると、合計がそのまま控除の入力になる。
+ * 見出しは合計だけが見える開閉式（detail）で、開くと1件ずつ名称と金額を
+ * 入れられる。合計は内訳の合計がそのまま控除の入力になる。
+ * 入力済みの内訳がある場合は、隠れて見えないことがないよう開いた状態で始める。
  */
 export const BreakdownEntriesFields = ({
+  title,
   entries,
   legacyTotal,
   onChange,
@@ -44,6 +49,7 @@ export const BreakdownEntriesFields = ({
   addLabel,
   note,
 }: BreakdownEntriesFieldsProps) => {
+  const [open, setOpen] = useState(() => entries.length > 0 || legacyTotal > 0);
   // 内訳がまだ無い場合は、保存済みの合計を1件として見せる（消えないように）。
   // 何も無ければ空の1行から始められるようにする。
   const rows: BreakdownEntry[] =
@@ -61,30 +67,17 @@ export const BreakdownEntriesFields = ({
 
   return (
     <Col gap="sm">
-      {rows.map((entry) => (
-        <Row key={entry.id} gap="sm" align="center">
-          <Input
-            className={styles.recipient}
-            value={entry.recipient}
-            onChange={(e) => update(entry.id, { recipient: e.target.value })}
-            placeholder={namePlaceholder}
-            aria-label={nameLabel}
-          />
-          <Input
-            className={styles.amount}
-            type="number"
-            value={entry.amount}
-            onChange={(e) => update(entry.id, { amount: toAmount(e.target.value) })}
-            aria-label="金額"
-          />
-          <Button variant="ghost" size="sm" onClick={() => remove(entry.id)}>
-            削除
-          </Button>
-        </Row>
-      ))}
       <Row gap="sm" align="center" justify="spaceBetween">
-        <Button variant="ghost" size="sm" onClick={add}>
-          {addLabel}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className={open ? styles.chevronOpen : styles.chevron}>
+            <Icon name="chevronDown" />
+          </span>
+          {title}
         </Button>
         <Row gap="sm" align="center">
           <Text variant="muted">合計</Text>
@@ -93,7 +86,37 @@ export const BreakdownEntriesFields = ({
           </Text>
         </Row>
       </Row>
-      {note ? <Text variant="muted">{note}</Text> : null}
+      {open ? (
+        <Col gap="sm" className={styles.body}>
+          {rows.map((entry) => (
+            <Row key={entry.id} gap="sm" align="center">
+              <Input
+                className={styles.recipient}
+                value={entry.recipient}
+                onChange={(e) => update(entry.id, { recipient: e.target.value })}
+                placeholder={namePlaceholder}
+                aria-label={nameLabel}
+              />
+              <Input
+                className={styles.amount}
+                type="number"
+                value={entry.amount}
+                onChange={(e) => update(entry.id, { amount: toAmount(e.target.value) })}
+                aria-label="金額"
+              />
+              <Button variant="ghost" size="sm" onClick={() => remove(entry.id)}>
+                削除
+              </Button>
+            </Row>
+          ))}
+          <Row gap="sm" align="center">
+            <Button variant="ghost" size="sm" onClick={add}>
+              {addLabel}
+            </Button>
+          </Row>
+          {note ? <Text variant="muted">{note}</Text> : null}
+        </Col>
+      ) : null}
     </Col>
   );
 };
