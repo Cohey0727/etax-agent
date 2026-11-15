@@ -7,7 +7,7 @@ import { AppView, FilingTab } from "@types";
  * 帳簿は全年度をひとつの画面で管理するため年度から独立して /ledger、
  * 設定も年度から独立して /settings。
  * 確定申告画面はさらにタブがぶら下がる（総合はスラッグなし）。
- * 例: 帳簿タブ = /accounts/2024/final-tax/ledger。
+ * 例: 収支タブ = /accounts/2024/final-tax/balance。
  */
 const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Dashboard]: "dashboard",
@@ -22,7 +22,7 @@ const VIEW_SLUGS: Record<AppView, string> = {
 /** 確定申告タブとURLスラッグの対応。総合（overview）は標準でスラッグなし。 */
 const FILING_TAB_SLUGS: Record<FilingTab, string | null> = {
   overview: null,
-  ledger: "ledger",
+  balance: "balance",
   deductions: "deductions",
   consumption: "consumption",
   taxpayer: "taxpayer",

@@ -53,7 +53,7 @@ const appViews = [
 
 // サイドバーで確定申告にぶら下げる子項目（タブへの直接遷移）。総合は親そのものなので出さない。
 const FILING_NAV_CHILDREN: readonly { view: AppView; key: string; label: string }[] = [
-  { view: AppView.Filing, key: "ledger", label: "帳簿" },
+  { view: AppView.Filing, key: "balance", label: "収支" },
   { view: AppView.Filing, key: "deductions", label: "控除" },
   { view: AppView.Filing, key: "consumption", label: "消費税" },
   { view: AppView.Filing, key: "taxpayer", label: "納税者情報" },

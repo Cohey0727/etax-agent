@@ -14,7 +14,7 @@ interface ManualItem {
 
 // 提出は e-Tax で行い、このアプリでは状態を持たないため項目に含めない。
 const MANUAL_ITEMS: readonly ManualItem[] = [
-  { key: "confirmed", label: "帳簿" },
+  { key: "confirmed", label: "収支" },
   { key: "calculated", label: "控除・計算" },
 ];
 
@@ -39,7 +39,7 @@ export interface FilingStatusPanelProps {
 }
 
 /**
- * 申告ステータス（表示専用）。帳簿・控除・計算は独立した項目として
+ * 申告ステータス（表示専用）。収支・控除・計算は独立した項目として
  * 一覧で示す（順序を表すステッパーは置かない）。ステータスの変更は
  * 確定申告画面で行い、ここからはリンクで遷移するだけ。
  * 提出は e-Tax で行うため、ここには状態として載せない。
@@ -73,7 +73,7 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
           <Col gap="sm">
             <Text variant="sectionTitle">申告ステータス — {year}年分</Text>
             <Text variant="muted">
-              帳簿と控除・計算の進捗表示です。ステータスの変更は確定申告画面で行います。
+              収支と控除・計算の進捗表示です。ステータスの変更は確定申告画面で行います。
               提出は e-Tax で行います。
             </Text>
           </Col>
@@ -116,7 +116,7 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
         <Col gap="sm">
           <Text variant="sectionTitle">申告ステータス — {year}年分</Text>
           <Text variant="muted">
-            帳簿と控除・計算の進捗表示です。ステータスの変更は確定申告画面で行います。
+            収支と控除・計算の進捗表示です。ステータスの変更は確定申告画面で行います。
             提出は e-Tax で行います。
           </Text>
         </Col>

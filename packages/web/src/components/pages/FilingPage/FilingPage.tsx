@@ -13,7 +13,7 @@ import { ReactNode, useMemo, useState } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import { Tabs } from "@components/molecules";
 import {
-  ConfirmSummary,
+  BalanceSummary,
   ConsumptionTaxPanel,
   DeductionPanel,
   FilingPanel,
@@ -40,10 +40,10 @@ import { AppView, FilingTab, ViewPageProps } from "@types";
 import { createFilingSnapshot } from "@utils/api";
 import { pathForView } from "@utils/routing";
 
-/** タブの並び。総合が起点で、帳簿・控除・消費税はそれぞれ独立した作業場。 */
+/** タブの並び。総合が起点で、収支・控除・消費税はそれぞれ独立した作業場。 */
 const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
   { id: "overview", label: "総合" },
-  { id: "ledger", label: "帳簿" },
+  { id: "balance", label: "収支" },
   { id: "deductions", label: "控除" },
   { id: "consumption", label: "消費税" },
   { id: "taxpayer", label: "納税者情報" },
@@ -193,12 +193,12 @@ const FilingWorkspace = ({
         />
       </>
     ),
-    ledger: (
+    balance: (
       <>
         <Card>
           <Col gap="md">
-            <Text variant="sectionTitle">帳簿</Text>
-            <ConfirmSummary
+            <Text variant="sectionTitle">収支</Text>
+            <BalanceSummary
               transactions={transactions}
               year={year}
               filingOptions={filingOptions}
@@ -209,8 +209,8 @@ const FilingWorkspace = ({
         <FilingStatusToggle
           year={year}
           statusKey="confirmed"
-          label="帳簿"
-          description="帳簿の金額・科目・区分に誤りがないか見直したら、ここで確定できます（総合・ダッシュボードと共有）。"
+          label="収支"
+          description="収支の金額・科目・区分に誤りがないか見直したら、ここで確定できます（総合・ダッシュボードと共有）。"
         />
       </>
     ),

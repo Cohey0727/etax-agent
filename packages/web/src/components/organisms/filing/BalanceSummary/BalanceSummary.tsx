@@ -9,7 +9,7 @@ import { useMemo } from "react";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { formatYen } from "@utils";
-import styles from "./ConfirmSummary.css";
+import styles from "./BalanceSummary.css";
 
 interface CategoryAmount {
   category: string;
@@ -20,9 +20,11 @@ interface MonthlyAmount {
   month: number;
   income: number;
   expense: number;
+  balance: number;
+  cumulative: number;
 }
 
-export interface ConfirmSummaryProps {
+export interface BalanceSummaryProps {
   transactions: Transaction[];
   /** 左上の年度切替で選ばれている年 */
   year: number;
@@ -33,15 +35,24 @@ export interface ConfirmSummaryProps {
 }
 
 /**
- * 確定申告の「帳簿」欄の中身。所得の統計カード、事業／不動産の
- * 収入・経費と青色申告特別控除の内訳、月別の推移、勘定科目ごとの内訳を
- * その場で見直せるように出す。未分類が残っていれば注意も出す。
+ * 確定申告の「収支」タブの中身。その年の帳簿を収支として見直せるように、
+ * 収入・支出・差引（収支）を中心に置き、事業／不動産ごとの収支、
+ * そこから所得合計への内訳、月別の収支と累計、勘定科目ごとの内訳を出す。
+ * 未分類が残っていれば注意も出す。
  */
-export const ConfirmSummary = ({ transactions, year, filingOptions, miscIncome }: ConfirmSummaryProps) => {
+export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }: BalanceSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
     [yearTransactions, year, filingOptions?.filingType, filingOptions?.realEstateBusinessScale],
+  );
+  const incomeTotal = useMemo(
+    () => yearTransactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
+    [yearTransactions],
+  );
+  const expenseTotal = useMemo(
+    () => yearTransactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
+    [yearTransactions],
   );
   const income = useMemo(
     () => sumByCategory(yearTransactions.filter((t) => t.amount > 0), false),
@@ -55,6 +66,8 @@ export const ConfirmSummary = ({ transactions, year, filingOptions, miscIncome }
   const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
   const misc = miscIncome?.income ?? 0;
   const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
+  const businessBalance = figures.business_revenue - figures.business_expenses;
+  const realEstateBalance = figures.real_estate_revenue - figures.real_estate_expenses;
 
   if (yearTransactions.length === 0) {
     return <Text variant="muted">この年の取引はまだありません。先に帳簿へ取り込んでください。</Text>;
@@ -63,20 +76,18 @@ export const ConfirmSummary = ({ transactions, year, filingOptions, miscIncome }
   const isWhite = filingOptions?.filingType === "white";
   const suffix = isWhite ? "" : "（青色控除後）";
   const statCards: readonly { label: string; value: string }[] = [
-    { label: `事業所得${suffix}`, value: formatYen(figures._detail.business_income) },
-    { label: `不動産所得${suffix}`, value: formatYen(figures._detail.real_estate_income) },
-    ...(misc > 0 ? [{ label: "雑所得", value: formatYen(misc) }] : []),
+    { label: "収入合計", value: formatYen(incomeTotal) },
+    { label: "支出合計", value: formatYen(expenseTotal) },
+    { label: "収支（差引）", value: formatYen(incomeTotal - expenseTotal) },
     { label: `所得合計${suffix}`, value: formatYen(totalIncome) },
   ];
 
-  const totals: readonly { label: string; amount: number }[] = [
-    { label: "事業収入", amount: figures.business_revenue },
-    { label: "事業経費", amount: figures.business_expenses },
-    { label: "不動産収入", amount: figures.real_estate_revenue },
-    { label: "不動産経費", amount: figures.real_estate_expenses },
+  const bridgeRows: readonly { label: string; amount: number }[] = [
+    { label: "事業の差引", amount: businessBalance },
+    { label: "不動産の差引", amount: realEstateBalance },
     {
       label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
-      amount: figures.blue_deduction,
+      amount: -figures.blue_deduction,
     },
     ...(misc > 0 ? [{ label: "雑所得", amount: misc }] : []),
   ];
@@ -94,9 +105,18 @@ export const ConfirmSummary = ({ transactions, year, filingOptions, miscIncome }
         ))}
       </div>
 
+      <div className={styles.breakdownGrid}>
+        <DivisionBalance title="事業の収支" revenue={figures.business_revenue} expenses={figures.business_expenses} />
+        <DivisionBalance
+          title="不動産の収支"
+          revenue={figures.real_estate_revenue}
+          expenses={figures.real_estate_expenses}
+        />
+      </div>
+
       <Col gap="sm">
-        <Text variant="statLabel">内訳</Text>
-        {totals.map((row) => (
+        <Text variant="statLabel">所得の内訳</Text>
+        {bridgeRows.map((row) => (
           <Row key={row.label} align="center" justify="spaceBetween">
             <Text variant="muted">{row.label}</Text>
             <Text className={styles.amount}>{formatYen(row.amount)}</Text>
@@ -109,16 +129,8 @@ export const ConfirmSummary = ({ transactions, year, filingOptions, miscIncome }
       </Col>
 
       <Col gap="sm">
-        <Row align="center" justify="spaceBetween">
-          <Text variant="statLabel">月別の推移</Text>
-          <Row gap="sm" align="center">
-            <span className={styles.legendSwatchIncome} />
-            <Text variant="muted">収入</Text>
-            <span className={styles.legendSwatchExpense} />
-            <Text variant="muted">支出</Text>
-          </Row>
-        </Row>
-        <MonthlyChart rows={monthly} />
+        <Text variant="statLabel">月別の収支</Text>
+        <MonthlyTable rows={monthly} incomeTotal={incomeTotal} expenseTotal={expenseTotal} />
       </Col>
 
       <div className={styles.breakdownGrid}>
@@ -135,34 +147,71 @@ export const ConfirmSummary = ({ transactions, year, filingOptions, miscIncome }
   );
 };
 
-const MonthlyChart = ({ rows }: { rows: readonly MonthlyAmount[] }) => {
-  const max = Math.max(1, ...rows.map((row) => Math.max(row.income, row.expense)));
-  return (
-    <div className={styles.chart}>
-      {rows.map((row) => (
-        <div
-          key={row.month}
-          className={styles.chartCol}
-          title={`${row.month}月 収入 ${formatYen(row.income)} / 支出 ${formatYen(row.expense)}`}
-        >
-          <div className={styles.chartBars}>
-            <div
-              className={styles.chartBarIncome}
-              style={{ height: `${Math.round((row.income / max) * 100)}%` }}
-            />
-            <div
-              className={styles.chartBarExpense}
-              style={{ height: `${Math.round((row.expense / max) * 100)}%` }}
-            />
-          </div>
-          <Text variant="muted" className={styles.chartLabel}>
-            {row.month}月
-          </Text>
-        </div>
-      ))}
+const DivisionBalance = ({
+  title,
+  revenue,
+  expenses,
+}: {
+  title: string;
+  revenue: number;
+  expenses: number;
+}) => (
+  <Col gap="sm">
+    <Text variant="statLabel">{title}</Text>
+    <Row align="center" justify="spaceBetween">
+      <Text variant="muted">収入</Text>
+      <Text className={styles.amount}>{formatYen(revenue)}</Text>
+    </Row>
+    <Row align="center" justify="spaceBetween">
+      <Text variant="muted">経費</Text>
+      <Text className={styles.amount}>{formatYen(expenses)}</Text>
+    </Row>
+    <Row align="center" justify="spaceBetween" className={styles.subtotalRow}>
+      <Text>差引</Text>
+      <Text className={styles.amount}>{formatYen(revenue - expenses)}</Text>
+    </Row>
+  </Col>
+);
+
+const MonthlyTable = ({
+  rows,
+  incomeTotal,
+  expenseTotal,
+}: {
+  rows: readonly MonthlyAmount[];
+  incomeTotal: number;
+  expenseTotal: number;
+}) => (
+  <div>
+    <div className={`${styles.monthRow} ${styles.monthHead}`}>
+      <span>月</span>
+      <span className={styles.monthCell}>収入</span>
+      <span className={styles.monthCell}>支出</span>
+      <span className={styles.monthCell}>差引</span>
+      <span className={styles.monthCell}>累計収支</span>
     </div>
-  );
-};
+    {rows.map((row) => (
+      <div key={row.month} className={styles.monthRow}>
+        <span>{row.month}月</span>
+        <span className={styles.monthCell}>{formatYen(row.income)}</span>
+        <span className={styles.monthCell}>{formatYen(row.expense)}</span>
+        <span className={`${styles.monthCell} ${row.balance < 0 ? styles.amountNegative : ""}`}>
+          {formatYen(row.balance)}
+        </span>
+        <span className={`${styles.monthCell} ${row.cumulative < 0 ? styles.amountNegative : ""}`}>
+          {formatYen(row.cumulative)}
+        </span>
+      </div>
+    ))}
+    <div className={`${styles.monthRow} ${styles.monthTotal}`}>
+      <span>合計</span>
+      <span className={styles.monthCell}>{formatYen(incomeTotal)}</span>
+      <span className={styles.monthCell}>{formatYen(expenseTotal)}</span>
+      <span className={styles.monthCell}>{formatYen(incomeTotal - expenseTotal)}</span>
+      <span className={styles.monthCell}>―</span>
+    </div>
+  </div>
+);
 
 const BAR_FILL_CLASS: Record<"income" | "expense", string> = {
   income: styles.barFillIncome,
@@ -222,18 +271,26 @@ function sumByCategory(transactions: Transaction[], absolute: boolean): Category
     .sort((a, b) => b.amount - a.amount);
 }
 
-/** 月ごとの収入・支出（支出は絶対値）。取引のない月も0で並べる。 */
+/** 月ごとの収入・支出・差引と、差引の累計（累計収支）。取引のない月も0で並べる。 */
 function sumByMonth(transactions: Transaction[]): MonthlyAmount[] {
   const rows: MonthlyAmount[] = Array.from({ length: 12 }, (_, i) => ({
     month: i + 1,
     income: 0,
     expense: 0,
+    balance: 0,
+    cumulative: 0,
   }));
   for (const t of transactions) {
     const month = Number(t.date.slice(5, 7));
     if (month < 1 || month > 12) continue;
     if (t.amount > 0) rows[month - 1].income += Math.trunc(t.amount);
     else rows[month - 1].expense += Math.abs(Math.trunc(t.amount));
+  }
+  let cumulative = 0;
+  for (const row of rows) {
+    row.balance = row.income - row.expense;
+    cumulative += row.balance;
+    row.cumulative = cumulative;
   }
   return rows;
 }

@@ -18,7 +18,7 @@ import styles from "./FilingPanel.css";
 export type FilingSection = Exclude<FilingTab, "overview">;
 
 const SECTION_OPEN_LABELS: Record<FilingSection, string> = {
-  ledger: "帳簿タブを開く",
+  balance: "収支タブを開く",
   deductions: "控除タブを開く",
   consumption: "消費税タブを開く",
   taxpayer: "納税者情報タブを開く",
@@ -34,7 +34,7 @@ interface ManualItem {
 
 /**
  * 手動で「確定」を付けられる項目。どれも独立していて、順番は問わない。
- * 各項目の行の直下に、その項目の結果の数字（帳簿→所得、控除・計算→税額）を
+ * 各項目の行の直下に、その項目の結果の数字（収支→所得、控除・計算→税額）を
  * 並べ、見直してそのまま「確定」にできるようにする。
  * 提出はこのアプリでは行えない（e-Tax で本人が送信する）ため、確定を付ける
  * 項目には含めず、下に提出先への動線として別に置く。
@@ -42,9 +42,9 @@ interface ManualItem {
 const MANUAL_ITEMS: readonly ManualItem[] = [
   {
     key: "confirmed",
-    label: "帳簿",
-    description: "帳簿の金額・科目・区分に誤りがないか見直したら確定します。見直しは帳簿タブで行います。",
-    section: "ledger",
+    label: "収支",
+    description: "収支の金額・科目・区分に誤りがないか見直したら確定します。見直しは収支タブで行います。",
+    section: "balance",
   },
   {
     key: "calculated",
@@ -106,7 +106,7 @@ export const FilingPanel = ({
           <Col gap="sm">
             <Text variant="sectionTitle">{year}年分の確定申告</Text>
             <Text variant="muted">
-              帳簿と控除・計算はそれぞれ独立した項目です。どの順番でも入力でき、
+              収支と控除・計算はそれぞれ独立した項目です。どの順番でも入力でき、
               いつでも行き来して直せます。確定した項目には印を付けておけます（ダッシュボードの
               申告ステータスと共有）。提出は e-Tax で行います。
             </Text>

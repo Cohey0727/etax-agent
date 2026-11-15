@@ -21,14 +21,22 @@ export interface IncomeSummaryProps {
 }
 
 /**
- * 「帳簿」行の直下に置く所得の要約。帳簿を見直したら、その結果である
- * 所得の数字を真下で確認して、そのまま「確定」にできるようにする。
+ * 「収支」行の直下に置く収支の要約。収支（収入・支出・差引）を見直したら、
+ * その結果である所得の数字を真下で確認して、そのまま「確定」にできるようにする。
  */
 export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }: IncomeSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
     [yearTransactions, year, filingOptions?.filingType, filingOptions?.realEstateBusinessScale],
+  );
+  const incomeTotal = useMemo(
+    () => yearTransactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
+    [yearTransactions],
+  );
+  const expenseTotal = useMemo(
+    () => yearTransactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
+    [yearTransactions],
   );
 
   if (yearTransactions.length === 0) {
@@ -42,19 +50,17 @@ export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }:
   const misc = miscIncome?.income ?? 0;
   const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
   const statCards: readonly { label: string; value: string }[] = [
-    { label: `事業所得${suffix}`, value: formatYen(figures._detail.business_income) },
-    { label: `不動産所得${suffix}`, value: formatYen(figures._detail.real_estate_income) },
-    ...(misc > 0 ? [{ label: "雑所得", value: formatYen(misc) }] : []),
-    { label: "所得合計", value: formatYen(totalIncome) },
+    { label: "収入合計", value: formatYen(incomeTotal) },
+    { label: "支出合計", value: formatYen(expenseTotal) },
+    { label: "収支（差引）", value: formatYen(incomeTotal - expenseTotal) },
+    { label: `所得合計${suffix}`, value: formatYen(totalIncome) },
   ];
-  const incomeRows: readonly { label: string; amount: number }[] = [
-    { label: "事業収入", amount: figures.business_revenue },
-    { label: "事業経費", amount: figures.business_expenses },
-    { label: "不動産収入", amount: figures.real_estate_revenue },
-    { label: "不動産経費", amount: figures.real_estate_expenses },
+  const bridgeRows: readonly { label: string; amount: number }[] = [
+    { label: "事業の差引", amount: figures.business_revenue - figures.business_expenses },
+    { label: "不動産の差引", amount: figures.real_estate_revenue - figures.real_estate_expenses },
     {
       label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
-      amount: figures.blue_deduction,
+      amount: -figures.blue_deduction,
     },
     ...(misc > 0 ? [{ label: "雑所得", amount: misc }] : []),
   ];
@@ -72,7 +78,7 @@ export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }:
         ))}
       </div>
       <Col gap="sm">
-        {incomeRows.map((row) => (
+        {bridgeRows.map((row) => (
           <Row key={row.label} align="center" justify="spaceBetween">
             <Text variant="muted">{row.label}</Text>
             <Text className={styles.amount}>{formatYen(row.amount)}</Text>

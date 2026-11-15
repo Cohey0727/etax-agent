@@ -1,4 +1,4 @@
-export * from "./ConfirmSummary";
+export * from "./BalanceSummary";
 export * from "./ConsumptionTaxPanel";
 export * from "./DeductionPanel";
 export * from "./FilingPanel";

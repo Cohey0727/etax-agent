@@ -5,7 +5,7 @@ import { SendKeyMode } from "./Chat";
 import { ThemeMode } from "./Theme";
 
 /** 確定申告画面のタブ。URL（/accounts/<年度>/final-tax/<タブ>）と連動する。 */
-export type FilingTab = "overview" | "ledger" | "deductions" | "consumption" | "taxpayer";
+export type FilingTab = "overview" | "balance" | "deductions" | "consumption" | "taxpayer";
 
 /**
  * 画面（ビュー）コンポーネント共通の props。

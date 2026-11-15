@@ -2,7 +2,7 @@ import { globalStyle, style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
-  // 所得の統計カードの並び。
+  // 収支の統計カードの並び。
   statGrid: style({
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
@@ -14,7 +14,13 @@ const styles = {
     paddingTop: theme.space.sm,
     fontWeight: theme.fontWeight.semibold,
   }),
-  // 内訳の2カラム（収入／支出）。狭い画面では縦に積む。
+  // 区分ごとの差引の小計行。
+  subtotalRow: style({
+    borderTop: `1px solid ${theme.color.borderStrong}`,
+    paddingTop: theme.space.sm,
+    fontWeight: theme.fontWeight.semibold,
+  }),
+  // 2カラムの並び（事業／不動産、収入／支出の内訳）。狭い画面では縦に積む。
   breakdownGrid: style({
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
@@ -29,6 +35,40 @@ const styles = {
   amount: style({
     fontVariantNumeric: "tabular-nums",
     whiteSpace: "nowrap",
+  }),
+  // マイナスの金額（差引・累計が赤字の月）。
+  amountNegative: style({
+    color: theme.color.negative,
+  }),
+  // 月別収支の表。月＋4つの金額列を等幅数字で揃える。
+  monthRow: style({
+    display: "grid",
+    gridTemplateColumns: "2.5rem repeat(4, 1fr)",
+    gap: theme.space.sm,
+    paddingTop: theme.space.xs,
+    paddingBottom: theme.space.xs,
+    borderBottom: `1px solid ${theme.color.lineSoft}`,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+    "@media": {
+      "(max-width: 640px)": {
+        fontSize: theme.fontSizes.xs,
+        gap: theme.space.xs,
+      },
+    },
+  }),
+  monthHead: style({
+    color: theme.color.muted,
+    fontSize: theme.fontSizes.sm,
+    borderBottom: `1px solid ${theme.color.borderStrong}`,
+  }),
+  monthCell: style({
+    textAlign: "right",
+  }),
+  monthTotal: style({
+    borderBottom: "none",
+    borderTop: `2px solid ${theme.color.borderStrong}`,
+    fontWeight: theme.fontWeight.semibold,
   }),
   // 科目内訳の割合バー。土台の線の上に金額比で色を伸ばす。
   barTrack: style({
@@ -45,56 +85,6 @@ const styles = {
   barFillExpense: style({
     height: "100%",
     borderRadius: theme.borderRadius.pill,
-    background: theme.color.negative,
-  }),
-  // 月別グラフ。12か月を横に並べ、各月に収入・支出の2本のバーを立てる。
-  // バーは各月の幅いっぱいに広げ、月同士の間隔を詰めて密度を出す。
-  chart: style({
-    display: "flex",
-    gap: theme.space.xs,
-  }),
-  chartCol: style({
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: theme.space.xs,
-    minWidth: 0,
-  }),
-  chartBars: style({
-    height: "96px",
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    gap: "2px",
-    borderBottom: `1px solid ${theme.color.lineSoft}`,
-  }),
-  chartBarIncome: style({
-    flex: "1 1 0",
-    minHeight: "2px",
-    borderRadius: "3px 3px 0 0",
-    background: theme.color.accent,
-  }),
-  chartBarExpense: style({
-    flex: "1 1 0",
-    minHeight: "2px",
-    borderRadius: "3px 3px 0 0",
-    background: theme.color.negative,
-  }),
-  chartLabel: style({
-    textAlign: "center",
-    fontSize: theme.fontSizes.xs,
-  }),
-  // グラフの凡例の色見本。
-  legendSwatchIncome: style({
-    width: "10px",
-    height: "10px",
-    borderRadius: "3px",
-    background: theme.color.accent,
-  }),
-  legendSwatchExpense: style({
-    width: "10px",
-    height: "10px",
-    borderRadius: "3px",
     background: theme.color.negative,
   }),
 };
