@@ -1,5 +1,6 @@
 import { Button, Card, Col, Icon, IconName, Input, Text } from "@components/atoms";
 import { AgentConnectionConfig, SendKeyMode, ThemeMode } from "@types";
+import { SystemOneSettingsPanel } from "../SystemOneSettingsPanel";
 import styles from "./SettingsPanel.css";
 
 export interface SettingsPanelProps {
@@ -146,6 +147,7 @@ export const SettingsPanel = ({
           </Text>
         </Col>
       </Card>
+      <SystemOneSettingsPanel />
       <Card>
         <Col gap="md">
           <Text variant="sectionTitle">アプリについて</Text>

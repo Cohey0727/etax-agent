@@ -6,7 +6,7 @@ import {
   Transaction,
 } from "@etax/shared";
 import { useMemo } from "react";
-import { Card, Col, Row, Text } from "@components/atoms";
+import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { formatYen } from "@utils";
 import styles from "./BalanceSummary.css";
@@ -24,6 +24,8 @@ export interface BalanceSummaryProps {
   filingOptions?: BlueDeductionOptions;
   /** 雑所得（その他）。帳簿に載らない所得として合計に含める。 */
   miscIncome?: MiscIncomeInput;
+  /** 未分類の警告から、帳簿を年度＋未分類フィルターで開く。 */
+  onOpenUnclassified?: () => void;
 }
 
 /**
@@ -34,28 +36,39 @@ export interface BalanceSummaryProps {
  * MonthlyBalance と BalanceRecords がそれぞれ別カードで並べる。
  * 未分類が残っていれば注意も出す。
  */
-export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }: BalanceSummaryProps) => {
+export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome, onOpenUnclassified }: BalanceSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
     [yearTransactions, year, filingOptions?.filingType, filingOptions?.realEstateBusinessScale],
   );
-  const incomeTotal = useMemo(
-    () => yearTransactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
-    [yearTransactions],
-  );
-  const expenseTotal = useMemo(
-    () => yearTransactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
+  // 収入・支出の見出しは事業＋不動産だけを数える。口座の生の出入り
+  // （チャージ・振替・投資・カード決済などの「その他」区分）を収入に
+  // 混ぜると、実態とかけ離れた金額になるため。
+  const incomeTotal = figures.business_revenue + figures.real_estate_revenue;
+  const expenseTotal = figures.business_expenses + figures.real_estate_expenses;
+  const scopedTransactions = useMemo(
+    () => yearTransactions.filter((t) => t.income_type !== "other"),
     [yearTransactions],
   );
   const income = useMemo(
-    () => sumByCategory(yearTransactions.filter((t) => t.amount > 0), false),
-    [yearTransactions],
+    () => sumByCategory(scopedTransactions.filter((t) => t.amount > 0), false),
+    [scopedTransactions],
   );
   const expenses = useMemo(
-    () => sumByCategory(yearTransactions.filter((t) => t.amount < 0), true),
-    [yearTransactions],
+    () => sumByCategory(scopedTransactions.filter((t) => t.amount < 0), true),
+    [scopedTransactions],
   );
+  const otherFlow = useMemo(() => {
+    const others = yearTransactions.filter((t) => t.income_type === "other");
+    return {
+      count: others.length,
+      income: others.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
+      expense: others
+        .filter((t) => t.amount < 0)
+        .reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
+    };
+  }, [yearTransactions]);
   const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
   const misc = miscIncome?.income ?? 0;
   const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
@@ -126,9 +139,25 @@ export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }
         <CategoryList title="支出の内訳" rows={expenses} tone="expense" />
       </div>
 
+      {otherFlow.count > 0 ? (
+        <Text variant="caption">
+          集計対象外（資金移動・投資・個人的な出入り）: {otherFlow.count} 件・入金{" "}
+          {formatYen(otherFlow.income)} / 出金 {formatYen(otherFlow.expense)}
+        </Text>
+      ) : null}
+
       {unclassifiedCount > 0 ? (
         <AlertBox variant="notice">
-          未分類の取引が {unclassifiedCount} 件あります。帳簿で勘定科目を付けてから確認済みにしてください。
+          <Row gap="sm" align="center" justify="spaceBetween" wrap>
+            <Text>
+              未分類の取引が {unclassifiedCount} 件あります。帳簿で勘定科目を付けてから確認済みにしてください。
+            </Text>
+            {onOpenUnclassified ? (
+              <Button variant="ghost" size="sm" onClick={onOpenUnclassified}>
+                帳簿で確認する →
+              </Button>
+            ) : null}
+          </Row>
         </AlertBox>
       ) : null}
     </Col>

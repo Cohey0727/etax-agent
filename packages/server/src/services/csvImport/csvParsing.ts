@@ -94,7 +94,10 @@ export function parseWithMapping(
       income_type,
       tax_category: cell(row, iTaxCategory).trim(),
     };
-    const key = `${tx.date}|${tx.amount}|${tx.description}|${tx.account}`;
+    // 重複判定は「行全体が完全一致」した場合だけに限る。日付・金額・摘要が
+    // 同じでも、取引番号や時刻が違えば別の取引（例: PayPay のギフトカード
+    // チャージの連続実行）であり、落としてはいけない。
+    const key = row.join("\u0000");
     if (seen.has(key)) {
       duplicatesSkipped++;
       continue;

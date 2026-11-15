@@ -820,11 +820,14 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
             </Table>
             </div>
             {totalPages > 1 ? (
-              <Row gap="sm" align="center" justify="center">
-                <Text variant="muted">
-                  全{visibleRows.length}件中 {(currentPage - 1) * PAGE_SIZE + 1}–
-                  {(currentPage - 1) * PAGE_SIZE + displayedRows.length}件目
-                </Text>
+              <Col gap="sm">
+                <Row justify="end">
+                  <Text variant="muted">
+                    全{visibleRows.length}件中 {(currentPage - 1) * PAGE_SIZE + 1}–
+                    {(currentPage - 1) * PAGE_SIZE + displayedRows.length}件目
+                  </Text>
+                </Row>
+                <Row gap="sm" align="center" justify="center">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -857,7 +860,8 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
                 >
                   次へ
                 </Button>
-              </Row>
+                </Row>
+              </Col>
             ) : null}
             </>
           )}

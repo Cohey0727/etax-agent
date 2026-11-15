@@ -4,10 +4,14 @@
  * 判定の優先順位:
  *   1. 過去の傾向: ユーザーが過去に確定した「摘要 → 科目」の学習履歴。
  *      同じ支払先・摘要が再び来たら、履歴の科目を高い確信度で返す。
- *   2. SystemOne: 判定モデルAPI（/v1/systemone）に choice 質問として投げ、
- *      科目ごとの確率分布を得る。接続できない/未設定なら静かに次へ落ちる。
- *   3. キーワードルール: shared の CATEGORY_RULES による決定的な推定。
- *   4. どれにも当たらなければ「未分類」。
+ *   2. 生成ルール: 学習履歴から自動生成した正規表現ルール（generateRules）。
+ *      個別の変更が貯まるほど、判定モデルなしで決定的に当たる範囲が広がる。
+ *   3. SystemOne: 判定モデルAPI（/v1/systemone）に choice 質問として投げ、
+ *      科目ごとの確率分布を得る。その際、生成ルールと確定例を文章化した
+ *      プロンプト（generateRules の jevPrompt）を判定プロンプトに組み込む。
+ *      接続できない/未設定なら静かに次へ落ちる。
+ *   4. キーワードルール: shared の CATEGORY_RULES による決定的な推定。
+ *   5. どれにも当たらなければ「未分類」。
  *
  * 依存（履歴・SystemOneクライアント）は引数で受け取る（規約: services は
  * 依存を引数で受ける純粋な業務関数として書く）。
@@ -18,8 +22,9 @@ import {
   ClassificationHistoryRecord,
   normalizeDescriptionKey,
 } from "../../repositories/classificationHistoryRepository";
+import { generateRules, matchGeneratedRule } from "./generateRules";
 
-export type ClassificationSource = "history" | "systemone" | "rules" | "none";
+export type ClassificationSource = "history" | "generated" | "systemone" | "rules" | "none";
 
 export interface AccountCandidate {
   account: string;
@@ -38,6 +43,8 @@ export interface AccountClassification {
 export interface ClassifyAccountDeps {
   history: ClassificationHistoryRecord[];
   systemOne: SystemOneClient | null;
+  /** 判定モデルへ渡す state の前に付ける文脈（例: 「三井住友銀行・出金」）。 */
+  stateHint?: string;
 }
 
 /**
@@ -75,9 +82,26 @@ export async function classifyAccount(
       candidates: [{ account: hit.account, probability: confidence }],
     };
   }
+  // 学習履歴から適用ルールを自動生成する（正規表現ルール＋jev用プロンプト）。
+  // 履歴が変われば生成結果も変わるため、判定のたびに作り直す。
+  const generated = generateRules(deps.history);
+  const ruleHit = matchGeneratedRule(description, generated.regexRules);
+  if (ruleHit) {
+    return {
+      account: ruleHit.category,
+      confidence: null,
+      source: "generated",
+      candidates: [],
+    };
+  }
   if (deps.systemOne) {
     try {
-      const judgement = await deps.systemOne.judgeAccount(description, ACCOUNT_CRITERIA);
+      const state = deps.stateHint ? `【${deps.stateHint}】${description}` : description;
+      const judgement = await deps.systemOne.judgeAccount(
+        state,
+        ACCOUNT_CRITERIA,
+        generated.jevPrompt || undefined,
+      );
       const candidates = Object.entries(judgement.probabilities)
         .map(([account, probability]) => ({ account, probability }))
         .sort((a, b) => b.probability - a.probability)

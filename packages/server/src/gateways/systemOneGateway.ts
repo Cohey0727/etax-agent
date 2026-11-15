@@ -25,8 +25,17 @@ export interface AccountJudgement {
 }
 
 export interface SystemOneClient {
-  /** 摘要テキストがどの勘定科目に当たるかを判定する。 */
-  judgeAccount(state: string, accounts: readonly AccountCriterion[]): Promise<AccountJudgement>;
+  /**
+   * 摘要テキストがどの勘定科目に当たるかを判定する。
+   * learnedPrompt（学習履歴から自動生成した適用ルールと確定例の文章）が
+   * あれば、判定プロンプトの指示文に組み込んで渡す（個別の修正を学習と
+   * して判定に活かすため）。
+   */
+  judgeAccount(
+    state: string,
+    accounts: readonly AccountCriterion[],
+    learnedPrompt?: string,
+  ): Promise<AccountJudgement>;
 }
 
 const USER_AGENT = "etax-agent/0.1";
@@ -94,15 +103,20 @@ class SystemOneHttpClient implements SystemOneClient {
   async judgeAccount(
     state: string,
     accounts: readonly AccountCriterion[],
+    learnedPrompt?: string,
   ): Promise<AccountJudgement> {
     const criteria: Record<string, string> = {};
     for (const { account, criteria: text } of capCandidates(accounts)) criteria[account] = text;
+    const baseInstructions = "この支出または収入は、どの勘定科目に該当しますか？";
+    const instructions = learnedPrompt
+      ? `${baseInstructions}\n${learnedPrompt}`
+      : baseInstructions;
     const payload: Record<string, unknown> = {
       state,
       questions: {
         account: {
           type: "choice",
-          instructions: "この支出または収入は、どの勘定科目に該当しますか？",
+          instructions,
           criteria,
         },
       },

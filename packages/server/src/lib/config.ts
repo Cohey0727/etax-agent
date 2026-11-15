@@ -87,12 +87,38 @@ export interface SystemOneConfig {
   model: string | null;
 }
 
-/** 環境変数から SystemOne 互換エンドポイントの設定を読み込む。 */
+/** 設定画面から保存された SystemOne 設定の上書き（空の項目は環境変数を使う）。 */
+export interface SystemOneOverrides {
+  baseUrl?: string;
+  apiKey?: string;
+  model?: string;
+}
+
+let systemOneOverrides: SystemOneOverrides = {};
+
+/** 保存済み設定の上書きを差し替える（systemOneSettingsRepository が使う）。 */
+export function setSystemOneOverrides(overrides: SystemOneOverrides): void {
+  systemOneOverrides = overrides;
+}
+
+/** 現在の上書き（保存済み設定）を読む。 */
+export function getSystemOneOverrides(): SystemOneOverrides {
+  return systemOneOverrides;
+}
+
+/**
+ * SystemOne 互換エンドポイントの設定を読み込む。
+ * 設定画面で保存された値があれば、環境変数より優先する。
+ */
 export function loadSystemOneConfig(): SystemOneConfig {
   return {
-    baseUrl: (process.env.SYSTEMONE_BASE_URL || "http://127.0.0.1:11434").replace(/\/+$/, ""),
-    apiKey: process.env.SYSTEMONE_API_KEY || null,
-    model: process.env.SYSTEMONE_MODEL || null,
+    baseUrl: (
+      systemOneOverrides.baseUrl ||
+      process.env.SYSTEMONE_BASE_URL ||
+      "http://127.0.0.1:11434"
+    ).replace(/\/+$/, ""),
+    apiKey: systemOneOverrides.apiKey || process.env.SYSTEMONE_API_KEY || null,
+    model: systemOneOverrides.model || process.env.SYSTEMONE_MODEL || null,
   };
 }
 

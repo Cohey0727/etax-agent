@@ -20,20 +20,25 @@ export interface MonthlyBalanceProps {
 /**
  * 収支タブの「月別の収支」を独立した1枚のカードで出す。
  * 月ごとの収入・支出・差引と、差引の累計（累計収支）。
- * 取引のない月も0で並べる。
+ * 取引のない月も0で並べる。集計は収支カードに合わせ、事業・不動産の
+ * 取引だけを対象にする（資金移動などの「その他」区分は含めない）。
  */
 export const MonthlyBalance = ({ transactions }: MonthlyBalanceProps) => {
-  const monthly = useMemo(() => sumByMonth(transactions), [transactions]);
-  const incomeTotal = useMemo(
-    () => transactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
+  const scoped = useMemo(
+    () => transactions.filter((t) => t.income_type !== "other"),
     [transactions],
+  );
+  const monthly = useMemo(() => sumByMonth(scoped), [scoped]);
+  const incomeTotal = useMemo(
+    () => scoped.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
+    [scoped],
   );
   const expenseTotal = useMemo(
-    () => transactions.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
-    [transactions],
+    () => scoped.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
+    [scoped],
   );
 
-  if (transactions.length === 0) return null;
+  if (scoped.length === 0) return null;
 
   return (
     <Card>

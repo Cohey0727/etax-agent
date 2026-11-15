@@ -14,7 +14,7 @@ export const AccountClassificationSchema = z
   .object({
     account: z.string(),
     confidence: z.number().nullable(),
-    source: z.enum(["history", "systemone", "rules", "none"]),
+    source: z.enum(["history", "generated", "systemone", "rules", "none"]),
     candidates: z.array(AccountCandidateSchema),
   })
   .openapi("AccountClassification");
@@ -66,3 +66,21 @@ export const RecordClassificationFeedbackResponseSchema = z
 export type RecordClassificationFeedbackResponse = z.infer<
   typeof RecordClassificationFeedbackResponseSchema
 >;
+
+export const GeneratedRegexRuleSchema = z
+  .object({
+    pattern: z.string(),
+    category: z.string(),
+    count: z.number(),
+    example: z.string(),
+  })
+  .openapi("GeneratedRegexRule");
+
+export const GeneratedRulesResponseSchema = z
+  .object({
+    regexRules: z.array(GeneratedRegexRuleSchema),
+    jevPrompt: z.string(),
+  })
+  .openapi("GeneratedRulesResponse");
+
+export type GeneratedRulesResponse = z.infer<typeof GeneratedRulesResponseSchema>;

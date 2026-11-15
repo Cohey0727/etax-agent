@@ -47,6 +47,7 @@ import { ensureTables, isDatabaseConfigured } from "./lib/db";
 import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
 import { createSystemOneClient } from "./gateways/systemOneGateway";
 import { loadSystemOneConfig } from "./lib/config";
+import { loadSystemOneSettings } from "./repositories/systemOneSettingsRepository";
 import agentRoutes from "./routes/agent";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
@@ -59,6 +60,7 @@ import healthRoutes from "./routes/health";
 import importsRoutes from "./routes/imports";
 import mcpRoutes from "./routes/mcp";
 import receiptsRoutes from "./routes/receipts";
+import settingsRoutes from "./routes/settings";
 import taxpayerRoutes from "./routes/taxpayer";
 import transactionsRoutes from "./routes/transactions";
 
@@ -72,6 +74,7 @@ app.route("/", importsRoutes);
 app.route("/", agentRoutes);
 app.route("/", classifyRoutes);
 app.route("/", receiptsRoutes);
+app.route("/", settingsRoutes);
 app.route("/", filesRoutes);
 app.route("/", freeeRoutes);
 app.route("/", filingStatusRoutes);
@@ -133,7 +136,15 @@ void (async () => {
 // 初回の科目判定がコールドスタートで遅くなる。起動時に一度ダミー判定を
 // 投げてモデルを読み込ませておく。失敗しても起動は続行する
 // （判定自体は履歴→ルールへフォールバックする）。
+// その前に、設定画面で保存された接続設定を読み込んでおく。
 void (async () => {
+  try {
+    await loadSystemOneSettings();
+  } catch (e) {
+    console.warn(
+      `SystemOne の保存済み設定の読み込みに失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
   try {
     const systemOne = createSystemOneClient(loadSystemOneConfig());
     await systemOne.judgeAccount("コーヒー 打ち合わせ", ACCOUNT_CRITERIA);

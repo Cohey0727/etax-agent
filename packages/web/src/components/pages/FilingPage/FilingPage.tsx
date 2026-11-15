@@ -131,14 +131,16 @@ const FilingWorkspace = ({
     saveDeductionState(year, state);
   };
 
-  // 消費税タブの警告から、帳簿画面をこの年度＋警告種別のフィルターで開く。
+  // 各タブの警告から、帳簿画面をこの年度＋警告種別のフィルターで開く。
   // URLにクエリを付けてから画面遷移すると、AppPage のURL同期は
   // パスが同じためクエリを消さず、帳簿側がマウント時に読み取る。
-  const openLedgerFiltered = (kind: "mismatch" | "taxUnset") => {
+  const openLedgerFiltered = (kind: "mismatch" | "taxUnset" | "unclassified") => {
     const search =
       kind === "mismatch"
         ? `?filters=year,mismatch&year=${year}`
-        : `?filters=year,taxCategory&year=${year}&tax=`;
+        : kind === "taxUnset"
+          ? `?filters=year,taxCategory&year=${year}&tax=`
+          : `?filters=year,category&year=${year}&cat=${encodeURIComponent("未分類")}`;
     window.history.pushState(null, "", `${pathForView(AppView.Ledger, year)}${search}`);
     onNavigate?.(AppView.Ledger);
   };
@@ -205,6 +207,7 @@ const FilingWorkspace = ({
               year={year}
               filingOptions={filingOptions}
               miscIncome={deductionState.miscIncome}
+              onOpenUnclassified={() => openLedgerFiltered("unclassified")}
             />
             <FilingStatusToggle
               bare

@@ -34,7 +34,22 @@ export interface AgentChatResponse {
   error?: string;
 }
 
-export type ClassificationSource = "history" | "systemone" | "rules" | "none";
+export type ClassificationSource = "history" | "generated" | "systemone" | "rules" | "none";
+
+/** SystemOne（jev）接続設定。APIキーの実値はサーバーから返らない。 */
+export interface SystemOneSettings {
+  baseUrl: string;
+  model: string;
+  apiKeySet: boolean;
+  effectiveBaseUrl: string;
+  effectiveModel: string | null;
+}
+
+export interface SystemOneTestResult {
+  ok: boolean;
+  top: string | null;
+  error: string | null;
+}
 
 export interface AccountClassification {
   account: string;

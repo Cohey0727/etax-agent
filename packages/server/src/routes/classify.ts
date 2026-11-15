@@ -12,6 +12,10 @@ import {
   recordClassificationFeedbackHandler,
   recordClassificationFeedbackRoute,
 } from "../usecases/recordClassificationFeedback";
+import {
+  getGeneratedRulesHandler,
+  getGeneratedRulesRoute,
+} from "../usecases/getGeneratedRules";
 
 const app = new OpenAPIHono();
 app.openapi(
@@ -29,5 +33,6 @@ app.openapi(
   recordClassificationFeedbackHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
+app.openapi(getGeneratedRulesRoute, getGeneratedRulesHandler);
 
 export default app;

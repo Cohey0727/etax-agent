@@ -21,6 +21,8 @@ import {
   LedgerTransactionInput,
   ListLedgerTransactionsResponse,
   PresignUploadFileResponse,
+  SystemOneSettings,
+  SystemOneTestResult,
   XtxTaxpayerInput,
 } from "@types";
 
@@ -104,6 +106,41 @@ export async function recordClassificationFeedback(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ description, account }),
   }).catch(() => undefined);
+}
+
+/** SystemOne（jev）接続設定を取得する。 */
+export async function fetchSystemOneSettings(): Promise<SystemOneSettings> {
+  const resp = await fetch("/api/settings/systemone");
+  return parseJson<SystemOneSettings>(resp);
+}
+
+/** SystemOne（jev）接続設定を保存する。apiKey は渡した時だけ差し替わる。 */
+export async function updateSystemOneSettings(input: {
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  clearApiKey?: boolean;
+}): Promise<SystemOneSettings> {
+  const resp = await fetch("/api/settings/systemone", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson<SystemOneSettings>(resp);
+}
+
+/** SystemOne（jev）への接続テスト。フォームの未保存の値でも試せる。 */
+export async function testSystemOneSettings(input: {
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+}): Promise<SystemOneTestResult> {
+  const resp = await fetch("/api/settings/systemone/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson<SystemOneTestResult>(resp);
 }
 
 const UPLOADABLE_IMAGE_TYPES: readonly string[] = [

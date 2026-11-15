@@ -13,6 +13,7 @@ export interface ReceiptPanelProps {
 
 const sourceLabels = {
   history: "過去の傾向（学習履歴）",
+  generated: "生成ルール",
   systemone: "SystemOne判定",
   rules: "キーワードルール",
   none: "判定なし",

@@ -37,7 +37,8 @@ export const CATEGORY_RULES: CategoryRule[] = [
   { category: "修繕費", keywords: ["修繕", "修理", "リフォーム"] },
   { category: "管理費", keywords: ["管理費", "管理会社"] },
   { category: "家賃収入", keywords: ["家賃収入", "賃料収入"] },
-  { category: "売上高", keywords: ["売上", "開発費用", "業務報酬", "請求"] },
+  // 「請求」は入れない: カード請求・請求書払い等の出金に誤爆して売上高になる
+  { category: "売上高", keywords: ["売上", "開発費用", "業務報酬"] },
 ];
 
 /** 摘要にキーワードが含まれれば勘定科目を推定する。見つからなければ null。 */
