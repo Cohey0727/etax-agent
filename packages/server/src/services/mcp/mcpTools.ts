@@ -37,7 +37,7 @@ import {
 } from "@etax/shared";
 import { createSystemOneClient } from "../../gateways/systemOneGateway";
 import { Db, getDb } from "../../lib/db";
-import { getJevPromptOverride, loadSystemOneConfig } from "../../lib/config";
+import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
 import { databaseUnavailableMessage } from "../../lib/errors";
 import {
   loadClassificationHistory,
@@ -616,7 +616,7 @@ export async function dispatchMcpTool(
       case "classify_account": {
         const history = await loadClassificationHistory();
         const systemOne = createSystemOneClient(loadSystemOneConfig());
-        const result = await classifyAccount(String(args["description"]), { history, systemOne, jevPromptOverride: getJevPromptOverride() });
+        const result = await classifyAccount(String(args["description"]), { history, systemOne, jevPromptOverride: getJevPromptOverride(), regexRulesOverride: getRegexRulesOverride() });
         return textResult(result);
       }
       case "classify_feedback": {

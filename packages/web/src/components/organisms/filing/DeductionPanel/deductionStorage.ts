@@ -69,6 +69,49 @@ const BREAKDOWN_TOTAL_FIELDS: Record<
   medical: "medicalExpensesPaid",
 };
 
+/** エージェント（set_deductions ツール）から適用される控除入力の変更分。 */
+export interface DeductionPatch {
+  /** 控除入力の部分上書き（DeductionInputs の形）。 */
+  deductions?: Partial<DeductionInputs>;
+  /** 申告の種類。 */
+  filingType?: FilingType;
+  /** 雑所得（その他）の部分上書き。 */
+  miscIncome?: Partial<MiscIncomeInput>;
+  /** 内訳の差し替え（キーごとに全件差し替え、合計は自動同期）。 */
+  entries?: Partial<Record<BreakdownEntriesKey, BreakdownEntry[]>>;
+}
+
+/** 変更分を現在の状態へ適用した新しい状態を返す（エージェント経由の編集用）。 */
+export function applyDeductionPatch(state: DeductionState, patch: DeductionPatch): DeductionState {
+  let next = state;
+  if (patch.deductions) {
+    const d = patch.deductions;
+    next = {
+      ...next,
+      deductions: {
+        ...next.deductions,
+        ...d,
+        lifeInsurance: { ...next.deductions.lifeInsurance, ...(d.lifeInsurance ?? {}) },
+        earthquakeInsurance: {
+          ...next.deductions.earthquakeInsurance,
+          ...(d.earthquakeInsurance ?? {}),
+        },
+        dependents: { ...next.deductions.dependents, ...(d.dependents ?? {}) },
+        disability: { ...next.deductions.disability, ...(d.disability ?? {}) },
+      },
+    };
+  }
+  if (patch.filingType) next = { ...next, filingType: patch.filingType };
+  if (patch.miscIncome) next = { ...next, miscIncome: { ...next.miscIncome, ...patch.miscIncome } };
+  if (patch.entries) {
+    for (const key of Object.keys(patch.entries) as BreakdownEntriesKey[]) {
+      const entries = patch.entries[key];
+      if (entries) next = applyBreakdownEntries(next, key, entries);
+    }
+  }
+  return next;
+}
+
 /** 内訳を差し替え、合計を対応する金額フィールドへ同期した新しい状態を返す。 */
 export function applyBreakdownEntries(
   state: DeductionState,

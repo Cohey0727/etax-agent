@@ -76,14 +76,34 @@ export const GeneratedRegexRuleSchema = z
   })
   .openapi("GeneratedRegexRule");
 
-export const GeneratedRulesResponseSchema = z
+export const RegexRuleSchema = z
   .object({
-    regexRules: z.array(GeneratedRegexRuleSchema),
-    jevPrompt: z.string(),
+    pattern: z.string(),
+    category: z.string(),
   })
-  .openapi("GeneratedRulesResponse");
+  .openapi("RegexRule");
 
-export type GeneratedRulesResponse = z.infer<typeof GeneratedRulesResponseSchema>;
+export const RegexRulesResponseSchema = z
+  .object({
+    /** 設定画面で手編集されたルール（未設定なら空配列）。 */
+    customRules: z.array(RegexRuleSchema),
+    /** カスタムルールが有効かどうか（有効なら実効ルールはカスタム）。 */
+    usingCustom: z.boolean(),
+    /** 学習履歴から自動生成されるルール。 */
+    generatedRules: z.array(GeneratedRegexRuleSchema),
+    /** 実際に判定へ使われるルール。 */
+    effectiveRules: z.array(RegexRuleSchema),
+  })
+  .openapi("RegexRulesResponse");
+
+export type RegexRulesResponse = z.infer<typeof RegexRulesResponseSchema>;
+
+export const UpdateRegexRulesRequestSchema = z
+  .object({
+    /** 空配列で保存するとカスタムが消えて自動生成に戻る。 */
+    rules: z.array(RegexRuleSchema).max(500),
+  })
+  .openapi("UpdateRegexRulesRequest");
 
 export const JevPromptResponseSchema = z
   .object({

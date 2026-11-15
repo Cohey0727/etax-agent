@@ -59,10 +59,18 @@ export interface AgentTestResult {
   error: string | null;
 }
 
-/** 学習履歴から自動生成される適用ルール。 */
-export interface GeneratedRules {
-  regexRules: Array<{ pattern: string; category: string; count: number; example: string }>;
-  jevPrompt: string;
+/** 正規表現ルール1件（自動生成・手編集カスタム共通）。 */
+export interface RegexRuleItem {
+  pattern: string;
+  category: string;
+}
+
+/** 正規表現ルール一式（カスタム／自動生成／実効）。 */
+export interface RegexRulesInfo {
+  customRules: RegexRuleItem[];
+  usingCustom: boolean;
+  generatedRules: Array<RegexRuleItem & { count: number; example: string }>;
+  effectiveRules: RegexRuleItem[];
 }
 
 /** jev用プロンプト一式（カスタム／自動生成／実効）。 */

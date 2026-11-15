@@ -5,9 +5,17 @@ export const ChatRole = {
 
 export type ChatRole = (typeof ChatRole)[keyof typeof ChatRole];
 
+/** エージェントが使ったツールの記録（助手の発言に添えて表示する）。 */
+export interface ChatToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
 export interface ChatMessage {
   role: ChatRole;
   content: string;
+  /** その発言でエージェントが使ったツール（助手の発言のみ）。 */
+  toolCalls?: ChatToolCall[];
 }
 
 /**

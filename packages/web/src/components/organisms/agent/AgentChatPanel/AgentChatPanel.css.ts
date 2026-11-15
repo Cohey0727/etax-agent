@@ -52,6 +52,31 @@ const styles = {
     whiteSpace: "normal",
     wordBreak: "break-word",
   }),
+  // 助手の発言ブロック（吹き出し＋使ったツールの一覧）。
+  assistantBlock: style({
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.space.xs,
+    alignSelf: "flex-start",
+    maxWidth: "85%",
+  }),
+  assistantBubble: style({
+    maxWidth: "100%",
+  }),
+  // 使ったツールの一覧。発言の下にチップで並べる。
+  toolList: style({
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.space.xs,
+  }),
+  toolChip: style({
+    background: theme.color.accentSoft,
+    color: theme.color.accentText,
+    borderRadius: theme.borderRadius.sm,
+    padding: "2px 8px",
+    fontSize: theme.fontSizes.xs,
+    lineHeight: 1.6,
+  }),
   // 入力欄はパネルの一番下に固定（縮まない）。
   inputRow: style({
     flexShrink: 0,

@@ -16,11 +16,15 @@ import {
   normalizeDescriptionKey,
 } from "../../repositories/classificationHistoryRepository";
 
-export interface GeneratedRegexRule {
+/** 正規表現ルール1件（自動生成・手編集カスタム共通の最小形）。 */
+export interface RegexRule {
   /** 正規表現のソース（正規化済み摘要への部分一致で使う）。 */
   pattern: string;
   /** このパターンに当てはまる摘要の勘定科目。 */
   category: string;
+}
+
+export interface GeneratedRegexRule extends RegexRule {
   /** 根拠になった確定回数の合計。 */
   count: number;
   /** 人間可読な代表例（元の摘要）。 */
@@ -158,11 +162,11 @@ function buildJevPrompt(
   return sections.join("\n");
 }
 
-/** 生成済み正規表現ルールに摘要が当たるか（先に並んだルールが優先）。 */
+/** 正規表現ルールに摘要が当たるか（先に並んだルールが優先）。 */
 export function matchGeneratedRule(
   description: string,
-  rules: readonly GeneratedRegexRule[],
-): GeneratedRegexRule | null {
+  rules: readonly RegexRule[],
+): RegexRule | null {
   const normalized = normalizeDescriptionKey(description);
   for (const rule of rules) {
     if (new RegExp(rule.pattern).test(normalized)) return rule;

@@ -7,6 +7,7 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Button, Col, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
+import { DeductionPatch } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppView, AgentConnectionConfig, ChatMessage, ChatRole, SendKeyMode, ThemeMode } from "@types";
 import {
   agentChat,
@@ -25,13 +26,19 @@ export type AgentUiAction =
   | { type: "setYear"; year: number }
   | { type: "navigate"; view: AppView }
   | { type: "setTheme"; mode: ThemeMode }
-  | { type: "reloadTransactions" };
+  | { type: "reloadTransactions" }
+  /** 控除入力の変更を画面側の保存値へ適用する（set_deductions の結果）。 */
+  | { type: "applyDeductions"; year: number; patch: DeductionPatch }
+  /** 設定・申告まわりの変更後に、表示中の画面を読み直す。 */
+  | { type: "reloadView" };
 
 export interface AgentChatPanelProps {
   transactions: Transaction[];
   onUiAction?: (action: AgentUiAction) => void;
   /** チャットの送信キー（設定画面で切替、AppPage が保持） */
   sendKeyMode: SendKeyMode;
+  /** 送信時点の控除入力スナップショットを返す（エージェントの控除ツール用）。 */
+  getDeductionsSnapshot?: () => { year: number; state: unknown } | null;
   /** 外部接続（AI）の上書き設定（設定画面で入力、AppPage が保持） */
   agentConnection: AgentConnectionConfig;
   /** 保存済みの過去の会話（履歴の状態は AppPage が保持し、見出し横のボタンと共有する） */
@@ -50,6 +57,13 @@ export interface AgentChatPanelProps {
 
 /** 帳簿DBへの書き込み系ツール（成功したら画面の取引を読み直す）。 */
 const WRITE_TOOL_NAMES = new Set(["update_transactions", "add_transaction", "delete_transaction"]);
+
+/** 設定系の書き込みツール（成功したら表示中の画面を読み直す）。 */
+const SETTINGS_WRITE_TOOL_NAMES = new Set([
+  "set_classification_rules",
+  "set_jev_prompt",
+  "update_systemone_settings",
+]);
 
 // ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。
 const deriveUiActions = (
@@ -83,6 +97,30 @@ const deriveUiActions = (
       if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
         push({ type: "reloadTransactions" });
       }
+    } else if (tc.name === "set_deductions") {
+      // 控除入力の変更は画面側の保存値へ適用し、確定申告画面で見せる。
+      const result = tc.result as
+        | { ok?: unknown; applied?: unknown; year?: unknown; patch?: unknown }
+        | undefined;
+      if (result?.ok === true && result.applied === "deductions" && typeof result.year === "number") {
+        push({
+          type: "applyDeductions",
+          year: result.year,
+          patch: (result.patch ?? {}) as DeductionPatch,
+        });
+        push({ type: "navigate", view: AppView.Filing });
+      }
+    } else if (tc.name === "set_filing_status" || tc.name === "update_taxpayer_profile") {
+      // 申告ステータス・納税者情報は確定申告画面の表示に効く。
+      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
+        push({ type: "navigate", view: AppView.Filing });
+        push({ type: "reloadView" });
+      }
+    } else if (SETTINGS_WRITE_TOOL_NAMES.has(tc.name)) {
+      // 設定の変更は、設定画面を開いていればその表示に効く。
+      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
+        push({ type: "reloadView" });
+      }
     }
   }
   return actions;
@@ -98,6 +136,7 @@ export const AgentChatPanel = ({
   transactions,
   onUiAction,
   sendKeyMode,
+  getDeductionsSnapshot,
   agentConnection,
   sessions,
   historyOpen,
@@ -131,12 +170,31 @@ export const AgentChatPanel = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await agentChat(next, transactions, agentConnection);
-      const answered: ChatMessage[] = [...next, { role: ChatRole.Assistant, content: res.reply }];
+      const res = await agentChat(
+        next,
+        transactions,
+        agentConnection,
+        getDeductionsSnapshot?.() ?? undefined,
+      );
+      // 使ったツールは発言に添えて表示する（何をしたか分かるように）。
+      const answered: ChatMessage[] = [
+        ...next,
+        {
+          role: ChatRole.Assistant,
+          content: res.reply,
+          ...(res.toolCalls.length > 0
+            ? {
+                toolCalls: res.toolCalls.map((tc) => ({
+                  name: tc.name,
+                  arguments: tc.arguments,
+                })),
+              }
+            : {}),
+        },
+      ];
       setMessages(answered);
       saveCurrentMessages(answered);
       if (res.toolCalls.length > 0) {
-        // 画面操作は裏でだけ行い、ログとしては表示しない（会話の邪魔になるため）。
         const actions = deriveUiActions(res.toolCalls);
         if (onUiAction && actions.length > 0) {
           actions.forEach((action) => onUiAction(action));
@@ -205,9 +263,10 @@ export const AgentChatPanel = ({
           <div className={styles.chatLog} ref={logRef}>
             {messages.length === 0 && !loading ? (
               <Text variant="muted">
-                質問や、集計・計算などの処理を頼めます。例:
+                質問や、集計・計算などの処理を頼めます。設定の変更もできます。例:
                 「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
                 「ファミリーマートの支出はどのくらい？」「ＣａＳｙの科目を雑費に変えて」
+                「『よどばし』を消耗品費にする分類ルールを追加して」
               </Text>
             ) : null}
             <MessageBubbles items={messages} />
@@ -262,15 +321,27 @@ const MessageBubbles = ({ items }: { items: ChatMessage[] }) => {
     <>
       {items.map((m, i) =>
         m.role === ChatRole.Assistant ? (
-          <div key={i} className={clsx(styles.bubble, styles.role[m.role])}>
-            <div className={styles.markdown}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, rehypeSanitize]}
-              >
-                {m.content}
-              </ReactMarkdown>
+          <div key={i} className={styles.assistantBlock}>
+            <div className={clsx(styles.bubble, styles.role[m.role], styles.assistantBubble)}>
+              <div className={styles.markdown}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                >
+                  {m.content}
+                </ReactMarkdown>
+              </div>
             </div>
+            {m.toolCalls && m.toolCalls.length > 0 ? (
+              <div className={styles.toolList}>
+                {m.toolCalls.map((tc, j) => (
+                  <span key={j} className={styles.toolChip} title={tc.name}>
+                    🔧 {toolLabel(tc.name)}
+                    {summarizeToolArgs(tc.arguments) ? `（${summarizeToolArgs(tc.arguments)}）` : ""}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div key={i} className={clsx(styles.bubble, styles.role[m.role])}>
@@ -280,6 +351,57 @@ const MessageBubbles = ({ items }: { items: ChatMessage[] }) => {
       )}
     </>
   );
+};
+
+/** ツール名の日本語ラベル（チャットのツールチップ表示用）。 */
+const TOOL_LABELS: Record<string, string> = {
+  import_csv_info: "取込データの確認",
+  search_transactions: "取引を検索",
+  aggregate_year: "所得を集計",
+  consumption_tax: "消費税を計算",
+  amendment_delta: "修正申告の差分",
+  search_tax_knowledge: "税務知識を検索",
+  update_transactions: "取引を一括変更",
+  add_transaction: "取引を追加",
+  delete_transaction: "取引を削除",
+  classify_account: "科目を判定",
+  get_classification_rules: "分類ルールを確認",
+  set_classification_rules: "分類ルールを保存",
+  get_jev_prompt: "判定プロンプトを確認",
+  set_jev_prompt: "判定プロンプトを保存",
+  get_systemone_settings: "判定モデル設定を確認",
+  update_systemone_settings: "判定モデル設定を変更",
+  get_filing_status: "申告ステータスを確認",
+  set_filing_status: "申告ステータスを変更",
+  get_taxpayer_profile: "納税者情報を確認",
+  update_taxpayer_profile: "納税者情報を変更",
+  get_deductions: "控除入力を確認",
+  set_deductions: "控除入力を変更",
+  set_theme: "テーマを変更",
+};
+
+const toolLabel = (name: string): string => TOOL_LABELS[name] ?? name;
+
+/** チップに出す引数の要約（主要なものだけ短く）。 */
+const summarizeToolArgs = (args: Record<string, unknown>): string => {
+  const parts: string[] = [];
+  const text = (v: unknown, max = 18): string => {
+    const s = String(v);
+    return s.length > max ? `${s.slice(0, max)}…` : s;
+  };
+  if (typeof args.year === "number") parts.push(`${args.year}年`);
+  if (typeof args.keyword === "string" && args.keyword) parts.push(text(args.keyword));
+  if (typeof args.description === "string" && args.description) parts.push(text(args.description));
+  if (typeof args.query === "string" && args.query) parts.push(text(args.query));
+  if (typeof args.mode === "string") parts.push(args.mode);
+  if (typeof args.method === "string") parts.push(args.method);
+  if (typeof args.set_category === "string") parts.push(`→ ${args.set_category}`);
+  if (typeof args.category === "string" && !args.set_category) parts.push(args.category);
+  if (Array.isArray(args.rules)) parts.push(`${args.rules.length}件のルール`);
+  if (typeof args.prompt === "string") {
+    parts.push(args.prompt === "" ? "自動生成に戻す" : `${args.prompt.length}文字`);
+  }
+  return parts.join("・");
 };
 
 function formatSessionDate(iso: string): string {

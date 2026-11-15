@@ -12,12 +12,10 @@ import {
   recordClassificationFeedbackHandler,
   recordClassificationFeedbackRoute,
 } from "../usecases/recordClassificationFeedback";
-import {
-  getGeneratedRulesHandler,
-  getGeneratedRulesRoute,
-} from "../usecases/getGeneratedRules";
 import { getJevPromptHandler, getJevPromptRoute } from "../usecases/getJevPrompt";
+import { getRegexRulesHandler, getRegexRulesRoute } from "../usecases/getRegexRules";
 import { updateJevPromptHandler, updateJevPromptRoute } from "../usecases/updateJevPrompt";
+import { updateRegexRulesHandler, updateRegexRulesRoute } from "../usecases/updateRegexRules";
 
 const app = new OpenAPIHono();
 app.openapi(
@@ -35,7 +33,12 @@ app.openapi(
   recordClassificationFeedbackHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
-app.openapi(getGeneratedRulesRoute, getGeneratedRulesHandler);
+app.openapi(getRegexRulesRoute, getRegexRulesHandler);
+app.openapi(
+  updateRegexRulesRoute,
+  updateRegexRulesHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
 app.openapi(getJevPromptRoute, getJevPromptHandler);
 app.openapi(
   updateJevPromptRoute,

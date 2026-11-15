@@ -7,6 +7,7 @@
  */
 import { tool } from "ai";
 import { z } from "zod";
+import { TaxpayerProfile } from "../../schemas/taxpayer";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import {
   addTransactionForAgent,
@@ -14,6 +15,19 @@ import {
   loadAllTransactionsForAgent,
   updateTransactionsBulk,
 } from "./agentDbWrites";
+import {
+  classifyAccountForAgent,
+  getClassificationRulesForAgent,
+  getFilingStatusForAgent,
+  getJevPromptForAgent,
+  getSystemOneSettingsForAgent,
+  getTaxpayerProfileForAgent,
+  setClassificationRulesForAgent,
+  setFilingStatusForAgent,
+  setJevPromptForAgent,
+  updateSystemOneSettingsForAgent,
+  updateTaxpayerProfileForAgent,
+} from "./agentSettingsTools";
 import { AgentContext, ToolCallLog, dispatchTool } from "./agentTools";
 
 /** エージェントのツール一式を生成する。実行のたびに log へ記録が追加される。 */
@@ -35,6 +49,21 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
     try {
       result = await write();
       ctx.transactions = await loadAllTransactionsForAgent();
+    } catch (e) {
+      result = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+    log.push({ name, arguments: args, result });
+    return result;
+  };
+  // 設定系ツール。失敗は例外にせず { ok: false, error } として LLM へ返し、説明させる。
+  const runSettings = async (
+    name: string,
+    args: Record<string, unknown>,
+    work: () => Promise<unknown>,
+  ) => {
+    let result: unknown;
+    try {
+      result = { ok: true, ...(await work()) as Record<string, unknown> };
     } catch (e) {
       result = { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
@@ -188,6 +217,163 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
             amount: args.amount,
           }),
         ),
+    }),
+    classify_account: tool({
+      description:
+        "摘要1件の勘定科目を、現在の判定パイプライン（正規表現ルール→判定モデル→キーワードルール）で判定する。「この摘要は何の科目になる？」の確認や、ルール追加前のテストに使う。",
+      inputSchema: z.object({
+        description: z.string().describe("判定したい摘要（例: ヨドバシカメラ キーボード購入）"),
+      }),
+      execute: async ({ description }) =>
+        runSettings("classify_account", { description }, () => classifyAccountForAgent(description)),
+    }),
+    get_classification_rules: tool({
+      description:
+        "自動分類の正規表現ルール一式を返す。custom_rules は手編集されたカスタムルール、generated_rules は学習履歴からの自動生成、effective_rules は実際に判定へ使われるルール（カスタムがあればカスタム優先）。ルールの確認・追加・変更の前に必ずこれで現状を読むこと。",
+      inputSchema: z.object({}),
+      execute: async () => runSettings("get_classification_rules", {}, getClassificationRulesForAgent),
+    }),
+    set_classification_rules: tool({
+      description:
+        "自動分類の正規表現ルールを保存する（一式の上書き。保存したルールが実効ルールになる）。ルールは上から順に照合され、最初に当たったものが使われる。摘要は正規化（英数字は半角・小文字化、カタカナは全角化）された文字列に照合されるため、パターンの英数字は半角小文字、カタカナは全角で書くこと。1件だけ追加・変更したい場合も、get_classification_rules の effective_rules に変更を加えた一式を丸ごと渡すこと（渡さなかったルールは消える）。空配列を渡すとカスタムが消えて自動生成に戻る。",
+      inputSchema: z.object({
+        rules: z
+          .array(
+            z.object({
+              pattern: z.string().describe("正規表現（正規化済み摘要への部分一致）"),
+              category: z.string().describe("勘定科目（例: 消耗品費）"),
+            }),
+          )
+          .describe("ルール一式（優先順）"),
+      }),
+      execute: async ({ rules }) =>
+        runSettings("set_classification_rules", { rules }, () => setClassificationRulesForAgent(rules)),
+    }),
+    get_jev_prompt: tool({
+      description:
+        "科目判定モデル（jev）用プロンプトを返す。custom_prompt は手編集されたカスタム、generated_prompt は学習履歴からの自動生成、effective_prompt は実際に使われるもの（カスタム優先）。",
+      inputSchema: z.object({}),
+      execute: async () => runSettings("get_jev_prompt", {}, getJevPromptForAgent),
+    }),
+    set_jev_prompt: tool({
+      description:
+        "科目判定モデル（jev）用プロンプトを保存する。保存したプロンプトが自動生成より優先される。空文字を渡すとカスタムが消えて自動生成に戻る。",
+      inputSchema: z.object({
+        prompt: z.string().describe("プロンプト全文（空文字で自動生成に戻る）"),
+      }),
+      execute: async ({ prompt }) =>
+        runSettings("set_jev_prompt", { prompt }, () => setJevPromptForAgent(prompt)),
+    }),
+    get_systemone_settings: tool({
+      description:
+        "科目判定モデル（SystemOne）の接続設定を返す。base_url / model は保存値（未保存なら空）、effective_base_url / effective_model は実際に使われる値。APIキーは有無（api_key_set）だけが返る。",
+      inputSchema: z.object({}),
+      execute: async () => runSettings("get_systemone_settings", {}, getSystemOneSettingsForAgent),
+    }),
+    update_systemone_settings: tool({
+      description:
+        "科目判定モデル（SystemOne）の接続設定を更新する。指定した項目だけが変わる（空文字は変更しない）。",
+      inputSchema: z.object({
+        base_url: z.string().optional().describe("接続先URL（例: http://127.0.0.1:11434）"),
+        model: z.string().optional().describe("モデル名（例: tev1）"),
+        api_key: z.string().optional().describe("APIキー（必要な場合のみ）"),
+      }),
+      execute: async ({ base_url, model, api_key }) =>
+        runSettings("update_systemone_settings", { base_url, model }, () =>
+          updateSystemOneSettingsForAgent({ baseUrl: base_url, model, apiKey: api_key }),
+        ),
+    }),
+    get_filing_status: tool({
+      description:
+        "申告ステータス（帳簿の確認 confirmed / 控除・計算 calculated / 提出 submitted の済み状態）を返す。year を省略すると全年度分を返す。",
+      inputSchema: z.object({
+        year: z.number().int().optional().describe("対象年（西暦）。省略時は全年度"),
+      }),
+      execute: async ({ year }) =>
+        runSettings("get_filing_status", { year }, () => getFilingStatusForAgent(year)),
+    }),
+    set_filing_status: tool({
+      description:
+        "指定年の申告ステータスを更新する。指定した項目だけが変わる（true で済み、false で未了に戻す）。提出（submitted）は e-Tax での送信を本人が終えた場合にだけ true にすること。",
+      inputSchema: z.object({
+        year: z.number().int().describe("対象年（西暦）"),
+        confirmed: z.boolean().optional().describe("帳簿の確認"),
+        calculated: z.boolean().optional().describe("控除・計算の確定"),
+        submitted: z.boolean().optional().describe("提出"),
+      }),
+      execute: async ({ year, confirmed, calculated, submitted }) =>
+        runSettings("set_filing_status", { year, confirmed, calculated, submitted }, () =>
+          setFilingStatusForAgent(year, { confirmed, calculated, submitted }),
+        ),
+    }),
+    get_taxpayer_profile: tool({
+      description:
+        "指定年の納税者情報（氏名・住所・税務署・インボイス番号など）を返す。対象年に保存が無ければ過去年からの引き継ぎ（carried_from に年が入る）。",
+      inputSchema: z.object({
+        year: z.number().int().describe("対象年（西暦）"),
+      }),
+      execute: async ({ year }) =>
+        runSettings("get_taxpayer_profile", { year }, () => getTaxpayerProfileForAgent(year)),
+    }),
+    update_taxpayer_profile: tool({
+      description:
+        "指定年の納税者情報を更新する。profile には変更する項目だけを snake_case のキーで渡す（name / name_kana / zip_code / address / address_line2 / birth_date / phone / tax_office_name / tax_office_code / my_number / occupation / shop_name / jan1_address / invoice_number / previous_zip_code / previous_address）。未指定の項目は現在の値を維持する。",
+      inputSchema: z.object({
+        year: z.number().int().describe("対象年（西暦）"),
+        profile: z
+          .record(z.string(), z.string())
+          .describe("変更する項目（snake_case のキーと値）"),
+      }),
+      execute: async ({ year, profile }) =>
+        runSettings("update_taxpayer_profile", { year, profile }, () =>
+          updateTaxpayerProfileForAgent(year, profile as Partial<TaxpayerProfile>),
+        ),
+    }),
+    get_deductions: tool({
+      description:
+        "画面に保存されている控除入力（所得控除・税額控除・雑所得・申告の種類・内訳）を、対象年分まとめて返す。控除の確認や変更の前に使う。",
+      inputSchema: z.object({}),
+      execute: async () => run("get_deductions", {}),
+    }),
+    set_deductions: tool({
+      description:
+        "控除入力を変更する（画面側の保存値へ反映される）。deductions は DeductionInputs の部分JSON（例: {\"socialInsurancePaid\": 140080, \"donationsTotal\": 47000}。内訳がある控除は *_entries で明細を渡すと合計も自動で合う）。filing_type は blue65 / blue55 / blue10 / white。misc_income は雑所得（revenue / income / kubun）。",
+      inputSchema: z.object({
+        year: z.number().int().describe("対象年（西暦）"),
+        deductions: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("控除入力の部分JSON（DeductionInputs のフィールド名で指定）"),
+        filing_type: z
+          .enum(["blue65", "blue55", "blue10", "white"])
+          .optional()
+          .describe("申告の種類"),
+        misc_income: z
+          .object({
+            revenue: z.number().optional(),
+            income: z.number().optional(),
+            kubun: z.number().optional(),
+          })
+          .optional()
+          .describe("雑所得（その他）の入力"),
+        donation_entries: z
+          .array(z.object({ recipient: z.string(), amount: z.number() }))
+          .optional()
+          .describe("寄附金の内訳（名称と金額）"),
+        social_insurance_entries: z
+          .array(z.object({ recipient: z.string(), amount: z.number() }))
+          .optional()
+          .describe("社会保険料の内訳"),
+        mutual_aid_entries: z
+          .array(z.object({ recipient: z.string(), amount: z.number() }))
+          .optional()
+          .describe("小規模企業共済等掛金の内訳"),
+        medical_entries: z
+          .array(z.object({ recipient: z.string(), amount: z.number() }))
+          .optional()
+          .describe("医療費の内訳"),
+      }),
+      execute: async (args) => run("set_deductions", { ...args }),
     }),
     amendment_delta: tool({
       description:

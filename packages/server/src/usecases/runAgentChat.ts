@@ -91,8 +91,9 @@ export const runAgentChatHandler: RouteHandler<typeof runAgentChatRoute> = async
     .map((m) => ({ role: m.role, content: m.content }));
   const transactions = normalizeTransactions(body.transactions ?? []);
   const csvText = body.csvText;
+  const deductions = body.deductions;
   try {
-    const result = await runAgentTurn(cfg, history, { transactions, csvText });
+    const result = await runAgentTurn(cfg, history, { transactions, csvText, deductions });
     const response: AgentChatResponse = result;
     return c.json(response, 200);
   } catch (e) {

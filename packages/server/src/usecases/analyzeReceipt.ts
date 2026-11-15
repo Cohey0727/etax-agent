@@ -20,6 +20,7 @@ import {
 import { createSystemOneClient } from "../gateways/systemOneGateway";
 import {
   getJevPromptOverride,
+  getRegexRulesOverride,
   loadAgentConfig,
   loadStorageConfig,
   loadSystemOneConfig,
@@ -141,6 +142,7 @@ export const analyzeReceiptHandler: RouteHandler<typeof analyzeReceiptRoute> = a
     history,
     systemOne,
     jevPromptOverride: getJevPromptOverride(),
+    regexRulesOverride: getRegexRulesOverride(),
   });
   return c.json({ ...extracted, classification }, 200);
 };

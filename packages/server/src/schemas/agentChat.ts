@@ -14,6 +14,11 @@ export const AgentChatRequestSchema = z
     messages: z.array(z.unknown()),
     transactions: z.unknown().optional(),
     csvText: z.string().optional().catch(undefined),
+    // 画面が保持する控除入力のスナップショット（対象年つき）。
+    deductions: z
+      .object({ year: z.number().int(), state: z.unknown() })
+      .optional()
+      .catch(undefined),
     // 設定画面（外部接続）からの上書き。空・欠落はサーバー設定を使う。
     agentConfig: z
       .object({

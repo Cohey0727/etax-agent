@@ -123,6 +123,25 @@ export function getJevPromptOverride(): string {
 }
 
 /**
+ * 設定画面で編集された正規表現ルールの上書き（null＝未設定）。
+ * 設定がある間は、学習履歴から自動生成されるルールより優先される
+ * （実効ルールはこのリストそのものになる）。
+ */
+let regexRulesOverride: { pattern: string; category: string }[] | null = null;
+
+/** 保存済みの正規表現ルール上書きを差し替える（regexRulesRepository が使う）。 */
+export function setRegexRulesOverride(
+  rules: { pattern: string; category: string }[] | null,
+): void {
+  regexRulesOverride = rules;
+}
+
+/** 現在の正規表現ルール上書きを読む（未設定なら null）。 */
+export function getRegexRulesOverride(): { pattern: string; category: string }[] | null {
+  return regexRulesOverride;
+}
+
+/**
  * SystemOne 互換エンドポイントの設定を読み込む。
  * 設定画面で保存された値があれば、環境変数より優先する。
  */

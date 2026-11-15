@@ -6,8 +6,9 @@ import {
   AgentTestResult,
   AnalyzeReceiptResponse,
   ChatMessage,
-  GeneratedRules,
   JevPromptInfo,
+  RegexRuleItem,
+  RegexRulesInfo,
   ExportConsumptionXtxRequest,
   ExportConsumptionXtxResponse,
   ExportDomicilePdfRequest,
@@ -57,6 +58,7 @@ export async function agentChat(
   messages: ChatMessage[],
   transactions: Transaction[],
   connection?: AgentConnectionConfig,
+  deductions?: { year: number; state: unknown },
 ): Promise<AgentChatResponse> {
   // 設定画面の外部接続は、入っている項目だけを上書きとして送る（空はサーバー設定）。
   const agentConfig = {
@@ -68,8 +70,10 @@ export async function agentChat(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      messages,
+      // ツール実行ログは会話履歴として送らない（表示専用）。
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
       transactions,
+      ...(deductions ? { deductions } : {}),
       ...(Object.keys(agentConfig).length > 0 ? { agentConfig } : {}),
     }),
   });
@@ -146,10 +150,20 @@ export async function testAgentSettings(input: {
   return parseJson<AgentTestResult>(resp);
 }
 
-/** 学習履歴から自動生成される適用ルールを取得する。 */
-export async function fetchGeneratedRules(): Promise<GeneratedRules> {
-  const resp = await fetch("/api/classify/generated-rules");
-  return parseJson<GeneratedRules>(resp);
+/** 正規表現ルール一式（カスタム／自動生成／実効）を取得する。 */
+export async function fetchRegexRules(): Promise<RegexRulesInfo> {
+  const resp = await fetch("/api/classify/regex-rules");
+  return parseJson<RegexRulesInfo>(resp);
+}
+
+/** 正規表現ルールを保存する（空配列でカスタムを消して自動生成に戻る）。 */
+export async function updateRegexRules(rules: RegexRuleItem[]): Promise<RegexRulesInfo> {
+  const resp = await fetch("/api/classify/regex-rules", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rules }),
+  });
+  return parseJson<RegexRulesInfo>(resp);
 }
 
 /** jev用プロンプト一式（カスタム／自動生成／実効）を取得する。 */

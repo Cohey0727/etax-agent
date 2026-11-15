@@ -2,8 +2,9 @@
  * classifyAccount.ts — 勘定科目の判定（services/classification）。
  *
  * 判定の優先順位:
- *   1. 生成ルール: 学習履歴から自動生成した正規表現ルール（generateRules）。
- *      決定的に当たるため、引っ掛かればそのまま自動で対応する。
+ *   1. 正規表現ルール: 学習履歴から自動生成したルール（generateRules）。
+ *      設定画面で手編集されたルール（regexRulesOverride）があればそちらを
+ *      実効ルールとして使う。決定的に当たるため、引っ掛かれば自動で対応する。
  *   2. SystemOne: 正規表現で決められないものを、判定モデルAPI
  *      （/v1/systemone）に choice 質問として投げ、科目ごとの確率分布を
  *      得る。その際、生成ルールと確定例を文章化したプロンプト
@@ -20,7 +21,7 @@
 import { ACCOUNT_CRITERIA, suggestCategory } from "@etax/shared";
 import { SystemOneClient } from "../../gateways/systemOneGateway";
 import { ClassificationHistoryRecord } from "../../repositories/classificationHistoryRepository";
-import { generateRules, matchGeneratedRule } from "./generateRules";
+import { RegexRule, generateRules, matchGeneratedRule } from "./generateRules";
 
 export type ClassificationSource = "generated" | "systemone" | "rules" | "none";
 
@@ -45,6 +46,11 @@ export interface ClassifyAccountDeps {
   stateHint?: string;
   /** 設定画面で手編集された jev 用プロンプト。非空なら自動生成より優先する。 */
   jevPromptOverride?: string;
+  /**
+   * 設定画面で手編集された正規表現ルール。null でない場合は自動生成の
+   * 代わりにこれが実効ルールになる（空配列ならルールなし）。
+   */
+  regexRulesOverride?: readonly RegexRule[] | null;
 }
 
 /**
@@ -122,7 +128,9 @@ export async function classifyAccount(
   // 履歴が変われば生成結果も変わるため、判定のたびに作り直す。
   // 履歴そのものを直接照合はしない（材料としてだけ使う）。
   const generated = generateRules(deps.history);
-  const ruleHit = matchGeneratedRule(description, generated.regexRules);
+  // 手編集ルールがあれば自動生成より優先する（空配列なら正規表現は使わない）。
+  const effectiveRules = deps.regexRulesOverride ?? generated.regexRules;
+  const ruleHit = matchGeneratedRule(description, effectiveRules);
   if (ruleHit) {
     return {
       account: ruleHit.category,

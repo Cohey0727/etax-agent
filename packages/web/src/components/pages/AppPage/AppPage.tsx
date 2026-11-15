@@ -2,6 +2,13 @@ import { sampleTransactions, Transaction } from "@etax/shared";
 import { ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconName } from "@components/atoms";
 import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
+import {
+  applyDeductionPatch,
+  BreakdownEntry,
+  DeductionPatch,
+  loadDeductionState,
+  saveDeductionState,
+} from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppTemplate } from "@components/templates";
 import {
   AgentConnectionConfig,
@@ -58,6 +65,23 @@ const FILING_NAV_CHILDREN: readonly { view: AppView; key: string; label: string 
   { view: AppView.Filing, key: "consumption", label: "消費税" },
   { view: AppView.Filing, key: "taxpayer", label: "納税者情報" },
 ];
+
+/** エージェント由来の控除パッチの内訳に、保存用の id を補う。 */
+const withEntryIds = (patch: DeductionPatch): DeductionPatch => {
+  if (!patch.entries) return patch;
+  const entries: DeductionPatch["entries"] = {};
+  for (const [key, list] of Object.entries(patch.entries)) {
+    if (!list) continue;
+    entries[key as keyof typeof entries] = list.map(
+      (e, i): BreakdownEntry => ({
+        id: e.id || `agent-${key}-${i}`,
+        recipient: e.recipient ?? "",
+        amount: typeof e.amount === "number" ? e.amount : 0,
+      }),
+    );
+  }
+  return { ...patch, entries };
+};
 
 const THEME_STORAGE_KEY = "etax-theme";
 
@@ -159,6 +183,8 @@ export const AppPage = () => {
   );
   // エージェント会話の履歴。見出し横の履歴ボタンとパネルで状態を共有する。
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
+  // エージェントが設定・申告まわりを変更したときに、表示中の画面を読み直させる。
+  const [viewRefreshKey, setViewRefreshKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingSession, setViewingSession] = useState<ChatSession | null>(null);
   // 会話クリアはパネル側の操作だが、ボタンはヘッダー（履歴の隣）に置くためハンドラを受け取る。
@@ -313,6 +339,13 @@ export const AppPage = () => {
   const handleUiAction = (action: AgentUiAction) => {
     if (action.type === "setYear") {
       handleYearChange(action.year);
+    } else if (action.type === "applyDeductions") {
+      // エージェントの控除変更を、画面側の保存値（localStorage）へ適用する。
+      const patch = withEntryIds(action.patch);
+      saveDeductionState(action.year, applyDeductionPatch(loadDeductionState(action.year), patch));
+      setViewRefreshKey((v) => v + 1);
+    } else if (action.type === "reloadView") {
+      setViewRefreshKey((v) => v + 1);
     } else if (action.type === "reloadTransactions") {
       // エージェントが帳簿DBへ書き込んだ後は、帳簿の最新状態を読み直して反映する。
       void (async () => {
@@ -346,6 +379,7 @@ export const AppPage = () => {
           transactions={transactions}
           onUiAction={handleUiAction}
           sendKeyMode={sendKeyMode}
+          getDeductionsSnapshot={() => ({ year, state: loadDeductionState(year) })}
           agentConnection={agentConnection}
           sessions={chatSessions}
           historyOpen={historyOpen}
@@ -389,6 +423,7 @@ export const AppPage = () => {
       onNavChildSelect={handleNavChildSelect}
     >
       <ActiveComponent
+        key={viewRefreshKey}
         transactions={transactions}
         year={year}
         onUseTransactions={handleUseImported}

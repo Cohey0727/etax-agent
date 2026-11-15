@@ -6,7 +6,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { createSystemOneClient } from "../gateways/systemOneGateway";
-import { getJevPromptOverride, loadSystemOneConfig } from "../lib/config";
+import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../lib/config";
 import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import {
   ClassifyAccountsBatchRequestSchema,
@@ -47,7 +47,7 @@ export const classifyAccountsBatchHandler: RouteHandler<
   const systemOne = createSystemOneClient(loadSystemOneConfig());
   const results = [];
   for (const item of body.items) {
-    results.push(await classifyAccount(item.description, { history, systemOne, jevPromptOverride: getJevPromptOverride() }));
+    results.push(await classifyAccount(item.description, { history, systemOne, jevPromptOverride: getJevPromptOverride(), regexRulesOverride: getRegexRulesOverride() }));
   }
   return c.json({ results }, 200);
 };

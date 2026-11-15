@@ -26,6 +26,11 @@ const styles = {
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
     fontSize: theme.fontSizes.xs,
   }),
+  // ルール編集行の正規表現入力。行の幅いっぱいに広げる。
+  rulePatternInput: style({
+    flex: 1,
+    minWidth: 0,
+  }),
   promptPre: style({
     margin: 0,
     background: theme.color.hover,

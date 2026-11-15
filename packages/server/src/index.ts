@@ -49,6 +49,7 @@ import { createSystemOneClient } from "./gateways/systemOneGateway";
 import { loadSystemOneConfig } from "./lib/config";
 import { loadSystemOneSettings } from "./repositories/systemOneSettingsRepository";
 import { loadJevPromptOverride } from "./repositories/jevPromptRepository";
+import { loadRegexRulesOverride } from "./repositories/regexRulesRepository";
 import agentRoutes from "./routes/agent";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
@@ -142,6 +143,7 @@ void (async () => {
   try {
     await loadSystemOneSettings();
     await loadJevPromptOverride();
+    await loadRegexRulesOverride();
   } catch (e) {
     console.warn(
       `SystemOne の保存済み設定の読み込みに失敗しました: ${e instanceof Error ? e.message : String(e)}`,
