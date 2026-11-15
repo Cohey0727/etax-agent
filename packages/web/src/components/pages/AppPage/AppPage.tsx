@@ -101,7 +101,7 @@ const readStoredYear = (): number => {
   }
 };
 
-/** 取引がまだ無いのに追加された年度（年度セレクタの「＋ 年度を追加」）。 */
+/** 取引がまだ無いのに追加された年度（年度セレクタの「YYYY年度を追加」）。 */
 const EXTRA_YEARS_STORAGE_KEY = "etax-extra-years";
 
 const readExtraYears = (): number[] => {

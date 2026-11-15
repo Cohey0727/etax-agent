@@ -1,6 +1,6 @@
 import { Fragment, ReactNode, useEffect, useState } from "react";
 import { clsx } from "clsx";
-import { Badge, Button, Col, Icon, IconName, Input, Row, Select, Text } from "@components/atoms";
+import { Badge, Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
 
@@ -80,18 +80,14 @@ export const AppTemplate = ({
   onNavChildSelect,
   children,
 }: AppTemplateProps) => {
-  // 年度追加の入力欄の開閉と入力値。
-  const [addingYear, setAddingYear] = useState(false);
-  const [newYearText, setNewYearText] = useState("");
-  const startAddingYear = () => {
-    setNewYearText(String((years[0] ?? new Date().getFullYear()) + 1));
-    setAddingYear(true);
-  };
-  const submitNewYear = () => {
-    const nextYear = Number(newYearText);
-    if (Number.isInteger(nextYear) && nextYear >= 1900 && nextYear <= 2100) {
-      onAddYear?.(nextYear);
-      setAddingYear(false);
+  // 年度の追加はセレクタの中の選択肢で行う（最大年度+1 / 最小年度-1）。
+  const nextYear = (years[0] ?? new Date().getFullYear()) + 1;
+  const prevYear = years.length > 0 ? years[years.length - 1] - 1 : null;
+  const handleYearSelect = (raw: string) => {
+    if (raw.startsWith("add:")) {
+      onAddYear?.(Number(raw.slice("add:".length)));
+    } else {
+      onYearChange(Number(raw));
     }
   };
   // 左右パネルの開閉はレイアウト側の状態で、端末に保存して次回も引き継ぐ。
@@ -153,37 +149,19 @@ export const AppTemplate = ({
                 <Select
                   className={styles.yearSelect}
                   value={selectedYear}
-                  onChange={(e) => onYearChange(Number(e.target.value))}
+                  onChange={(e) => handleYearSelect(e.target.value)}
                   aria-label="年度"
                 >
+                  {onAddYear ? <option value={`add:${nextYear}`}>{nextYear}年度を追加</option> : null}
                   {years.map((year) => (
                     <option key={year} value={year}>
-                      {year}年
+                      {year}年度
                     </option>
                   ))}
+                  {onAddYear && prevYear !== null ? (
+                    <option value={`add:${prevYear}`}>{prevYear}年度を追加</option>
+                  ) : null}
                 </Select>
-                {onAddYear ? (
-                  addingYear ? (
-                    <Row gap="sm" align="center">
-                      <Input
-                        type="number"
-                        value={newYearText}
-                        onChange={(e) => setNewYearText(e.target.value)}
-                        aria-label="追加する年度"
-                      />
-                      <Button variant="ghost" size="sm" onClick={submitNewYear}>
-                        追加
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setAddingYear(false)}>
-                        やめる
-                      </Button>
-                    </Row>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={startAddingYear}>
-                      ＋ 年度を追加
-                    </Button>
-                  )
-                ) : null}
               </Col>
               <Col gap="sm">
                 {navViews.map((view) => {
