@@ -44,6 +44,7 @@ import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
 import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { ensureTables, isDatabaseConfigured } from "./lib/db";
+import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
 import { createSystemOneClient } from "./gateways/systemOneGateway";
 import { loadSystemOneConfig } from "./lib/config";
 import agentRoutes from "./routes/agent";
@@ -119,6 +120,8 @@ void (async () => {
   try {
     await ensureTables();
     console.log("帳簿DBのテーブルを確認しました");
+    const knowledgeCount = await seedTaxKnowledge();
+    console.log(`税務知識ベースを準備しました（${knowledgeCount}件）`);
   } catch (e) {
     console.warn(
       `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,

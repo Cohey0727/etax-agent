@@ -150,5 +150,23 @@ export async function ensureTables(): Promise<void> {
       figures text NOT NULL
     )
   `);
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS knowledge_docs (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      slug text NOT NULL UNIQUE,
+      number text NOT NULL DEFAULT '',
+      title text NOT NULL,
+      category text NOT NULL DEFAULT '',
+      source_url text NOT NULL DEFAULT '',
+      content text NOT NULL,
+      updated_at integer NOT NULL
+    )
+  `);
+  // 日本語の部分一致検索用に trigram トークナイザを使う（rowid = knowledge_docs.id）。
+  db.run(sql`
+    CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(
+      title, content, tokenize='trigram'
+    )
+  `);
   tablesEnsured = true;
 }

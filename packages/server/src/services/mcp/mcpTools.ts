@@ -58,6 +58,7 @@ import {
   updateTransactionRow,
 } from "../../repositories/transactionRepository";
 import { classifyAccount } from "../classification/classifyAccount";
+import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
 
@@ -109,6 +110,22 @@ export const MCP_TOOLS: McpToolDef[] = [
     description:
       "帳簿DBの指定年の消費税を、本則（standard）・簡易課税（simplified）・2割特例（special20）の3方式すべて計算して返す。家賃収入は非課税として扱う。",
     inputSchema: { type: "object", properties: { year: yearProperty }, required: ["year"] },
+  },
+  {
+    name: "search_tax_knowledge",
+    description:
+      "税務知識ベース（国税庁タックスアンサーの本文を収録）を検索し、関連する制度・手続きの抜粋と出典（No.とURL）を返す。税率・控除の要件や上限、簡易課税のみなし仕入率、申告・納付の手続きや期限など、税制のルールで不確かな点の確認に使う。金額の計算は他の計算ツールで行うこと。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "検索キーワード（空白区切りで複数可。例: 簡易課税 みなし仕入率 第5種）",
+        },
+        limit: { type: "integer", description: "返す件数（任意、既定5、最大10）" },
+      },
+      required: ["query"],
+    },
   },
   {
     name: "income_tax",
@@ -696,6 +713,14 @@ export async function dispatchMcpTool(
           full_deduction: result.fullDeduction,
           xtx,
         });
+      }
+      case "search_tax_knowledge": {
+        requireDb();
+        const query = typeof args["query"] === "string" ? args["query"] : "";
+        if (!query.trim()) throw new Error("query（検索キーワード）が必要です");
+        const limit =
+          typeof args["limit"] === "number" ? Math.min(10, Math.max(1, Math.trunc(args["limit"]))) : 5;
+        return textResult(await searchTaxKnowledge(query, limit));
       }
       case "get_filing_status": {
         const db = requireDb();

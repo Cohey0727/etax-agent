@@ -7,6 +7,7 @@
  */
 import { tool } from "ai";
 import { z } from "zod";
+import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { AgentContext, ToolCallLog, dispatchTool } from "./agentTools";
 
 /** エージェントのツール一式を生成する。実行のたびに log へ記録が追加される。 */
@@ -57,6 +58,31 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
         mode: z.enum(["light", "dark", "system"]),
       }),
       execute: async ({ mode }) => run("set_theme", { mode }),
+    }),
+    search_tax_knowledge: tool({
+      description:
+        "税務知識ベース（国税庁タックスアンサーの本文を収録）を検索し、関連する制度・手続きの抜粋と出典（No.とURL）を返す。税率・控除の要件や上限、簡易課税のみなし仕入率、申告・納付の手続きや期限など、税制のルールで不確かな点があるときは、推測で答えず必ずこれで調べてから答える。金額の計算自体は他の計算ツールで行うこと（このツールは制度の確認用）。",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .describe("検索キーワード（空白区切りで複数可。例: 簡易課税 みなし仕入率 第5種）"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .optional()
+          .describe("返す件数（既定5）"),
+      }),
+      execute: async ({ query, limit }) => {
+        const result = await searchTaxKnowledge(query, limit ?? 5);
+        log.push({
+          name: "search_tax_knowledge",
+          arguments: { query, limit: limit ?? 5 },
+          result,
+        });
+        return result;
+      },
     }),
     amendment_delta: tool({
       description:

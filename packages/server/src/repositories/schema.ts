@@ -113,9 +113,30 @@ export const filingSnapshotsTable = sqliteTable("filing_snapshots", {
   figures: text("figures", { mode: "json" }).notNull(),
 });
 
+/**
+ * 税務知識ベース（国税庁タックスアンサー等の本文を収録した参照用テーブル）。
+ * 全文検索は knowledge_fts（FTS5・trigram）側で行い、rowid = 本テーブルの id で結ぶ。
+ */
+export const knowledgeDocsTable = sqliteTable("knowledge_docs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** 一意キー（例: "nta-2072"） */
+  slug: text("slug").notNull().unique(),
+  /** 出典の番号（タックスアンサー番号。例: "2072"） */
+  number: text("number").notNull().default(""),
+  title: text("title").notNull(),
+  /** 分野（例: 所得控除、消費税） */
+  category: text("category").notNull().default(""),
+  sourceUrl: text("source_url").notNull().default(""),
+  content: text("content").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type ImportRow = typeof importsTable.$inferSelect;
 export type TransactionRow = typeof transactionsTable.$inferSelect;
 export type NewTransactionRow = typeof transactionsTable.$inferInsert;
 export type FilingStatusRow = typeof filingStatusTable.$inferSelect;
 export type TaxpayerProfileRow = typeof taxpayerProfilesTable.$inferSelect;
 export type FilingSnapshotRow = typeof filingSnapshotsTable.$inferSelect;
+export type KnowledgeDocRow = typeof knowledgeDocsTable.$inferSelect;
