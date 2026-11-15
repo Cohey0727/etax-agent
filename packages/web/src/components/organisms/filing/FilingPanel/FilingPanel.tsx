@@ -6,7 +6,6 @@ import {
   buildSnapshotFigures,
   useFilingSnapshots,
 } from "@components/organisms/filing/ConfirmComparePanel";
-import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
 import { IncomeSummary } from "@components/organisms/filing/IncomeSummary";
 import { TaxSummary } from "@components/organisms/filing/TaxSummary";
@@ -37,7 +36,8 @@ interface ManualItem {
  * 各項目の行の直下に、その項目の結果の数字（収支→所得、控除・計算→税額）を
  * 並べ、見直してそのまま「確定」にできるようにする。
  * 提出はこのアプリでは行えない（e-Tax で本人が送信する）ため、確定を付ける
- * 項目には含めず、下に提出先への動線として別に置く。
+ * 項目には含めない。提出の動線（XTX出力と e-Tax へのリンク）は下の
+ * TaxpayerPanel のカードにだけ置く（重複させない）。
  */
 const MANUAL_ITEMS: readonly ManualItem[] = [
   {
@@ -164,19 +164,6 @@ export const FilingPanel = ({
               </Fragment>
             );
           })}
-
-          <div className={styles.statusRow}>
-            <Col gap="sm" className={styles.itemMain}>
-              <Text className={styles.itemLabel}>提出</Text>
-              <Text variant="muted">
-                e-Tax 用データ（XTX）を出力し、e-Tax に取り込んで送信します。出力は
-                この画面の下の提出パネルで行います。
-              </Text>
-            </Col>
-          </div>
-          <div className={styles.figuresBlock}>
-            <EtaxSubmitActions />
-          </div>
 
           <div className={styles.statusRow}>
             <Col gap="sm" className={styles.itemMain}>
