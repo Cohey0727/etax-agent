@@ -481,10 +481,6 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   // 期間フィルターは常設で、検索の左に置く。それ以外は下の段に並べる。
   const periodFilter = filters.find((f) => f.field === "period");
   const otherFilters = filters.filter((f) => f.field !== "period");
-  const periodActive =
-    periodFilter?.field === "period" &&
-    (periodFilter.from !== "" || periodFilter.to !== "");
-  const hasActiveFilters = Boolean(normalizedQuery) || otherFilters.length > 0 || periodActive;
 
   // 統計は表示中（絞り込み後）の取引で集計する。期間を絞れば、その期間の合計が見える。
   const incomeTotal = visibleRows.reduce(
@@ -508,7 +504,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
       <Col gap="md">
           <Row gap="md" align="center" justify="spaceBetween">
-            <Text variant="sectionTitle">帳簿（全年度）</Text>
+            <Text variant="sectionTitle">帳簿</Text>
             <Row gap="md" align="center">
               <div className={styles.addMenuWrap}>
                 <Button
@@ -602,35 +598,33 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
               </Card>
             ))}
           </div>
-          <Row gap="sm" align="center" wrap>
-            {periodFilter ? (
-              <FilterChip
-                bare
-                filter={periodFilter}
-                years={yearOptions}
-                onChange={updateFilter}
-              />
-            ) : null}
-            <div className={styles.searchWrap}>
-              <span className={styles.searchIcon}>
-                <Icon name="search" size={16} />
-              </span>
-              <Input
-                className={styles.searchInput}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="摘要・科目・出所で検索"
-                aria-label="取引を検索"
-              />
-            </div>
-            {hasActiveFilters ? (
-              <>
-                <Text variant="muted">{visibleRows.length}件ヒット</Text>
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  クリア
-                </Button>
-              </>
-            ) : null}
+          <Row gap="sm" align="center" justify="spaceBetween" wrap>
+            <Row gap="sm" align="center" wrap>
+              {periodFilter ? (
+                <FilterChip
+                  bare
+                  filter={periodFilter}
+                  years={yearOptions}
+                  onChange={updateFilter}
+                />
+              ) : null}
+              <div className={styles.searchWrap}>
+                <span className={styles.searchIcon}>
+                  <Icon name="search" size={16} />
+                </span>
+                <Input
+                  className={styles.searchInput}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="摘要・科目・出所で検索"
+                  aria-label="取引を検索"
+                />
+              </div>
+            </Row>
+            {/* クリアは常時表示。条件が無ければ押しても何も起きない。 */}
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              クリア
+            </Button>
           </Row>
           <Row gap="sm" align="center" wrap>
             {otherFilters.map((filter) => (
@@ -687,6 +681,9 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
             <Text variant="body">条件に一致する取引はありません。</Text>
           ) : (
             <>
+            <Row gap="sm" align="center" justify="end">
+              <Text variant="muted">{visibleRows.length}件ヒット</Text>
+            </Row>
             <div className={styles.tableWrap}>
             <Table>
               <thead>
