@@ -66,6 +66,7 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
   if (body.account !== undefined) patch.account = body.account;
   if (body.category !== undefined) patch.category = body.category;
   if (body.income_type !== undefined) patch.incomeType = body.income_type;
+  if (body.tax_category !== undefined) patch.taxCategory = body.tax_category;
   let row;
   try {
     row = await updateTransactionRow(db, id, patch);

@@ -8,6 +8,13 @@ const menuPop = keyframes({
   "100%": { opacity: 1, transform: "scale(1) translateY(0)" },
 });
 
+// スケルトンの明滅。
+const skeletonPulse = keyframes({
+  "0%": { opacity: 0.5 },
+  "50%": { opacity: 1 },
+  "100%": { opacity: 0.5 },
+});
+
 const styles = {
   cellInput: style({
     width: "100%",
@@ -112,6 +119,82 @@ const styles = {
     selectors: {
       "&:hover": { background: theme.color.hover },
     },
+  }),
+  // フィルター追加メニューは左寄せで開く（ヘッダーの右寄せメニューと対）。
+  addMenuLeft: style({
+    right: "auto",
+    left: 0,
+    transformOrigin: "top left",
+  }),
+  menuNote: style({
+    display: "block",
+    padding: "9px 10px",
+  }),
+  // フィルター1件分のチップ。項目名＋条件入力＋削除をひとまとめにする。
+  filterChip: style({
+    display: "flex",
+    alignItems: "center",
+    gap: theme.space.xs,
+    padding: `${theme.space.xs} ${theme.space.sm}`,
+    background: theme.color.surface,
+    border: `1px solid ${theme.color.border}`,
+    borderRadius: theme.borderRadius.pill,
+    flexWrap: "wrap",
+  }),
+  chipInput: style({
+    width: "138px",
+  }),
+  chipNumber: style({
+    width: "92px",
+  }),
+  chipSelect: style({
+    minWidth: "104px",
+  }),
+  chipRemove: style({
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "20px",
+    height: "20px",
+    padding: 0,
+    border: "none",
+    borderRadius: theme.borderRadius.pill,
+    background: "transparent",
+    color: theme.color.muted,
+    cursor: "pointer",
+    selectors: {
+      "&:hover": { background: theme.color.hover, color: theme.color.text },
+    },
+  }),
+  // 読み込み中スケルトンの土台。
+  skeleton: style({
+    background: theme.color.lineSoft,
+    borderRadius: theme.borderRadius.sm,
+    animation: `${skeletonPulse} 1.4s ease-in-out infinite`,
+  }),
+  skeletonTitle: style({
+    width: "180px",
+    height: "24px",
+  }),
+  skeletonButton: style({
+    width: "120px",
+    height: "32px",
+  }),
+  skeletonLabel: style({
+    width: "55%",
+    height: "12px",
+  }),
+  skeletonValue: style({
+    width: "80%",
+    height: "24px",
+  }),
+  skeletonSearch: style({
+    width: "420px",
+    maxWidth: "100%",
+    height: "36px",
+  }),
+  skeletonRow: style({
+    height: "20px",
   }),
 };
 

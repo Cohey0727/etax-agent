@@ -32,6 +32,8 @@ export const CsvMappingSchema = z
     categoryColumn: z.string().nullable(),
     /** 収入区分の明示列（あれば、その値が分類で推定より優先される） */
     incomeTypeColumn: z.string().nullable(),
+    /** 消費税の税区分の明示列（あれば、その値がそのまま税区分になる） */
+    taxCategoryColumn: z.string().nullable(),
     /** 検出した日付書式（例: "YYYY/MM/DD"） */
     dateFormat: z.string(),
     /**
@@ -56,6 +58,7 @@ export const ImportedTransactionSchema = z
     account: z.string(),
     category: z.string(),
     income_type: z.enum(["business", "real_estate", "other"]),
+    tax_category: z.string(),
   })
   .openapi("ImportedTransaction");
 

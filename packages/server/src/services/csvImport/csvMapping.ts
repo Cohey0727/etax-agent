@@ -27,6 +27,7 @@ const descriptionKeywords = ["ご利用内容", "お取引内容", "取引内容
 const amountKeywords = ["金額", "ご利用代金", "amount"];
 const categoryKeywords = ["勘定科目", "科目", "費目", "category"];
 const incomeTypeKeywords = ["収入区分", "所得区分", "income_type", "incometype"];
+const taxCategoryKeywords = ["税区分", "消費税区分", "tax_category", "taxcategory"];
 
 /**
  * キーワード一致で最適な列を選ぶ。キーワードが長い（具体的）ほど高スコア。
@@ -95,6 +96,7 @@ export function heuristicMapping(headers: string[], dataRows: string[][]): CsvMa
   // 明示の分類列（あれば分類で推定より優先される。銀行明細には通常は無い）
   const categoryColumn = take(categoryKeywords);
   const incomeTypeColumn = take(incomeTypeKeywords);
+  const taxCategoryColumn = take(taxCategoryKeywords);
 
   // 日付書式は実データから検出する
   let dateFormat = "不明";
@@ -119,6 +121,7 @@ export function heuristicMapping(headers: string[], dataRows: string[][]): CsvMa
     accountColumn,
     categoryColumn,
     incomeTypeColumn,
+    taxCategoryColumn,
     dateFormat,
     amountSign,
   };
@@ -141,11 +144,12 @@ const MAPPING_SYSTEM_PROMPT = `あなたは銀行・カード明細CSVの「列�
 - accountColumn: 口座名・口座番号の列
 - categoryColumn: 勘定科目が明示されている列（無ければ null）
 - incomeTypeColumn: 収入区分（business / real_estate / other）が明示されている列（無ければ null）
+- taxCategoryColumn: 消費税の税区分（課税売上10% / 課対仕入10% / 非課売上 / 対象外 など）が明示されている列（無ければ null）
 - dateFormat: 日付の書式（例 "YYYY/MM/DD"、"YYYY-MM-DD"、"YYYYMMDD"、"YY/MM/DD"、"YYYY年M月D日"）
 - amountSign: amountColumn を使う場合の符号の約束。"as-is"（収入が正、そのまま使える）/ "inverted"（支出が正・収入が負など反転が必要）/ "split"（debitColumn と creditColumn を使う）
 
 回答は次の JSON オブジェクトのみを出力してください。説明文やコードフェンスは不要です:
-{"dateColumn":null,"descriptionColumn":null,"amountColumn":null,"debitColumn":null,"creditColumn":null,"balanceColumn":null,"accountColumn":null,"categoryColumn":null,"incomeTypeColumn":null,"dateFormat":"YYYY/MM/DD","amountSign":"as-is"}`;
+{"dateColumn":null,"descriptionColumn":null,"amountColumn":null,"debitColumn":null,"creditColumn":null,"balanceColumn":null,"accountColumn":null,"categoryColumn":null,"incomeTypeColumn":null,"taxCategoryColumn":null,"dateFormat":"YYYY/MM/DD","amountSign":"as-is"}`;
 
 /** LLMの応答JSONを検証して CsvMapping にする。不正なら null（呼び出し側がヒューリスティクスへ落とす）。 */
 export function validateAiMapping(raw: unknown, headers: string[]): CsvMapping | null {
@@ -167,7 +171,8 @@ export function validateAiMapping(raw: unknown, headers: string[]): CsvMapping |
   const accountColumn = col(o["accountColumn"]);
   const categoryColumn = col(o["categoryColumn"]);
   const incomeTypeColumn = col(o["incomeTypeColumn"]);
-  const cols = [dateColumn, descriptionColumn, amountColumn, debitColumn, creditColumn, balanceColumn, accountColumn, categoryColumn, incomeTypeColumn];
+  const taxCategoryColumn = col(o["taxCategoryColumn"]);
+  const cols = [dateColumn, descriptionColumn, amountColumn, debitColumn, creditColumn, balanceColumn, accountColumn, categoryColumn, incomeTypeColumn, taxCategoryColumn];
   if (cols.some((c) => c === undefined)) return null;
   if (!dateColumn) return null;
   if (!amountColumn && !debitColumn && !creditColumn) return null;
@@ -188,6 +193,7 @@ export function validateAiMapping(raw: unknown, headers: string[]): CsvMapping |
     accountColumn: accountColumn ?? null,
     categoryColumn: categoryColumn ?? null,
     incomeTypeColumn: incomeTypeColumn ?? null,
+    taxCategoryColumn: taxCategoryColumn ?? null,
     dateFormat,
     amountSign,
   };

@@ -32,6 +32,15 @@ const styles = {
     fontWeight: theme.fontWeight.semibold,
     color: theme.color.textSubtle,
   }),
+  // 帳簿集計の読み取り専用の金額。入力欄と左端を揃え、右寄せ＋等幅数字。
+  amountValue: style({
+    flex: "1 1 auto",
+    textAlign: "right",
+    fontVariantNumeric: "tabular-nums",
+    "@media": {
+      "(max-width: 640px)": { flex: "1 1 100%" },
+    },
+  }),
 };
 
 export default styles;

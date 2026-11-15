@@ -40,6 +40,11 @@ export interface AgentChatPanelProps {
   onSelectSession: (session: ChatSession) => void;
   /** クリア時に現在の会話を履歴へ保存する。 */
   onArchive: (messages: ChatMessage[]) => void;
+  /**
+   * クリア操作をヘッダー側（履歴ボタンの隣）へ渡す。
+   * クリアできる状態のときだけハンドラを渡し、それ以外は null を渡す。
+   */
+  onClearReady?: (handler: (() => void) | null) => void;
 }
 
 // ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。
@@ -87,6 +92,7 @@ export const AgentChatPanel = ({
   viewing,
   onSelectSession,
   onArchive,
+  onClearReady,
 }: AgentChatPanelProps) => {
   // 会話は端末に保存し、再読み込みしても続きから使えるようにする。
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadCurrentMessages());
@@ -141,19 +147,15 @@ export const AgentChatPanel = ({
     saveCurrentMessages([]);
   };
 
+  // クリアボタンはヘッダー（履歴の隣）に置くため、押せる状態だけハンドラを渡す。
+  useEffect(() => {
+    onClearReady?.(!inHistory && messages.length > 0 && !loading ? clearChat : null);
+    // clearChat は毎レンダーで作り直されるが、状態が変わったときだけ親へ伝えれば足りる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, inHistory, loading, onClearReady]);
+
   return (
     <div className={styles.root}>
-      <Text variant="muted">
-        質問や、集計・計算などの処理を頼めます。例:
-        「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
-      </Text>
-      {!inHistory && messages.length > 0 ? (
-        <Row gap="sm" align="center" justify="end">
-          <Button variant="ghost" size="sm" onClick={clearChat} disabled={loading}>
-            クリア
-          </Button>
-        </Row>
-      ) : null}
 
       {viewing ? (
         <div className={styles.chatLog} ref={logRef}>
@@ -165,6 +167,9 @@ export const AgentChatPanel = ({
       ) : historyOpen ? (
         <div className={styles.chatLog} ref={logRef}>
           <Col gap="sm">
+            {sessions.length === 0 ? (
+              <Text variant="muted">保存済みの会話はまだありません。</Text>
+            ) : null}
             {sessions.map((session) => (
               <Button
                 key={session.id}
@@ -186,6 +191,13 @@ export const AgentChatPanel = ({
       ) : (
         <>
           <div className={styles.chatLog} ref={logRef}>
+            {messages.length === 0 && !loading ? (
+              <Text variant="muted">
+                質問や、集計・計算などの処理を頼めます。例:
+                「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
+                「ファミリーマートの支出はどのくらい？」
+              </Text>
+            ) : null}
             <MessageBubbles items={messages} />
             {loading && (
               <div className={clsx(styles.bubble, styles.role[ChatRole.Assistant])}>

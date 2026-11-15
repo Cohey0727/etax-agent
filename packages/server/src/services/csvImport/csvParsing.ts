@@ -37,6 +37,7 @@ export function parseWithMapping(
   const iAccount = idxOf(mapping.accountColumn);
   const iCategory = idxOf(mapping.categoryColumn);
   const iIncomeType = idxOf(mapping.incomeTypeColumn);
+  const iTaxCategory = idxOf(mapping.taxCategoryColumn);
 
   if (iDate < 0) throw new Error("日付列が特定できませんでした（マッピング失敗）");
   if (iAmount < 0 && iDebit < 0 && iCredit < 0) {
@@ -91,6 +92,7 @@ export function parseWithMapping(
       account,
       category,
       income_type,
+      tax_category: cell(row, iTaxCategory).trim(),
     };
     const key = `${tx.date}|${tx.amount}|${tx.description}|${tx.account}`;
     if (seen.has(key)) {

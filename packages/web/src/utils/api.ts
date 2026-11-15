@@ -252,6 +252,7 @@ export function ledgerRowToTransaction(row: LedgerTransaction): Transaction {
     account: row.account,
     category: row.category,
     income_type: incomeType,
+    tax_category: row.tax_category ?? "",
   };
 }
 
@@ -264,6 +265,7 @@ export function transactionToLedgerInput(tx: Transaction): LedgerTransactionInpu
     account: tx.account,
     category: tx.category,
     income_type: tx.income_type,
+    tax_category: tx.tax_category,
   };
 }
 

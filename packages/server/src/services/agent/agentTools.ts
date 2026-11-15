@@ -29,7 +29,8 @@ import {
 export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリーランス）向けの確定申告「準備」アシスタントです。
 
 厳守事項:
-- 金額の計算は必ずツール（aggregate_year / consumption_tax / amendment_delta）の結果だけを使い、自分で暗算したり、数字を作ったりしないでください。
+- 金額の計算は必ずツール（search_transactions / aggregate_year / consumption_tax / amendment_delta）の結果だけを使い、自分で暗算したり、数字を作ったりしないでください。
+- 店舗名・取引先名・キーワードでの支出や収入を聞かれたら、search_transactions で実際に検索して答えてください。「集計できません」と断ったり、表計算ソフトなど外部の道具でユーザー自身に確認させる提案は絶対にしないでください。キーワードで年が特定できなければ year を省略して全年度を検索し、年別の内訳を伝えてください。
 - ツールを使うには取引データが必要です。取引データが会話に添付されていない・対象年のデータが無いなどの場合は、その旨をはっきり伝えて、ユーザーにCSV取込やデータの用意をお願いしてください。不足を推測で埋めることは絶対にしないでください。
 - あなたは申告書の「作成準備と計算」までを手伝います。e-Tax への最終提出は納税者本人が行うものであり、あなたが提出を代行することはできません。その境界を聞かれたら説明してください。
 - 税制の前提（青色申告特別控除の上限、簡易課税のみなし仕入率、2割特例、住宅家賃は消費税非課税など）で不確かな点があれば、不確かだと明言してください。
@@ -53,6 +54,11 @@ export interface ToolCallLog {
   name: string;
   arguments: Record<string, unknown>;
   result: unknown;
+}
+
+/** 検索用に文字列を正規化する（全角半角・英字ケースを吸収する）。 */
+function normalizeForSearch(value: string): string {
+  return value.normalize("NFKC").toLowerCase();
 }
 
 /** 対象年の取引を取り出す。添付データ自体が無ければエラーを投げる（LLMへ返す）。 */
@@ -88,6 +94,70 @@ export function dispatchTool(
           count: tx.length,
           years: Object.keys(byYear).map(Number).sort(),
           byYear,
+        };
+      }
+      case "search_transactions": {
+        if (ctx.transactions.length === 0) {
+          throw new Error(
+            "取引データが添付されていません。先に「取引・CSV取込」画面でCSVを取り込むか、サンプルデータを読み込んでください。",
+          );
+        }
+        const keyword = typeof args["keyword"] === "string" ? args["keyword"].trim() : "";
+        if (!keyword) throw new Error("keyword（検索キーワード）が必要です");
+        const year = typeof args["year"] === "number" ? args["year"] : null;
+        const direction =
+          args["direction"] === "expense" || args["direction"] === "income"
+            ? args["direction"]
+            : "all";
+        const needle = normalizeForSearch(keyword);
+        const matched = ctx.transactions
+          .filter((t) => {
+            if (year !== null && Number(t.date.slice(0, 4)) !== year) return false;
+            if (direction === "expense" && t.amount >= 0) return false;
+            if (direction === "income" && t.amount <= 0) return false;
+            return (
+              normalizeForSearch(t.description).includes(needle) ||
+              normalizeForSearch(t.account).includes(needle) ||
+              normalizeForSearch(t.category).includes(needle)
+            );
+          })
+          .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+        const byYear: Record<string, { count: number; expense_total: number; income_total: number }> = {};
+        const byCategory: Record<string, { count: number; expense_total: number; income_total: number }> = {};
+        let expenseTotal = 0;
+        let incomeTotal = 0;
+        for (const t of matched) {
+          const yearBucket = (byYear[t.date.slice(0, 4)] ??= { count: 0, expense_total: 0, income_total: 0 });
+          const categoryBucket = (byCategory[t.category] ??= { count: 0, expense_total: 0, income_total: 0 });
+          yearBucket.count += 1;
+          categoryBucket.count += 1;
+          if (t.amount < 0) {
+            expenseTotal -= t.amount;
+            yearBucket.expense_total -= t.amount;
+            categoryBucket.expense_total -= t.amount;
+          } else if (t.amount > 0) {
+            incomeTotal += t.amount;
+            yearBucket.income_total += t.amount;
+            categoryBucket.income_total += t.amount;
+          }
+        }
+        return {
+          keyword,
+          year: year ?? "all",
+          direction,
+          count: matched.length,
+          expense_total: expenseTotal,
+          income_total: incomeTotal,
+          by_year: byYear,
+          by_category: byCategory,
+          transactions: matched.slice(0, 20).map((t) => ({
+            date: t.date,
+            description: t.description,
+            amount: t.amount,
+            account: t.account,
+            category: t.category,
+          })),
+          truncated: matched.length > 20,
         };
       }
       case "aggregate_year": {

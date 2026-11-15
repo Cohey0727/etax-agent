@@ -57,6 +57,7 @@ export async function createImportWithTransactions(
         account: t.account,
         category: t.category,
         incomeType: t.income_type,
+        taxCategory: t.tax_category,
         importId,
       })),
     );

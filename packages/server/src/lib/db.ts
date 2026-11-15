@@ -83,10 +83,16 @@ export async function ensureTables(): Promise<void> {
       account text NOT NULL DEFAULT '',
       category text NOT NULL DEFAULT '未分類',
       income_type text NOT NULL DEFAULT 'other',
+      tax_category text NOT NULL DEFAULT '',
       import_id integer REFERENCES imports(id),
       created_at integer NOT NULL
     )
   `);
+  // 既存DBへの列追加（CREATE TABLE IF NOT EXISTS では既存テーブルに列が増えないため）。
+  const txColumns = db.all<{ name: string }>(sql`PRAGMA table_info(transactions)`);
+  if (!txColumns.some((c) => c.name === "tax_category")) {
+    db.run(sql`ALTER TABLE transactions ADD COLUMN tax_category text NOT NULL DEFAULT ''`);
+  }
   db.run(sql`
     CREATE TABLE IF NOT EXISTS filing_status (
       year integer PRIMARY KEY,

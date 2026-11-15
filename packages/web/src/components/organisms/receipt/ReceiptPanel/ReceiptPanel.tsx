@@ -72,6 +72,8 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
       account: "領収書画像",
       category: draft.account,
       income_type: guessIncomeType(draft.description, draft.account),
+      // 領収書は仕入・経費なので、既定は課税仕入10%（帳簿で直せる）
+      tax_category: "課対仕入10%",
     };
     onUseTransactions([...transactions, tx]);
     // 確定した科目は学習履歴に記録し、次回から「過去の傾向」で優先する

@@ -13,7 +13,6 @@ import {
   ConfirmSummary,
   ConsumptionTaxPanel,
   DeductionPanel,
-  FilingOverview,
   FilingPanel,
   FilingStatusToggle,
   TaxCreditPanel,
@@ -114,10 +113,10 @@ const FilingWorkspace = ({
         <FilingPanel
           transactions={transactions}
           year={year}
+          taxResult={taxResult}
           onNavigate={onNavigate}
           onOpenSection={onTabChange}
         />
-        <FilingOverview transactions={transactions} year={year} taxResult={taxResult} />
         <TaxpayerPanel
           year={year}
           transactions={yearTransactions}

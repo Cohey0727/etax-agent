@@ -19,6 +19,7 @@ export function transactionToApi(row: TransactionRow): TransactionResponse {
     account: row.account,
     category: row.category,
     income_type: row.incomeType,
+    tax_category: row.taxCategory,
     import_id: row.importId,
     created_at: row.createdAt.toISOString(),
   };
@@ -50,6 +51,7 @@ export async function insertTransactionRow(
     account: string;
     category: string;
     incomeType: string;
+    taxCategory: string;
   },
 ): Promise<TransactionRow | undefined> {
   const [row] = await db.insert(transactionsTable).values(values).returning();

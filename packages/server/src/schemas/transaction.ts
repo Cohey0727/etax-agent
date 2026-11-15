@@ -17,6 +17,7 @@ export const TransactionSchema = z
     account: z.string(),
     category: z.string(),
     income_type: z.string(),
+    tax_category: z.string(),
     import_id: z.number().nullable(),
     created_at: z.string(),
   })
@@ -82,6 +83,7 @@ export const CreateTransactionRequestSchema = z
     account: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
     income_type: z.string().optional().catch(undefined),
+    tax_category: z.string().optional().catch(undefined),
   })
   .openapi("CreateTransactionRequest");
 
@@ -95,6 +97,7 @@ export const UpdateTransactionRequestSchema = z
     account: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
     income_type: z.string().optional().catch(undefined),
+    tax_category: z.string().optional().catch(undefined),
   })
   .openapi("UpdateTransactionRequest");
 

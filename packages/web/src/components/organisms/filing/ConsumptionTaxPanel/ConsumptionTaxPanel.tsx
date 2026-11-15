@@ -1,8 +1,8 @@
 import {
-  NON_TAXABLE_EXPENSE_CATEGORIES,
+  ConsumptionTaxSummary,
   Transaction,
   computeConsumptionReturn,
-  filterYear,
+  summarizeConsumptionTax,
 } from "@etax/shared";
 import { useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
@@ -10,16 +10,10 @@ import { AlertBox } from "@components/molecules";
 import { loadTaxpayer } from "@components/organisms/filing/TaxpayerProfilePanel";
 import { ExportConsumptionXtxRequest } from "@types";
 import { exportConsumptionXtxFile } from "@utils/api";
-import { formatNumber } from "@utils";
+import { formatNumber, formatYen } from "@utils";
 import styles from "./ConsumptionTaxPanel.css";
 
-interface ConsumptionForm {
-  salesIncl10: number;
-  salesIncl8: number;
-  nontaxableSales: number;
-  exemptSales: number;
-  purchasesIncl10: number;
-  purchasesIncl8: number;
+interface EditableForm {
   basePeriodSalesThousands: number;
   interimNational: number;
   interimLocal: number;
@@ -27,23 +21,26 @@ interface ConsumptionForm {
   originalLocal: number;
 }
 
-type FormKey = keyof ConsumptionForm;
+type EditableKey = keyof EditableForm;
 
-const AMOUNT_FIELDS: readonly { key: FormKey; label: string }[] = [
+const EDITABLE_FIELDS: readonly { key: EditableKey; label: string }[] = [
+  { key: "basePeriodSalesThousands", label: "基準期間の課税売上高（千円）" },
+  { key: "interimNational", label: "中間納付税額（国税）" },
+  { key: "interimLocal", label: "中間納付譲渡割額（地方）" },
+];
+
+const AMENDMENT_FIELDS: readonly { key: EditableKey; label: string }[] = [
+  { key: "originalNational", label: "既確定税額（国税）" },
+  { key: "originalLocal", label: "既確定譲渡割額（地方）" },
+];
+
+const SUMMARY_ROWS: readonly { key: keyof ConsumptionTaxSummary; label: string }[] = [
   { key: "salesIncl10", label: "課税売上（税込）・10%" },
   { key: "salesIncl8", label: "課税売上（税込）・軽減8%" },
   { key: "nontaxableSales", label: "非課税売上（対価の額）" },
   { key: "exemptSales", label: "免税売上（対価の額）" },
   { key: "purchasesIncl10", label: "課税仕入（税込）・10%" },
   { key: "purchasesIncl8", label: "課税仕入（税込）・軽減8%" },
-  { key: "basePeriodSalesThousands", label: "基準期間の課税売上高（千円）" },
-  { key: "interimNational", label: "中間納付税額（国税）" },
-  { key: "interimLocal", label: "中間納付譲渡割額（地方）" },
-];
-
-const AMENDMENT_FIELDS: readonly { key: FormKey; label: string }[] = [
-  { key: "originalNational", label: "既確定税額（国税）" },
-  { key: "originalLocal", label: "既確定譲渡割額（地方）" },
 ];
 
 export interface ConsumptionTaxPanelProps {
@@ -53,15 +50,21 @@ export interface ConsumptionTaxPanelProps {
 
 /**
  * 消費税申告書（一般用・本則）の作成パネル。
- * 初期値は帳簿からの概算（課税売上＝事業収入、課税仕入＝課税対象の経費）
- * で、税区分まで確定した金額に直してから出力するのが前提。
+ * 売上・仕入の金額は自由入力ではなく、帳簿の税区分集計から決める
+ * （帳簿と申告が食い違わないようにするため）。手入力するのは
+ * 基準期間・中間納付・既確定税額など、帳簿の外にある数字だけ。
  * 課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算される。
  */
 export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelProps) => {
   const [taxpayer] = useState(() => loadTaxpayer(year).taxpayer);
-  const [form, setForm] = useState<ConsumptionForm>(() =>
-    estimateInitialValues(transactions, year),
-  );
+  const summary = useMemo(() => summarizeConsumptionTax(transactions, year), [transactions, year]);
+  const [form, setForm] = useState<EditableForm>(() => ({
+    basePeriodSalesThousands: deriveBasePeriodSalesThousands(transactions, year),
+    interimNational: 0,
+    interimLocal: 0,
+    originalNational: 0,
+    originalLocal: 0,
+  }));
   const [filingKind, setFilingKind] = useState<1 | 3>(1);
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
   const [exporting, setExporting] = useState(false);
@@ -71,19 +74,19 @@ export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelP
   const preview = useMemo(
     () =>
       computeConsumptionReturn({
-        salesIncl10: form.salesIncl10,
-        salesIncl8: form.salesIncl8,
-        nontaxableSales: form.nontaxableSales,
-        exemptSales: form.exemptSales,
-        purchasesIncl10: form.purchasesIncl10,
-        purchasesIncl8: form.purchasesIncl8,
+        salesIncl10: summary.salesIncl10,
+        salesIncl8: summary.salesIncl8,
+        nontaxableSales: summary.nontaxableSales,
+        exemptSales: summary.exemptSales,
+        purchasesIncl10: summary.purchasesIncl10,
+        purchasesIncl8: summary.purchasesIncl8,
         interimNational: form.interimNational,
         interimLocal: form.interimLocal,
       }),
-    [form],
+    [summary, form],
   );
 
-  const update = (key: FormKey, value: number) => {
+  const update = (key: EditableKey, value: number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -99,12 +102,12 @@ export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelP
         submission_date: submissionDate,
         filing_kind: filingKind,
         base_period_sales_thousands: form.basePeriodSalesThousands,
-        sales_incl_10: form.salesIncl10,
-        sales_incl_8: form.salesIncl8,
-        nontaxable_sales: form.nontaxableSales,
-        exempt_sales: form.exemptSales,
-        purchases_incl_10: form.purchasesIncl10,
-        purchases_incl_8: form.purchasesIncl8,
+        sales_incl_10: summary.salesIncl10,
+        sales_incl_8: summary.salesIncl8,
+        nontaxable_sales: summary.nontaxableSales,
+        exempt_sales: summary.exemptSales,
+        purchases_incl_10: summary.purchasesIncl10,
+        purchases_incl_8: summary.purchasesIncl8,
         interim_national: form.interimNational,
         interim_local: form.interimLocal,
         original_national: filingKind === 3 ? form.originalNational : null,
@@ -128,15 +131,14 @@ export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelP
         <Col gap="sm">
           <Text variant="sectionTitle">消費税申告書（本則）の作成</Text>
           <Text variant="muted">
-            消費税及び地方消費税の確定申告書（一般用）と付表1・2を作成します。初期値は帳簿
-            からの概算です。出力前に、税区分ごとの確定金額（課税売上・課税仕入の税込合計）
-            に必ず直してください。納税者情報は修正申告の画面で入力したものを使います。
-            期限後申告も申告の種類は「確定」です。
+            消費税及び地方消費税の確定申告書（一般用）と付表1・2を作成します。売上・仕入の
+            金額は帳簿の税区分集計から自動で決まります（帳簿と食い違う入力はできません）。
+            税区分の付け直しは帳簿で行ってください。納税者情報は納税者情報タブで入力した
+            ものを使います。期限後申告も申告の種類は「確定」です。
           </Text>
           {taxpayer.name === "" ? (
             <Text variant="muted">
-              納税者情報が未入力です。先に修正申告の画面の「納税者情報と e-Tax 出力」で
-              氏名・住所・税務署名を入力してください。
+              納税者情報が未入力です。先に納税者情報タブで氏名・住所・税務署名を入力してください。
             </Text>
           ) : null}
         </Col>
@@ -168,7 +170,30 @@ export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelP
           />
         </Row>
 
-        {AMOUNT_FIELDS.map((field) => (
+        <Text className={styles.subhead}>帳簿からの集計（自動）</Text>
+        {SUMMARY_ROWS.map((row) => (
+          <Row key={row.key} gap="sm">
+            <div className={styles.fieldLabel}>
+              <Text variant="muted">{row.label}</Text>
+            </div>
+            <Text className={styles.amountValue}>{formatYen(summary[row.key])}</Text>
+          </Row>
+        ))}
+        {summary.unsetCount > 0 || summary.excludedCount > 0 ? (
+          <AlertBox variant="notice">
+            集計に含まれていない取引があります
+            {summary.unsetCount > 0
+              ? `（税区分が未設定 ${summary.unsetCount} 件・合計 ${formatYen(summary.unsetAmount)}）`
+              : ""}
+            {summary.excludedCount > 0
+              ? `（税区分と金額の符号が不一致 ${summary.excludedCount} 件・合計 ${formatYen(summary.excludedAmount)}）`
+              : ""}
+            。帳簿で各取引の税区分を確認してください。
+          </AlertBox>
+        ) : null}
+
+        <Text className={styles.subhead}>帳簿の外の数字（入力）</Text>
+        {EDITABLE_FIELDS.map((field) => (
           <AmountField
             key={field.key}
             label={field.label}
@@ -227,33 +252,15 @@ const AmountField = ({ label, value, onChange }: AmountFieldProps) => (
   </Row>
 );
 
-/** 帳簿からの概算初期値。課税売上＝事業収入、非課税売上＝不動産収入、課税仕入＝課税対象経費。 */
-function estimateInitialValues(transactions: Transaction[], year: number): ConsumptionForm {
-  const yearTransactions = filterYear(transactions, year);
-  let sales = 0;
-  let nontaxable = 0;
-  let purchases = 0;
-  for (const t of yearTransactions) {
-    const amount = Math.trunc(t.amount || 0);
-    if (amount > 0 && t.income_type === "business") sales += amount;
-    if (amount > 0 && t.income_type === "real_estate") nontaxable += amount;
-    if (amount < 0 && !NON_TAXABLE_EXPENSE_CATEGORIES.has(t.category || "")) {
-      purchases += -amount;
-    }
-  }
-  return {
-    salesIncl10: sales,
-    salesIncl8: 0,
-    nontaxableSales: nontaxable,
-    exemptSales: 0,
-    purchasesIncl10: purchases,
-    purchasesIncl8: 0,
-    basePeriodSalesThousands: 0,
-    interimNational: 0,
-    interimLocal: 0,
-    originalNational: 0,
-    originalLocal: 0,
-  };
+/**
+ * 基準期間（2年前）の課税売上高（千円・税抜）を帳簿から出す。
+ * 2年前の帳簿が無ければ 0（手入力で直す前提）。
+ */
+function deriveBasePeriodSalesThousands(transactions: Transaction[], year: number): number {
+  const base = summarizeConsumptionTax(transactions, year - 2);
+  const excl10 = Math.floor((base.salesIncl10 * 100) / 110);
+  const excl8 = Math.floor((base.salesIncl8 * 100) / 108);
+  return Math.floor((excl10 + excl8) / 1000);
 }
 
 function todayIso(): string {

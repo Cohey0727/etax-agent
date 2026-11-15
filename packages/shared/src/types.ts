@@ -19,7 +19,23 @@ export interface Transaction {
   account: string;
   category: string;
   income_type: IncomeType;
+  /**
+   * 消費税の税区分（freee の表記そのまま）。消費税申告の金額は
+   * この区分で帳簿を集計して決める。"" は未設定（集計から漏れる）。
+   */
+  tax_category: string;
 }
+
+/** 税区分の選択肢（"" は未設定）。帳簿の編集や取込マッピングで使う。 */
+export const TAX_CATEGORIES: readonly string[] = [
+  "課税売上10%",
+  "課税売上8%",
+  "非課売上",
+  "免税売上",
+  "課対仕入10%",
+  "課対仕入8%",
+  "対象外",
+];
 
 export const VALID_INCOME_TYPES: ReadonlySet<string> = new Set([
   "business",

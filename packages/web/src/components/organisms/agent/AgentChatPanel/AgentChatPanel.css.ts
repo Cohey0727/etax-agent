@@ -12,7 +12,7 @@ const styles = {
   root: style({
     display: "flex",
     flexDirection: "column",
-    gap: theme.space.md,
+    gap: theme.space.sm,
     flex: "1 1 auto",
     minHeight: 0,
   }),

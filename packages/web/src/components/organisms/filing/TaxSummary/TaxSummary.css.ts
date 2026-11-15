@@ -2,7 +2,7 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
-  // 所得・税額の統計カードの並び。
+  // 税額の統計カードの並び。
   statGrid: style({
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
@@ -13,7 +13,7 @@ const styles = {
     fontVariantNumeric: "tabular-nums",
     whiteSpace: "nowrap",
   }),
-  // 小計・確定税額の行。区切り線と太字で締める。
+  // 確定税額の行。区切り線と太字で締める。
   totalRow: style({
     borderTop: `2px solid ${theme.color.borderStrong}`,
     paddingTop: theme.space.sm,

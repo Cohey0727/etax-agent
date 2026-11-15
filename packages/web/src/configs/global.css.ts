@@ -19,8 +19,10 @@ globalStyle("body", {
 
 globalStyle("*", { boxSizing: "border-box" });
 
+// 文字選択はアクセント色ベタ塗り＋白文字で、選択範囲がはっきり分かるようにする。
 globalStyle("::selection", {
-  background: theme.color.accentSoft,
+  background: theme.color.accent,
+  color: theme.color.onAccent,
 });
 
 globalStyle(":focus-visible", {

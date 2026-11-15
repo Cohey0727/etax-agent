@@ -70,6 +70,7 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
       account: body.account ?? "",
       category: body.category ? body.category : "未分類",
       incomeType: body.income_type ?? "other",
+      taxCategory: body.tax_category ?? "",
     });
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });

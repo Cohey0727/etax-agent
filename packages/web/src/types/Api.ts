@@ -91,6 +91,7 @@ export interface LedgerTransaction {
   account: string;
   category: string;
   income_type: string;
+  tax_category: string;
   import_id: number | null;
   created_at: string;
 }
@@ -108,6 +109,7 @@ export interface LedgerTransactionInput {
   account: string;
   category: string;
   income_type: string;
+  tax_category: string;
 }
 
 /** e-Tax XTX出力の納税者情報。サーバーAPIのワイヤ形式（snake_case）。 */

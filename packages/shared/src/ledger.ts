@@ -300,6 +300,7 @@ export function importCsvText(text: string, rules: CategoryRule[] = CATEGORY_RUL
       account: col(row, "account").trim(),
       category: classified.category,
       income_type: classified.income_type,
+      tax_category: col(row, "tax_category").trim(),
     });
   }
   return transactions;
@@ -352,6 +353,7 @@ export function normalizeTransaction(raw: Record<string, unknown>): Transaction 
     account: typeof raw["account"] === "string" ? (raw["account"] as string) : "",
     category: typeof raw["category"] === "string" && raw["category"] ? (raw["category"] as string) : "未分類",
     income_type: VALID_INCOME_TYPES.has(itypeRaw) ? (itypeRaw as IncomeType) : "other",
+    tax_category: typeof raw["tax_category"] === "string" ? (raw["tax_category"] as string) : "",
   };
 }
 

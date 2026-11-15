@@ -75,6 +75,7 @@ export const replaceYearTransactionsHandler: RouteHandler<
       account: body.account ?? "",
       category: body.category ? body.category : "未分類",
       incomeType: body.income_type ?? "other",
+      taxCategory: body.tax_category ?? "",
     };
   });
   let rows;

@@ -23,6 +23,17 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
       inputSchema: z.object({}),
       execute: async () => run("import_csv_info", {}),
     }),
+    search_transactions: tool({
+      description:
+        "取引をキーワードで検索し、件数・合計金額・年別/科目別の内訳・明細サンプルを返す。キーワードは摘要・口座名・科目への部分一致（全角半角は吸収）。「ファミリーマートの支出はどのくらい？」「Amazonへの支払い合計は？」のような店舗名・取引先名・キーワードでの質問には必ずこれを使う。year を省略すると全年度を検索する（年別内訳も返る）。direction は expense（支出のみ）/ income（収入のみ）/ all（両方）。",
+      inputSchema: z.object({
+        keyword: z.string().describe("検索キーワード（例: ファミリーマート、Amazon）"),
+        year: z.number().int().optional().describe("対象年（西暦）。省略時は全年度"),
+        direction: z.enum(["expense", "income", "all"]).optional().describe("支出/収入の絞り込み"),
+      }),
+      execute: async ({ keyword, year, direction }) =>
+        run("search_transactions", { keyword, year, direction }),
+    }),
     aggregate_year: tool({
       description: "指定年の事業所得・不動産所得を集計し、青色申告特別控除も計算する。",
       inputSchema: z.object({

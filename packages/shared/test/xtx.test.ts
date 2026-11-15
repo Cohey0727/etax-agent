@@ -18,6 +18,7 @@ function tx(partial: Partial<Transaction>): Transaction {
     account: "普通預金",
     category: "未分類",
     income_type: "business",
+    tax_category: "",
     ...partial,
   };
 }

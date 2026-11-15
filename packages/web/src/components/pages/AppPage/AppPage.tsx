@@ -147,6 +147,13 @@ export const AppPage = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingSession, setViewingSession] = useState<ChatSession | null>(null);
+  // 会話クリアはパネル側の操作だが、ボタンはヘッダー（履歴の隣）に置くためハンドラを受け取る。
+  const clearChatRef = useRef<(() => void) | null>(null);
+  const [canClearChat, setCanClearChat] = useState(false);
+  const handleClearReady = useCallback((handler: (() => void) | null) => {
+    clearChatRef.current = handler;
+    setCanClearChat(handler !== null);
+  }, []);
 
   const years = useMemo(
     () => [...new Set(transactions.map((t) => t.year))].sort((a, b) => b - a),
@@ -300,6 +307,7 @@ export const AppPage = () => {
           viewing={viewingSession}
           onSelectSession={setViewingSession}
           onArchive={handleArchiveChat}
+          onClearReady={handleClearReady}
         />
       }
       agentHeaderExtra={
@@ -308,14 +316,24 @@ export const AppPage = () => {
             ← チャットに戻る
           </Button>
         ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={chatSessions.length === 0}
-            onClick={() => setHistoryOpen(true)}
-          >
-            履歴{chatSessions.length > 0 ? `（${chatSessions.length}）` : ""}
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={chatSessions.length === 0}
+              onClick={() => setHistoryOpen(true)}
+            >
+              履歴{chatSessions.length > 0 ? `（${chatSessions.length}）` : ""}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!canClearChat}
+              onClick={() => clearChatRef.current?.()}
+            >
+              クリア
+            </Button>
+          </>
         )
       }
       onViewChange={setActiveView}

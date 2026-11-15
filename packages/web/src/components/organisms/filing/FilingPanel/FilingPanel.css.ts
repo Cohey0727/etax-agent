@@ -2,6 +2,13 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
+  // 各項目の結果の数字を、その行の直下にぶら下げるブロック。
+  // 左に線とインデントを付け、上の行に属することが見て分かるようにする。
+  figuresBlock: style({
+    marginLeft: theme.space.md,
+    paddingLeft: theme.space.md,
+    borderLeft: `2px solid ${theme.color.lineSoft}`,
+  }),
   // 独立した項目1件分の行。区切り線で並べるだけで、順序は表さない。
   statusRow: style({
     display: "flex",

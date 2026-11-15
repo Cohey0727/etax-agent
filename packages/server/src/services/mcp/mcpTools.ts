@@ -138,6 +138,10 @@ export const MCP_TOOLS: McpToolDef[] = [
           enum: ["business", "real_estate", "other"],
           description: "所得区分（任意、既定は business）",
         },
+        tax_category: {
+          type: "string",
+          description: "消費税の税区分（任意。課税売上10% / 課対仕入10% / 非課売上 / 対象外 など）",
+        },
       },
       required: ["date", "description", "amount"],
     },
@@ -155,6 +159,7 @@ export const MCP_TOOLS: McpToolDef[] = [
         account: { type: "string" },
         category: { type: "string" },
         income_type: { type: "string", enum: ["business", "real_estate", "other"] },
+        tax_category: { type: "string" },
       },
       required: ["id"],
     },
@@ -301,6 +306,7 @@ function rowsToTransactions(rows: TransactionRow[], year: number): Transaction[]
       account: row.account,
       category: row.category,
       income_type: row.incomeType as IncomeType,
+      tax_category: row.taxCategory,
     }));
 }
 
@@ -478,6 +484,7 @@ export async function dispatchMcpTool(
           account: typeof args["account"] === "string" ? args["account"] : "",
           category,
           incomeType: parseIncomeType(args["income_type"]),
+          taxCategory: typeof args["tax_category"] === "string" ? args["tax_category"] : "",
         });
         if (!row) throw new Error("取引の登録に失敗しました");
         if (category !== "未分類") {
@@ -495,6 +502,7 @@ export async function dispatchMcpTool(
         if (typeof args["account"] === "string") patch.account = args["account"];
         if (typeof args["category"] === "string") patch.category = args["category"];
         if (args["income_type"] !== undefined) patch.incomeType = parseIncomeType(args["income_type"]);
+        if (typeof args["tax_category"] === "string") patch.taxCategory = args["tax_category"];
         const row = await updateTransactionRow(db, id, patch);
         if (!row) throw new Error(`取引が見つかりません: id=${id}`);
         if (patch.category !== undefined && patch.category !== "未分類") {

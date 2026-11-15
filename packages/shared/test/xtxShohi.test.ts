@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  Transaction,
+  summarizeConsumptionTax,
   ConsumptionReturnInput,
   buildConsumptionXtx,
   computeConsumptionReturn,
@@ -118,5 +120,50 @@ describe("buildConsumptionXtx", () => {
     expect(xtx).toContain("<AAM00020><kubun_CD>2</kubun_CD></AAM00020>");
     expect(xtx).toContain("<DTG00170>9090</DTG00170>");
     expect(xtx).not.toContain("<DTF00000>");
+  });
+});
+
+describe("summarizeConsumptionTax", () => {
+  const tx = (partial: Partial<Transaction>): Transaction => ({
+    date: "2025-06-01",
+    year: 2025,
+    description: "",
+    amount: 0,
+    account: "",
+    category: "売上高",
+    income_type: "business",
+    tax_category: "",
+    ...partial,
+  });
+
+  test("税区分ごとに集計し、仕入は正の税込額になる", () => {
+    const summary = summarizeConsumptionTax(
+      [
+        tx({ amount: 110_000, tax_category: "課税売上10%" }),
+        tx({ amount: 108_000, tax_category: "課税売上8%" }),
+        tx({ amount: 147_000, tax_category: "非課売上", income_type: "real_estate" }),
+        tx({ amount: 50_000, tax_category: "免税売上" }),
+        tx({ amount: -55_000, tax_category: "課対仕入10%" }),
+        tx({ amount: -54_000, tax_category: "課対仕入8%" }),
+        tx({ amount: -10_000, tax_category: "対象外" }),
+        tx({ amount: 999, tax_category: "" }),
+        tx({ amount: 777, tax_category: "不明な区分" }),
+        tx({ amount: 555, tax_category: "課税売上10%", year: 2024, date: "2024-06-01" }),
+        // 符号が合わない付け間違いは集計から外れる
+        tx({ amount: -3_000, tax_category: "課税売上10%" }),
+        tx({ amount: 4_000, tax_category: "課対仕入10%" }),
+      ],
+      2025,
+    );
+    expect(summary.salesIncl10).toBe(110_000);
+    expect(summary.salesIncl8).toBe(108_000);
+    expect(summary.nontaxableSales).toBe(147_000);
+    expect(summary.exemptSales).toBe(50_000);
+    expect(summary.purchasesIncl10).toBe(55_000);
+    expect(summary.purchasesIncl8).toBe(54_000);
+    expect(summary.unsetCount).toBe(2);
+    expect(summary.unsetAmount).toBe(999 + 777);
+    expect(summary.excludedCount).toBe(2);
+    expect(summary.excludedAmount).toBe(-3_000 + 4_000);
   });
 });

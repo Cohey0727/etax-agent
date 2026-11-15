@@ -214,7 +214,7 @@ const styles = {
   panelInner: style({
     display: "flex",
     flexDirection: "column",
-    gap: theme.space.md,
+    gap: theme.space.sm,
     width: theme.component.agentPanelWidth,
     height: "100%",
     padding: theme.space.md,

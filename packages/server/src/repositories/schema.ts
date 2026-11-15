@@ -34,6 +34,8 @@ export const transactionsTable = sqliteTable("transactions", {
   category: text("category").notNull().default("未分類"),
   /** business / real_estate / other */
   incomeType: text("income_type").notNull().default("other"),
+  /** 消費税の税区分（freee表記）。"" は未設定 */
+  taxCategory: text("tax_category").notNull().default(""),
   importId: integer("import_id").references(() => importsTable.id),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()

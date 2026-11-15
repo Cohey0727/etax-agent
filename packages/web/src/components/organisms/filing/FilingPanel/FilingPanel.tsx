@@ -1,6 +1,9 @@
-import { Transaction } from "@etax/shared";
+import { IncomeTaxResult, Transaction } from "@etax/shared";
+import { Fragment } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
+import { IncomeSummary } from "@components/organisms/filing/IncomeSummary";
+import { TaxSummary } from "@components/organisms/filing/TaxSummary";
 import { AppView, FilingTab } from "@types";
 import styles from "./FilingPanel.css";
 
@@ -24,7 +27,8 @@ interface ManualItem {
 
 /**
  * 手動で「済み」を付けられる項目。どれも独立していて、順番は問わない。
- * 帳簿は取引データから自動判定するので、ここには含めない。
+ * 各項目の行の直下に、その項目の結果の数字（帳簿→所得、控除・計算→税額）を
+ * 並べ、見直してそのまま「済み」にできるようにする。
  */
 const MANUAL_ITEMS: readonly ManualItem[] = [
   {
@@ -50,6 +54,8 @@ export interface FilingPanelProps {
   transactions: Transaction[];
   /** 左上の年度切替で選ばれている年 */
   year: number;
+  /** 所得税の計算結果。「控除・計算」の行の下に税額の要約を表示するために使う。 */
+  taxResult?: IncomeTaxResult;
   onNavigate?: (view: AppView) => void;
   /** 総合タブから各タブへ遷移する（確定申告画面内のタブ切替）。 */
   onOpenSection?: (section: FilingSection) => void;
@@ -60,7 +66,13 @@ export interface FilingPanelProps {
  * 行ったり来たりできる（ステッパーは置かない）。
  * ステータスはダッシュボードの表示とサーバー保存を共有する。
  */
-export const FilingPanel = ({ year, onNavigate, onOpenSection }: FilingPanelProps) => {
+export const FilingPanel = ({
+  transactions,
+  year,
+  taxResult,
+  onNavigate,
+  onOpenSection,
+}: FilingPanelProps) => {
   const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
   const allSubmitted = status.submitted;
 
@@ -99,37 +111,49 @@ export const FilingPanel = ({ year, onNavigate, onOpenSection }: FilingPanelProp
             const done = status[item.key];
             const doneAt = status[`${item.key}_at`];
             return (
-              <div key={item.key} className={styles.statusRow}>
-                <Col gap="sm" className={styles.itemMain}>
-                  <Text className={styles.itemLabel}>
-                    {item.label}
-                    <span className={done ? styles.stateDone : styles.stateTodo}>
-                      {done ? `済み${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未"}
-                    </span>
-                  </Text>
-                  <Text variant="muted">{item.description}</Text>
-                </Col>
-                <Row gap="sm" className={styles.itemActions}>
-                  {item.section ? (
+              <Fragment key={item.key}>
+                <div className={styles.statusRow}>
+                  <Col gap="sm" className={styles.itemMain}>
+                    <Text className={styles.itemLabel}>
+                      {item.label}
+                      <span className={done ? styles.stateDone : styles.stateTodo}>
+                        {done ? `済み${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未"}
+                      </span>
+                    </Text>
+                    <Text variant="muted">{item.description}</Text>
+                  </Col>
+                  <Row gap="sm" className={styles.itemActions}>
+                    {item.section ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!onOpenSection}
+                        onClick={() => item.section && onOpenSection?.(item.section)}
+                      >
+                        {SECTION_OPEN_LABELS[item.section]}
+                      </Button>
+                    ) : null}
                     <Button
-                      variant="ghost"
+                      variant={done ? "ghost" : "primary"}
                       size="sm"
-                      disabled={!onOpenSection}
-                      onClick={() => item.section && onOpenSection?.(item.section)}
+                      disabled={savingKey === item.key || !available}
+                      onClick={() => void toggle(item.key)}
                     >
-                      {SECTION_OPEN_LABELS[item.section]}
+                      {done ? "戻す" : "済みにする"}
                     </Button>
-                  ) : null}
-                  <Button
-                    variant={done ? "ghost" : "primary"}
-                    size="sm"
-                    disabled={savingKey === item.key || !available}
-                    onClick={() => void toggle(item.key)}
-                  >
-                    {done ? "戻す" : "済みにする"}
-                  </Button>
-                </Row>
-              </div>
+                  </Row>
+                </div>
+                {item.key === "confirmed" ? (
+                  <div className={styles.figuresBlock}>
+                    <IncomeSummary transactions={transactions} year={year} />
+                  </div>
+                ) : null}
+                {item.key === "calculated" && taxResult ? (
+                  <div className={styles.figuresBlock}>
+                    <TaxSummary taxResult={taxResult} />
+                  </div>
+                ) : null}
+              </Fragment>
             );
           })}
 

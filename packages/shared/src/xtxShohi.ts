@@ -23,6 +23,7 @@ ref,
 yymmddXml,
 zipXml,
 } from "./xtx";
+import { Transaction } from "./types";
 
 const SOFT_NAME = "eTaxAgent";
 const SHOHI_NS = "http://xml.e-tax.nta.go.jp/XSD/shohi";
@@ -103,6 +104,98 @@ payableLocal: number;
 interimRefundLocal: number;
 /** 消費税及び地方消費税の合計（納付は正、還付は負） */
 totalPayable: number;
+}
+
+/** 帳簿の税区分集計（消費税申告の入力金額）。金額はいずれも税込。 */
+export interface ConsumptionTaxSummary {
+  salesIncl10: number;
+  salesIncl8: number;
+  nontaxableSales: number;
+  exemptSales: number;
+  purchasesIncl10: number;
+  purchasesIncl8: number;
+  /** 税区分が未設定（"" または未知の値）の取引件数。集計に含まれない。 */
+  unsetCount: number;
+  /** 税区分が未設定の取引の金額合計（符号つき）。 */
+  unsetAmount: number;
+  /**
+   * 税区分と金額の符号が合わない取引件数（例: 支出なのに課税売上の区分）。
+   * 集計に含まれない。帳簿の税区分の付け間違いとして表面化させる。
+   */
+  excludedCount: number;
+  /** 符号不一致で集計から外れた取引の金額合計（符号つき）。 */
+  excludedAmount: number;
+}
+
+type ConsumptionBucket =
+  | "salesIncl10"
+  | "salesIncl8"
+  | "nontaxableSales"
+  | "exemptSales"
+  | "purchasesIncl10"
+  | "purchasesIncl8";
+
+/** 税区分 → 集計バケツ。対象外は申告金額に含めないのでバケツ無し（null）。 */
+const TAX_CATEGORY_BUCKETS: Record<string, ConsumptionBucket | null> = {
+  "課税売上10%": "salesIncl10",
+  "課税売上8%": "salesIncl8",
+  非課売上: "nontaxableSales",
+  免税売上: "exemptSales",
+  "課対仕入10%": "purchasesIncl10",
+  "課対仕入8%": "purchasesIncl8",
+  対象外: null,
+};
+
+/**
+ * 帳簿（取引の税区分）から消費税申告の入力金額を集計する。
+ * 消費税の金額は自由入力ではなく、この集計で決めるのが原則。
+ * 売上バケツは収入（正の金額）だけ、仕入バケツは支出（負の金額）を
+ * 正の税込額として合計する。符号が合わない取引は付け間違いとして
+ * 集計から外し、件数を返して画面で警告できるようにする。
+ */
+export function summarizeConsumptionTax(
+  transactions: Transaction[],
+  year: number,
+): ConsumptionTaxSummary {
+  const summary: ConsumptionTaxSummary = {
+    salesIncl10: 0,
+    salesIncl8: 0,
+    nontaxableSales: 0,
+    exemptSales: 0,
+    purchasesIncl10: 0,
+    purchasesIncl8: 0,
+    unsetCount: 0,
+    unsetAmount: 0,
+    excludedCount: 0,
+    excludedAmount: 0,
+  };
+  for (const t of transactions) {
+    if (t.year !== year) continue;
+    const amount = Math.trunc(t.amount || 0);
+    const bucket = TAX_CATEGORY_BUCKETS[t.tax_category];
+    if (bucket === undefined) {
+      summary.unsetCount += 1;
+      summary.unsetAmount += amount;
+      continue;
+    }
+    if (bucket === null) continue;
+    if (bucket === "purchasesIncl10" || bucket === "purchasesIncl8") {
+      if (amount >= 0) {
+        summary.excludedCount += 1;
+        summary.excludedAmount += amount;
+        continue;
+      }
+      summary[bucket] += -amount;
+    } else {
+      if (amount <= 0) {
+        summary.excludedCount += 1;
+        summary.excludedAmount += amount;
+        continue;
+      }
+      summary[bucket] += amount;
+    }
+  }
+  return summary;
 }
 
 function floor100(x: number): number {
