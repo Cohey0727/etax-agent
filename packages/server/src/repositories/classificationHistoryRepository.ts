@@ -57,6 +57,27 @@ export async function loadClassificationHistory(): Promise<ClassificationHistory
   }
 }
 
+/** 学習履歴を保存する。 */
+async function saveClassificationHistory(
+  records: ClassificationHistoryRecord[],
+): Promise<ClassificationHistoryRecord[]> {
+  await mkdir(serverDataDir(), { recursive: true });
+  await writeFile(historyPath(), JSON.stringify(records, null, 2), "utf-8");
+  return records;
+}
+
+/** 摘要（正規化キー）と科目で1件を引く（照合は摘要から作り直したキーで比べる）。 */
+function findRecord(
+  records: ClassificationHistoryRecord[],
+  description: string,
+  account: string,
+): ClassificationHistoryRecord | undefined {
+  const key = normalizeDescriptionKey(description);
+  return records.find(
+    (r) => normalizeDescriptionKey(r.description) === key && r.account === account,
+  );
+}
+
 /** 確定した対応を1件記録する（同じ摘要×科目は回数を増やす）。 */
 export async function recordClassification(
   description: string,
@@ -65,9 +86,7 @@ export async function recordClassification(
   const records = await loadClassificationHistory();
   const key = normalizeDescriptionKey(description);
   const now = new Date().toISOString();
-  const existing = records.find(
-    (r) => normalizeDescriptionKey(r.description) === key && r.account === account,
-  );
+  const existing = findRecord(records, description, account);
   if (existing) {
     existing.key = key;
     existing.count += 1;
@@ -76,7 +95,41 @@ export async function recordClassification(
   } else {
     records.push({ key, description, account, count: 1, updatedAt: now });
   }
-  await mkdir(serverDataDir(), { recursive: true });
-  await writeFile(historyPath(), JSON.stringify(records, null, 2), "utf-8");
-  return records;
+  return saveClassificationHistory(records);
+}
+
+/**
+ * 学習した対応の科目を変更する（AIのメモリーの編集）。
+ * 変更先の科目で同じ摘要の対応が既にあれば、回数を合算して1件にまとめる。
+ * 対象が無ければ null。
+ */
+export async function updateClassificationAccount(
+  description: string,
+  account: string,
+  newAccount: string,
+): Promise<ClassificationHistoryRecord[] | null> {
+  const records = await loadClassificationHistory();
+  const target = findRecord(records, description, account);
+  if (!target) return null;
+  if (account === newAccount) return records;
+  const mergeInto = findRecord(records, description, newAccount);
+  if (mergeInto && mergeInto !== target) {
+    mergeInto.count += target.count;
+    mergeInto.updatedAt = new Date().toISOString();
+    return saveClassificationHistory(records.filter((r) => r !== target));
+  }
+  target.account = newAccount;
+  target.updatedAt = new Date().toISOString();
+  return saveClassificationHistory(records);
+}
+
+/** 学習した対応を1件削除する（AIのメモリーの編集）。対象が無ければ null。 */
+export async function deleteClassification(
+  description: string,
+  account: string,
+): Promise<ClassificationHistoryRecord[] | null> {
+  const records = await loadClassificationHistory();
+  const target = findRecord(records, description, account);
+  if (!target) return null;
+  return saveClassificationHistory(records.filter((r) => r !== target));
 }

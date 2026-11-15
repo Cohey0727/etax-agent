@@ -9,8 +9,7 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import { ClassificationHistoryResponseSchema } from "../schemas/classify";
 import { ErrorSchema } from "../schemas/common";
-
-const MAX_RECORDS = 500;
+import { toHistoryListing } from "../services/classification/historyListing";
 
 export const getClassificationHistoryRoute = createRoute({
   method: "get",
@@ -34,19 +33,5 @@ export const getClassificationHistoryHandler: RouteHandler<
   typeof getClassificationHistoryRoute
 > = async (c) => {
   const history = await loadClassificationHistory();
-  const sorted = [...history].sort((a, b) =>
-    b.count !== a.count ? b.count - a.count : b.updatedAt.localeCompare(a.updatedAt),
-  );
-  return c.json(
-    {
-      records: sorted.slice(0, MAX_RECORDS).map((r) => ({
-        description: r.description,
-        account: r.account,
-        count: r.count,
-        updatedAt: r.updatedAt,
-      })),
-      total: history.length,
-    },
-    200,
-  );
+  return c.json(toHistoryListing(history), 200);
 };

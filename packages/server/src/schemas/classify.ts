@@ -102,3 +102,18 @@ export const ClassificationHistoryResponseSchema = z
   .openapi("ClassificationHistoryResponse");
 
 export type ClassificationHistoryResponse = z.infer<typeof ClassificationHistoryResponseSchema>;
+
+export const UpdateClassificationHistoryRequestSchema = z
+  .object({
+    description: z.string().min(1),
+    account: z.string().min(1),
+    newAccount: z.string().min(1),
+  })
+  .openapi("UpdateClassificationHistoryRequest");
+
+export const DeleteClassificationHistoryRequestSchema = z
+  .object({
+    description: z.string().min(1),
+    account: z.string().min(1),
+  })
+  .openapi("DeleteClassificationHistoryRequest");

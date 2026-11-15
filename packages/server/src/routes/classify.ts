@@ -20,6 +20,14 @@ import {
   getClassificationHistoryHandler,
   getClassificationHistoryRoute,
 } from "../usecases/getClassificationHistory";
+import {
+  updateClassificationHistoryHandler,
+  updateClassificationHistoryRoute,
+} from "../usecases/updateClassificationHistory";
+import {
+  deleteClassificationHistoryHandler,
+  deleteClassificationHistoryRoute,
+} from "../usecases/deleteClassificationHistory";
 
 const app = new OpenAPIHono();
 app.openapi(
@@ -39,5 +47,15 @@ app.openapi(
 );
 app.openapi(getGeneratedRulesRoute, getGeneratedRulesHandler);
 app.openapi(getClassificationHistoryRoute, getClassificationHistoryHandler);
+app.openapi(
+  updateClassificationHistoryRoute,
+  updateClassificationHistoryHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
+app.openapi(
+  deleteClassificationHistoryRoute,
+  deleteClassificationHistoryHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
 
 export default app;

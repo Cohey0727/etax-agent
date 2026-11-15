@@ -5,7 +5,7 @@ const styles = {
   recordRow: style({
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "baseline",
+    alignItems: "center",
     gap: theme.space.md,
     padding: `${theme.space.sm} 0`,
     borderBottom: `1px solid ${theme.color.lineSoft}`,
