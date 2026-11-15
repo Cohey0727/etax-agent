@@ -30,6 +30,8 @@ export function emptyTaxpayerProfile(): TaxpayerProfile {
     shop_name: "",
     jan1_address: "",
     invoice_number: "",
+    previous_zip_code: "",
+    previous_address: "",
   };
 }
 
@@ -50,6 +52,8 @@ export function taxpayerProfileToApi(row: TaxpayerProfileRow): TaxpayerProfile {
     shop_name: row.shopName,
     jan1_address: row.jan1Address,
     invoice_number: row.invoiceNumber,
+    previous_zip_code: row.previousZipCode,
+    previous_address: row.previousAddress,
   };
 }
 
@@ -106,6 +110,8 @@ export async function upsertTaxpayerProfileRow(
     shopName: profile.shop_name,
     jan1Address: profile.jan1_address,
     invoiceNumber: profile.invoice_number,
+    previousZipCode: profile.previous_zip_code,
+    previousAddress: profile.previous_address,
     updatedAt: new Date(),
   };
   const { year: _year, ...updates } = values;

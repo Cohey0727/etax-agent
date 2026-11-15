@@ -30,6 +30,16 @@ const TEXT_FIELDS: readonly {
   { key: "my_number", label: "個人番号（任意）", placeholder: "マイナンバー12桁" },
 ];
 
+/** 異動・変更前の納税地（納税地の異動申出書の出力に使う）。 */
+const PREVIOUS_FIELDS: readonly {
+  key: keyof XtxTaxpayerInput;
+  label: string;
+  placeholder?: string;
+}[] = [
+  { key: "previous_zip_code", label: "異動前の郵便番号", placeholder: "1000001" },
+  { key: "previous_address", label: "異動前の住所", placeholder: "東京都千代田区千代田1-1" },
+];
+
 /** 入力が止まってからDBへ保存するまでの待ち時間（ミリ秒）。 */
 const SAVE_DELAY_MS = 600;
 
@@ -129,6 +139,20 @@ export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
             aria-label="生年月日"
           />
         </Row>
+
+        <Text variant="muted">
+          異動・変更前の納税地は、納税地の異動申出書（印刷用PDF）の出力に使います。
+          転居前の住所を入れておくと、提出パネルから記入済みの申出書を出力できます。
+        </Text>
+        {PREVIOUS_FIELDS.map((field) => (
+          <TextField
+            key={field.key}
+            label={field.label}
+            placeholder={field.placeholder}
+            value={taxpayer[field.key]}
+            onChange={(v) => update(field.key, v)}
+          />
+        ))}
       </Col>
     </Card>
   );

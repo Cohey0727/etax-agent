@@ -119,9 +119,19 @@ export async function ensureTables(): Promise<void> {
       shop_name text NOT NULL DEFAULT '',
       jan1_address text NOT NULL DEFAULT '',
       invoice_number text NOT NULL DEFAULT '',
+      previous_zip_code text NOT NULL DEFAULT '',
+      previous_address text NOT NULL DEFAULT '',
       updated_at integer NOT NULL
     )
   `);
+  // 既存DBへの列追加（異動申出書用の異動前納税地）。
+  const taxpayerColumns = db.all<{ name: string }>(sql`PRAGMA table_info(taxpayer_profiles)`);
+  if (!taxpayerColumns.some((c) => c.name === "previous_zip_code")) {
+    db.run(sql`ALTER TABLE taxpayer_profiles ADD COLUMN previous_zip_code text NOT NULL DEFAULT ''`);
+  }
+  if (!taxpayerColumns.some((c) => c.name === "previous_address")) {
+    db.run(sql`ALTER TABLE taxpayer_profiles ADD COLUMN previous_address text NOT NULL DEFAULT ''`);
+  }
   db.run(sql`
     CREATE TABLE IF NOT EXISTS filing_snapshots (
       id integer PRIMARY KEY AUTOINCREMENT,

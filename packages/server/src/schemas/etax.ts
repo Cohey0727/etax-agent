@@ -8,6 +8,7 @@
  */
 import { z } from "@hono/zod-openapi";
 import { DeductionInputsSchema, TaxCreditInputsSchema } from "./calc";
+import { TaxpayerProfileSchema } from "./taxpayer";
 
 export const XtxTaxpayerSchema = z
   .object({
@@ -26,6 +27,9 @@ export const XtxTaxpayerSchema = z
     jan1_address: z.string(),
     /** インボイス登録番号。XTX には含まれず、プロフィールとして保持するだけ。 */
     invoice_number: z.string().optional(),
+    /** 納税地の異動申出書用：異動・変更前の納税地。XTX には含まれない。 */
+    previous_zip_code: z.string().optional(),
+    previous_address: z.string().optional(),
   })
   .openapi("XtxTaxpayer");
 
@@ -80,6 +84,29 @@ export const ExportReturnPdfResponseSchema = z
   .openapi("ExportReturnPdfResponse");
 
 export type ExportReturnPdfResponse = z.infer<typeof ExportReturnPdfResponseSchema>;
+
+/**
+ * 納税地の異動又は変更に関する申出書（印刷用 PDF）の出力リクエスト。
+ * 納税者情報はプロフィール形式（異動前の納税地を含む）で受ける。
+ */
+export const ExportDomicilePdfRequestSchema = z
+  .object({
+    year: z.number(),
+    submission_date: z.string(),
+    taxpayer: TaxpayerProfileSchema,
+  })
+  .openapi("ExportDomicilePdfRequest");
+
+export type ExportDomicilePdfRequest = z.infer<typeof ExportDomicilePdfRequestSchema>;
+
+export const ExportDomicilePdfResponseSchema = z
+  .object({
+    filename: z.string(),
+    pdf_base64: z.string(),
+  })
+  .openapi("ExportDomicilePdfResponse");
+
+export type ExportDomicilePdfResponse = z.infer<typeof ExportDomicilePdfResponseSchema>;
 
 export const ExportConsumptionXtxRequestSchema = z
   .object({

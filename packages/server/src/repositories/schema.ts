@@ -81,6 +81,9 @@ export const taxpayerProfilesTable = sqliteTable("taxpayer_profiles", {
   shopName: text("shop_name").notNull().default(""),
   jan1Address: text("jan1_address").notNull().default(""),
   invoiceNumber: text("invoice_number").notNull().default(""),
+  /** 納税地の異動申出書用：異動・変更前の納税地（郵便番号・住所）。 */
+  previousZipCode: text("previous_zip_code").notNull().default(""),
+  previousAddress: text("previous_address").notNull().default(""),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),

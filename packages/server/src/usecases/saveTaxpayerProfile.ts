@@ -74,6 +74,8 @@ export const saveTaxpayerProfileHandler: RouteHandler<typeof saveTaxpayerProfile
     shop_name: parsed.data.shop_name ?? "",
     jan1_address: parsed.data.jan1_address ?? "",
     invoice_number: parsed.data.invoice_number ?? "",
+    previous_zip_code: parsed.data.previous_zip_code ?? "",
+    previous_address: parsed.data.previous_address ?? "",
   };
   let row;
   try {

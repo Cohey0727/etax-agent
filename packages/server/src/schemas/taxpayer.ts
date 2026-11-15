@@ -23,6 +23,9 @@ export const TaxpayerProfileSchema = z
     shop_name: z.string(),
     jan1_address: z.string(),
     invoice_number: z.string(),
+    /** 納税地の異動申出書用：異動・変更前の納税地。 */
+    previous_zip_code: z.string(),
+    previous_address: z.string(),
   })
   .openapi("TaxpayerProfile");
 

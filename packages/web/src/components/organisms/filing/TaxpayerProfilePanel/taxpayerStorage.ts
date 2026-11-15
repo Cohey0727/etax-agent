@@ -33,6 +33,8 @@ export function emptyTaxpayer(): XtxTaxpayerInput {
     shop_name: "",
     jan1_address: "",
     invoice_number: "",
+    previous_zip_code: "",
+    previous_address: "",
   };
 }
 
@@ -59,6 +61,8 @@ function parseStored(raw: string | null): XtxTaxpayerInput | null {
       shop_name: str(parsed.shop_name),
       jan1_address: str(parsed.jan1_address),
       invoice_number: str(parsed.invoice_number),
+      previous_zip_code: str(parsed.previous_zip_code),
+      previous_address: str(parsed.previous_address),
     };
   } catch {
     return null;

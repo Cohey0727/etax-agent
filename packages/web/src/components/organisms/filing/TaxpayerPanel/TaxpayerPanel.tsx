@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
-import { exportReturnPdfFile, exportXtxFile } from "@utils/api";
+import { exportDomicilePdfFile, exportReturnPdfFile, exportXtxFile } from "@utils/api";
 import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingSection } from "../FilingPanel";
 import { emptyTaxpayer, loadTaxpayer } from "../TaxpayerProfilePanel";
@@ -59,6 +59,7 @@ export const TaxpayerPanel = ({
   const [prepaidTax, setPrepaidTax] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingDomicile, setExportingDomicile] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,6 +128,27 @@ export const TaxpayerPanel = ({
       setError(e instanceof Error ? e.message : "紙イメージ PDF の出力に失敗しました");
     } finally {
       setExportingPdf(false);
+    }
+  };
+
+  const handleExportDomicilePdf = async () => {
+    setExportingDomicile(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await exportDomicilePdfFile({
+        year,
+        submission_date: submissionDate,
+        taxpayer,
+      });
+      downloadPdfFile(result.filename, result.pdf_base64);
+      setMessage(
+        `${result.filename} をダウンロードしました。公式様式にプロフィールを記入した印刷用の申出書です。印刷して、異動後の納税地を所轄する税務署へ提出してください（郵送も可）。`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "異動申出書 PDF の出力に失敗しました");
+    } finally {
+      setExportingDomicile(false);
     }
   };
 
@@ -244,6 +266,9 @@ export const TaxpayerPanel = ({
           </Button>
           <Button onClick={handleExportPdf} disabled={exportingPdf}>
             {exportingPdf ? "出力中…" : "申告書の紙イメージ（PDF）"}
+          </Button>
+          <Button onClick={handleExportDomicilePdf} disabled={exportingDomicile}>
+            {exportingDomicile ? "出力中…" : "納税地の異動申出書（PDF）"}
           </Button>
           {!supported ? (
             <Text variant="muted">

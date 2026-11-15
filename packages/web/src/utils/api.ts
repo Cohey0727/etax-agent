@@ -7,6 +7,8 @@ import {
   ChatMessage,
   ExportConsumptionXtxRequest,
   ExportConsumptionXtxResponse,
+  ExportDomicilePdfRequest,
+  ExportDomicilePdfResponse,
   ExportXtxRequest,
   ExportReturnPdfResponse,
   ExportXtxResponse,
@@ -289,6 +291,18 @@ export async function exportReturnPdfFile(
     body: JSON.stringify(request),
   });
   return parseJson<ExportReturnPdfResponse>(resp);
+}
+
+/** 納税地の異動申出書（印刷用 PDF）を生成する。プロフィールから生成する。 */
+export async function exportDomicilePdfFile(
+  request: ExportDomicilePdfRequest,
+): Promise<ExportDomicilePdfResponse> {
+  const resp = await fetch("/api/etax/export-domicile-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJson<ExportDomicilePdfResponse>(resp);
 }
 
 /** 消費税申告書（本則）のXTXを生成する。失敗時はサーバーのエラー文言で例外。 */

@@ -8,6 +8,10 @@ import {
   exportConsumptionXtxRoute,
 } from "../usecases/exportConsumptionXtx";
 import {
+  exportDomicilePdfHandler,
+  exportDomicilePdfRoute,
+} from "../usecases/exportDomicilePdf";
+import {
   exportReturnPdfHandler,
   exportReturnPdfRoute,
 } from "../usecases/exportReturnPdf";
@@ -27,6 +31,11 @@ app.openapi(
 app.openapi(
   exportConsumptionXtxRoute,
   exportConsumptionXtxHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
+app.openapi(
+  exportDomicilePdfRoute,
+  exportDomicilePdfHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 

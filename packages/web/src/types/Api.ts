@@ -148,6 +148,9 @@ export interface XtxTaxpayerInput {
   jan1_address: string;
   /** インボイス登録番号（T+13桁）。プロフィールとして年度別に保持する。 */
   invoice_number: string;
+  /** 納税地の異動申出書用：異動・変更前の納税地（郵便番号・住所）。 */
+  previous_zip_code: string;
+  previous_address: string;
 }
 
 /** e-Tax 申告等データ（XTX）出力のリクエスト。 */
@@ -178,6 +181,19 @@ export interface ExportXtxResponse {
 
 /** 申告書の紙イメージ PDF 出力のレスポンス。リクエストは XTX 出力と共通。 */
 export interface ExportReturnPdfResponse {
+  filename: string;
+  pdf_base64: string;
+}
+
+/** 納税地の異動申出書（印刷用 PDF）出力のリクエスト。 */
+export interface ExportDomicilePdfRequest {
+  year: number;
+  submission_date: string;
+  taxpayer: XtxTaxpayerInput;
+}
+
+/** 納税地の異動申出書（印刷用 PDF）出力のレスポンス。 */
+export interface ExportDomicilePdfResponse {
   filename: string;
   pdf_base64: string;
 }
