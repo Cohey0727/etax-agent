@@ -135,20 +135,26 @@ export const YearlyTrendPanel = ({ transactions }: YearlyTrendPanelProps) => {
             })}
           </svg>
         </div>
-        <div className={styles.table}>
-          <span className={styles.cellLabel}>年度</span>
-          <span className={styles.cellLabelRight}>売上</span>
-          <span className={styles.cellLabelRight}>経費</span>
-          <span className={styles.cellLabelRight}>収支</span>
-          {years.map((totals) => (
-            <Fragment key={totals.year}>
-              <span className={styles.cellYear}>{totals.year}年</span>
-              <span className={styles.cellValue}>{formatYen(totals.revenue)}</span>
-              <span className={styles.cellValue}>{formatYen(totals.expenses)}</span>
-              <span className={styles.cellBalance}>{formatYen(totals.balance)}</span>
-            </Fragment>
-          ))}
-        </div>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th className={styles.headCell}>年度</th>
+              <th className={styles.headCellRight}>売上</th>
+              <th className={styles.headCellRight}>経費</th>
+              <th className={styles.headCellRight}>収支</th>
+            </tr>
+          </thead>
+          <tbody>
+            {years.map((totals) => (
+              <tr key={totals.year}>
+                <td className={styles.cellYear}>{totals.year}年</td>
+                <td className={styles.cellValue}>{formatYen(totals.revenue)}</td>
+                <td className={styles.cellValue}>{formatYen(totals.expenses)}</td>
+                <td className={styles.cellBalance}>{formatYen(totals.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </Col>
     </Card>
   );

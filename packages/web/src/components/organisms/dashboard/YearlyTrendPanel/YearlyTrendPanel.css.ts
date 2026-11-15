@@ -42,36 +42,47 @@ const styles = {
   swatchRevenue: style({ ...swatchBase, backgroundColor: REVENUE_COLOR }),
   swatchExpense: style({ ...swatchBase, backgroundColor: EXPENSE_COLOR }),
   swatchBalance: style({ ...swatchBase, backgroundColor: BALANCE_COLOR }),
-  // 年度ごとの正確な金額（グラフの下に表で出す）。
+  // 年度ごとの正確な金額（グラフの下に罫線付きの表で出す）。行は詰める。
   table: style({
-    display: "grid",
-    gridTemplateColumns: "56px 1fr 1fr 1fr",
-    rowGap: theme.space.xs,
-    alignItems: "baseline",
+    width: "100%",
+    borderCollapse: "collapse",
   }),
-  cellLabel: style({
+  headCell: style({
     color: theme.color.muted,
     fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeight.medium,
+    textAlign: "left",
+    padding: `${theme.space.xs} ${theme.space.sm}`,
+    borderBottom: `1px solid ${theme.color.border}`,
   }),
-  cellLabelRight: style({
+  headCellRight: style({
     color: theme.color.muted,
     fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeight.medium,
     textAlign: "right",
+    padding: `${theme.space.xs} ${theme.space.sm}`,
+    borderBottom: `1px solid ${theme.color.border}`,
   }),
   cellYear: style({
     fontWeight: theme.fontWeight.semibold,
     fontSize: theme.fontSizes.sm,
+    padding: `${theme.space.xs} ${theme.space.sm}`,
+    borderBottom: `1px solid ${theme.color.lineSoft}`,
   }),
   cellValue: style({
     textAlign: "right",
     fontSize: theme.fontSizes.sm,
     fontVariantNumeric: "tabular-nums",
+    padding: `${theme.space.xs} ${theme.space.sm}`,
+    borderBottom: `1px solid ${theme.color.lineSoft}`,
   }),
   cellBalance: style({
     textAlign: "right",
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeight.semibold,
     fontVariantNumeric: "tabular-nums",
+    padding: `${theme.space.xs} ${theme.space.sm}`,
+    borderBottom: `1px solid ${theme.color.lineSoft}`,
   }),
 };
 

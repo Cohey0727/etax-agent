@@ -9,10 +9,11 @@ const skeletonPulse = keyframes({
 
 const styles = {
   // 独立した項目1件分の行。順序は表さず、状態だけを示す。
+  // 項目名・状態・補足は左に寄せて並べる（両端に散らすと隙間が開きすぎる）。
   statusRow: style({
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     gap: theme.space.md,
     minHeight: "24px",
   }),
