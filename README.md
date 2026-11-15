@@ -223,8 +223,17 @@ Muse・Grok 等の MCP クライアントから、サーバーの帳簿DBに対�
 集計（aggregate_year）・消費税3方式比較（consumption_tax）・所得税計算（income_tax）・
 修正申告の差分（amendment_delta）・取引CRUD（list/add/update/delete_transaction）・
 勘定科目の判定と学習（classify_account / classify_feedback）・
-XTX出力（export_xtx）・申告ステータス（get/set_filing_status）が使える。
+XTX出力（export_xtx）・申告ステータス（get/set_filing_status）・
+税務知識ベース検索（search_tax_knowledge）が使える。
 数字の計算は REST API と同じ決定的な関数のみで行う。e-Tax への提出は行わない。
+
+## 税務知識ベース
+
+エージェント（アプリ内・MCP 共通）が税制のルールや手続きの確認に使う知識ベース。
+国税庁タックスアンサー86件を SQLite（FTS5・trigram）に収録し、
+`search_tax_knowledge` ツールで検索する。エージェントは不確かな点を推測で答えず、
+検索して出典（タックスアンサー No.XXXX）を添える。
+法改正時の再収集手順など詳細は [docs/tax-knowledge-base.md](docs/tax-knowledge-base.md)。
 
 クライアント設定例（Claude Code）:
 

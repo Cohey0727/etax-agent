@@ -313,6 +313,14 @@ export const AppPage = () => {
   const handleUiAction = (action: AgentUiAction) => {
     if (action.type === "setYear") {
       handleYearChange(action.year);
+    } else if (action.type === "reloadTransactions") {
+      // エージェントが帳簿DBへ書き込んだ後は、帳簿の最新状態を読み直して反映する。
+      void (async () => {
+        const rows = await fetchLedgerTransactions();
+        if (!rows) return;
+        setTransactions(rows.map(ledgerRowToTransaction));
+        setDataSource("帳簿");
+      })();
     } else if (action.type === "setTheme") {
       handleThemeModeChange(action.mode);
     } else if (appViews.some((view) => view.id === action.view)) {

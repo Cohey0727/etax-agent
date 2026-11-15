@@ -8,12 +8,36 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
+import {
+  addTransactionForAgent,
+  deleteTransactionExact,
+  loadAllTransactionsForAgent,
+  updateTransactionsBulk,
+} from "./agentDbWrites";
 import { AgentContext, ToolCallLog, dispatchTool } from "./agentTools";
 
 /** エージェントのツール一式を生成する。実行のたびに log へ記録が追加される。 */
 export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
   const run = (name: string, args: Record<string, unknown>) => {
     const result = dispatchTool(name, args, ctx);
+    log.push({ name, arguments: args, result });
+    return result;
+  };
+  // 帳簿DBへの書き込み系ツール。成功したら ctx の取引を DB の最新状態へ差し替え、
+  // 同じターン内の後続の集計・検索も変更後の数字で動くようにする。
+  // 失敗は例外にせず { ok: false, error } として LLM へ返し、説明させる。
+  const runWrite = async (
+    name: string,
+    args: Record<string, unknown>,
+    write: () => Promise<{ ok: true } & Record<string, unknown>>,
+  ) => {
+    let result: { ok: boolean } & Record<string, unknown>;
+    try {
+      result = await write();
+      ctx.transactions = await loadAllTransactionsForAgent();
+    } catch (e) {
+      result = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
     log.push({ name, arguments: args, result });
     return result;
   };
@@ -83,6 +107,87 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
         });
         return result;
       },
+    }),
+    update_transactions: tool({
+      description:
+        "帳簿DBの取引を条件で絞り込み、科目・区分・税区分を一括で付け替える（例: 「2023年のＣａＳｙの消耗品費を雑費に変えて」→ keyword=ＣａＳｙ, year=2023, category=消耗品費, set_category=雑費）。絞り込み条件（keyword / year / category / income_type のいずれか1つ以上）と変更内容（set_category / set_income_type / set_tax_category のいずれか1つ以上）が必須。実行前に search_transactions で対象の件数と合計を確認してから使うこと。結果に変更件数と合計金額が返る。科目の付け替えは分類の学習にも反映される。",
+      inputSchema: z.object({
+        keyword: z
+          .string()
+          .optional()
+          .describe("摘要・口座名・科目への部分一致キーワード（例: ＣａＳｙ、Amazon）"),
+        year: z.number().int().optional().describe("割り当て年度（西暦）での絞り込み"),
+        category: z.string().optional().describe("現在の科目（完全一致）での絞り込み"),
+        income_type: z
+          .enum(["business", "real_estate", "other"])
+          .optional()
+          .describe("現在の区分での絞り込み"),
+        set_category: z.string().optional().describe("変更後の科目（例: 雑費）"),
+        set_income_type: z
+          .enum(["business", "real_estate", "other"])
+          .optional()
+          .describe("変更後の区分"),
+        set_tax_category: z.string().optional().describe("変更後の税区分（例: 課対仕入10%）"),
+      }),
+      execute: async (args) =>
+        runWrite("update_transactions", { ...args }, () =>
+          updateTransactionsBulk({
+            keyword: args.keyword,
+            year: args.year,
+            category: args.category,
+            incomeType: args.income_type,
+            setCategory: args.set_category,
+            setIncomeType: args.set_income_type,
+            setTaxCategory: args.set_tax_category,
+          }),
+        ),
+    }),
+    add_transaction: tool({
+      description:
+        "取引を1件、帳簿DBへ追加する。amount は符号つき税込金額（収入は正、支出は負）。year は割り当て年度で、省略時は日付の年になる。",
+      inputSchema: z.object({
+        date: z.string().describe("日付（YYYY-MM-DD）"),
+        description: z.string().describe("摘要"),
+        amount: z.number().describe("符号つき税込金額（収入は正、支出は負）"),
+        account: z.string().optional().describe("口座・カード名"),
+        category: z.string().optional().describe("勘定科目（省略時は未分類）"),
+        income_type: z
+          .enum(["business", "real_estate", "other"])
+          .optional()
+          .describe("区分（省略時は other）"),
+        tax_category: z.string().optional().describe("税区分（例: 課対仕入10%）"),
+        year: z.number().int().optional().describe("割り当て年度（西暦）。省略時は日付の年"),
+      }),
+      execute: async (args) =>
+        runWrite("add_transaction", { ...args }, () =>
+          addTransactionForAgent({
+            date: args.date,
+            description: args.description,
+            amount: args.amount,
+            account: args.account,
+            category: args.category,
+            incomeType: args.income_type,
+            taxCategory: args.tax_category,
+            year: args.year,
+          }),
+        ),
+    }),
+    delete_transaction: tool({
+      description:
+        "日付・摘要・金額が完全一致する取引を1件だけ帳簿DBから削除する。削除は取り消せないため、対象が1件に特定できる場合だけ使うこと（複数該当するとエラーになる）。先に search_transactions で対象を確認してから使うこと。",
+      inputSchema: z.object({
+        date: z.string().describe("日付（YYYY-MM-DD）"),
+        description: z.string().describe("摘要（完全一致）"),
+        amount: z.number().describe("符号つき税込金額（完全一致）"),
+      }),
+      execute: async (args) =>
+        runWrite("delete_transaction", { ...args }, () =>
+          deleteTransactionExact({
+            date: args.date,
+            description: args.description,
+            amount: args.amount,
+          }),
+        ),
     }),
     amendment_delta: tool({
       description:

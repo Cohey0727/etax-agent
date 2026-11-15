@@ -24,7 +24,8 @@ import styles from "./AgentChatPanel.css";
 export type AgentUiAction =
   | { type: "setYear"; year: number }
   | { type: "navigate"; view: AppView }
-  | { type: "setTheme"; mode: ThemeMode };
+  | { type: "setTheme"; mode: ThemeMode }
+  | { type: "reloadTransactions" };
 
 export interface AgentChatPanelProps {
   transactions: Transaction[];
@@ -47,8 +48,13 @@ export interface AgentChatPanelProps {
   onClearReady?: (handler: (() => void) | null) => void;
 }
 
+/** 帳簿DBへの書き込み系ツール（成功したら画面の取引を読み直す）。 */
+const WRITE_TOOL_NAMES = new Set(["update_transactions", "add_transaction", "delete_transaction"]);
+
 // ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。
-const deriveUiActions = (toolCalls: { name: string; arguments: Record<string, unknown> }[]) => {
+const deriveUiActions = (
+  toolCalls: { name: string; arguments: Record<string, unknown>; result?: unknown }[],
+) => {
   const actions: AgentUiAction[] = [];
   const seen = new Set<string>();
   const push = (action: AgentUiAction) => {
@@ -71,6 +77,11 @@ const deriveUiActions = (toolCalls: { name: string; arguments: Record<string, un
       const mode = tc.arguments.mode;
       if (mode === "light" || mode === "dark" || mode === "system") {
         push({ type: "setTheme", mode });
+      }
+    } else if (WRITE_TOOL_NAMES.has(tc.name)) {
+      // 書き込みが成功していたら、帳簿の最新状態を画面へ反映する。
+      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
+        push({ type: "reloadTransactions" });
       }
     }
   }
@@ -196,7 +207,7 @@ export const AgentChatPanel = ({
               <Text variant="muted">
                 質問や、集計・計算などの処理を頼めます。例:
                 「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
-                「ファミリーマートの支出はどのくらい？」
+                「ファミリーマートの支出はどのくらい？」「ＣａＳｙの科目を雑費に変えて」
               </Text>
             ) : null}
             <MessageBubbles items={messages} />
