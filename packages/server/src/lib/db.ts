@@ -102,5 +102,25 @@ export async function ensureTables(): Promise<void> {
       updated_at integer NOT NULL
     )
   `);
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS taxpayer_profiles (
+      year integer PRIMARY KEY,
+      name text NOT NULL DEFAULT '',
+      name_kana text NOT NULL DEFAULT '',
+      zip_code text NOT NULL DEFAULT '',
+      address text NOT NULL DEFAULT '',
+      address_line2 text NOT NULL DEFAULT '',
+      birth_date text NOT NULL DEFAULT '',
+      phone text NOT NULL DEFAULT '',
+      tax_office_name text NOT NULL DEFAULT '',
+      tax_office_code text NOT NULL DEFAULT '',
+      my_number text NOT NULL DEFAULT '',
+      occupation text NOT NULL DEFAULT '',
+      shop_name text NOT NULL DEFAULT '',
+      jan1_address text NOT NULL DEFAULT '',
+      invoice_number text NOT NULL DEFAULT '',
+      updated_at integer NOT NULL
+    )
+  `);
   tablesEnsured = true;
 }

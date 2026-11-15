@@ -12,7 +12,7 @@ import { AlertBox } from "@components/molecules";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportReturnPdfFile, exportXtxFile } from "@utils/api";
 import { FilingSection } from "../FilingPanel";
-import { loadTaxpayer } from "../TaxpayerProfilePanel";
+import { emptyTaxpayer, loadTaxpayer } from "../TaxpayerProfilePanel";
 import styles from "./TaxpayerPanel.css";
 
 export interface TaxpayerPanelProps {
@@ -52,7 +52,7 @@ export const TaxpayerPanel = ({
   originalIncomeTax,
   onOpenSection,
 }: TaxpayerPanelProps) => {
-  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => loadTaxpayer(year).taxpayer);
+  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
   const [withholdingTax, setWithholdingTax] = useState(0);
   const [prepaidTax, setPrepaidTax] = useState(0);
@@ -66,7 +66,13 @@ export const TaxpayerPanel = ({
   // 年度が切り替わったら、その年度のプロフィールを読み直す。
   // 納税者情報タブで編集して戻ってきた場合も、マウントし直しで最新を読む。
   useEffect(() => {
-    setTaxpayer(loadTaxpayer(year).taxpayer);
+    let cancelled = false;
+    loadTaxpayer(year).then((loadedProfile) => {
+      if (!cancelled) setTaxpayer(loadedProfile.taxpayer);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [year]);
 
   // 申告の種類はモードとして選ぶものではなく、入力内容から決まる。

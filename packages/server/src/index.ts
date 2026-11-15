@@ -57,6 +57,7 @@ import healthRoutes from "./routes/health";
 import importsRoutes from "./routes/imports";
 import mcpRoutes from "./routes/mcp";
 import receiptsRoutes from "./routes/receipts";
+import taxpayerRoutes from "./routes/taxpayer";
 import transactionsRoutes from "./routes/transactions";
 
 const app = new OpenAPIHono();
@@ -72,6 +73,7 @@ app.route("/", receiptsRoutes);
 app.route("/", filesRoutes);
 app.route("/", freeeRoutes);
 app.route("/", filingStatusRoutes);
+app.route("/", taxpayerRoutes);
 app.route("/", etaxRoutes);
 app.route("/", mcpRoutes);
 

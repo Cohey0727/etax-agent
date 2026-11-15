@@ -1,18 +1,20 @@
 /**
- * taxpayerStorage.ts — 納税者プロフィール（年度別）を端末へ保存する。
+ * taxpayerStorage.ts — 納税者プロフィール（年度別）の読み書き。
  *
- * プロフィールは年度ごとに持つ（住所・インボイス番号などが年で変わるため）。
- * 対象年の保存が無ければ、直近の過去年のプロフィールを「引き継ぎ」として
- * 読み込む（保存は対象年に対して行われる）。移行前の単一キー
- * （etax-taxpayer）も引き継ぎ元として扱う。個人番号を含むため保存先は
- * この端末の localStorage のみで、サーバーへは出力リクエスト時にだけ送る。
- * 保存値が壊れていても空の入力にフォールバックする。
+ * 保存先はサーバーのDB（年度別に1件）。対象年の保存が無ければ、直近の
+ * 過去年のプロフィールを「引き継ぎ」として返す（引き継ぎの判定はサーバー
+ * 側で行い、carried_from で知らせる）。保存は常に対象年に対して行う。
+ * 移行前に端末の localStorage へ保存していた値だけが残っている場合は、
+ * その値を読み込んでDBへ移し替える（移行は一度きり）。DBへ届かない
+ * 場合は端末保存の値で編集を続けられるようにする。保存値が壊れていても
+ * 空の入力にフォールバックする。
  */
 import { XtxTaxpayerInput } from "@types";
+import { fetchTaxpayerProfile, saveTaxpayerProfile } from "@utils/api";
 
 const LEGACY_KEY = "etax-taxpayer";
 const KEY_PREFIX = "etax-taxpayer-";
-/** 引き継ぎ元を探す過去年の範囲。 */
+/** 引き継ぎ元を探す過去年の範囲（端末保存の移行用）。 */
 const CARRY_SEARCH_YEARS = 10;
 
 export function emptyTaxpayer(): XtxTaxpayerInput {
@@ -71,6 +73,10 @@ function readKey(key: string): XtxTaxpayerInput | null {
   }
 }
 
+function isEmptyProfile(taxpayer: XtxTaxpayerInput): boolean {
+  return Object.values(taxpayer).every((value) => value === "");
+}
+
 export interface LoadedTaxpayer {
   taxpayer: XtxTaxpayerInput;
   /** 引き継ぎ元の年。対象年自身の保存を読んだ場合は null。 */
@@ -79,8 +85,8 @@ export interface LoadedTaxpayer {
   carriedFromLegacy: boolean;
 }
 
-/** 対象年のプロフィールを読み込む。無ければ過去年→旧キーの順に引き継ぐ。 */
-export function loadTaxpayer(year: number): LoadedTaxpayer {
+/** 端末保存（移行前）から読み込む。何も保存が無ければ null。 */
+function loadTaxpayerFromLocal(year: number): LoadedTaxpayer | null {
   const own = readKey(`${KEY_PREFIX}${year}`);
   if (own) return { taxpayer: own, carriedFrom: null, carriedFromLegacy: false };
   for (let y = year - 1; y >= year - CARRY_SEARCH_YEARS; y--) {
@@ -89,14 +95,37 @@ export function loadTaxpayer(year: number): LoadedTaxpayer {
   }
   const legacy = readKey(LEGACY_KEY);
   if (legacy) return { taxpayer: legacy, carriedFrom: null, carriedFromLegacy: true };
+  return null;
+}
+
+/** 対象年のプロフィールを読み込む。無ければ過去年からの引き継ぎ。 */
+export async function loadTaxpayer(year: number): Promise<LoadedTaxpayer> {
+  const remote = await fetchTaxpayerProfile(year);
+  if (remote && (!isEmptyProfile(remote.taxpayer) || remote.carried_from !== null)) {
+    return {
+      taxpayer: remote.taxpayer,
+      carriedFrom: remote.carried_from,
+      carriedFromLegacy: false,
+    };
+  }
+  const local = loadTaxpayerFromLocal(year);
+  if (local && !isEmptyProfile(local.taxpayer)) {
+    // 端末にだけ残っていた値をDBへ移し替える（対象年として保存する）。
+    await saveTaxpayerProfile(year, local.taxpayer);
+    return { taxpayer: local.taxpayer, carriedFrom: null, carriedFromLegacy: false };
+  }
+  if (remote) {
+    return {
+      taxpayer: remote.taxpayer,
+      carriedFrom: remote.carried_from,
+      carriedFromLegacy: false,
+    };
+  }
+  if (local) return local;
   return { taxpayer: emptyTaxpayer(), carriedFrom: null, carriedFromLegacy: false };
 }
 
-/** 対象年のプロフィールとして保存する。 */
-export function saveTaxpayer(year: number, taxpayer: XtxTaxpayerInput): void {
-  try {
-    localStorage.setItem(`${KEY_PREFIX}${year}`, JSON.stringify(taxpayer));
-  } catch {
-    // 保存できない環境ではそのまま編集を続ける。
-  }
+/** 対象年のプロフィールとしてDBへ保存する。 */
+export async function saveTaxpayer(year: number, taxpayer: XtxTaxpayerInput): Promise<void> {
+  await saveTaxpayerProfile(year, taxpayer);
 }

@@ -5,9 +5,10 @@
  * SQLite ファイルに置く。日時カラムは timestamp_ms モード（整数ミリ秒）で
  * 持ち、読み出し側では Date として扱う（従来の Postgres 実装と同じ感覚）。
  *
- * imports       : CSV取込の記録（ファイル名・自動マッピング結果・件数）
- * transactions  : 取引（取込元 imports への参照つき）
- * filing_status : 年度ごとの申告ステータス（確認・控除計算・提出の済み日時）
+ * imports           : CSV取込の記録（ファイル名・自動マッピング結果・件数）
+ * transactions      : 取引（取込元 imports への参照つき）
+ * filing_status     : 年度ごとの申告ステータス（確認・控除計算・提出の済み日時）
+ * taxpayer_profiles : 年度ごとの納税者プロフィール（申告書の見出し情報）
  */
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -56,7 +57,36 @@ export const filingStatusTable = sqliteTable("filing_status", {
     .$defaultFn(() => new Date()),
 });
 
+/**
+ * 納税者プロフィール（年度別）。申告書の見出しに入る情報で、年度ごとに
+ * 1行持つ（住所・インボイス番号などが年で変わるため）。個人番号も含むため
+ * 値はアプリのDB内にのみ置き、出力リクエストの生成に使う。
+ */
+export const taxpayerProfilesTable = sqliteTable("taxpayer_profiles", {
+  /** 対象年（西暦） */
+  year: integer("year").primaryKey(),
+  name: text("name").notNull().default(""),
+  nameKana: text("name_kana").notNull().default(""),
+  zipCode: text("zip_code").notNull().default(""),
+  address: text("address").notNull().default(""),
+  addressLine2: text("address_line2").notNull().default(""),
+  /** YYYY-MM-DD */
+  birthDate: text("birth_date").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  taxOfficeName: text("tax_office_name").notNull().default(""),
+  taxOfficeCode: text("tax_office_code").notNull().default(""),
+  myNumber: text("my_number").notNull().default(""),
+  occupation: text("occupation").notNull().default(""),
+  shopName: text("shop_name").notNull().default(""),
+  jan1Address: text("jan1_address").notNull().default(""),
+  invoiceNumber: text("invoice_number").notNull().default(""),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type ImportRow = typeof importsTable.$inferSelect;
 export type TransactionRow = typeof transactionsTable.$inferSelect;
 export type NewTransactionRow = typeof transactionsTable.$inferInsert;
 export type FilingStatusRow = typeof filingStatusTable.$inferSelect;
+export type TaxpayerProfileRow = typeof taxpayerProfilesTable.$inferSelect;

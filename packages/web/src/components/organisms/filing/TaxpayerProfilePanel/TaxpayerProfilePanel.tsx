@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, Col, Input, Row, Text } from "@components/atoms";
 import { XtxTaxpayerInput } from "@types";
-import { loadTaxpayer, saveTaxpayer } from "./taxpayerStorage";
+import {
+  LoadedTaxpayer,
+  emptyTaxpayer,
+  loadTaxpayer,
+  saveTaxpayer,
+} from "./taxpayerStorage";
 import styles from "./TaxpayerProfilePanel.css";
 
 /** テキスト入力の項目定義（ラベル列つきで並べる）。 */
@@ -25,31 +30,60 @@ const TEXT_FIELDS: readonly {
   { key: "my_number", label: "個人番号（任意）", placeholder: "マイナンバー12桁" },
 ];
 
+/** 入力が止まってからDBへ保存するまでの待ち時間（ミリ秒）。 */
+const SAVE_DELAY_MS = 600;
+
 export interface TaxpayerProfilePanelProps {
   year: number;
 }
 
 /**
  * 納税者情報の編集パネル（確定申告画面の「納税者情報」タブ）。
- * 申告書の見出しに入る情報で、プロフィールは年度別にこの端末にのみ保存される
- * （個人番号は出力ファイルにだけ含まれる）。入力はその場で保存され、
- * 総合タブの提出パネルが同じ保存値を読み直して出力に使う。
+ * 申告書の見出しに入る情報で、プロフィールは年度別にサーバー（帳簿DB）へ
+ * 保存される。入力は少し待ってから自動で保存され、総合タブの提出パネルや
+ * 消費税タブが同じ保存値を読み直して出力に使う。
  */
 export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
-  const [loaded, setLoaded] = useState(() => loadTaxpayer(year));
-  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => loaded.taxpayer);
+  const [loaded, setLoaded] = useState<LoadedTaxpayer | null>(null);
+  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
+  const pendingRef = useRef<{ year: number; taxpayer: XtxTaxpayerInput } | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   // 年度が切り替わったら、その年度のプロフィール（無ければ引き継ぎ）を読み直す。
   useEffect(() => {
-    const next = loadTaxpayer(year);
-    setLoaded(next);
-    setTaxpayer(next.taxpayer);
+    let cancelled = false;
+    setLoaded(null);
+    loadTaxpayer(year).then((next) => {
+      if (cancelled) return;
+      setLoaded(next);
+      setTaxpayer(next.taxpayer);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [year]);
+
+  // 画面を離れるとき、保存待ちの入力があれば即座に保存する。
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+      if (pending) void saveTaxpayer(pending.year, pending.taxpayer);
+    };
+  }, []);
 
   const update = (key: keyof XtxTaxpayerInput, value: string) => {
     const next = { ...taxpayer, [key]: value };
     setTaxpayer(next);
-    saveTaxpayer(year, next);
+    pendingRef.current = { year, taxpayer: next };
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+      if (pending) void saveTaxpayer(pending.year, pending.taxpayer);
+    }, SAVE_DELAY_MS);
   };
 
   return (
@@ -58,15 +92,15 @@ export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
         <Col gap="sm">
           <Text variant="sectionTitle">納税者情報</Text>
           <Text variant="muted">
-            申告書の見出しに入る情報です。プロフィールは年度別に、この端末にのみ保存
-            されます（個人番号は出力ファイルにだけ含まれます）。
+            申告書の見出しに入る情報です。プロフィールは年度別にサーバー（この
+            アプリのDB）へ保存されます。
           </Text>
-          {loaded.carriedFrom !== null ? (
+          {loaded?.carriedFrom != null ? (
             <Text variant="muted">
               {loaded.carriedFrom}年分のプロフィールを引き継いでいます。変更すると
               {year}年分として保存されます。
             </Text>
-          ) : loaded.carriedFromLegacy ? (
+          ) : loaded?.carriedFromLegacy ? (
             <Text variant="muted">
               これまでのプロフィールを引き継いでいます。変更すると{year}年分として
               保存されます。

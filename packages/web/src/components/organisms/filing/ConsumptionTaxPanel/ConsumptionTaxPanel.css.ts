@@ -41,6 +41,18 @@ const styles = {
       "(max-width: 640px)": { flex: "1 1 100%" },
     },
   }),
+  // 計算結果の裏付け行で、金額の列まで空けるためのスペーサー（ラベル列と同じ幅）。
+  backingSpacer: style({
+    flex: "0 0 210px",
+    "@media": {
+      "(max-width: 640px)": { display: "none" },
+    },
+  }),
+  // 計算結果の裏付け（項目の直下に、金額の列に揃えて出す）。
+  resultBacking: style({
+    flex: "1 1 auto",
+    fontSize: theme.fontSizes.xs,
+  }),
 };
 
 export default styles;

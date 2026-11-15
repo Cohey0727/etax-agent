@@ -1,14 +1,18 @@
 import {
+  ConsumptionReturn,
   ConsumptionTaxSummary,
   Transaction,
   computeConsumptionReturn,
   summarizeConsumptionTax,
 } from "@etax/shared";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { loadTaxpayer } from "@components/organisms/filing/TaxpayerProfilePanel";
-import { ExportConsumptionXtxRequest } from "@types";
+import {
+  emptyTaxpayer,
+  loadTaxpayer,
+} from "@components/organisms/filing/TaxpayerProfilePanel";
+import { ExportConsumptionXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportConsumptionXtxFile } from "@utils/api";
 import { formatNumber, formatYen } from "@utils";
 import styles from "./ConsumptionTaxPanel.css";
@@ -61,7 +65,19 @@ export interface ConsumptionTaxPanelProps {
  * 課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算される。
  */
 export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: ConsumptionTaxPanelProps) => {
-  const [taxpayer] = useState(() => loadTaxpayer(year).taxpayer);
+  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
+
+  // 納税者プロフィール（DB保存）を読み込む。出力するXTXの見出しに使う。
+  useEffect(() => {
+    let cancelled = false;
+    loadTaxpayer(year).then((loadedProfile) => {
+      if (!cancelled) setTaxpayer(loadedProfile.taxpayer);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [year]);
+
   const summary = useMemo(() => summarizeConsumptionTax(transactions, year), [transactions, year]);
   const [form, setForm] = useState<EditableForm>(() => ({
     basePeriodSalesThousands: deriveBasePeriodSalesThousands(transactions, year),
@@ -90,6 +106,66 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
       }),
     [summary, form],
   );
+
+  // 計算結果の各項目と、その裏付け（どう計算したか）を直下に並べる。
+  const resultRows: readonly { label: string; value: string; backing: string }[] = [
+    {
+      label: "課税売上割合",
+      value: `${preview.ratio}%`,
+      backing:
+        `課税売上高（税抜）${formatYen(preview.salesExcl)} ÷ 売上高の合計（税抜）` +
+        `${formatYen(preview.totalSalesExcl)} ・ ${preview.fullDeduction ? "全額控除" : "一括比例配分"}`,
+    },
+    {
+      label: "課税標準額",
+      value: formatYen(preview.taxBase),
+      backing: "課税売上高（税抜）の千円未満を切り捨て",
+    },
+    {
+      label: "消費税額",
+      value: formatYen(preview.outputTax),
+      backing: outputTaxBacking(preview),
+    },
+    {
+      label: "控除対象仕入税額",
+      value: formatYen(preview.inputTax),
+      backing: preview.fullDeduction
+        ? `課税仕入にかかる消費税額 ${formatYen(preview.inputTaxRaw10 + preview.inputTaxRaw8)} の全額`
+        : `課税仕入にかかる消費税額 ${formatYen(preview.inputTaxRaw10 + preview.inputTaxRaw8)} × 課税売上割合 ${preview.ratio}%`,
+    },
+    preview.refundNational > 0
+      ? {
+          label: "還付税額（国税）",
+          value: formatYen(preview.refundNational),
+          backing: `消費税額 ${formatYen(preview.outputTax)} − 控除対象仕入税額 ${formatYen(preview.inputTax)}`,
+        }
+      : {
+          label: "納付税額（国税）",
+          value: formatYen(preview.payableNational),
+          backing:
+            `消費税額 ${formatYen(preview.outputTax)} − 控除対象仕入税額 ${formatYen(preview.inputTax)}` +
+            ` = ${formatYen(preview.diffNational)}` +
+            (form.interimNational > 0 ? ` − 中間納付 ${formatYen(form.interimNational)}` : ""),
+        },
+    preview.refundLocal > 0
+      ? {
+          label: "還付譲渡割額（地方）",
+          value: formatYen(preview.refundLocal),
+          backing: `還付税額（国税）× 22/78`,
+        }
+      : {
+          label: "納付譲渡割額（地方）",
+          value: formatYen(preview.payableLocal),
+          backing:
+            `差引税額（国税）${formatYen(preview.diffNational)} × 22/78 = ${formatYen(preview.localTaxGross)}` +
+            (form.interimLocal > 0 ? ` − 中間納付 ${formatYen(form.interimLocal)}` : ""),
+        },
+    {
+      label: "合計",
+      value: formatYen(preview.totalPayable),
+      backing: `国税 ${formatYen(preview.payableNational)} ＋ 地方 ${formatYen(preview.payableLocal)}`,
+    },
+  ];
 
   const update = (key: EditableKey, value: number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -239,11 +315,23 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
             ))
           : null}
 
-        <Text>
-          課税売上割合 {preview.ratio}%（{preview.fullDeduction ? "全額控除" : "一括比例配分"}）
-          ・ 納付税額（国税）{formatNumber(preview.payableNational)}円 ・ 納付譲渡割額{" "}
-          {formatNumber(preview.payableLocal)}円 ・ 合計 {formatNumber(preview.totalPayable)}円
-        </Text>
+        <Text className={styles.subhead}>計算結果</Text>
+        {resultRows.map((row) => (
+          <Col key={row.label} gap="sm">
+            <Row gap="sm">
+              <div className={styles.fieldLabel}>
+                <Text variant="muted">{row.label}</Text>
+              </div>
+              <Text className={styles.amountValue}>{row.value}</Text>
+            </Row>
+            <Row gap="sm">
+              <div className={styles.backingSpacer} />
+              <Text variant="muted" className={styles.resultBacking}>
+                {row.backing}
+              </Text>
+            </Row>
+          </Col>
+        ))}
 
         {error ? <AlertBox variant="error">{error}</AlertBox> : null}
         {message ? <AlertBox>{message}</AlertBox> : null}
@@ -278,6 +366,14 @@ const AmountField = ({ label, value, onChange }: AmountFieldProps) => (
     />
   </Row>
 );
+
+/** 消費税額の裏付け表記（課税標準額 × 税率の内訳）。 */
+function outputTaxBacking(preview: ConsumptionReturn): string {
+  const parts: string[] = [];
+  if (preview.base10 > 0) parts.push(`10%分 ${formatYen(preview.base10)} × 7.8%`);
+  if (preview.base8 > 0) parts.push(`軽減8%分 ${formatYen(preview.base8)} × 6.24%`);
+  return parts.length > 0 ? `課税標準額 ${parts.join(" ＋ ")}` : "課税標準額なし";
+}
 
 /**
  * 基準期間（2年前）の課税売上高（千円・税抜）を帳簿から出す。

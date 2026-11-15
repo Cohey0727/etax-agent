@@ -17,6 +17,7 @@ import {
   LedgerTransactionInput,
   ListLedgerTransactionsResponse,
   PresignUploadFileResponse,
+  XtxTaxpayerInput,
 } from "@types";
 
 /** サーバーAPIの型つきラッパー。/api は Vite プロキシで localhost:3001 へ。 */
@@ -197,6 +198,42 @@ export async function updateFilingStatus(
     return data.status;
   } catch {
     return null;
+  }
+}
+
+/** 納税者プロフィールの取得結果。carried_from は引き継ぎ元の年（無ければ null）。 */
+export interface TaxpayerProfileResult {
+  taxpayer: XtxTaxpayerInput;
+  carried_from: number | null;
+}
+
+/** 納税者プロフィール（年度別・DB保存）を取得する。取得できない場合は null。 */
+export async function fetchTaxpayerProfile(
+  year: number,
+): Promise<TaxpayerProfileResult | null> {
+  try {
+    const resp = await fetch(`/api/taxpayer/${year}`);
+    if (!resp.ok) return null;
+    return (await resp.json()) as TaxpayerProfileResult;
+  } catch {
+    return null;
+  }
+}
+
+/** 納税者プロフィールを対象年としてDBへ保存する。失敗した場合は false。 */
+export async function saveTaxpayerProfile(
+  year: number,
+  taxpayer: XtxTaxpayerInput,
+): Promise<boolean> {
+  try {
+    const resp = await fetch(`/api/taxpayer/${year}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(taxpayer),
+    });
+    return resp.ok;
+  } catch {
+    return false;
   }
 }
 

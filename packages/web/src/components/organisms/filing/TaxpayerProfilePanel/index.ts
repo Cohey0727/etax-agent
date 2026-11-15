@@ -1,2 +1,2 @@
 export * from "./TaxpayerProfilePanel";
-export { loadTaxpayer, saveTaxpayer } from "./taxpayerStorage";
+export { emptyTaxpayer, loadTaxpayer, saveTaxpayer } from "./taxpayerStorage";
