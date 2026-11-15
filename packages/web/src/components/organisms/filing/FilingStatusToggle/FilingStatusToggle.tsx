@@ -10,11 +10,14 @@ export interface FilingStatusToggleProps {
   description: string;
   /** 未確定→確定に切り替えた直後に呼ばれる（確定スナップショットの保存など）。 */
   onConfirm?: () => Promise<void>;
+  /** true のときはカードで囲まず、既存のカードの中にそのまま置ける形で出す。 */
+  bare?: boolean;
 }
 
 /**
- * 各タブの末尾に置く「確定する」バー。そのタブの作業を終えたら
- * その場で確定でき、総合タブ・ダッシュボードと状態を共有する。
+ * 「確定する／確定解除」のバー。そのタブの作業を終えたらその場で
+ * 確定でき、総合タブ・ダッシュボードと状態を共有する。
+ * 既定では独立したカードとして出し、bare のときは他のカードの中に置く。
  */
 export const FilingStatusToggle = ({
   year,
@@ -22,6 +25,7 @@ export const FilingStatusToggle = ({
   label,
   description,
   onConfirm,
+  bare = false,
 }: FilingStatusToggleProps) => {
   const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
   const done = status[statusKey];
@@ -33,8 +37,7 @@ export const FilingStatusToggle = ({
     if (turningOn && onConfirm) await onConfirm();
   };
 
-  return (
-    <Card>
+  const content = (
       <Row gap="md" align="center" justify="spaceBetween">
         <Col gap="sm" className={styles.itemMain}>
           <Text className={styles.itemLabel}>
@@ -58,8 +61,9 @@ export const FilingStatusToggle = ({
           {done ? "確定解除" : "確定する"}
         </Button>
       </Row>
-    </Card>
   );
+
+  return bare ? content : <Card>{content}</Card>;
 };
 
 function formatDate(iso: string): string {

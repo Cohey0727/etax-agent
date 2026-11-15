@@ -16,14 +16,6 @@ interface CategoryAmount {
   amount: number;
 }
 
-interface MonthlyAmount {
-  month: number;
-  income: number;
-  expense: number;
-  balance: number;
-  cumulative: number;
-}
-
 export interface BalanceSummaryProps {
   transactions: Transaction[];
   /** 左上の年度切替で選ばれている年 */
@@ -35,11 +27,12 @@ export interface BalanceSummaryProps {
 }
 
 /**
- * 確定申告の「収支」タブの中身。その年の帳簿を収支として見直せるように、
- * 収入・支出・差引（収支）を中心に置き、事業／不動産ごとの収支、
- * そこから所得合計への内訳、月別の収支と累計、勘定科目ごとの内訳を出す。
- * 集計の対象になっている帳簿レコードそのものは、隣の BalanceRecords が
- * 別カードで並べる。未分類が残っていれば注意も出す。
+ * 確定申告の「収支」タブの集計カードの中身。その年の帳簿を収支として
+ * 見直せるように、収入・支出・差引（収支）を中心に置き、事業／不動産
+ * ごとの収支、そこから所得合計への内訳、勘定科目ごとの内訳を出す。
+ * 月別の収支と、集計の対象になっている帳簿レコードそのものは、隣の
+ * MonthlyBalance と BalanceRecords がそれぞれ別カードで並べる。
+ * 未分類が残っていれば注意も出す。
  */
 export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }: BalanceSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
@@ -63,7 +56,6 @@ export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }
     () => sumByCategory(yearTransactions.filter((t) => t.amount < 0), true),
     [yearTransactions],
   );
-  const monthly = useMemo(() => sumByMonth(yearTransactions), [yearTransactions]);
   const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
   const misc = miscIncome?.income ?? 0;
   const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
@@ -129,11 +121,6 @@ export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome }
         </Row>
       </Col>
 
-      <Col gap="sm">
-        <Text variant="statLabel">月別の収支</Text>
-        <MonthlyTable rows={monthly} incomeTotal={incomeTotal} expenseTotal={expenseTotal} />
-      </Col>
-
       <div className={styles.breakdownGrid}>
         <CategoryList title="収入の内訳" rows={income} tone="income" />
         <CategoryList title="支出の内訳" rows={expenses} tone="expense" />
@@ -172,46 +159,6 @@ const DivisionBalance = ({
       <Text className={styles.amount}>{formatYen(revenue - expenses)}</Text>
     </Row>
   </Col>
-);
-
-const MonthlyTable = ({
-  rows,
-  incomeTotal,
-  expenseTotal,
-}: {
-  rows: readonly MonthlyAmount[];
-  incomeTotal: number;
-  expenseTotal: number;
-}) => (
-  <div>
-    <div className={`${styles.monthRow} ${styles.monthHead}`}>
-      <span>月</span>
-      <span className={styles.monthCell}>収入</span>
-      <span className={styles.monthCell}>支出</span>
-      <span className={styles.monthCell}>差引</span>
-      <span className={styles.monthCell}>累計収支</span>
-    </div>
-    {rows.map((row) => (
-      <div key={row.month} className={styles.monthRow}>
-        <span>{row.month}月</span>
-        <span className={styles.monthCell}>{formatYen(row.income)}</span>
-        <span className={styles.monthCell}>{formatYen(row.expense)}</span>
-        <span className={`${styles.monthCell} ${row.balance < 0 ? styles.amountNegative : ""}`}>
-          {formatYen(row.balance)}
-        </span>
-        <span className={`${styles.monthCell} ${row.cumulative < 0 ? styles.amountNegative : ""}`}>
-          {formatYen(row.cumulative)}
-        </span>
-      </div>
-    ))}
-    <div className={`${styles.monthRow} ${styles.monthTotal}`}>
-      <span>合計</span>
-      <span className={styles.monthCell}>{formatYen(incomeTotal)}</span>
-      <span className={styles.monthCell}>{formatYen(expenseTotal)}</span>
-      <span className={styles.monthCell}>{formatYen(incomeTotal - expenseTotal)}</span>
-      <span className={styles.monthCell}>―</span>
-    </div>
-  </div>
 );
 
 const BAR_FILL_CLASS: Record<"income" | "expense", string> = {
@@ -270,28 +217,4 @@ function sumByCategory(transactions: Transaction[], absolute: boolean): Category
   return [...totals.entries()]
     .map(([category, amount]) => ({ category, amount }))
     .sort((a, b) => b.amount - a.amount);
-}
-
-/** 月ごとの収入・支出・差引と、差引の累計（累計収支）。取引のない月も0で並べる。 */
-function sumByMonth(transactions: Transaction[]): MonthlyAmount[] {
-  const rows: MonthlyAmount[] = Array.from({ length: 12 }, (_, i) => ({
-    month: i + 1,
-    income: 0,
-    expense: 0,
-    balance: 0,
-    cumulative: 0,
-  }));
-  for (const t of transactions) {
-    const month = Number(t.date.slice(5, 7));
-    if (month < 1 || month > 12) continue;
-    if (t.amount > 0) rows[month - 1].income += Math.trunc(t.amount);
-    else rows[month - 1].expense += Math.abs(Math.trunc(t.amount));
-  }
-  let cumulative = 0;
-  for (const row of rows) {
-    row.balance = row.income - row.expense;
-    cumulative += row.balance;
-    row.cumulative = cumulative;
-  }
-  return rows;
 }

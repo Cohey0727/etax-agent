@@ -5,6 +5,7 @@ export * from "./DeductionPanel";
 export * from "./FilingPanel";
 export * from "./IncomeSummary";
 export * from "./MiscIncomePanel";
+export * from "./MonthlyBalance";
 export * from "./FilingStatusToggle";
 export * from "./TaxCreditPanel";
 export * from "./TaxSummary";

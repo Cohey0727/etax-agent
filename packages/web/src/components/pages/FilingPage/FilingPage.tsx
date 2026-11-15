@@ -20,6 +20,7 @@ import {
   FilingPanel,
   FilingStatusToggle,
   MiscIncomePanel,
+  MonthlyBalance,
   TaxCreditPanel,
   TaxpayerPanel,
   TaxpayerProfilePanel,
@@ -205,15 +206,17 @@ const FilingWorkspace = ({
               filingOptions={filingOptions}
               miscIncome={deductionState.miscIncome}
             />
+            <FilingStatusToggle
+              bare
+              year={year}
+              statusKey="confirmed"
+              label="収支"
+              description="収支の金額・科目・区分に誤りがないか見直したら、ここで確定できます（総合・ダッシュボードと共有）。"
+            />
           </Col>
         </Card>
+        <MonthlyBalance transactions={yearTransactions} />
         <BalanceRecords key={year} transactions={yearTransactions} />
-        <FilingStatusToggle
-          year={year}
-          statusKey="confirmed"
-          label="収支"
-          description="収支の金額・科目・区分に誤りがないか見直したら、ここで確定できます（総合・ダッシュボードと共有）。"
-        />
       </>
     ),
     deductions: (
