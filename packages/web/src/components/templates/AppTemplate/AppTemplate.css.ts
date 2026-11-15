@@ -141,6 +141,12 @@ const styles = {
     width: "100%",
   }),
   spacer: style({ flex: 1 }),
+  // 画面にぶら下がる子項目（ネスト）の受け皿。左の罫線と字下げで階層を出す。
+  navChildren: style({
+    marginLeft: theme.space.md,
+    paddingLeft: theme.space.sm,
+    borderLeft: `1px solid ${theme.color.lineSoft}`,
+  }),
   dataPanel: style({
     background: theme.color.bg,
     borderRadius: theme.borderRadius.md,

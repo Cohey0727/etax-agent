@@ -1,19 +1,20 @@
 import { filterYear, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
-import { AppView, FilingStatus } from "@types";
+import { AppView, FilingStatus, FilingTab } from "@types";
 import { fetchFilingStatuses, updateFilingStatus } from "@utils/api";
 import styles from "./FilingPanel.css";
 
 type ManualKey = "confirmed" | "calculated" | "submitted";
 
-/** 確定申告画面のタブのうち、総合から遷移できる先。 */
-export type FilingSection = "ledger" | "deductions" | "consumption";
+/** 確定申告画面のタブのうち、総合から遷移できる先（総合自身を除くタブ）。 */
+export type FilingSection = Exclude<FilingTab, "overview">;
 
 const SECTION_OPEN_LABELS: Record<FilingSection, string> = {
   ledger: "帳簿タブを開く",
   deductions: "控除タブを開く",
   consumption: "消費税タブを開く",
+  taxpayer: "納税者情報タブを開く",
 };
 
 interface ManualItem {

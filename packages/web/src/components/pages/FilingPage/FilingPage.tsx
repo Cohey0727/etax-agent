@@ -14,30 +14,42 @@ import {
   ConsumptionTaxPanel,
   DeductionPanel,
   FilingPanel,
-  FilingSection,
   TaxCreditPanel,
   TaxpayerPanel,
+  TaxpayerProfilePanel,
 } from "@components/organisms/filing";
 import {
   DeductionState,
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
-import { AppView, ViewPageProps } from "@types";
+import { AppView, FilingTab, ViewPageProps } from "@types";
 
-/** 確定申告画面のタブ。総合が起点で、帳簿・控除・消費税はそれぞれ独立した作業場。 */
-type FilingTab = "overview" | FilingSection;
-
+/** タブの並び。総合が起点で、帳簿・控除・消費税はそれぞれ独立した作業場。 */
 const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
   { id: "overview", label: "総合" },
   { id: "ledger", label: "帳簿" },
   { id: "deductions", label: "控除" },
   { id: "consumption", label: "消費税" },
+  { id: "taxpayer", label: "納税者情報" },
 ];
 
-export const FilingPage = ({ transactions, year, onNavigate }: ViewPageProps) => {
+export const FilingPage = ({
+  transactions,
+  year,
+  onNavigate,
+  filingTab,
+  onFilingTabChange,
+}: ViewPageProps) => {
   return (
-    <FilingWorkspace key={year} transactions={transactions} year={year} onNavigate={onNavigate} />
+    <FilingWorkspace
+      key={year}
+      transactions={transactions}
+      year={year}
+      onNavigate={onNavigate}
+      tab={filingTab ?? "overview"}
+      onTabChange={onFilingTabChange ?? (() => {})}
+    />
   );
 };
 
@@ -45,14 +57,23 @@ interface FilingWorkspaceProps {
   transactions: Transaction[];
   year: number;
   onNavigate?: (view: AppView) => void;
+  /** 選択中のタブ。URL（AppPage が保持）と連動する。 */
+  tab: FilingTab;
+  onTabChange: (tab: FilingTab) => void;
 }
 
 /**
- * タブと控除入力の状態を持つ作業領域。控除の入力は年度ごとに保存され、
+ * 控除入力の状態を持つ作業領域。控除の入力は年度ごとに保存され、
  * 修正申告の画面（過去の確定分との比較）と共有される。
+ * タブの選択自体はURLが正で、ここでは保持しない。
  */
-const FilingWorkspace = ({ transactions, year, onNavigate }: FilingWorkspaceProps) => {
-  const [tab, setTab] = useState<FilingTab>("overview");
+const FilingWorkspace = ({
+  transactions,
+  year,
+  onNavigate,
+  tab,
+  onTabChange,
+}: FilingWorkspaceProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const computed = useMemo(
     () => computeCorrectedFigures(yearTransactions, year),
@@ -92,7 +113,7 @@ const FilingWorkspace = ({ transactions, year, onNavigate }: FilingWorkspaceProp
           transactions={transactions}
           year={year}
           onNavigate={onNavigate}
-          onOpenSection={setTab}
+          onOpenSection={onTabChange}
         />
         <TaxpayerPanel
           year={year}
@@ -100,6 +121,7 @@ const FilingWorkspace = ({ transactions, year, onNavigate }: FilingWorkspaceProp
           deductions={deductionState.deductions}
           taxCredits={deductionState.taxCredits}
           originalIncomeTax={null}
+          onOpenSection={onTabChange}
         />
       </>
     ),
@@ -127,11 +149,12 @@ const FilingWorkspace = ({ transactions, year, onNavigate }: FilingWorkspaceProp
       </>
     ),
     consumption: <ConsumptionTaxPanel transactions={transactions} year={year} />,
+    taxpayer: <TaxpayerProfilePanel year={year} />,
   };
 
   return (
     <Col gap="md">
-      <Tabs items={FILING_TABS} activeId={tab} onChange={setTab} />
+      <Tabs items={FILING_TABS} activeId={tab} onChange={onTabChange} />
       {tabContent[tab]}
     </Col>
   );

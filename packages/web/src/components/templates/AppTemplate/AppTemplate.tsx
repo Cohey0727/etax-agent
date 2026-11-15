@@ -1,7 +1,6 @@
-import { ReactNode, useEffect, useState } from "react";
+import { Fragment, ReactNode, useEffect, useState } from "react";
 import { clsx } from "clsx";
 import { Badge, Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
-import { Tabs } from "@components/molecules";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
 
@@ -18,6 +17,11 @@ export interface AppTemplateProps {
   /** エージェント見出しの右に置く追加ボタン（履歴ボタンなど）。 */
   agentHeaderExtra?: ReactNode;
   onViewChange: (view: AppView) => void;
+  /** 画面にぶら下がる子項目（サイドバーのネスト表示。確定申告のタブなど）。 */
+  navChildren?: readonly { view: AppView; key: string; label: string }[];
+  /** 選択中の子項目の key。親画面がアクティブなときだけハイライトする。 */
+  activeNavChildKey?: string | null;
+  onNavChildSelect?: (view: AppView, key: string) => void;
   children?: ReactNode;
 }
 
@@ -68,6 +72,9 @@ export const AppTemplate = ({
   agentPanel,
   agentHeaderExtra,
   onViewChange,
+  navChildren,
+  activeNavChildKey,
+  onNavChildSelect,
   children,
 }: AppTemplateProps) => {
   // 左右パネルの開閉はレイアウト側の状態で、端末に保存して次回も引き継ぐ。
@@ -100,6 +107,10 @@ export const AppTemplate = ({
   const isNarrow = useMediaQuery("(max-width: 900px)");
   const handleViewChange = (view: AppView) => {
     onViewChange(view);
+    if (isNarrow) setSidebarOpen(false);
+  };
+  const handleNavChildSelect = (view: AppView, key: string) => {
+    onNavChildSelect?.(view, key);
     if (isNarrow) setSidebarOpen(false);
   };
   return (
@@ -135,12 +146,45 @@ export const AppTemplate = ({
                   ))}
                 </Select>
               </Col>
-              <Tabs
-                items={navViews}
-                activeId={activeView}
-                onChange={handleViewChange}
-                orientation="vertical"
-              />
+              <Col gap="sm">
+                {navViews.map((view) => {
+                  const children = (navChildren ?? []).filter(
+                    (child) => child.view === view.id,
+                  );
+                  return (
+                    <Fragment key={view.id}>
+                      <Button
+                        variant={view.id === activeView ? "navActive" : "nav"}
+                        size="md"
+                        onClick={() => handleViewChange(view.id)}
+                      >
+                        <Icon name={view.icon} />
+                        {view.label}
+                      </Button>
+                      {children.length > 0 ? (
+                        <div className={styles.navChildren}>
+                          <Col gap="sm">
+                            {children.map((child) => (
+                              <Button
+                                key={child.key}
+                                variant={
+                                  view.id === activeView && child.key === activeNavChildKey
+                                    ? "navActive"
+                                    : "nav"
+                                }
+                                size="sm"
+                                onClick={() => handleNavChildSelect(view.id, child.key)}
+                              >
+                                {child.label}
+                              </Button>
+                            ))}
+                          </Col>
+                        </div>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </Col>
               <div className={styles.spacer} />
               <div className={styles.dataPanel}>
                 <Col gap="sm">

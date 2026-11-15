@@ -4,6 +4,9 @@ import { AppView } from "./AppView";
 import { SendKeyMode } from "./Chat";
 import { ThemeMode } from "./Theme";
 
+/** 確定申告画面のタブ。URL（/accounts/<年度>/final-tax/<タブ>）と連動する。 */
+export type FilingTab = "overview" | "ledger" | "deductions" | "consumption" | "taxpayer";
+
 /**
  * 画面（ビュー）コンポーネント共通の props。
  * ビュー切替の対応表（AppPage の appViews）へ載せるため全ビューで揃える。
@@ -27,4 +30,7 @@ export interface ViewPageProps {
   /** 外部接続（AI）の上書き設定。設定画面だけが使うが、共通の形で配る。 */
   agentConnection: AgentConnectionConfig;
   onAgentConnectionChange: (config: AgentConnectionConfig) => void;
+  /** 確定申告画面のタブ（URL連動）。確定申告画面だけが使うが、共通の形で配る。 */
+  filingTab?: FilingTab;
+  onFilingTabChange?: (tab: FilingTab) => void;
 }

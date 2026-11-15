@@ -4,29 +4,9 @@ import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportReturnPdfFile, exportXtxFile } from "@utils/api";
-import { loadTaxpayer, saveTaxpayer } from "./taxpayerStorage";
+import { FilingSection } from "../FilingPanel";
+import { loadTaxpayer } from "../TaxpayerProfilePanel";
 import styles from "./TaxpayerPanel.css";
-
-/** テキスト入力の項目定義（ラベル列つきで並べる）。 */
-const TEXT_FIELDS: readonly {
-  key: keyof XtxTaxpayerInput;
-  label: string;
-  placeholder?: string;
-}[] = [
-  { key: "name", label: "氏名" },
-  { key: "name_kana", label: "フリガナ" },
-  { key: "zip_code", label: "郵便番号", placeholder: "7220062" },
-  { key: "address", label: "住所" },
-  { key: "address_line2", label: "住所（下段）", placeholder: "建物名・部屋番号など" },
-  { key: "phone", label: "電話番号", placeholder: "080-2500-7879" },
-  { key: "tax_office_name", label: "提出先の税務署名", placeholder: "尾道（「税務署」は付けない）" },
-  { key: "tax_office_code", label: "税務署コード（任意）", placeholder: "5桁" },
-  { key: "occupation", label: "職業" },
-  { key: "shop_name", label: "屋号（任意）" },
-  { key: "jan1_address", label: "1月1日の住所（任意）", placeholder: "現住所と違う場合のみ" },
-  { key: "invoice_number", label: "インボイス登録番号", placeholder: "T9810103628696" },
-  { key: "my_number", label: "個人番号（任意）", placeholder: "マイナンバー12桁" },
-];
 
 export interface TaxpayerPanelProps {
   year: number;
@@ -39,17 +19,24 @@ export interface TaxpayerPanelProps {
    * 比較する修正申告として出力する。null なら確定申告として出力する。
    */
   originalIncomeTax: number | null;
+  /** 納税者情報タブへの遷移（確定申告画面の総合でのみ渡される）。 */
+  onOpenSection?: (section: FilingSection) => void;
 }
 
+/**
+ * 提出パネル（確定申告画面の総合タブ）。納税者情報は要約だけを表示し、
+ * 編集は納税者情報タブで行う。ここでは出力の条件とXTX／紙イメージの出力、
+ * そして e-Tax サイトへのリンク（提出の動線）を担う。
+ */
 export const TaxpayerPanel = ({
   year,
   transactions,
   deductions,
   taxCredits,
   originalIncomeTax,
+  onOpenSection,
 }: TaxpayerPanelProps) => {
-  const [loaded, setLoaded] = useState(() => loadTaxpayer(year));
-  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => loaded.taxpayer);
+  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => loadTaxpayer(year).taxpayer);
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
   const [withholdingTax, setWithholdingTax] = useState(0);
   const [prepaidTax, setPrepaidTax] = useState(0);
@@ -60,18 +47,11 @@ export const TaxpayerPanel = ({
 
   const supported = xtxSupportedYears().includes(year);
 
-  // 年度が切り替わったら、その年度のプロフィール（無ければ引き継ぎ）を読み直す。
+  // 年度が切り替わったら、その年度のプロフィールを読み直す。
+  // 納税者情報タブで編集して戻ってきた場合も、マウントし直しで最新を読む。
   useEffect(() => {
-    const next = loadTaxpayer(year);
-    setLoaded(next);
-    setTaxpayer(next.taxpayer);
+    setTaxpayer(loadTaxpayer(year).taxpayer);
   }, [year]);
-
-  const update = (key: keyof XtxTaxpayerInput, value: string) => {
-    const next = { ...taxpayer, [key]: value };
-    setTaxpayer(next);
-    saveTaxpayer(year, next);
-  };
 
   // 申告の種類はモードとして選ぶものではなく、入力内容から決まる。
   // 申告済みの所得税額が入っていれば過去の確定分と比較する修正申告になる。
@@ -124,50 +104,60 @@ export const TaxpayerPanel = ({
     }
   };
 
+  const summaryRows: readonly { label: string; value: string }[] = [
+    {
+      label: "氏名",
+      value: taxpayer.name
+        ? taxpayer.name_kana
+          ? `${taxpayer.name}（${taxpayer.name_kana}）`
+          : taxpayer.name
+        : "",
+    },
+    {
+      label: "住所",
+      value: [
+        taxpayer.zip_code ? `〒${taxpayer.zip_code}` : "",
+        taxpayer.address,
+        taxpayer.address_line2,
+      ]
+        .filter((part) => part.length > 0)
+        .join(" "),
+    },
+    { label: "電話番号", value: taxpayer.phone },
+    {
+      label: "提出先の税務署",
+      value: taxpayer.tax_office_name ? `${taxpayer.tax_office_name}税務署` : "",
+    },
+    { label: "インボイス登録番号", value: taxpayer.invoice_number },
+  ];
+
   return (
     <Card>
       <Col gap="md">
         <Col gap="sm">
-          <Text variant="sectionTitle">納税者情報と e-Tax 出力</Text>
+          <Text variant="sectionTitle">提出</Text>
           <Text variant="muted">
-            申告書の見出しに入る情報です。プロフィールは年度別に、この端末にのみ保存
-            されます（個人番号は出力ファイルにだけ含まれます）。XTXは取引データ
-            （帳簿）と控除の入力から生成されます。
+            XTXは取引データ（帳簿）と控除の入力から生成されます。納税者情報の編集は
+            納税者情報タブで行います。
           </Text>
-          {loaded.carriedFrom !== null ? (
-            <Text variant="muted">
-              {loaded.carriedFrom}年分のプロフィールを引き継いでいます。変更すると
-              {year}年分として保存されます。
-            </Text>
-          ) : loaded.carriedFromLegacy ? (
-            <Text variant="muted">
-              これまでのプロフィールを引き継いでいます。変更すると{year}年分として
-              保存されます。
-            </Text>
-          ) : null}
         </Col>
 
-        {TEXT_FIELDS.map((field) => (
-          <TextField
-            key={field.key}
-            label={field.label}
-            placeholder={field.placeholder}
-            value={taxpayer[field.key]}
-            onChange={(v) => update(field.key, v)}
-          />
+        <Text className={styles.subhead}>納税者情報</Text>
+        {summaryRows.map((row) => (
+          <Row key={row.label} gap="sm">
+            <div className={styles.fieldLabel}>
+              <Text variant="muted">{row.label}</Text>
+            </div>
+            {row.value ? <Text>{row.value}</Text> : <Text variant="muted">未入力</Text>}
+          </Row>
         ))}
-        <Row gap="sm">
-          <div className={styles.fieldLabel}>
-            <Text variant="muted">生年月日</Text>
-          </div>
-          <Input
-            className={styles.fieldInput}
-            type="date"
-            value={taxpayer.birth_date}
-            onChange={(e) => update("birth_date", e.target.value)}
-            aria-label="生年月日"
-          />
-        </Row>
+        {onOpenSection ? (
+          <Row gap="sm">
+            <Button variant="ghost" size="sm" onClick={() => onOpenSection("taxpayer")}>
+              納税者情報タブを開く
+            </Button>
+          </Row>
+        ) : null}
 
         <Text className={styles.subhead}>出力の条件</Text>
         <Row gap="sm">
@@ -235,33 +225,26 @@ export const TaxpayerPanel = ({
             </Text>
           ) : null}
         </Row>
+
+        <Text className={styles.subhead}>提出</Text>
+        <Text variant="muted">
+          提出は e-Tax サイト（e-Taxソフト（WEB版））で行います。出力したXTXを取り込み、
+          内容を確認して送信してください。送信にはマイナンバーカードが必要です。
+        </Text>
+        <Row gap="sm">
+          <a
+            className={styles.etaxLink}
+            href="https://www.e-tax.nta.go.jp"
+            target="_blank"
+            rel="noreferrer"
+          >
+            e-Taxサイトを開く
+          </a>
+        </Row>
       </Col>
     </Card>
   );
 };
-
-interface TextFieldProps {
-  label: string;
-  placeholder?: string;
-  value: string;
-  onChange: (value: string) => void;
-}
-
-const TextField = ({ label, placeholder, value, onChange }: TextFieldProps) => (
-  <Row gap="sm">
-    <div className={styles.fieldLabel}>
-      <Text variant="muted">{label}</Text>
-    </div>
-    <Input
-      className={styles.fieldInput}
-      type="text"
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={label}
-    />
-  </Row>
-);
 
 function todayIso(): string {
   const now = new Date();

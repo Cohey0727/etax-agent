@@ -7,6 +7,7 @@ import {
   AgentConnectionConfig,
   AppView,
   ChatMessage,
+  FilingTab,
   SendKeyMode,
   ThemeMode,
   ViewPageProps,
@@ -50,6 +51,14 @@ const appViews = [
   nav: boolean;
   Component: ComponentType<ViewPageProps>;
 }[];
+
+// サイドバーで確定申告にぶら下げる子項目（タブへの直接遷移）。総合は親そのものなので出さない。
+const FILING_NAV_CHILDREN: readonly { view: AppView; key: string; label: string }[] = [
+  { view: AppView.Filing, key: "ledger", label: "帳簿" },
+  { view: AppView.Filing, key: "deductions", label: "控除" },
+  { view: AppView.Filing, key: "consumption", label: "消費税" },
+  { view: AppView.Filing, key: "taxpayer", label: "納税者情報" },
+];
 
 const THEME_STORAGE_KEY = "etax-theme";
 
@@ -124,6 +133,10 @@ export const AppPage = () => {
   const [activeView, setActiveView] = useState<AppView>(initialView);
   const [selectedYear, setSelectedYear] = useState<number>(
     () => initialRoute?.year ?? readStoredYear(),
+  );
+  // 確定申告画面のタブもURLと連動させる（リロード・戻る/進むで復元される）。
+  const [filingTab, setFilingTab] = useState<FilingTab>(
+    () => initialRoute?.filingTab ?? "overview",
   );
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const [sendKeyMode, setSendKeyMode] = useState<SendKeyMode>(() => readStoredSendKeyMode());
@@ -207,10 +220,10 @@ export const AppPage = () => {
     }
   }, []);
 
-  // 画面・年度の状態をURL（/<画面>/<年度>）へ反映する。初回だけ履歴を汚さず置き換える。
+  // 画面・年度（と確定申告タブ）の状態をURLへ反映する。初回だけ履歴を汚さず置き換える。
   const firstUrlSyncRef = useRef(true);
   useEffect(() => {
-    const path = pathForView(activeView, year);
+    const path = pathForView(activeView, year, filingTab);
     if (window.location.pathname !== path) {
       if (firstUrlSyncRef.current) {
         window.history.replaceState(null, "", path);
@@ -219,7 +232,7 @@ export const AppPage = () => {
       }
     }
     firstUrlSyncRef.current = false;
-  }, [activeView, year]);
+  }, [activeView, year, filingTab]);
 
   // ブラウザの戻る/進むに合わせて画面・年度を復元する。
   useEffect(() => {
@@ -228,11 +241,17 @@ export const AppPage = () => {
       if (!route || !appViews.some((view) => view.id === route.view)) return;
       setActiveView(route.view);
       if (route.year) handleYearChange(route.year);
+      if (route.filingTab) setFilingTab(route.filingTab);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [handleYearChange]);
 
+  // サイドバーのネスト項目（確定申告のタブ）から直接そのタブへ遷移する。
+  const handleNavChildSelect = (view: AppView, key: string) => {
+    if (view === AppView.Filing) setFilingTab(key as FilingTab);
+    setActiveView(view);
+  };
   const handleAgentConnectionChange = (config: AgentConnectionConfig) => {
     setAgentConnection(config);
     try {
@@ -300,6 +319,9 @@ export const AppPage = () => {
         )
       }
       onViewChange={setActiveView}
+      navChildren={FILING_NAV_CHILDREN}
+      activeNavChildKey={filingTab}
+      onNavChildSelect={handleNavChildSelect}
     >
       <ActiveComponent
         transactions={transactions}
@@ -314,6 +336,8 @@ export const AppPage = () => {
         onSendKeyModeChange={handleSendKeyModeChange}
         agentConnection={agentConnection}
         onAgentConnectionChange={handleAgentConnectionChange}
+        filingTab={filingTab}
+        onFilingTabChange={setFilingTab}
       />
     </AppTemplate>
   );
