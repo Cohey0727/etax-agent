@@ -104,7 +104,7 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
       return {
         label: item.label,
         done,
-        state: done && doneAt ? `${formatDate(doneAt)} 済み` : done ? "済み" : "未",
+        state: done && doneAt ? `${formatDate(doneAt)} 確定` : done ? "確定" : "未確定",
       };
     }),
   ];
@@ -126,7 +126,7 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
               <Text className={styles.itemLabel}>
                 {row.label}
                 <span className={row.done ? styles.stateDone : styles.stateTodo}>
-                  {row.done ? "済み" : "未"}
+                  {row.done ? "確定" : "未確定"}
                 </span>
               </Text>
               <Text variant="muted">{row.state}</Text>

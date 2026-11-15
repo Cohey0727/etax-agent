@@ -1,4 +1,4 @@
-import { ACCOUNT_NAMES, TAX_CATEGORIES, Transaction } from "@etax/shared";
+import { ACCOUNT_NAMES, TAX_CATEGORIES, Transaction, taxCategorySignMismatch } from "@etax/shared";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -69,7 +69,8 @@ type LedgerFilter =
   | { field: "amount"; min: string; max: string }
   | { field: "category"; value: string }
   | { field: "incomeType"; value: string }
-  | { field: "taxCategory"; value: string };
+  | { field: "taxCategory"; value: string }
+  | { field: "mismatch" };
 
 type LedgerFilterField = LedgerFilter["field"];
 
@@ -79,6 +80,7 @@ const FILTER_FIELDS: readonly LedgerFilterField[] = [
   "category",
   "incomeType",
   "taxCategory",
+  "mismatch",
 ];
 
 const FILTER_FIELD_LABELS: Record<LedgerFilterField, string> = {
@@ -87,6 +89,7 @@ const FILTER_FIELD_LABELS: Record<LedgerFilterField, string> = {
   category: "勘定科目",
   incomeType: "区分",
   taxCategory: "税区分",
+  mismatch: "税区分の符号不一致",
 };
 
 const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
@@ -101,6 +104,8 @@ const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
       return { field, value: "business" };
     case "taxCategory":
       return { field, value: "" };
+    case "mismatch":
+      return { field };
   }
 };
 
@@ -924,7 +929,7 @@ const FilterChip = ({
             </option>
           ))}
         </Select>
-      ) : (
+      ) : filter.field === "mismatch" ? null : (
         <Select
           className={styles.chipSelect}
           value={filter.value}
@@ -978,6 +983,8 @@ function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
       return row.income_type === filter.value;
     case "taxCategory":
       return row.tax_category === filter.value;
+    case "mismatch":
+      return taxCategorySignMismatch(row);
   }
 }
 
@@ -1014,6 +1021,8 @@ function parseFiltersFromSearch(
         return { field, value: params.get("itype") ?? "business" };
       case "taxCategory":
         return { field, value: params.get("tax") ?? "" };
+      case "mismatch":
+        return { field };
     }
   });
   return { query: params.get("q") ?? "", filters };
@@ -1044,6 +1053,8 @@ function buildFilterSearch(query: string, filters: LedgerFilter[]): string {
           break;
         case "taxCategory":
           params.set("tax", filter.value);
+          break;
+        case "mismatch":
           break;
       }
     }

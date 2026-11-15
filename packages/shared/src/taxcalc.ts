@@ -34,6 +34,52 @@ export const BLUE_MAX_BUSINESS = 650_000;
 /** 青色申告特別控除（不動産・非事業的規模） */
 export const BLUE_MAX_REAL_ESTATE = 100_000;
 
+/** 申告の種類（青色申告特別控除の区分）。白色申告は控除なし。 */
+export type FilingType = "blue65" | "blue55" | "blue10" | "white";
+
+/** 青色申告特別控除の計算条件。 */
+export interface BlueDeductionOptions {
+  /** 申告の種類（既定: blue65） */
+  filingType?: FilingType;
+  /** 不動産貸付けが事業的規模か（既定: false＝事業的規模でない） */
+  realEstateBusinessScale?: boolean;
+}
+
+/** 申告の種類ごとの控除上限（本体分）。 */
+const BLUE_MAIN_CAPS: Record<FilingType, number> = {
+  blue65: 650_000,
+  blue55: 550_000,
+  blue10: 100_000,
+  white: 0,
+};
+
+export interface BlueDeductionCaps {
+  /** 事業所得からの控除上限 */
+  business: number;
+  /** 不動産所得からの控除上限 */
+  realEstate: number;
+  /** 合計の上限 */
+  total: number;
+}
+
+/**
+ * 申告の種類と不動産の規模から、青色申告特別控除の上限を求める。
+ * - 青色65万円・55万円で不動産が事業的規模でない場合、不動産分は
+ *   10万円が別枠になり、合計は事業分＋10万円まで。
+ * - 不動産が事業的規模の場合と青色10万円の場合は、事業・不動産を
+ *   合算した所得に対して上限がかかる（国税庁タックスアンサーNo.2072）。
+ * - 白色申告は控除なし。
+ */
+export function blueDeductionCaps(options: BlueDeductionOptions = {}): BlueDeductionCaps {
+  const filingType = options.filingType ?? "blue65";
+  const main = BLUE_MAIN_CAPS[filingType];
+  if (filingType === "white") return { business: 0, realEstate: 0, total: 0 };
+  if (filingType === "blue10" || options.realEstateBusinessScale) {
+    return { business: main, realEstate: main, total: main };
+  }
+  return { business: main, realEstate: BLUE_MAX_REAL_ESTATE, total: main + BLUE_MAX_REAL_ESTATE };
+}
+
 /** 簡易課税のみなし仕入率（事業区分ごと） */
 export const SIMPLIFIED_RATES = {
 wholesale: 0.9, // 第1種 卸売業
@@ -118,25 +164,36 @@ total: number;
 
 /**
 * 青色申告特別控除を「不動産 → 事業」の順で計算する。
-* - 不動産所得（事業的規模でない前提）: 所得の範囲内で最大 100,000円
+* 既定（オプションなし）は青色65万円・不動産は事業的規模でない前提で、
+* - 不動産所得: 所得の範囲内で最大 100,000円（別枠）
 * - 事業所得: 所得の範囲内で最大 650,000円
 * - 両方ある場合の合計上限は 750,000円（100,000 + 650,000）
+* 申告の種類（青色55万円・10万円・白色）や不動産の事業的規模は
+* BlueDeductionOptions で切り替える（上限の組み立ては blueDeductionCaps）。
 * 所得がマイナスの区分からは控除しない（控除で赤字は作らない）。
 */
 export function blueDeduction(
 realEstateIncome: number,
 businessIncome: number,
+options: BlueDeductionOptions = {},
 ): BlueDeduction {
-const reDed = Math.min(Math.max(realEstateIncome, 0), BLUE_MAX_REAL_ESTATE);
-let bizDed = Math.min(Math.max(businessIncome, 0), BLUE_MAX_BUSINESS);
-// 合計上限（=750,000）の明示チェック。通常は各上限の合計がそのまま
-// 合計上限になるため素通りするが、将来上限が変わっても破綻しない
-// よう防御的に置く（Python 版と同一）。
-const totalCap = BLUE_MAX_REAL_ESTATE + BLUE_MAX_BUSINESS;
-if (reDed + bizDed > totalCap) {
-bizDed = totalCap - reDed;
+const filingType = options.filingType ?? "blue65";
+const rePos = Math.max(realEstateIncome, 0);
+const bizPos = Math.max(businessIncome, 0);
+if (filingType === "white") {
+return { realEstate: 0, business: 0, total: 0 };
 }
-return { realEstate: reDed, business: bizDed, total: reDed + bizDed};
+const caps = blueDeductionCaps(options);
+// 事業・不動産を合算して上限がかかる場合（不動産が事業的規模、または
+// 青色10万円）は、合算した黒字の範囲内で不動産→事業の順に控除する。
+if (filingType === "blue10" || options.realEstateBusinessScale) {
+const pool = Math.min(caps.total, rePos + bizPos);
+const realEstate = Math.min(rePos, pool);
+return { realEstate, business: pool - realEstate, total: pool };
+}
+const realEstate = Math.min(rePos, caps.realEstate);
+const business = Math.min(bizPos, caps.business);
+return { realEstate, business, total: realEstate + business };
 }
 
 // ---------------------------------------------------------------------------
@@ -330,9 +387,10 @@ export interface CorrectedFigures {
 export function computeCorrectedFigures(
   transactions: Transaction[],
   year = 0,
+  options: BlueDeductionOptions = {},
 ): CorrectedFigures {
   const b = aggregateIncome(transactions);
-  const blue = blueDeduction(b.realEstateIncome, b.businessIncome);
+  const blue = blueDeduction(b.realEstateIncome, b.businessIncome, options);
 
   // 住宅家賃（非課税）の合計。ledger.residentialRentTotal と同条件だが、
   // taxcalc の独立性（ledger に依存しない）を保つためここで数える。

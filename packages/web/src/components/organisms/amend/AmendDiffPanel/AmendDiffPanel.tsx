@@ -1,8 +1,10 @@
 import {
+  BlueDeductionOptions,
   amendmentDelta,
   computeCorrectedFigures,
   computeIncomeTax,
   DeductionInputs,
+  FilingType,
   filterYear,
   SAMPLE_ORIGINAL_2024,
   TaxCreditInputs,
@@ -12,7 +14,10 @@ import { useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Table, TableCell, TableHeaderCell, Text } from "@components/atoms";
 import { DeductionPanel } from "@components/organisms/filing/DeductionPanel";
 import {
+  BreakdownEntriesKey,
+  BreakdownEntry,
   DeductionState,
+  applyBreakdownEntries,
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
@@ -70,16 +75,20 @@ export interface AmendDiffPanelProps {
 
 export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const computed = useMemo(
-    () => computeCorrectedFigures(yearTransactions, year),
-    [yearTransactions, year],
-  );
   const [original, setOriginal] = useState<FigureForm>(() => loadOriginal(year));
   const [correctedEdits, setCorrectedEdits] = useState<Partial<Record<FigureKey, number>>>({});
   const [correctedTax, setCorrectedTax] = useState<number | null>(null);
   const [diffOnly, setDiffOnly] = useState(true);
   const [deductionState, setDeductionState] = useState<DeductionState>(() =>
     loadDeductionState(year),
+  );
+  const filingOptions: BlueDeductionOptions = {
+    filingType: deductionState.filingType,
+    realEstateBusinessScale: deductionState.realEstateBusinessScale,
+  };
+  const computed = useMemo(
+    () => computeCorrectedFigures(yearTransactions, year, filingOptions),
+    [yearTransactions, year, deductionState.filingType, deductionState.realEstateBusinessScale],
   );
 
   const updateDeductions = (next: DeductionInputs) => {
@@ -89,6 +98,16 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
   };
   const updateTaxCredits = (next: TaxCreditInputs) => {
     const state = { ...deductionState, taxCredits: next };
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
+  const updateFilingSettings = (filingType: FilingType, realEstateBusinessScale: boolean) => {
+    const state = { ...deductionState, filingType, realEstateBusinessScale };
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
+  const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => {
+    const state = applyBreakdownEntries(deductionState, key, entries);
     setDeductionState(state);
     saveDeductionState(year, state);
   };
@@ -351,6 +370,16 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
         deductions={deductionState.deductions}
         breakdown={taxResult.deductions}
         onChange={updateDeductions}
+        filingType={deductionState.filingType}
+        realEstateBusinessScale={deductionState.realEstateBusinessScale}
+        onFilingSettingsChange={updateFilingSettings}
+        breakdownEntries={{
+          donations: deductionState.donationEntries,
+          socialInsurance: deductionState.socialInsuranceEntries,
+          mutualAid: deductionState.mutualAidEntries,
+          medical: deductionState.medicalEntries,
+        }}
+        onBreakdownEntriesChange={updateBreakdownEntries}
       />
       <TaxCreditPanel
         taxCredits={deductionState.taxCredits}
@@ -362,6 +391,8 @@ export const AmendDiffPanel = ({ transactions, year }: AmendDiffPanelProps) => {
         transactions={yearTransactions}
         deductions={deductionState.deductions}
         taxCredits={deductionState.taxCredits}
+        filingType={deductionState.filingType}
+        realEstateBusinessScale={deductionState.realEstateBusinessScale}
         originalIncomeTax={original.income_tax}
       />
     </Col>

@@ -1,7 +1,9 @@
 import {
+  BlueDeductionOptions,
   computeCorrectedFigures,
   computeIncomeTax,
   DeductionInputs,
+  FilingType,
   filterYear,
   TaxCreditInputs,
   Transaction,
@@ -20,11 +22,15 @@ import {
   TaxpayerProfilePanel,
 } from "@components/organisms/filing";
 import {
+  BreakdownEntriesKey,
+  BreakdownEntry,
   DeductionState,
+  applyBreakdownEntries,
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppView, FilingTab, ViewPageProps } from "@types";
+import { pathForView } from "@utils/routing";
 
 /** タブの並び。総合が起点で、帳簿・控除・消費税はそれぞれ独立した作業場。 */
 const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
@@ -76,12 +82,16 @@ const FilingWorkspace = ({
   onTabChange,
 }: FilingWorkspaceProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const computed = useMemo(
-    () => computeCorrectedFigures(yearTransactions, year),
-    [yearTransactions, year],
-  );
   const [deductionState, setDeductionState] = useState<DeductionState>(() =>
     loadDeductionState(year),
+  );
+  const filingOptions: BlueDeductionOptions = {
+    filingType: deductionState.filingType,
+    realEstateBusinessScale: deductionState.realEstateBusinessScale,
+  };
+  const computed = useMemo(
+    () => computeCorrectedFigures(yearTransactions, year, filingOptions),
+    [yearTransactions, year, deductionState.filingType, deductionState.realEstateBusinessScale],
   );
 
   const updateDeductions = (next: DeductionInputs) => {
@@ -93,6 +103,24 @@ const FilingWorkspace = ({
     const state = { ...deductionState, taxCredits: next };
     setDeductionState(state);
     saveDeductionState(year, state);
+  };
+  const updateFilingSettings = (filingType: FilingType, realEstateBusinessScale: boolean) => {
+    const state = { ...deductionState, filingType, realEstateBusinessScale };
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
+  const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => {
+    const state = applyBreakdownEntries(deductionState, key, entries);
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
+
+  // 消費税タブの警告から、帳簿画面をフィルター付きで開く。
+  // URLにクエリを付けてから画面遷移すると、AppPage のURL同期は
+  // パスが同じためクエリを消さず、帳簿側がマウント時に読み取る。
+  const openLedgerFiltered = (search: string) => {
+    window.history.pushState(null, "", `${pathForView(AppView.Ledger, year)}${search}`);
+    onNavigate?.(AppView.Ledger);
   };
 
   const totalIncome = computed._detail.business_income + computed._detail.real_estate_income;
@@ -114,6 +142,7 @@ const FilingWorkspace = ({
           transactions={transactions}
           year={year}
           taxResult={taxResult}
+          filingOptions={filingOptions}
           onNavigate={onNavigate}
           onOpenSection={onTabChange}
         />
@@ -122,6 +151,8 @@ const FilingWorkspace = ({
           transactions={yearTransactions}
           deductions={deductionState.deductions}
           taxCredits={deductionState.taxCredits}
+          filingType={deductionState.filingType}
+          realEstateBusinessScale={deductionState.realEstateBusinessScale}
           originalIncomeTax={null}
           onOpenSection={onTabChange}
         />
@@ -132,14 +163,14 @@ const FilingWorkspace = ({
         <Card>
           <Col gap="md">
             <Text variant="sectionTitle">帳簿</Text>
-            <ConfirmSummary transactions={transactions} year={year} />
+            <ConfirmSummary transactions={transactions} year={year} filingOptions={filingOptions} />
           </Col>
         </Card>
         <FilingStatusToggle
           year={year}
           statusKey="confirmed"
           label="帳簿"
-          description="帳簿の金額・科目・区分に誤りがないか見直したら、ここで済みにできます（総合・ダッシュボードと共有）。"
+          description="帳簿の金額・科目・区分に誤りがないか見直したら、ここで確定できます（総合・ダッシュボードと共有）。"
         />
       </>
     ),
@@ -150,6 +181,16 @@ const FilingWorkspace = ({
           deductions={deductionState.deductions}
           breakdown={taxResult.deductions}
           onChange={updateDeductions}
+          filingType={deductionState.filingType}
+          realEstateBusinessScale={deductionState.realEstateBusinessScale}
+          onFilingSettingsChange={updateFilingSettings}
+          breakdownEntries={{
+            donations: deductionState.donationEntries,
+            socialInsurance: deductionState.socialInsuranceEntries,
+            mutualAid: deductionState.mutualAidEntries,
+            medical: deductionState.medicalEntries,
+          }}
+          onBreakdownEntriesChange={updateBreakdownEntries}
         />
         <TaxCreditPanel
           taxCredits={deductionState.taxCredits}
@@ -160,11 +201,13 @@ const FilingWorkspace = ({
           year={year}
           statusKey="calculated"
           label="控除・計算"
-          description="所得控除・税額控除の入力が終わったら、ここで済みにできます（総合・ダッシュボードと共有）。"
+          description="所得控除・税額控除の入力が終わったら、ここで確定できます（総合・ダッシュボードと共有）。"
         />
       </>
     ),
-    consumption: <ConsumptionTaxPanel transactions={transactions} year={year} />,
+    consumption: (
+      <ConsumptionTaxPanel transactions={transactions} year={year} onOpenLedger={openLedgerFiltered} />
+    ),
     taxpayer: <TaxpayerProfilePanel year={year} />,
   };
 

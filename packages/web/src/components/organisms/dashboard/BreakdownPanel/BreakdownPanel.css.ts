@@ -2,7 +2,7 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 // 円グラフ（ドーナツ）のスライス色。収入はアクセント（インディゴ）の濃淡、
-// 支出はグレーの濃淡で並べ、凡例の順とスライスの順を一致させる。
+// 支出は支出色（赤）の濃淡で並べ、凡例の順とスライスの順を一致させる。
 const SLICE_OPACITIES: readonly number[] = [1, 0.78, 0.6, 0.45, 0.33, 0.24];
 
 const sliceBase = {
@@ -35,7 +35,7 @@ const styles = {
     style({ ...sliceBase, stroke: theme.color.accent, strokeOpacity: opacity }),
   ),
   sliceExpense: SLICE_OPACITIES.map((opacity) =>
-    style({ ...sliceBase, stroke: theme.color.textSubtle, strokeOpacity: opacity }),
+    style({ ...sliceBase, stroke: theme.color.negative, strokeOpacity: opacity }),
   ),
   centerLabel: style({
     fill: theme.color.muted,
@@ -65,7 +65,7 @@ const styles = {
       width: "10px",
       height: "10px",
       borderRadius: "3px",
-      backgroundColor: theme.color.textSubtle,
+      backgroundColor: theme.color.negative,
       opacity,
     }),
   ),

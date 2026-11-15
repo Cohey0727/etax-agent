@@ -91,7 +91,10 @@ export function toTaxpayer(t: ExportXtxRequest["taxpayer"]): XtxTaxpayer {
 export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
   const body = c.req.valid("json");
   const transactions = filterYear(normalizeTransactions(body.transactions ?? []), body.year);
-  const figures = computeCorrectedFigures(transactions, body.year);
+  const figures = computeCorrectedFigures(transactions, body.year, {
+    filingType: body.filing_type,
+    realEstateBusinessScale: body.real_estate_business_scale,
+  });
   const tax = computeIncomeTax({
     year: body.year,
     totalIncome: figures._detail.business_income + figures._detail.real_estate_income,

@@ -1,4 +1,10 @@
-import { DeductionInputs, TaxCreditInputs, Transaction, xtxSupportedYears } from "@etax/shared";
+import {
+  DeductionInputs,
+  FilingType,
+  TaxCreditInputs,
+  Transaction,
+  xtxSupportedYears,
+} from "@etax/shared";
 import { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
@@ -14,6 +20,10 @@ export interface TaxpayerPanelProps {
   transactions: Transaction[];
   deductions: DeductionInputs;
   taxCredits: TaxCreditInputs;
+  /** 申告の種類（青色申告特別控除の区分）。出力する申告数値の計算に使う。 */
+  filingType?: FilingType;
+  /** 不動産貸付けが事業的規模か */
+  realEstateBusinessScale?: boolean;
   /**
    * 申告済みの所得税額（過去に確定した分）。入っていれば、その確定分と
    * 比較する修正申告として出力する。null なら確定申告として出力する。
@@ -33,6 +43,8 @@ export const TaxpayerPanel = ({
   transactions,
   deductions,
   taxCredits,
+  filingType,
+  realEstateBusinessScale,
   originalIncomeTax,
   onOpenSection,
 }: TaxpayerPanelProps) => {
@@ -65,6 +77,8 @@ export const TaxpayerPanel = ({
     transactions,
     deductions,
     tax_credits: taxCredits,
+    filing_type: filingType,
+    real_estate_business_scale: realEstateBusinessScale,
     withholding_tax: withholdingTax,
     prepaid_tax: prepaidTax,
     original_third_period_tax: amendment ? originalIncomeTax : null,

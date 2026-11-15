@@ -10,9 +10,11 @@
  *   - e-Tax への最終提出は本ツール群でも行わない（納税者本人の操作）。
  */
 import {
+  BlueDeductionOptions,
   DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_TAX_CREDIT_INPUTS,
+  FilingType,
   IncomeType,
   TaxCreditInputs,
   Transaction,
@@ -73,12 +75,31 @@ export interface McpToolResult {
 
 const yearProperty = { type: "integer", description: "対象年（西暦）" };
 
+const filingTypeProperty = {
+  type: "string",
+  enum: ["blue65", "blue55", "blue10", "white"],
+  description: "申告の種類（青色申告特別控除の区分、任意。既定は blue65）",
+};
+
+const realEstateScaleProperty = {
+  type: "boolean",
+  description: "不動産貸付けが事業的規模か（任意。既定は false）",
+};
+
 export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "aggregate_year",
     description:
-      "帳簿DBの指定年の取引を集計し、事業所得・不動産所得と青色申告特別控除（不動産10万円→事業65万円の順）を返す。",
-    inputSchema: { type: "object", properties: { year: yearProperty }, required: ["year"] },
+      "帳簿DBの指定年の取引を集計し、事業所得・不動産所得と青色申告特別控除を返す。控除は申告の種類（filing_type、既定は青色65万円）と不動産の規模で変わる。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        year: yearProperty,
+        filing_type: filingTypeProperty,
+        real_estate_business_scale: realEstateScaleProperty,
+      },
+      required: ["year"],
+    },
   },
   {
     name: "consumption_tax",
@@ -96,6 +117,8 @@ export const MCP_TOOLS: McpToolDef[] = [
         year: yearProperty,
         deductions: { type: "object", description: "所得控除の入力（DeductionInputs、camelCase）" },
         tax_credits: { type: "object", description: "税額控除の入力（TaxCreditInputs、camelCase）" },
+        filing_type: filingTypeProperty,
+        real_estate_business_scale: realEstateScaleProperty,
       },
       required: ["year"],
     },
@@ -215,6 +238,8 @@ export const MCP_TOOLS: McpToolDef[] = [
         },
         deductions: { type: "object", description: "所得控除の入力（任意）" },
         tax_credits: { type: "object", description: "税額控除の入力（任意）" },
+        filing_type: filingTypeProperty,
+        real_estate_business_scale: realEstateScaleProperty,
         withholding_tax: { type: "number", description: "源泉徴収税額（任意）" },
         prepaid_tax: { type: "number", description: "予定納税額（任意）" },
         original_third_period_tax: {
@@ -365,6 +390,19 @@ function nullableNumArg(args: Record<string, unknown>, key: string): number | nu
   return Math.trunc(value);
 }
 
+const FILING_TYPES: readonly string[] = ["blue65", "blue55", "blue10", "white"];
+
+/** 申告設定の引数（filing_type / real_estate_business_scale）を計算用オプションに変換する。 */
+function filingOptionsArg(args: Record<string, unknown>): BlueDeductionOptions {
+  const filingType = args["filing_type"];
+  return {
+    filingType: typeof filingType === "string" && FILING_TYPES.includes(filingType)
+      ? (filingType as FilingType)
+      : undefined,
+    realEstateBusinessScale: args["real_estate_business_scale"] === true,
+  };
+}
+
 /** 今日の日付（日本時間、YYYY-MM-DD）。 */
 function todayInTokyo(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
@@ -386,7 +424,7 @@ export async function dispatchMcpTool(
         const year = Number(args["year"]);
         const tx = await ledgerTransactions(db, year);
         const b = aggregateIncome(tx);
-        const blue = blueDeduction(b.realEstateIncome, b.businessIncome);
+        const blue = blueDeduction(b.realEstateIncome, b.businessIncome, filingOptionsArg(args));
         return textResult({
           year,
           count: tx.length,
@@ -438,7 +476,7 @@ export async function dispatchMcpTool(
         const db = requireDb();
         const year = Number(args["year"]);
         const tx = await ledgerTransactions(db, year);
-        const figures = computeCorrectedFigures(tx, year);
+        const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
         const result = computeIncomeTax({
           year,
           totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
@@ -537,7 +575,7 @@ export async function dispatchMcpTool(
         const tx = await ledgerTransactions(db, year);
         const deductions = mergeDeductionInputs(args["deductions"]);
         const taxCredits = mergeTaxCreditInputs(args["tax_credits"]);
-        const figures = computeCorrectedFigures(tx, year);
+        const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
         const tax = computeIncomeTax({
           year,
           totalIncome: figures._detail.business_income + figures._detail.real_estate_income,

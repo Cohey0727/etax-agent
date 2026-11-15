@@ -10,7 +10,7 @@ export interface TaxSummaryProps {
 
 /**
  * 「控除・計算」行の直下に置く税額の要約。控除を入力したら、その結果である
- * 税額の数字を真下で確認して、そのまま「済み」にできるようにする。
+ * 税額の数字を真下で確認して、そのまま「確定」にできるようにする。
  */
 export const TaxSummary = ({ taxResult }: TaxSummaryProps) => {
   const taxRows: readonly { label: string; amount: number }[] = [

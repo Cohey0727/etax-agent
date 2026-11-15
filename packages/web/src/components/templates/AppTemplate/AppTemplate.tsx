@@ -1,6 +1,6 @@
 import { Fragment, ReactNode, useEffect, useState } from "react";
 import { clsx } from "clsx";
-import { Badge, Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
+import { Badge, Button, Col, Icon, IconName, Input, Row, Select, Text } from "@components/atoms";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
 
@@ -11,6 +11,8 @@ export interface AppTemplateProps {
   years: readonly number[];
   selectedYear: number;
   onYearChange: (year: number) => void;
+  /** 取引がまだ無い年度を追加する（追加と同時にその年度へ切り替わる）。 */
+  onAddYear?: (year: number) => void;
   dataSource: string;
   transactionCount: number;
   agentPanel: ReactNode;
@@ -67,6 +69,7 @@ export const AppTemplate = ({
   years,
   selectedYear,
   onYearChange,
+  onAddYear,
   dataSource,
   transactionCount,
   agentPanel,
@@ -77,6 +80,20 @@ export const AppTemplate = ({
   onNavChildSelect,
   children,
 }: AppTemplateProps) => {
+  // 年度追加の入力欄の開閉と入力値。
+  const [addingYear, setAddingYear] = useState(false);
+  const [newYearText, setNewYearText] = useState("");
+  const startAddingYear = () => {
+    setNewYearText(String((years[0] ?? new Date().getFullYear()) + 1));
+    setAddingYear(true);
+  };
+  const submitNewYear = () => {
+    const nextYear = Number(newYearText);
+    if (Number.isInteger(nextYear) && nextYear >= 1900 && nextYear <= 2100) {
+      onAddYear?.(nextYear);
+      setAddingYear(false);
+    }
+  };
   // 左右パネルの開閉はレイアウト側の状態で、端末に保存して次回も引き継ぐ。
   // ただし狭い画面ではサイドバーが上部を占有するので、保存値によらず閉じた状態から始める
   // （下部バーのボタンでいつでも開ける。開閉の保存はデスクトップ幅でのみ効く）。
@@ -145,6 +162,28 @@ export const AppTemplate = ({
                     </option>
                   ))}
                 </Select>
+                {onAddYear ? (
+                  addingYear ? (
+                    <Row gap="sm" align="center">
+                      <Input
+                        type="number"
+                        value={newYearText}
+                        onChange={(e) => setNewYearText(e.target.value)}
+                        aria-label="追加する年度"
+                      />
+                      <Button variant="ghost" size="sm" onClick={submitNewYear}>
+                        追加
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setAddingYear(false)}>
+                        やめる
+                      </Button>
+                    </Row>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={startAddingYear}>
+                      ＋ 年度を追加
+                    </Button>
+                  )
+                ) : null}
               </Col>
               <Col gap="sm">
                 {navViews.map((view) => {

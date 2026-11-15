@@ -101,6 +101,21 @@ const readStoredYear = (): number => {
   }
 };
 
+/** 取引がまだ無いのに追加された年度（年度セレクタの「＋ 年度を追加」）。 */
+const EXTRA_YEARS_STORAGE_KEY = "etax-extra-years";
+
+const readExtraYears = (): number[] => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(EXTRA_YEARS_STORAGE_KEY) ?? "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (y): y is number => typeof y === "number" && Number.isInteger(y) && y >= 1900 && y <= 2100,
+    );
+  } catch {
+    return [];
+  }
+};
+
 const CONNECTION_STORAGE_KEY = "etax-agent-connection";
 
 const readStoredAgentConnection = (): AgentConnectionConfig => {
@@ -155,9 +170,31 @@ export const AppPage = () => {
     setCanClearChat(handler !== null);
   }, []);
 
+  const [extraYears, setExtraYears] = useState<number[]>(() => readExtraYears());
   const years = useMemo(
-    () => [...new Set(transactions.map((t) => t.year))].sort((a, b) => b - a),
-    [transactions],
+    () => [...new Set([...transactions.map((t) => t.year), ...extraYears])].sort((a, b) => b - a),
+    [transactions, extraYears],
+  );
+  const handleAddYear = useCallback(
+    (nextYear: number) => {
+      if (!extraYears.includes(nextYear)) {
+        const next = [...extraYears, nextYear];
+        setExtraYears(next);
+        try {
+          localStorage.setItem(EXTRA_YEARS_STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // 保存できなくても追加自体は有効にする
+        }
+      }
+      // handleYearChange と同じ処理（宣言順の都合で直接書く）。
+      setSelectedYear(nextYear);
+      try {
+        localStorage.setItem(YEAR_STORAGE_KEY, String(nextYear));
+      } catch {
+        // 保存できなくても切替自体は有効にする
+      }
+    },
+    [extraYears],
   );
   // 選択中の年がデータに無い場合は、描画時点で最新の年に詰める
   const year = years.includes(selectedYear) ? selectedYear : (years[0] ?? new Date().getFullYear());
@@ -294,6 +331,7 @@ export const AppPage = () => {
       years={years}
       selectedYear={year}
       onYearChange={handleYearChange}
+      onAddYear={handleAddYear}
       dataSource={dataSource}
       transactionCount={transactions.length}
       agentPanel={

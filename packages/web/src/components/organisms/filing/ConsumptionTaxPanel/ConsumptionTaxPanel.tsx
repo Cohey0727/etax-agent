@@ -46,6 +46,11 @@ const SUMMARY_ROWS: readonly { key: keyof ConsumptionTaxSummary; label: string }
 export interface ConsumptionTaxPanelProps {
   transactions: Transaction[];
   year: number;
+  /**
+   * 帳簿画面をフィルター付きで開く（税区分の警告からの遷移）。
+   * 引数は帳簿URLのクエリ文字列（例: "?filters=mismatch"）。
+   */
+  onOpenLedger?: (search: string) => void;
 }
 
 /**
@@ -55,7 +60,7 @@ export interface ConsumptionTaxPanelProps {
  * 基準期間・中間納付・既確定税額など、帳簿の外にある数字だけ。
  * 課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算される。
  */
-export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelProps) => {
+export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: ConsumptionTaxPanelProps) => {
   const [taxpayer] = useState(() => loadTaxpayer(year).taxpayer);
   const summary = useMemo(() => summarizeConsumptionTax(transactions, year), [transactions, year]);
   const [form, setForm] = useState<EditableForm>(() => ({
@@ -179,16 +184,38 @@ export const ConsumptionTaxPanel = ({ transactions, year }: ConsumptionTaxPanelP
             <Text className={styles.amountValue}>{formatYen(summary[row.key])}</Text>
           </Row>
         ))}
-        {summary.unsetCount > 0 || summary.excludedCount > 0 ? (
+        {summary.unsetCount > 0 ? (
           <AlertBox variant="notice">
-            集計に含まれていない取引があります
-            {summary.unsetCount > 0
-              ? `（税区分が未設定 ${summary.unsetCount} 件・合計 ${formatYen(summary.unsetAmount)}）`
-              : ""}
-            {summary.excludedCount > 0
-              ? `（税区分と金額の符号が不一致 ${summary.excludedCount} 件・合計 ${formatYen(summary.excludedAmount)}）`
-              : ""}
-            。帳簿で各取引の税区分を確認してください。
+            <Row gap="sm" align="center" justify="spaceBetween" wrap>
+              <Text>
+                税区分が未設定の取引が {summary.unsetCount} 件（合計 {formatYen(summary.unsetAmount)}
+                ）あります。集計に含まれていません。
+              </Text>
+              {onOpenLedger ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onOpenLedger("?filters=taxCategory&tax=")}
+                >
+                  帳簿で確認する →
+                </Button>
+              ) : null}
+            </Row>
+          </AlertBox>
+        ) : null}
+        {summary.excludedCount > 0 ? (
+          <AlertBox variant="notice">
+            <Row gap="sm" align="center" justify="spaceBetween" wrap>
+              <Text>
+                税区分と金額の符号が不一致の取引が {summary.excludedCount} 件（合計{" "}
+                {formatYen(summary.excludedAmount)}）あります。集計に含まれていません。
+              </Text>
+              {onOpenLedger ? (
+                <Button variant="ghost" size="sm" onClick={() => onOpenLedger("?filters=mismatch")}>
+                  帳簿で確認する →
+                </Button>
+              ) : null}
+            </Row>
           </AlertBox>
         ) : null}
 

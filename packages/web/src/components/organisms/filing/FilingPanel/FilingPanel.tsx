@@ -1,4 +1,4 @@
-import { IncomeTaxResult, Transaction } from "@etax/shared";
+import { BlueDeductionOptions, IncomeTaxResult, Transaction } from "@etax/shared";
 import { Fragment } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
@@ -26,15 +26,15 @@ interface ManualItem {
 }
 
 /**
- * 手動で「済み」を付けられる項目。どれも独立していて、順番は問わない。
+ * 手動で「確定」を付けられる項目。どれも独立していて、順番は問わない。
  * 各項目の行の直下に、その項目の結果の数字（帳簿→所得、控除・計算→税額）を
- * 並べ、見直してそのまま「済み」にできるようにする。
+ * 並べ、見直してそのまま「確定」にできるようにする。
  */
 const MANUAL_ITEMS: readonly ManualItem[] = [
   {
     key: "confirmed",
     label: "帳簿",
-    description: "帳簿の金額・科目・区分に誤りがないか見直したら「済み」にします。見直しは帳簿タブで行います。",
+    description: "帳簿の金額・科目・区分に誤りがないか見直したら確定します。見直しは帳簿タブで行います。",
     section: "ledger",
   },
   {
@@ -56,6 +56,8 @@ export interface FilingPanelProps {
   year: number;
   /** 所得税の計算結果。「控除・計算」の行の下に税額の要約を表示するために使う。 */
   taxResult?: IncomeTaxResult;
+  /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
+  filingOptions?: BlueDeductionOptions;
   onNavigate?: (view: AppView) => void;
   /** 総合タブから各タブへ遷移する（確定申告画面内のタブ切替）。 */
   onOpenSection?: (section: FilingSection) => void;
@@ -70,6 +72,7 @@ export const FilingPanel = ({
   transactions,
   year,
   taxResult,
+  filingOptions,
   onNavigate,
   onOpenSection,
 }: FilingPanelProps) => {
@@ -84,7 +87,7 @@ export const FilingPanel = ({
             <Text variant="sectionTitle">{year}年分の確定申告</Text>
             <Text variant="muted">
               帳簿・確認・控除・提出はそれぞれ独立した項目です。どの順番でも入力でき、
-              いつでも行き来して直せます。済んだ項目には印を付けておけます（ダッシュボードの
+              いつでも行き来して直せます。確定した項目には印を付けておけます（ダッシュボードの
               申告ステータスと共有）。
             </Text>
             {allSubmitted ? (
@@ -117,7 +120,7 @@ export const FilingPanel = ({
                     <Text className={styles.itemLabel}>
                       {item.label}
                       <span className={done ? styles.stateDone : styles.stateTodo}>
-                        {done ? `済み${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未"}
+                        {done ? `確定${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未確定"}
                       </span>
                     </Text>
                     <Text variant="muted">{item.description}</Text>
@@ -139,13 +142,13 @@ export const FilingPanel = ({
                       disabled={savingKey === item.key || !available}
                       onClick={() => void toggle(item.key)}
                     >
-                      {done ? "戻す" : "済みにする"}
+                      {done ? "戻す" : "確定する"}
                     </Button>
                   </Row>
                 </div>
                 {item.key === "confirmed" ? (
                   <div className={styles.figuresBlock}>
-                    <IncomeSummary transactions={transactions} year={year} />
+                    <IncomeSummary transactions={transactions} year={year} filingOptions={filingOptions} />
                   </div>
                 ) : null}
                 {item.key === "calculated" && taxResult ? (
@@ -179,7 +182,7 @@ export const FilingPanel = ({
 
           {loaded && !available ? (
             <Text variant="muted">
-              ステータスを保存するサーバーに接続できていません。「済みにする」は接続時に使えます。
+              ステータスを保存するサーバーに接続できていません。「確定する」は接続時に使えます。
             </Text>
           ) : null}
         </Col>

@@ -98,6 +98,39 @@ describe("青色申告特別控除の振り分け", () => {
   test("順序(iv) 両区分赤字 → 合計 0", () => {
     expect(blueDeduction(-1, -1).total).toBe(0);
   });
+
+  test("青色55万円（非事業的規模）→ 100,000 + 550,000 = 650,000", () => {
+    const blue = blueDeduction(300_000, 5_000_000, { filingType: "blue55" });
+    expect(blue.realEstate).toBe(100_000);
+    expect(blue.business).toBe(550_000);
+    expect(blue.total).toBe(650_000);
+  });
+
+  test("白色申告 → 控除なし", () => {
+    const blue = blueDeduction(300_000, 5_000_000, { filingType: "white" });
+    expect(blue.total).toBe(0);
+  });
+
+  test("青色10万円 → 事業・不動産の合算に10万円まで（不動産から先に控除）", () => {
+    const blue = blueDeduction(300_000, 5_000_000, { filingType: "blue10" });
+    expect(blue.realEstate).toBe(100_000);
+    expect(blue.business).toBe(0);
+    expect(blue.total).toBe(100_000);
+    const blue2 = blueDeduction(30_000, 5_000_000, { filingType: "blue10" });
+    expect(blue2.realEstate).toBe(30_000);
+    expect(blue2.business).toBe(70_000);
+    expect(blue2.total).toBe(100_000);
+  });
+
+  test("不動産が事業的規模（青色65万円）→ 合算に65万円まで", () => {
+    const blue = blueDeduction(300_000, 5_000_000, {
+      filingType: "blue65",
+      realEstateBusinessScale: true,
+    });
+    expect(blue.realEstate).toBe(300_000);
+    expect(blue.business).toBe(350_000);
+    expect(blue.total).toBe(650_000);
+  });
 });
 
 describe("サンプルCSV（2024年分）", () => {

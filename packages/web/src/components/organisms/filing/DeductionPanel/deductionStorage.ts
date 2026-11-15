@@ -7,13 +7,80 @@ import {
   DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_TAX_CREDIT_INPUTS,
+  FilingType,
   TaxCreditInputs,
 } from "@etax/shared";
+
+/**
+ * 内訳の1件（名称と金額）。寄附金・社会保険料・小規模企業共済等・医療費の
+ * ように「内訳があって合計が控除の元になる」入力で共有する。
+ * 合計は対応する deductions の金額フィールドに同期する。
+ */
+export interface BreakdownEntry {
+  id: string;
+  /** 名称（寄附先・保険の種類・医療機関名など） */
+  recipient: string;
+  amount: number;
+}
+
+/** 寄附金の内訳（旧名の互換）。 */
+export type DonationEntry = BreakdownEntry;
+
+/** 内訳を持つ控除入力のキー。 */
+export type BreakdownEntriesKey = "donations" | "socialInsurance" | "mutualAid" | "medical";
 
 export interface DeductionState {
   deductions: DeductionInputs;
   taxCredits: TaxCreditInputs;
+  /** 申告の種類（青色申告特別控除の区分） */
+  filingType: FilingType;
+  /** 不動産貸付けが事業的規模か */
+  realEstateBusinessScale: boolean;
+  /** 寄附金の内訳 */
+  donationEntries: BreakdownEntry[];
+  /** 社会保険料の内訳 */
+  socialInsuranceEntries: BreakdownEntry[];
+  /** 小規模企業共済等掛金の内訳 */
+  mutualAidEntries: BreakdownEntry[];
+  /** 医療費の内訳 */
+  medicalEntries: BreakdownEntry[];
 }
+
+const BREAKDOWN_STATE_FIELDS: Record<
+  BreakdownEntriesKey,
+  "donationEntries" | "socialInsuranceEntries" | "mutualAidEntries" | "medicalEntries"
+> = {
+  donations: "donationEntries",
+  socialInsurance: "socialInsuranceEntries",
+  mutualAid: "mutualAidEntries",
+  medical: "medicalEntries",
+};
+
+const BREAKDOWN_TOTAL_FIELDS: Record<
+  BreakdownEntriesKey,
+  "donationsTotal" | "socialInsurancePaid" | "smallBusinessMutualAidPaid" | "medicalExpensesPaid"
+> = {
+  donations: "donationsTotal",
+  socialInsurance: "socialInsurancePaid",
+  mutualAid: "smallBusinessMutualAidPaid",
+  medical: "medicalExpensesPaid",
+};
+
+/** 内訳を差し替え、合計を対応する金額フィールドへ同期した新しい状態を返す。 */
+export function applyBreakdownEntries(
+  state: DeductionState,
+  key: BreakdownEntriesKey,
+  entries: BreakdownEntry[],
+): DeductionState {
+  const total = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
+  return {
+    ...state,
+    [BREAKDOWN_STATE_FIELDS[key]]: entries,
+    deductions: { ...state.deductions, [BREAKDOWN_TOTAL_FIELDS[key]]: total },
+  };
+}
+
+const FILING_TYPES: readonly FilingType[] = ["blue65", "blue55", "blue10", "white"];
 
 /** 空の入力状態（EMPTY 定数をそのまま共有しないよう複製する）。 */
 export function freshDeductionState(): DeductionState {
@@ -27,11 +94,34 @@ export function freshDeductionState(): DeductionState {
       casualtyLoss: null,
     },
     taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    filingType: "blue65",
+    realEstateBusinessScale: false,
+    donationEntries: [],
+    socialInsuranceEntries: [],
+    mutualAidEntries: [],
+    medicalEntries: [],
   };
 }
 
 function storageKey(year: number): string {
   return `etax-amend-deductions-${year}`;
+}
+
+/** 保存済みの内訳を検証して取り出す。壊れた要素は捨てる。 */
+function parseBreakdownEntries(raw: unknown): BreakdownEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const entries: BreakdownEntry[] = [];
+  raw.forEach((item, index) => {
+    if (typeof item !== "object" || item === null) return;
+    const e = item as Partial<BreakdownEntry>;
+    const amount = typeof e.amount === "number" && Number.isFinite(e.amount) ? Math.trunc(e.amount) : 0;
+    entries.push({
+      id: typeof e.id === "string" && e.id ? e.id : `breakdown-loaded-${index}`,
+      recipient: typeof e.recipient === "string" ? e.recipient : "",
+      amount,
+    });
+  });
+  return entries;
 }
 
 export function loadDeductionState(year: number): DeductionState {
@@ -60,6 +150,14 @@ export function loadDeductionState(year: number): DeductionState {
     return {
       deductions,
       taxCredits: { ...base.taxCredits, ...(parsed.taxCredits ?? {}) },
+      filingType: FILING_TYPES.includes(parsed.filingType as FilingType)
+        ? (parsed.filingType as FilingType)
+        : "blue65",
+      realEstateBusinessScale: parsed.realEstateBusinessScale === true,
+      donationEntries: parseBreakdownEntries(parsed.donationEntries),
+      socialInsuranceEntries: parseBreakdownEntries(parsed.socialInsuranceEntries),
+      mutualAidEntries: parseBreakdownEntries(parsed.mutualAidEntries),
+      medicalEntries: parseBreakdownEntries(parsed.medicalEntries),
     };
   } catch {
     return base;

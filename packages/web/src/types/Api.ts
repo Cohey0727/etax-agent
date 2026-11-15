@@ -1,4 +1,4 @@
-import { Transaction } from "@etax/shared";
+import { FilingType, Transaction } from "@etax/shared";
 
 export interface CsvMapping {
   dateColumn: string | null;
@@ -140,6 +140,10 @@ export interface ExportXtxRequest {
   transactions: Transaction[];
   deductions: unknown;
   tax_credits: unknown;
+  /** 申告の種類（青色申告特別控除の区分）。未指定なら青色65万円。 */
+  filing_type?: FilingType;
+  /** 不動産貸付けが事業的規模か */
+  real_estate_business_scale?: boolean;
   withholding_tax: number;
   prepaid_tax: number;
   original_third_period_tax: number | null;

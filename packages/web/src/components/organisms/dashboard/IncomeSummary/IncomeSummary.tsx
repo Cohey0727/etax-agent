@@ -1,14 +1,32 @@
-import { BlueDeduction, IncomeBreakdown } from "@etax/shared";
+import { BlueDeduction, FilingType, IncomeBreakdown, blueDeductionCaps } from "@etax/shared";
 import { Card, Col, Text } from "@components/atoms";
+import { FilingTypeFields } from "@components/organisms/filing/FilingTypeFields";
 import { formatYen } from "@utils";
 import styles from "./IncomeSummary.css";
 
 export interface IncomeSummaryProps {
   breakdown: IncomeBreakdown;
   blue: BlueDeduction;
+  /** 申告の種類（青色申告特別控除の区分） */
+  filingType: FilingType;
+  /** 不動産貸付けが事業的規模か */
+  realEstateBusinessScale: boolean;
+  onFilingSettingsChange: (filingType: FilingType, realEstateBusinessScale: boolean) => void;
 }
 
-export const IncomeSummary = ({ breakdown, blue }: IncomeSummaryProps) => {
+export const IncomeSummary = ({
+  breakdown,
+  blue,
+  filingType,
+  realEstateBusinessScale,
+  onFilingSettingsChange,
+}: IncomeSummaryProps) => {
+  const caps = blueDeductionCaps({ filingType, realEstateBusinessScale });
+  // 事業・不動産を合算して上限がかかる場合は、内訳ごとの上限は出さない。
+  const pooled = filingType === "blue10" || realEstateBusinessScale || filingType === "white";
+  const realEstateLabel = pooled ? "不動産分" : `不動産分（上限${formatCap(caps.realEstate)}）`;
+  const businessLabel = pooled ? "事業分" : `事業分（上限${formatCap(caps.business)}）`;
+  const totalLabel = filingType === "white" ? "合計" : `合計（最大${formatCap(caps.total)}）`;
   return (
     <div className={styles.grid}>
       <IncomeStatCard
@@ -29,22 +47,32 @@ export const IncomeSummary = ({ breakdown, blue }: IncomeSummaryProps) => {
         <Col gap="sm">
           <Text variant="sectionTitle">青色申告特別控除</Text>
           <Col gap="none">
-            <Text variant="statLabel">不動産分（上限10万円）</Text>
+            <Text variant="statLabel">{realEstateLabel}</Text>
             <Text>{formatYen(blue.realEstate)}</Text>
           </Col>
           <Col gap="none">
-            <Text variant="statLabel">事業分（上限65万円）</Text>
+            <Text variant="statLabel">{businessLabel}</Text>
             <Text>{formatYen(blue.business)}</Text>
           </Col>
           <Col gap="none">
-            <Text variant="statLabel">合計（最大75万円）</Text>
+            <Text variant="statLabel">{totalLabel}</Text>
             <Text variant="statValue">{formatYen(blue.total)}</Text>
           </Col>
+          <FilingTypeFields
+            filingType={filingType}
+            realEstateBusinessScale={realEstateBusinessScale}
+            onChange={onFilingSettingsChange}
+          />
         </Col>
       </Card>
     </div>
   );
 };
+
+/** 上限額を「65万円」の形で出す。 */
+function formatCap(amount: number): string {
+  return `${amount / 10_000}万円`;
+}
 
 interface IncomeStatCardProps {
   title: string;

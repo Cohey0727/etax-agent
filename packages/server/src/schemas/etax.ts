@@ -40,6 +40,8 @@ export const ExportXtxRequestSchema = z
     transactions: z.unknown().optional(),
     deductions: DeductionInputsSchema,
     tax_credits: TaxCreditInputsSchema,
+    filing_type: z.enum(["blue65", "blue55", "blue10", "white"]).optional(),
+    real_estate_business_scale: z.boolean().optional(),
     withholding_tax: z.number(),
     prepaid_tax: z.number(),
     original_third_period_tax: z.number().nullable(),

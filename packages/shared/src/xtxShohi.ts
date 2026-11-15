@@ -147,6 +147,19 @@ const TAX_CATEGORY_BUCKETS: Record<string, ConsumptionBucket | null> = {
 };
 
 /**
+ * 税区分と金額の符号が合わない取引か（例: 支出なのに課税売上の区分）。
+ * 消費税の集計から外れる取引の判定で、帳簿の絞り込みでも使う。
+ * 税区分が未設定・対象外の取引は不一致ではない。
+ */
+export function taxCategorySignMismatch(t: Pick<Transaction, "tax_category" | "amount">): boolean {
+  const bucket = TAX_CATEGORY_BUCKETS[t.tax_category];
+  if (bucket === undefined || bucket === null) return false;
+  const amount = Math.trunc(t.amount || 0);
+  if (bucket === "purchasesIncl10" || bucket === "purchasesIncl8") return amount >= 0;
+  return amount <= 0;
+}
+
+/**
  * 帳簿（取引の税区分）から消費税申告の入力金額を集計する。
  * 消費税の金額は自由入力ではなく、この集計で決めるのが原則。
  * 売上バケツは収入（正の金額）だけ、仕入バケツは支出（負の金額）を
@@ -179,19 +192,14 @@ export function summarizeConsumptionTax(
       continue;
     }
     if (bucket === null) continue;
+    if (taxCategorySignMismatch(t)) {
+      summary.excludedCount += 1;
+      summary.excludedAmount += amount;
+      continue;
+    }
     if (bucket === "purchasesIncl10" || bucket === "purchasesIncl8") {
-      if (amount >= 0) {
-        summary.excludedCount += 1;
-        summary.excludedAmount += amount;
-        continue;
-      }
       summary[bucket] += -amount;
     } else {
-      if (amount <= 0) {
-        summary.excludedCount += 1;
-        summary.excludedAmount += amount;
-        continue;
-      }
       summary[bucket] += amount;
     }
   }

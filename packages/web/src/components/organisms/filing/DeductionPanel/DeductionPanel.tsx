@@ -2,12 +2,16 @@ import {
   CasualtyLossInput,
   DeductionInputs,
   EarthquakeInsurancePremiums,
+  FilingType,
   IncomeDeductionBreakdown,
   LifeInsurancePremiums,
   SpouseCategory,
 } from "@etax/shared";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { formatNumber } from "@utils";
+import { BreakdownEntriesFields } from "../BreakdownEntriesFields";
+import { FilingTypeFields } from "../FilingTypeFields";
+import { BreakdownEntriesKey, BreakdownEntry } from "./deductionStorage";
 import styles from "./DeductionPanel.css";
 
 /** 所得控除の内訳表示ラベル（エンジンの内訳キー → 正式名称）。 */
@@ -36,9 +40,27 @@ export interface DeductionPanelProps {
   /** 所得控除の内訳（自動計算済み） */
   breakdown: IncomeDeductionBreakdown;
   onChange: (next: DeductionInputs) => void;
+  /** 申告の種類（青色申告特別控除の区分） */
+  filingType: FilingType;
+  /** 不動産貸付けが事業的規模か */
+  realEstateBusinessScale: boolean;
+  onFilingSettingsChange: (filingType: FilingType, realEstateBusinessScale: boolean) => void;
+  /** 内訳を持つ控除入力（寄附金・社会保険料・小規模企業共済等・医療費） */
+  breakdownEntries: Record<BreakdownEntriesKey, BreakdownEntry[]>;
+  onBreakdownEntriesChange: (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => void;
 }
 
-export const DeductionPanel = ({ year, deductions, breakdown, onChange }: DeductionPanelProps) => {
+export const DeductionPanel = ({
+  year,
+  deductions,
+  breakdown,
+  onChange,
+  filingType,
+  realEstateBusinessScale,
+  onFilingSettingsChange,
+  breakdownEntries,
+  onBreakdownEntriesChange,
+}: DeductionPanelProps) => {
   const set = (patch: Partial<DeductionInputs>) => onChange({ ...deductions, ...patch });
   const setLife = (patch: Partial<LifeInsurancePremiums>) =>
     set({ lifeInsurance: { ...deductions.lifeInsurance, ...patch } });
@@ -57,6 +79,15 @@ export const DeductionPanel = ({ year, deductions, breakdown, onChange }: Deduct
     <Card>
       <Col gap="md">
         <Col gap="sm">
+          <Text variant="sectionTitle">申告の種類</Text>
+          <FilingTypeFields
+            filingType={filingType}
+            realEstateBusinessScale={realEstateBusinessScale}
+            onChange={onFilingSettingsChange}
+          />
+        </Col>
+
+        <Col gap="sm">
           <Text variant="sectionTitle">所得控除の入力</Text>
           <Text variant="muted">
             支払った金額や家族の状況を入れると、所得控除が自動計算されて上の差分表の
@@ -66,31 +97,56 @@ export const DeductionPanel = ({ year, deductions, breakdown, onChange }: Deduct
         </Col>
 
         <Text className={styles.subhead}>支払った金額</Text>
-        <AmountField
-          label="社会保険料（国民年金・国保など）"
-          value={deductions.socialInsurancePaid}
-          onChange={(v) => set({ socialInsurancePaid: v })}
-        />
-        <AmountField
-          label="小規模企業共済・iDeCo等の掛金"
-          value={deductions.smallBusinessMutualAidPaid}
-          onChange={(v) => set({ smallBusinessMutualAidPaid: v })}
-        />
-        <AmountField
-          label="医療費の支払額"
-          value={deductions.medicalExpensesPaid}
-          onChange={(v) => set({ medicalExpensesPaid: v })}
-        />
+        <Col gap="sm">
+          <Text variant="muted">社会保険料の内訳</Text>
+          <BreakdownEntriesFields
+            entries={breakdownEntries.socialInsurance}
+            legacyTotal={deductions.socialInsurancePaid}
+            onChange={(entries) => onBreakdownEntriesChange("socialInsurance", entries)}
+            namePlaceholder="国民年金・国民健康保険など"
+            nameLabel="社会保険料の名称"
+            addLabel="＋ 保険料を追加"
+          />
+        </Col>
+        <Col gap="sm">
+          <Text variant="muted">小規模企業共済・iDeCo等の内訳</Text>
+          <BreakdownEntriesFields
+            entries={breakdownEntries.mutualAid}
+            legacyTotal={deductions.smallBusinessMutualAidPaid}
+            onChange={(entries) => onBreakdownEntriesChange("mutualAid", entries)}
+            namePlaceholder="小規模企業共済・iDeCoなど"
+            nameLabel="掛金の名称"
+            addLabel="＋ 掛金を追加"
+          />
+        </Col>
+        <Col gap="sm">
+          <Text variant="muted">医療費の内訳</Text>
+          <BreakdownEntriesFields
+            entries={breakdownEntries.medical}
+            legacyTotal={deductions.medicalExpensesPaid}
+            onChange={(entries) => onBreakdownEntriesChange("medical", entries)}
+            namePlaceholder="医療機関名など"
+            nameLabel="医療費の支払先"
+            addLabel="＋ 医療費を追加"
+          />
+        </Col>
         <AmountField
           label="医療費の補填金（保険金など）"
           value={deductions.medicalReimbursement}
           onChange={(v) => set({ medicalReimbursement: v })}
         />
-        <AmountField
-          label="寄附金の合計（ふるさと納税を含む）"
-          value={deductions.donationsTotal}
-          onChange={(v) => set({ donationsTotal: v })}
-        />
+        <Col gap="sm">
+          <Text variant="muted">寄附金の内訳（ふるさと納税を含む）</Text>
+          <BreakdownEntriesFields
+            entries={breakdownEntries.donations}
+            legacyTotal={deductions.donationsTotal}
+            onChange={(entries) => onBreakdownEntriesChange("donations", entries)}
+            namePlaceholder="寄附先（自治体名など）"
+            nameLabel="寄附先"
+            addLabel="＋ 寄附を追加"
+            note="寄附金控除は、合計から2,000円を差し引いた額です（所得金額の40%が上限）。ふるさと納税もここに含めてください。"
+          />
+        </Col>
 
         <Text className={styles.subhead}>保険料</Text>
         <AmountField

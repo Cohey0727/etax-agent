@@ -10,18 +10,18 @@ const TEXT_FIELDS: readonly {
   label: string;
   placeholder?: string;
 }[] = [
-  { key: "name", label: "氏名" },
-  { key: "name_kana", label: "フリガナ" },
-  { key: "zip_code", label: "郵便番号", placeholder: "7220062" },
-  { key: "address", label: "住所" },
+  { key: "name", label: "氏名", placeholder: "山田太郎" },
+  { key: "name_kana", label: "フリガナ", placeholder: "ヤマダタロウ" },
+  { key: "zip_code", label: "郵便番号", placeholder: "1000001" },
+  { key: "address", label: "住所", placeholder: "東京都千代田区千代田1-1" },
   { key: "address_line2", label: "住所（下段）", placeholder: "建物名・部屋番号など" },
-  { key: "phone", label: "電話番号", placeholder: "080-2500-7879" },
-  { key: "tax_office_name", label: "提出先の税務署名", placeholder: "尾道（「税務署」は付けない）" },
+  { key: "phone", label: "電話番号", placeholder: "090-1234-5678" },
+  { key: "tax_office_name", label: "提出先の税務署名", placeholder: "麹町（「税務署」は付けない）" },
   { key: "tax_office_code", label: "税務署コード（任意）", placeholder: "5桁" },
-  { key: "occupation", label: "職業" },
+  { key: "occupation", label: "職業", placeholder: "ソフトウェア開発" },
   { key: "shop_name", label: "屋号（任意）" },
   { key: "jan1_address", label: "1月1日の住所（任意）", placeholder: "現住所と違う場合のみ" },
-  { key: "invoice_number", label: "インボイス登録番号", placeholder: "T9810103628696" },
+  { key: "invoice_number", label: "インボイス登録番号", placeholder: "T1234567890123" },
   { key: "my_number", label: "個人番号（任意）", placeholder: "マイナンバー12桁" },
 ];
 

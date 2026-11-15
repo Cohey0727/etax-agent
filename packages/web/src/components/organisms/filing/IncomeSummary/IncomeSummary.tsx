@@ -1,4 +1,9 @@
-import { Transaction, computeCorrectedFigures, filterYear } from "@etax/shared";
+import {
+  BlueDeductionOptions,
+  Transaction,
+  computeCorrectedFigures,
+  filterYear,
+} from "@etax/shared";
 import { useMemo } from "react";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
@@ -8,17 +13,19 @@ export interface IncomeSummaryProps {
   transactions: Transaction[];
   /** 左上の年度切替で選ばれている年 */
   year: number;
+  /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
+  filingOptions?: BlueDeductionOptions;
 }
 
 /**
  * 「帳簿」行の直下に置く所得の要約。帳簿を見直したら、その結果である
- * 所得の数字を真下で確認して、そのまま「済み」にできるようにする。
+ * 所得の数字を真下で確認して、そのまま「確定」にできるようにする。
  */
-export const IncomeSummary = ({ transactions, year }: IncomeSummaryProps) => {
+export const IncomeSummary = ({ transactions, year, filingOptions }: IncomeSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
-    () => computeCorrectedFigures(yearTransactions, year),
-    [yearTransactions, year],
+    () => computeCorrectedFigures(yearTransactions, year, filingOptions),
+    [yearTransactions, year, filingOptions?.filingType, filingOptions?.realEstateBusinessScale],
   );
 
   if (yearTransactions.length === 0) {
@@ -27,10 +34,12 @@ export const IncomeSummary = ({ transactions, year }: IncomeSummaryProps) => {
     );
   }
 
+  const isWhite = filingOptions?.filingType === "white";
+  const suffix = isWhite ? "" : "（青色控除後）";
   const totalIncome = figures._detail.business_income + figures._detail.real_estate_income;
   const statCards: readonly { label: string; value: string }[] = [
-    { label: "事業所得（青色控除後）", value: formatYen(figures._detail.business_income) },
-    { label: "不動産所得（青色控除後）", value: formatYen(figures._detail.real_estate_income) },
+    { label: `事業所得${suffix}`, value: formatYen(figures._detail.business_income) },
+    { label: `不動産所得${suffix}`, value: formatYen(figures._detail.real_estate_income) },
     { label: "所得合計", value: formatYen(totalIncome) },
   ];
   const incomeRows: readonly { label: string; amount: number }[] = [
@@ -38,7 +47,10 @@ export const IncomeSummary = ({ transactions, year }: IncomeSummaryProps) => {
     { label: "事業経費", amount: figures.business_expenses },
     { label: "不動産収入", amount: figures.real_estate_revenue },
     { label: "不動産経費", amount: figures.real_estate_expenses },
-    { label: "青色申告特別控除", amount: figures.blue_deduction },
+    {
+      label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
+      amount: figures.blue_deduction,
+    },
   ];
 
   return (
@@ -61,7 +73,7 @@ export const IncomeSummary = ({ transactions, year }: IncomeSummaryProps) => {
           </Row>
         ))}
         <Row align="center" justify="spaceBetween" className={styles.totalRow}>
-          <Text>所得合計（青色控除後）</Text>
+          <Text>所得合計{suffix}</Text>
           <Text className={styles.amount}>{formatYen(totalIncome)}</Text>
         </Row>
       </Col>

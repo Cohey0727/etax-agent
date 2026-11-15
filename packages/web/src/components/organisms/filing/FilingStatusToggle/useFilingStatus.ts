@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { FilingStatus } from "@types";
 import { fetchFilingStatuses, updateFilingStatus } from "@utils/api";
 
-/** 手動で「済み」を付けられる申告ステータスの項目。 */
+/** 手動で「確定」を付けられる申告ステータスの項目。 */
 export type FilingStatusKey = "confirmed" | "calculated" | "submitted";
 
 const EMPTY_STATUS: FilingStatus = {
@@ -29,8 +29,8 @@ export interface UseFilingStatusResult {
 }
 
 /**
- * 申告ステータス（済み印）の読み書きを共有するフック。
- * 総合タブの一覧と、各タブの「済みにする」が同じ保存先を見るために使う。
+ * 申告ステータス（確定印）の読み書きを共有するフック。
+ * 総合タブの一覧と、各タブの「確定する」が同じ保存先を見るために使う。
  * ステータスはダッシュボードの表示ともサーバー保存を共有する。
  */
 export const useFilingStatus = (year: number): UseFilingStatusResult => {
