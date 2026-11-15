@@ -6,7 +6,6 @@ import {
   AgentTestResult,
   AnalyzeReceiptResponse,
   ChatMessage,
-  ClassificationHistory,
   GeneratedRules,
   JevPromptInfo,
   ExportConsumptionXtxRequest,
@@ -100,7 +99,7 @@ export async function classifyAccountsBatch(
   return data.results;
 }
 
-/** 確定した科目を学習履歴に記録する（次回から「過去の傾向」で優先される）。 */
+/** 確定した科目を学習履歴に記録する（生成ルールとプロンプトの材料になる）。 */
 export async function recordClassificationFeedback(
   description: string,
   account: string,
@@ -145,12 +144,6 @@ export async function testAgentSettings(input: {
     body: JSON.stringify(input),
   });
   return parseJson<AgentTestResult>(resp);
-}
-
-/** AIのメモリー（科目判定の学習履歴）を取得する。 */
-export async function fetchClassificationHistory(): Promise<ClassificationHistory> {
-  const resp = await fetch("/api/classify/history");
-  return parseJson<ClassificationHistory>(resp);
 }
 
 /** 学習履歴から自動生成される適用ルールを取得する。 */

@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Col, Row, Text, Textarea } from "@components/atoms";
-import { ClassificationHistory, GeneratedRules, JevPromptInfo } from "@types";
-import {
-  fetchClassificationHistory,
-  fetchGeneratedRules,
-  fetchJevPrompt,
-  updateJevPrompt,
-} from "@utils";
+import { GeneratedRules, JevPromptInfo } from "@types";
+import { fetchGeneratedRules, fetchJevPrompt, updateJevPrompt } from "@utils";
 import styles from "./AiMemoryPanel.css";
 
 interface AiMemoryData {
-  history: ClassificationHistory;
   rules: GeneratedRules;
   prompt: JevPromptInfo;
 }
@@ -21,11 +15,10 @@ interface StatusMessage {
 }
 
 /**
- * AIのメモリー（科目判定の学習）を見るカード。
- * 学習した対応と自動生成ルールは参照のみ。jev用プロンプトだけはここで
- * 直接編集でき、保存すると自動生成より優先して判定に使われる
- * （空にして保存すると自動生成に戻る）。
- * 判定はこの順で効く: 学習履歴 → 生成ルール → jev → キーワードルール。
+ * AIのメモリー（科目判定の学習）を見るカード。表示するのは2つだけ:
+ * 学習履歴から自動生成される正規表現ルールと、jev用プロンプト。
+ * プロンプトはここで直接編集でき、保存すると自動生成より優先して
+ * 判定に使われる（空にして保存すると自動生成に戻る）。
  */
 export const AiMemoryPanel = () => {
   const [data, setData] = useState<AiMemoryData | null>(null);
@@ -37,9 +30,9 @@ export const AiMemoryPanel = () => {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchClassificationHistory(), fetchGeneratedRules(), fetchJevPrompt()])
-      .then(([history, rules, prompt]) => {
-        if (!cancelled) setData({ history, rules, prompt });
+    Promise.all([fetchGeneratedRules(), fetchJevPrompt()])
+      .then(([rules, prompt]) => {
+        if (!cancelled) setData({ rules, prompt });
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -78,28 +71,6 @@ export const AiMemoryPanel = () => {
         ) : (
           <>
             <Col gap="sm">
-              <Text variant="statLabel">学習した対応（{data.history.total}件）</Text>
-              {data.history.records.length === 0 ? (
-                <Text variant="muted">
-                  まだ学習履歴がありません。帳簿や科目判定で科目を確定・修正すると、ここに貯まっていきます。
-                </Text>
-              ) : (
-                <div>
-                  {data.history.records.map((record) => (
-                    <div
-                      key={`${record.description}__${record.account}`}
-                      className={styles.recordRow}
-                    >
-                      <Text className={styles.recordMain}>{record.description}</Text>
-                      <Text variant="muted" className={styles.recordSide}>
-                        → {record.account}（{record.count}回）
-                      </Text>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Col>
-            <Col gap="sm">
               <Text variant="statLabel">自動生成ルール（正規表現）</Text>
               {data.rules.regexRules.length === 0 ? (
                 <Text variant="muted">まだ生成されていません。</Text>
@@ -130,38 +101,43 @@ export const AiMemoryPanel = () => {
                 aria-label="jev用プロンプト"
                 placeholder="（自動生成のプロンプトはまだありません。ここに書いて保存すると、そのまま判定に使われます）"
               />
-              <Row gap="sm" align="center">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={busy || !dirty}
-                  disabledReason={busy ? "処理中です" : "変更がありません"}
-                  onClick={() => void savePrompt(draftValue, "プロンプトを保存しました")}
-                >
-                  保存
-                </Button>
-                {data.prompt.customPrompt ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    disabledReason="処理中です"
-                    onClick={() => void savePrompt("", "自動生成のプロンプトに戻しました")}
-                  >
-                    自動生成に戻す
-                  </Button>
-                ) : null}
+              <Row gap="sm" align="center" justify="spaceBetween">
                 {message ? (
                   <Text variant="caption">
                     {message.ok ? "✓ " : "⚠ "}
                     {message.text}
                   </Text>
-                ) : null}
+                ) : (
+                  <span />
+                )}
+                <Row gap="sm" align="center">
+                  {data.prompt.customPrompt ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      disabledReason="処理中です"
+                      onClick={() => void savePrompt("", "自動生成のプロンプトに戻しました")}
+                    >
+                      自動生成に戻す
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={busy || !dirty}
+                    disabledReason={busy ? "処理中です" : "変更がありません"}
+                    onClick={() => void savePrompt(draftValue, "プロンプトを保存しました")}
+                  >
+                    保存
+                  </Button>
+                </Row>
               </Row>
             </Col>
             <Text variant="caption">
-              科目判定は「学習した対応 → 自動生成ルール → jev（科目判定の接続）→
-              キーワードルール」の順に効きます。学習履歴はサーバーに保存されます。
+              科目判定は「自動生成ルール（正規表現）→ jev（プロンプト）→
+              キーワードルール」の順に効きます。正規表現に引っ掛かれば自動で対応し、
+              決められないものはプロンプトで判定します。プロンプトはサーバーに保存されます。
             </Text>
           </>
         )}

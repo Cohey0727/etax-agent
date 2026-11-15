@@ -13,7 +13,6 @@ export interface AccountClassificationPanelProps {
 }
 
 const sourceLabels = {
-  history: "過去の傾向",
   generated: "生成ルール",
   systemone: "SystemOne判定",
   rules: "キーワードルール",
@@ -75,7 +74,7 @@ export const AccountClassificationPanel = ({
       return { ...tx, category: account, income_type: guessIncomeType(tx.description, account) };
     });
     onApply(updated);
-    // 確定した対応を学習履歴へ記録する（次回から過去の傾向として優先される）
+    // 確定した対応を学習履歴へ記録する（生成ルールとプロンプトの材料になる）
     for (const s of suggestions) {
       if (s.account !== "未分類") {
         void recordClassificationFeedback(transactions[s.index]?.description ?? "", s.account);
@@ -90,8 +89,8 @@ export const AccountClassificationPanel = ({
       <Col gap="sm">
         <Text variant="sectionTitle">勘定科目の判定（未分類 {unclassifiedIndexes.length}件）</Text>
         <Text variant="muted">
-          カード・銀行明細の未分類の行について、過去の傾向（学習履歴）と SystemOne
-          で科目を提案します。内容を確認して確定すると、科目が反映され、対応が学習されます。
+          カード・銀行明細の未分類の行について、自動生成ルール（正規表現）と SystemOne
+          （プロンプト）で科目を提案します。内容を確認して確定すると、科目が反映され、対応が学習されます。
         </Text>
         {error && <AlertBox variant="error">{error}</AlertBox>}
         {confirmed && (

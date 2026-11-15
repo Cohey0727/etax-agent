@@ -16,10 +16,6 @@ import {
   getGeneratedRulesHandler,
   getGeneratedRulesRoute,
 } from "../usecases/getGeneratedRules";
-import {
-  getClassificationHistoryHandler,
-  getClassificationHistoryRoute,
-} from "../usecases/getClassificationHistory";
 import { getJevPromptHandler, getJevPromptRoute } from "../usecases/getJevPrompt";
 import { updateJevPromptHandler, updateJevPromptRoute } from "../usecases/updateJevPrompt";
 
@@ -40,7 +36,6 @@ app.openapi(
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 app.openapi(getGeneratedRulesRoute, getGeneratedRulesHandler);
-app.openapi(getClassificationHistoryRoute, getClassificationHistoryHandler);
 app.openapi(getJevPromptRoute, getJevPromptHandler);
 app.openapi(
   updateJevPromptRoute,

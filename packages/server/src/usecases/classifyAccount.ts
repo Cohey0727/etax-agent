@@ -1,6 +1,6 @@
 /**
  * classifyAccount.ts — 勘定科目の判定ユースケース（usecases）。
- * 過去の傾向（学習履歴）→ SystemOne → キーワードルールの順で判定する。
+ * 自動生成ルール → SystemOne（プロンプト）→ キーワードルールの順で判定する。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { createSystemOneClient } from "../gateways/systemOneGateway";

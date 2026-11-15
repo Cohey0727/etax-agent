@@ -1,7 +1,7 @@
 /**
  * recordClassificationFeedback.ts — 科目判定の学習ユースケース（usecases）。
  * ユーザーが確定した「摘要 → 勘定科目」を学習履歴に記録し、
- * 次回以降の判定で「過去の傾向」として優先利用できるようにする。
+ * 生成ルールとプロンプトの材料として使えるようにする。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { recordClassification } from "../repositories/classificationHistoryRepository";

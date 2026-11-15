@@ -12,7 +12,6 @@ export interface ReceiptPanelProps {
 }
 
 const sourceLabels = {
-  history: "過去の傾向（学習履歴）",
   generated: "生成ルール",
   systemone: "SystemOne判定",
   rules: "キーワードルール",
@@ -77,7 +76,7 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
       tax_category: "課対仕入10%",
     };
     onUseTransactions([...transactions, tx]);
-    // 確定した科目は学習履歴に記録し、次回から「過去の傾向」で優先する
+    // 確定した科目は学習履歴に記録し、生成ルールとプロンプトの材料にする
     void recordClassificationFeedback(draft.description, draft.account);
     setAdded(true);
   };
@@ -88,9 +87,9 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
         <Col gap="sm">
           <Text variant="sectionTitle">領収書・レシート画像から帳簿付け</Text>
           <Text variant="muted">
-            画像を選ぶと、AIが日付・金額・支払先を読み取り、勘定科目は過去の傾向と
+            画像を選ぶと、AIが日付・金額・支払先を読み取り、勘定科目は自動生成ルールと
             SystemOne判定で提案します。内容を確認して「帳簿に追加」を押すと取引に加わり、
-            確定した科目は学習されて次回から自動で優先されます。
+            確定した科目は学習されて、生成ルールとプロンプトに反映されます。
           </Text>
           <Row gap="sm" align="center" wrap>
             <input

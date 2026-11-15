@@ -34,7 +34,7 @@ export interface AgentChatResponse {
   error?: string;
 }
 
-export type ClassificationSource = "history" | "generated" | "systemone" | "rules" | "none";
+export type ClassificationSource = "generated" | "systemone" | "rules" | "none";
 
 /** SystemOne（jev）接続設定。APIキーの実値はサーバーから返らない。 */
 export interface SystemOneSettings {
@@ -57,19 +57,6 @@ export interface AgentTestResult {
   model: string | null;
   reply: string | null;
   error: string | null;
-}
-
-/** AIのメモリー: 学習履歴の1件（摘要 → 科目の対応）。 */
-export interface ClassificationHistoryEntry {
-  description: string;
-  account: string;
-  count: number;
-  updatedAt: string;
-}
-
-export interface ClassificationHistory {
-  records: ClassificationHistoryEntry[];
-  total: number;
 }
 
 /** 学習履歴から自動生成される適用ルール。 */

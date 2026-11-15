@@ -14,7 +14,7 @@ export const AccountClassificationSchema = z
   .object({
     account: z.string(),
     confidence: z.number().nullable(),
-    source: z.enum(["history", "generated", "systemone", "rules", "none"]),
+    source: z.enum(["generated", "systemone", "rules", "none"]),
     candidates: z.array(AccountCandidateSchema),
   })
   .openapi("AccountClassification");
@@ -84,24 +84,6 @@ export const GeneratedRulesResponseSchema = z
   .openapi("GeneratedRulesResponse");
 
 export type GeneratedRulesResponse = z.infer<typeof GeneratedRulesResponseSchema>;
-
-export const ClassificationHistoryEntrySchema = z
-  .object({
-    description: z.string(),
-    account: z.string(),
-    count: z.number(),
-    updatedAt: z.string(),
-  })
-  .openapi("ClassificationHistoryEntry");
-
-export const ClassificationHistoryResponseSchema = z
-  .object({
-    records: z.array(ClassificationHistoryEntrySchema),
-    total: z.number(),
-  })
-  .openapi("ClassificationHistoryResponse");
-
-export type ClassificationHistoryResponse = z.infer<typeof ClassificationHistoryResponseSchema>;
 
 export const JevPromptResponseSchema = z
   .object({
