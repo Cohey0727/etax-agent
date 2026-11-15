@@ -1,6 +1,6 @@
 import { IncomeType, Transaction } from "@etax/shared";
 import { useMemo, useState } from "react";
-import { Button, Col, Row, Text } from "@components/atoms";
+import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
 import styles from "./BalanceRecords.css";
 
@@ -36,6 +36,7 @@ export const BalanceRecords = ({ transactions }: BalanceRecordsProps) => {
   if (sorted.length === 0) return null;
 
   return (
+    <Card>
     <Col gap="sm">
       <Text variant="statLabel">対象の取引（帳簿レコード {sorted.length}件）</Text>
       <div>
@@ -103,6 +104,7 @@ export const BalanceRecords = ({ transactions }: BalanceRecordsProps) => {
         </Row>
       ) : null}
     </Col>
+    </Card>
   );
 };
 
