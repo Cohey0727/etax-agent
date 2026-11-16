@@ -1,7 +1,8 @@
 import { sampleTransactions, Transaction } from "@etax/shared";
 import { ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconName } from "@components/atoms";
-import { PageSkeleton } from "@components/molecules";
+import { PageSkeleton, TableSkeleton } from "@components/molecules";
+import { DashboardSkeleton } from "@components/organisms/dashboard";
 import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
 import {
   applyDeductionPatch,
@@ -432,7 +433,13 @@ export const AppPage = () => {
       onNavChildSelect={handleNavChildSelect}
     >
       {ledgerLoading ? (
-        <PageSkeleton />
+        activeView === AppView.Dashboard ? (
+          <DashboardSkeleton year={year} />
+        ) : activeView === AppView.Ledger ? (
+          <TableSkeleton />
+        ) : (
+          <PageSkeleton />
+        )
       ) : (
         <ActiveComponent
           key={viewRefreshKey}
