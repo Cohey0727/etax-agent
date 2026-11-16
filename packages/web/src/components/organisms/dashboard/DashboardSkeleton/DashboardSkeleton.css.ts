@@ -8,6 +8,14 @@ const pulse = keyframes({
 });
 
 const styles = {
+  // 推移グラフのセンタリング（実物は chartWrap で中央寄せ）。
+  chartCenter: style({
+    display: "flex",
+    justifyContent: "center",
+  }),
+  chartInner: style({
+    width: "fit-content",
+  }),
   // 推移グラフの描画域。ベースライン（下辺の罫）に棒を立てる。
   chart: style({
     display: "flex",

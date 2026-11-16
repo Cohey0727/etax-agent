@@ -55,25 +55,27 @@ const TrendSkeleton = () => (
           ))}
         </Row>
       </Row>
-      <div aria-hidden="true">
-        <div className={styles.chart}>
-          {TREND_BAR_HEIGHTS.map((group, groupIndex) => (
-            <div key={groupIndex} className={styles.chartGroup}>
-              {group.map((height, barIndex) => (
-                <div key={barIndex} className={styles.barCol}>
-                  <SkeletonBar width="26px" height={9} />
-                  <SkeletonBar width="30px" height={height} radius={4} />
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className={styles.yearRow}>
-          {TREND_YEARS.map((label) => (
-            <div key={label} className={styles.yearCell}>
-              <Text variant="muted">{label}</Text>
-            </div>
-          ))}
+      <div className={styles.chartCenter} aria-hidden="true">
+        <div className={styles.chartInner}>
+          <div className={styles.chart}>
+            {TREND_BAR_HEIGHTS.map((group, groupIndex) => (
+              <div key={groupIndex} className={styles.chartGroup}>
+                {group.map((height, barIndex) => (
+                  <div key={barIndex} className={styles.barCol}>
+                    <SkeletonBar width="26px" height={9} />
+                    <SkeletonBar width="30px" height={height} radius={4} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className={styles.yearRow}>
+            {TREND_YEARS.map((label) => (
+              <div key={label} className={styles.yearCell}>
+                <Text variant="muted">{label}</Text>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       <div aria-hidden="true">
