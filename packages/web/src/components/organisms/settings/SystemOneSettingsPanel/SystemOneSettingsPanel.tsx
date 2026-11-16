@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
+import { Button, Card, Col, Input, Row, SkeletonBar, Text } from "@components/atoms";
 import { SystemOneSettings } from "@types";
 import { fetchSystemOneSettings, testSystemOneSettings, updateSystemOneSettings } from "@utils";
 
@@ -9,6 +9,9 @@ interface StatusMessage {
   ok: boolean;
   text: string;
 }
+
+/** 読み込み中にフォームの代わりへ出すスケルトンの行数。 */
+const SKELETON_ROWS: readonly number[] = [1, 2, 3];
 
 /**
  * 科目判定（Jev / SystemOne互換）の接続設定カード。
@@ -90,6 +93,28 @@ export const SystemOneSettingsPanel = () => {
       setBusy(null);
     }
   };
+
+  // 保存済み設定の読み込みが終わるまでは、空の設定フォームではなくスケルトンを出す
+  // （空欄を「未設定」と見せないため）。
+  if (!settings) {
+    return (
+      <Card>
+        <Col gap="md">
+          <Text variant="sectionTitle">科目判定（Jev / SystemOne）</Text>
+          {message ? (
+            <Text variant="caption">{message.text}</Text>
+          ) : (
+            SKELETON_ROWS.map((row) => (
+              <Col key={row} gap="sm">
+                <SkeletonBar width="96px" height={12} />
+                <SkeletonBar height={36} />
+              </Col>
+            ))
+          )}
+        </Col>
+      </Card>
+    );
+  }
 
   return (
     <Card>

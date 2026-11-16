@@ -1,6 +1,7 @@
 import { sampleTransactions, Transaction } from "@etax/shared";
 import { ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconName } from "@components/atoms";
+import { PageSkeleton } from "@components/molecules";
 import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
 import {
   applyDeductionPatch,
@@ -168,8 +169,10 @@ export const AppPage = () => {
     initialRoute && appViews.some((view) => view.id === initialRoute.view)
       ? initialRoute.view
       : AppView.Dashboard;
-  const [transactions, setTransactions] = useState<Transaction[]>(sample);
-  const [dataSource, setDataSource] = useState("サンプルデータ");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [dataSource, setDataSource] = useState("帳簿");
+  // 起動時の帳簿読み込みが終わるまではスケルトンを出す（サンプルデータは初期表示に使わない）。
+  const [ledgerLoading, setLedgerLoading] = useState(true);
   const [activeView, setActiveView] = useState<AppView>(initialView);
   const [selectedYear, setSelectedYear] = useState<number>(
     () => initialRoute?.year ?? readStoredYear(),
@@ -227,14 +230,18 @@ export const AppPage = () => {
   const year = years.includes(selectedYear) ? selectedYear : (years[0] ?? new Date().getFullYear());
 
   // 起動時に帳簿（DB）を読み、保存済みの取引があればそれを正として表示する。
-  // 帳簿が未接続・空ならサンプルデータのまま。
+  // 読み込み中はスケルトンを出し、帳簿が未接続・空なら空のままにする
+  // （サンプルデータは取込画面で明示的に読み込む場合だけ使う）。
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const rows = await fetchLedgerTransactions();
-      if (cancelled || !rows || rows.length === 0) return;
-      setTransactions(rows.map(ledgerRowToTransaction));
-      setDataSource("帳簿");
+      if (cancelled) return;
+      if (rows && rows.length > 0) {
+        setTransactions(rows.map(ledgerRowToTransaction));
+        setDataSource("帳簿");
+      }
+      setLedgerLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -424,23 +431,27 @@ export const AppPage = () => {
       activeNavChildKey={filingTab}
       onNavChildSelect={handleNavChildSelect}
     >
-      <ActiveComponent
-        key={viewRefreshKey}
-        transactions={transactions}
-        year={year}
-        onUseTransactions={handleUseImported}
-        onLoadSample={handleLoadSample}
-        onSyncTransactions={handleSyncTransactions}
-        onNavigate={setActiveView}
-        themeMode={themeMode}
-        onThemeModeChange={handleThemeModeChange}
-        sendKeyMode={sendKeyMode}
-        onSendKeyModeChange={handleSendKeyModeChange}
-        agentConnection={agentConnection}
-        onAgentConnectionChange={handleAgentConnectionChange}
-        filingTab={filingTab}
-        onFilingTabChange={setFilingTab}
-      />
+      {ledgerLoading ? (
+        <PageSkeleton />
+      ) : (
+        <ActiveComponent
+          key={viewRefreshKey}
+          transactions={transactions}
+          year={year}
+          onUseTransactions={handleUseImported}
+          onLoadSample={handleLoadSample}
+          onSyncTransactions={handleSyncTransactions}
+          onNavigate={setActiveView}
+          themeMode={themeMode}
+          onThemeModeChange={handleThemeModeChange}
+          sendKeyMode={sendKeyMode}
+          onSendKeyModeChange={handleSendKeyModeChange}
+          agentConnection={agentConnection}
+          onAgentConnectionChange={handleAgentConnectionChange}
+          filingTab={filingTab}
+          onFilingTabChange={setFilingTab}
+        />
+      )}
     </AppTemplate>
   );
 };

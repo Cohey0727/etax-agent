@@ -12,4 +12,5 @@ export * from "./Table";
 export * from "./TableCell";
 export * from "./TableHeaderCell";
 export * from "./LoadingCircle";
+export * from "./SkeletonBar";
 export * from "./hooks/useMediaQuery";

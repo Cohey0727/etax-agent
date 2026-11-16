@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Card, Col, Input, Row, Text } from "@components/atoms";
+import { Card, Col, Input, Row, SkeletonBar, Text } from "@components/atoms";
 import { XtxTaxpayerInput } from "@types";
 import {
   LoadedTaxpayer,
@@ -42,6 +42,9 @@ const PREVIOUS_FIELDS: readonly {
 
 /** 入力が止まってからDBへ保存するまでの待ち時間（ミリ秒）。 */
 const SAVE_DELAY_MS = 600;
+
+/** 読み込み中にフォームの代わりへ出すスケルトンの行数。 */
+const SKELETON_ROWS: readonly number[] = [1, 2, 3, 4, 5, 6];
 
 export interface TaxpayerProfilePanelProps {
   year: number;
@@ -95,6 +98,24 @@ export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
       if (pending) void saveTaxpayer(pending.year, pending.taxpayer);
     }, SAVE_DELAY_MS);
   };
+
+  // 保存済みプロフィールの読み込みが終わるまでは、空のフォームではなくスケルトンを出す
+  // （空欄を「未保存」と見せないため。読み込み前に入力すると上書きされる事故も防ぐ）。
+  if (!loaded) {
+    return (
+      <Card>
+        <Col gap="md">
+          <Text variant="sectionTitle">納税者情報</Text>
+          {SKELETON_ROWS.map((row) => (
+            <Row key={row} gap="sm">
+              <SkeletonBar width="120px" height={14} />
+              <SkeletonBar height={36} />
+            </Row>
+          ))}
+        </Col>
+      </Card>
+    );
+  }
 
   return (
     <Card>
