@@ -11,12 +11,22 @@
  *
  * 様式バージョンは年分ごとに固定: KOA020 は 2023年分=21.0 / 2024年分=22.0 /
  * 2025年分=23.0、KOA210=11.0、KOA220=8.0（手続内帳票対応表の現行セット）。
- * 手続バージョンも年分側に合わせる（2023→21.0.2 / 2024→22.0.1 / 2025→23.1.1）。
+ * 手続バージョンは様式バージョンとは世代が異なり、KOA020 21.0 ⇔ 手続 23.1.1 /
+ * 22.0 ⇔ 24.0.1 / 23.0 ⇔ 25.0.1（手続内帳票対応表（申告）で確認済み）。
+ * 手続・様式の組が対応表に存在しないデータは e-Taxソフト（WEB版）の
+ * 「作成済みデータの利用」で読み込めない（SE00S170）。
+ *
+ * 名前空間は DATA・RKO0010 とも shotoku をデフォルト名前空間とする
+ * （手続スキーマ RKO0010-231.xsd 等の定義どおり）。IT部は ITdefinition.xsd の
+ * シーケンス順に要素を並べ、必須の NOZEISHA_ID（利用者識別番号）と
+ * TETSUZUKI（手続コード）を必ず含める。ZEIMUSHO の子要素名は
+ * gen:zeimusho_CD / gen:zeimusho_NM（先頭小文字、XSDの定義どおり）。
+ * 生成物は公式 XML スキーマ（e-Tax 仕様書「19 XMLスキーマ」）で検証済み。
  *
  * 署名（XML署名）は付けない。e-Taxソフト／WEB版に組み込んだ後、納税者本人が
  * マイナンバーカードで署名して送信する前提のデータである。
- * CATALOG（管理用部分）は仕様書の骨格のみで、帳票の中身は CONTENTS 側が正。
- * 組み込み可否の最終確認は e-Taxソフト側での取り込みテストで行う。
+ * CATALOG（管理用部分）の RDF は CATALOG.xsd が lax のため骨格のみとし、
+ * FORM_SEC には様式IDを列挙する。帳票の中身は CONTENTS 側が正。
  */
 import { DeductionInputs, IncomeTaxResult, MiscIncomeInput } from "./deductions";
 import { CorrectedFigures } from "./taxcalc";
@@ -43,6 +53,8 @@ export interface XtxTaxpayer {
   taxOfficeCode: string;
   /** 個人番号（マイナンバー、12桁）。なければ空文字 */
   myNumber: string;
+  /** 利用者識別番号（e-Tax、16桁）。IT部の必須要素 NOZEISHA_ID に入る */
+  userId: string;
   /** 職業。なければ空文字 */
   occupation: string;
   /** 屋号・雅号。なければ空文字 */
@@ -62,6 +74,7 @@ export const EMPTY_XTX_TAXPAYER: XtxTaxpayer = {
   taxOfficeName: "",
   taxOfficeCode: "",
   myNumber: "",
+  userId: "",
   occupation: "",
   shopName: "",
   jan1Address: "",
@@ -104,9 +117,9 @@ interface YearVersions {
 
 /** 年分 → 手続バージョン / KOA020 様式バージョン。対応外の年は生成できない。 */
 const YEAR_VERSIONS: Record<number, YearVersions> = {
-  2023: { procedure: "21.0.2", koa020: "21.0" },
-  2024: { procedure: "22.0.1", koa020: "22.0" },
-  2025: { procedure: "23.1.1", koa020: "23.0" },
+  2023: { procedure: "23.1.1", koa020: "21.0" },
+  2024: { procedure: "24.0.1", koa020: "22.0" },
+  2025: { procedure: "25.0.1", koa020: "23.0" },
 };
 
 const KOA210_VR = "11.0";
@@ -221,27 +234,47 @@ export function zipXml(zipCode: string): string {
 // IT部
 // ---------------------------------------------------------------------------
 
-function buildIt(data: XtxFilingData): string {
-  const t = data.taxpayer;
-  const items: string[] = [];
-  items.push(`<NENBUN ID="NENBUN">${eraYearXml(data.year)}</NENBUN>`);
-  items.push(
-    `<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>${data.amendment ? 2 : 1}</kubun_CD></SHINKOKU_KBN>`,
-  );
-  if (t.taxOfficeName) {
-    const cd = t.taxOfficeCode ? `<gen:ZEIMUSHO_CD>${esc(t.taxOfficeCode)}</gen:ZEIMUSHO_CD>` : "";
-    items.push(
-      `<ZEIMUSHO ID="ZEIMUSHO">${cd}<gen:ZEIMUSHO_NM>${esc(t.taxOfficeName)}</gen:ZEIMUSHO_NM></ZEIMUSHO>`,
+/**
+ * IT部の必須項目（ITdefinition.xsd で必須の要素に対応する納税者情報）が
+ * 欠けていれば例外を投げる。欠けたまま生成すると e-Tax 側で読み込めない。
+ */
+export function assertXtxTaxpayer(t: XtxTaxpayer): void {
+  const missing: string[] = [];
+  if (!t.name) missing.push("氏名");
+  if (!t.address) missing.push("住所");
+  if (!t.taxOfficeName || !t.taxOfficeCode) missing.push("提出先税務署（名称・コード）");
+  if (!t.userId.replace(/\D/g, "")) missing.push("利用者識別番号");
+  if (missing.length > 0) {
+    throw new Error(
+      `XTX出力に必要な納税者情報が不足しています: ${missing.join("、")}（納税者情報で入力してください）`,
     );
   }
+}
+
+/** 税務署要素（ZEIMUSHO）。子要素名は XSD 定義どおり先頭小文字の zeimusho_CD / zeimusho_NM。 */
+export function zeimushoXml(t: XtxTaxpayer): string {
+  const cd = t.taxOfficeCode
+    ? `<gen:zeimusho_CD>${esc(t.taxOfficeCode)}</gen:zeimusho_CD>`
+    : "";
+  return `<ZEIMUSHO ID="ZEIMUSHO">${cd}<gen:zeimusho_NM>${esc(t.taxOfficeName)}</gen:zeimusho_NM></ZEIMUSHO>`;
+}
+
+/** 利用者識別番号要素（NOZEISHA_ID、IT部の必須要素）。数字のみを取り出す。 */
+export function nozeishaIdXml(t: XtxTaxpayer): string {
+  const digits = t.userId.replace(/\D/g, "");
+  if (!digits) return "";
+  return `<NOZEISHA_ID ID="NOZEISHA_ID">${esc(digits)}</NOZEISHA_ID>`;
+}
+
+function buildIt(data: XtxFilingData): string {
+  const t = data.taxpayer;
+  // ITdefinition.xsd の ITtype シーケンス順に並べる（順序が違うと検証エラー）。
+  const items: string[] = [];
+  if (t.taxOfficeName) items.push(zeimushoXml(t));
   const sub = yymmddXml(data.submissionDate);
   if (sub) items.push(`<TEISYUTSU_DAY ID="TEISYUTSU_DAY">${sub}</TEISYUTSU_DAY>`);
-  const zip = zipXml(t.zipCode);
-  if (zip) items.push(`<NOZEISHA_ZIP ID="NOZEISHA_ZIP">${zip}</NOZEISHA_ZIP>`);
-  if (t.address) items.push(`<NOZEISHA_ADR ID="NOZEISHA_ADR">${esc(t.address)}</NOZEISHA_ADR>`);
-  if (t.jan1Address) {
-    items.push(`<ICHIGATSUIPPI_ADR ID="ICHIGATSUIPPI_ADR">${esc(t.jan1Address)}</ICHIGATSUIPPI_ADR>`);
-  }
+  const uid = nozeishaIdXml(t);
+  if (uid) items.push(uid);
   if (t.myNumber) {
     items.push(
       `<NOZEISHA_BANGO ID="NOZEISHA_BANGO"><gen:kojinbango>${esc(t.myNumber)}</gen:kojinbango></NOZEISHA_BANGO>`,
@@ -249,12 +282,23 @@ function buildIt(data: XtxFilingData): string {
   }
   if (t.nameKana) items.push(`<NOZEISHA_NM_KN ID="NOZEISHA_NM_KN">${esc(t.nameKana)}</NOZEISHA_NM_KN>`);
   if (t.name) items.push(`<NOZEISHA_NM ID="NOZEISHA_NM">${esc(t.name)}</NOZEISHA_NM>`);
-  if (t.occupation) items.push(`<SHOKUGYO ID="SHOKUGYO">${esc(t.occupation)}</SHOKUGYO>`);
+  const zip = zipXml(t.zipCode);
+  if (zip) items.push(`<NOZEISHA_ZIP ID="NOZEISHA_ZIP">${zip}</NOZEISHA_ZIP>`);
+  if (t.address) items.push(`<NOZEISHA_ADR ID="NOZEISHA_ADR">${esc(t.address)}</NOZEISHA_ADR>`);
+  if (t.jan1Address) {
+    items.push(`<ICHIGATSUIPPI_ADR ID="ICHIGATSUIPPI_ADR">${esc(t.jan1Address)}</ICHIGATSUIPPI_ADR>`);
+  }
   if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${esc(t.shopName)}</NOZEISHA_YAGO>`);
-  const birth = yymmddXml(t.birthDate);
-  if (birth) items.push(`<BIRTHDAY ID="BIRTHDAY">${birth}</BIRTHDAY>`);
   const tel = phoneXml(t.phone);
   if (tel) items.push(`<NOZEISHA_TEL ID="NOZEISHA_TEL">${tel}</NOZEISHA_TEL>`);
+  const birth = yymmddXml(t.birthDate);
+  if (birth) items.push(`<BIRTHDAY ID="BIRTHDAY">${birth}</BIRTHDAY>`);
+  if (t.occupation) items.push(`<SHOKUGYO ID="SHOKUGYO">${esc(t.occupation)}</SHOKUGYO>`);
+  items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>RKO0010</procedure_CD></TETSUZUKI>`);
+  items.push(`<NENBUN ID="NENBUN">${eraYearXml(data.year)}</NENBUN>`);
+  items.push(
+    `<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>${data.amendment ? 2 : 1}</kubun_CD></SHINKOKU_KBN>`,
+  );
   return `<IT VR="1.0" id="IT">${items.join("")}</IT>`;
 }
 
@@ -611,16 +655,19 @@ export function buildXtxFiling(data: XtxFilingData): string {
       `XTX出力に対応していない年分です: ${data.year}（対応: ${xtxSupportedYears().join(", ")}）`,
     );
   }
+  assertXtxTaxpayer(data.taxpayer);
   const t = data.taxpayer;
-  const forms: string[] = [];
-  forms.push(
-    `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(data)}${buildKoa020Face2(data)}</KOA020>`,
-  );
+  const forms: { id: string; xml: string }[] = [];
+  forms.push({
+    id: "KOA020",
+    xml:
+      `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(data)}${buildKoa020Face2(data)}</KOA020>`,
+  });
   if (data.figures.business_revenue > 0 || data.figures.business_expenses > 0) {
-    forms.push(buildKoa210(data));
+    forms.push({ id: "KOA210", xml: buildKoa210(data) });
   }
   if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0) {
-    forms.push(buildKoa220(data));
+    forms.push({ id: "KOA220", xml: buildKoa220(data) });
   }
 
   const catalog =
@@ -629,7 +676,7 @@ export function buildXtxFiling(data: XtxFilingData): string {
     `<rdf:Description ID="REPORT">` +
     `<SEND_DATA/>` +
     `<IT_SEC/>` +
-    `<FORM_SEC><rdf:Seq>${forms.map(() => "<rdf:li/>").join("")}</rdf:Seq></FORM_SEC>` +
+    `<FORM_SEC><rdf:Seq>${forms.map((f) => `<rdf:li>${f.id}</rdf:li>`).join("")}</rdf:Seq></FORM_SEC>` +
     `<TENPU_SEC/>` +
     `<XBRL_SEC/>` +
     `<XBRL2_1_SEC/>` +
@@ -640,10 +687,10 @@ export function buildXtxFiling(data: XtxFilingData): string {
 
   return (
     `<?xml version="1.0" encoding="UTF-8" ?>\n` +
-    `<DATA id="DATA">` +
-    `<RKO0010 VR="${versions.procedure}" id="RKO0010" xmlns="http://xml.e-tax.nta.go.jp/XSD/kyotsu" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
+    `<DATA id="DATA" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">` +
+    `<RKO0010 VR="${versions.procedure}" id="RKO0010" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
     catalog +
-    `<CONTENTS id="CONTENTS">${buildIt(data)}${forms.join("")}</CONTENTS>` +
+    `<CONTENTS id="CONTENTS">${buildIt(data)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
     `</RKO0010></DATA>`
   );
 }

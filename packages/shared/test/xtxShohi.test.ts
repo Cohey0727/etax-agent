@@ -18,6 +18,7 @@ const TAXPAYER = {
   taxOfficeName: "尾道",
   taxOfficeCode: "08121",
   myNumber: "",
+  userId: "1234567890123456",
   occupation: "システムエンジニア",
   shopName: "",
   jan1Address: "",
@@ -87,7 +88,7 @@ describe("buildConsumptionXtx", () => {
       originalNational: null,
       originalLocal: null,
     });
-    expect(xtx).toContain('<RSH0010 VR="26.0"');
+    expect(xtx).toContain('<RSH0010 VR="26.0.0"');
     expect(xtx).toContain('<SHA010 VR="10.0"');
     expect(xtx).toContain('<SHB017 VR="2.0"');
     expect(xtx).toContain('<SHB033 VR="2.0"');
@@ -120,6 +121,38 @@ describe("buildConsumptionXtx", () => {
     expect(xtx).toContain("<AAM00020><kubun_CD>2</kubun_CD></AAM00020>");
     expect(xtx).toContain("<DTG00170>9090</DTG00170>");
     expect(xtx).not.toContain("<DTF00000>");
+  });
+
+  test("仕様適合: 名前空間・IT部の並び順と必須要素・FORM_SEC", () => {
+    const values = input({ salesIncl10: 15_352_564, purchasesIncl10: 4_496_249 });
+    const xtx = buildConsumptionXtx({
+      taxpayer: TAXPAYER,
+      periodFrom: "2025-01-01",
+      periodTo: "2025-12-31",
+      submissionDate: "2026-11-15",
+      filingKind: 1,
+      basePeriodSalesThousands: 11_345,
+      input: values,
+      result: computeConsumptionReturn(values),
+      originalNational: null,
+      originalLocal: null,
+    });
+    expect(xtx).toContain('<DATA id="DATA" xmlns="http://xml.e-tax.nta.go.jp/XSD/shohi">');
+    const order = [
+      "ZEIMUSHO", "TEISYUTSU_DAY", "NOZEISHA_ID", "NOZEISHA_NM_KN", "NOZEISHA_NM",
+      "NOZEISHA_ZIP", "NOZEISHA_ADR", "NOZEISHA_TEL",
+      "TETSUZUKI", "KAZEI_KIKAN_FROM", "KAZEI_KIKAN_TO", "SHINKOKU_KBN",
+    ];
+    const positions = order.map((tag) => xtx.indexOf(`<${tag} ID=`));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(xtx).toContain('<NOZEISHA_ID ID="NOZEISHA_ID">1234567890123456</NOZEISHA_ID>');
+    expect(xtx).toContain('<TETSUZUKI ID="TETSUZUKI"><procedure_CD>RSH0010</procedure_CD></TETSUZUKI>');
+    expect(xtx).toContain("<gen:zeimusho_CD>08121</gen:zeimusho_CD>");
+    expect(xtx).not.toContain("<gen:ZEIMUSHO_CD>");
+    expect(xtx).toContain("<rdf:li>SHA010</rdf:li>");
+    expect(xtx).toContain("<rdf:li>SHB017</rdf:li>");
+    expect(xtx).toContain("<rdf:li>SHB033</rdf:li>");
   });
 });
 

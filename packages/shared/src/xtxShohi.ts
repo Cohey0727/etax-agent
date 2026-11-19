@@ -1,11 +1,14 @@
 /**
 * xtxShohi.ts — 消費税申告書（一般用・本則）の e-Tax 申告等データ（XTX）生成。
 *
-* 手続 RSH0010（消費税及び地方消費税申告（一般・個人）、VR 26.0）に
+* 手続 RSH0010（消費税及び地方消費税申告（一般・個人）、VR 26.0.0）に
 * SHA010（申告書（一般用）VR 10.0）+ SHB017（付表1-3 VR 2.0）+
-* SHB033（付表2-3 VR 2.0）を組み込む。仕様根拠は e-Tax 仕様書
+* SHB033（付表2-3 VR 2.0）を組み込む。手続バージョンは仕様書の
+* 3桁表記（XX.X.X）で書く。仕様根拠は e-Tax 仕様書
 * 項番11（XML構造設計書及び帳票フィールド仕様書）と
-* 項番19（XMLスキーマ shohi）の XSD。
+* 項番19（XMLスキーマ shohi）の XSD。名前空間・IT部の並び順・
+* 必須要素（NOZEISHA_ID・TETSUZUKI）は所得税側（xtx.ts）と共通の
+* 規則に従い、生成物は公式 XSD で検証済み。
 *
 * 対象は税率10%・8%（軽減）の本則課税のみ。経過措置対象課税資産の
 * 譲渡等を含む期間（付表1-1/1-2・2-1/2-2）や簡易課税（SHA020）には
@@ -16,11 +19,14 @@ import {
 XtxTaxpayer,
 amount,
 amountAlways,
+assertXtxTaxpayer,
 esc,
 kubun,
+nozeishaIdXml,
 phoneXml,
 ref,
 yymmddXml,
+zeimushoXml,
 zipXml,
 } from "./xtx";
 import { Transaction } from "./types";
@@ -359,25 +365,13 @@ originalLocal: number | null;
 
 function buildShohiIt(data: ConsumptionXtxData): string {
 const t = data.taxpayer;
+// ITdefinition.xsd の ITtype シーケンス順に並べる（xtx.ts の buildIt と同じ規則）。
 const items: string[] = [];
-items.push(
-`<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>${data.filingKind}</kubun_CD></SHINKOKU_KBN>`,
-);
-if (t.taxOfficeName) {
-const cd = t.taxOfficeCode? `<gen:ZEIMUSHO_CD>${esc(t.taxOfficeCode)}</gen:ZEIMUSHO_CD>`: "";
-items.push(
-`<ZEIMUSHO ID="ZEIMUSHO">${cd}<gen:ZEIMUSHO_NM>${esc(t.taxOfficeName)}</gen:ZEIMUSHO_NM></ZEIMUSHO>`,
-);
-}
+if (t.taxOfficeName) items.push(zeimushoXml(t));
 const sub = yymmddXml(data.submissionDate);
 if (sub) items.push(`<TEISYUTSU_DAY ID="TEISYUTSU_DAY">${sub}</TEISYUTSU_DAY>`);
-const from = yymmddXml(data.periodFrom);
-if (from) items.push(`<KAZEI_KIKAN_FROM ID="KAZEI_KIKAN_FROM">${from}</KAZEI_KIKAN_FROM>`);
-const to = yymmddXml(data.periodTo);
-if (to) items.push(`<KAZEI_KIKAN_TO ID="KAZEI_KIKAN_TO">${to}</KAZEI_KIKAN_TO>`);
-const zip = zipXml(t.zipCode);
-if (zip) items.push(`<NOZEISHA_ZIP ID="NOZEISHA_ZIP">${zip}</NOZEISHA_ZIP>`);
-if (t.address) items.push(`<NOZEISHA_ADR ID="NOZEISHA_ADR">${esc(t.address)}</NOZEISHA_ADR>`);
+const uid = nozeishaIdXml(t);
+if (uid) items.push(uid);
 if (t.myNumber) {
 items.push(
 `<NOZEISHA_BANGO ID="NOZEISHA_BANGO"><gen:kojinbango>${esc(t.myNumber)}</gen:kojinbango></NOZEISHA_BANGO>`,
@@ -385,9 +379,20 @@ items.push(
 }
 if (t.nameKana) items.push(`<NOZEISHA_NM_KN ID="NOZEISHA_NM_KN">${esc(t.nameKana)}</NOZEISHA_NM_KN>`);
 if (t.name) items.push(`<NOZEISHA_NM ID="NOZEISHA_NM">${esc(t.name)}</NOZEISHA_NM>`);
+const zip = zipXml(t.zipCode);
+if (zip) items.push(`<NOZEISHA_ZIP ID="NOZEISHA_ZIP">${zip}</NOZEISHA_ZIP>`);
+if (t.address) items.push(`<NOZEISHA_ADR ID="NOZEISHA_ADR">${esc(t.address)}</NOZEISHA_ADR>`);
 if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${esc(t.shopName)}</NOZEISHA_YAGO>`);
 const tel = phoneXml(t.phone);
 if (tel) items.push(`<NOZEISHA_TEL ID="NOZEISHA_TEL">${tel}</NOZEISHA_TEL>`);
+items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>RSH0010</procedure_CD></TETSUZUKI>`);
+const from = yymmddXml(data.periodFrom);
+if (from) items.push(`<KAZEI_KIKAN_FROM ID="KAZEI_KIKAN_FROM">${from}</KAZEI_KIKAN_FROM>`);
+const to = yymmddXml(data.periodTo);
+if (to) items.push(`<KAZEI_KIKAN_TO ID="KAZEI_KIKAN_TO">${to}</KAZEI_KIKAN_TO>`);
+items.push(
+`<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>${data.filingKind}</kubun_CD></SHINKOKU_KBN>`,
+);
 return `<IT VR="1.0" id="IT">${items.join("")}</IT>`;
 }
 
@@ -619,14 +624,19 @@ parts.join("") +
 * 生成物は署名なしの組み込み用データで、送信は e-Tax 側で本人が行う。
 */
 export function buildConsumptionXtx(data: ConsumptionXtxData): string {
-const forms = [buildSha010(data), buildShb017(data), buildShb033(data)];
+assertXtxTaxpayer(data.taxpayer);
+const forms: { id: string; xml: string }[] = [
+{ id: "SHA010", xml: buildSha010(data) },
+{ id: "SHB017", xml: buildShb017(data) },
+{ id: "SHB033", xml: buildShb033(data) },
+];
 const catalog =
 `<CATALOG id="CATALOG">` +
 `<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
 `<rdf:Description ID="REPORT">` +
 `<SEND_DATA/>` +
 `<IT_SEC/>` +
-`<FORM_SEC><rdf:Seq>${forms.map(() => "<rdf:li/>").join("")}</rdf:Seq></FORM_SEC>` +
+`<FORM_SEC><rdf:Seq>${forms.map((f) => `<rdf:li>${f.id}</rdf:li>`).join("")}</rdf:Seq></FORM_SEC>` +
 `<TENPU_SEC/>` +
 `<XBRL_SEC/>` +
 `<XBRL2_1_SEC/>` +
@@ -636,10 +646,10 @@ const catalog =
 `</rdf:Description></rdf:RDF></CATALOG>`;
 return (
 `<?xml version="1.0" encoding="UTF-8"?>\n` +
-`<DATA id="DATA">` +
-`<RSH0010 VR="26.0" id="RSH0010" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
+`<DATA id="DATA" xmlns="${SHOHI_NS}">` +
+`<RSH0010 VR="26.0.0" id="RSH0010" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
 catalog +
-`<CONTENTS id="CONTENTS">${buildShohiIt(data)}${forms.join("")}</CONTENTS>` +
+`<CONTENTS id="CONTENTS">${buildShohiIt(data)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
 `</RSH0010></DATA>`
 );
 }

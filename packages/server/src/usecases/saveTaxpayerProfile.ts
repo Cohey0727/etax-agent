@@ -70,6 +70,7 @@ export const saveTaxpayerProfileHandler: RouteHandler<typeof saveTaxpayerProfile
     tax_office_name: parsed.data.tax_office_name ?? "",
     tax_office_code: parsed.data.tax_office_code ?? "",
     my_number: parsed.data.my_number ?? "",
+    user_id: parsed.data.user_id ?? "",
     occupation: parsed.data.occupation ?? "",
     shop_name: parsed.data.shop_name ?? "",
     jan1_address: parsed.data.jan1_address ?? "",

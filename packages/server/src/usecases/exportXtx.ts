@@ -83,6 +83,7 @@ export function toTaxpayer(t: ExportXtxRequest["taxpayer"]): XtxTaxpayer {
     taxOfficeName: t.tax_office_name,
     taxOfficeCode: t.tax_office_code,
     myNumber: t.my_number,
+    userId: t.user_id,
     occupation: t.occupation,
     shopName: t.shop_name,
     jan1Address: t.jan1_address,

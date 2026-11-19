@@ -190,6 +190,8 @@ export interface XtxTaxpayerInput {
   tax_office_name: string;
   tax_office_code: string;
   my_number: string;
+  /** 利用者識別番号（e-Tax、16桁）。XTX の IT 部必須要素 NOZEISHA_ID 用。 */
+  user_id: string;
   occupation: string;
   shop_name: string;
   jan1_address: string;

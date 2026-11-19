@@ -65,8 +65,9 @@ function buildSample(amendment: boolean) {
       birthDate: "1980-04-01",
       phone: "080-2500-7879",
       taxOfficeName: "尾道",
-      taxOfficeCode: "",
+      taxOfficeCode: "08121",
       myNumber: "",
+      userId: "1234567890123456",
       occupation: "システムエンジニア",
       shopName: "",
       jan1Address: "",
@@ -102,7 +103,7 @@ describe("buildXtxFiling", () => {
 
   test("修正申告のXTXに手続・様式バージョンと主要金額が入る", () => {
     const xtx = buildSample(true);
-    expect(xtx).toContain('<RKO0010 VR="21.0.2"');
+    expect(xtx).toContain('<RKO0010 VR="23.1.1"');
     expect(xtx).toContain('<KOA020 VR="21.0"');
     expect(xtx).toContain('<KOA210 VR="11.0"');
     expect(xtx).toContain('<KOA220 VR="8.0"');
@@ -152,8 +153,8 @@ describe("buildXtxFiling", () => {
       taxpayer: {
         name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
         address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
-        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "",
-        myNumber: "", occupation: "システムエンジニア", shopName: "", jan1Address: "",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+        myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア", shopName: "", jan1Address: "",
       },
       figures,
       deductionInputs: deductions,
@@ -193,6 +194,7 @@ describe("buildXtxFiling", () => {
           taxOfficeName: "",
           taxOfficeCode: "",
           myNumber: "",
+          userId: "",
           occupation: "",
           shopName: "",
           jan1Address: "",
@@ -229,8 +231,8 @@ describe("buildXtxFiling", () => {
       taxpayer: {
         name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
         address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
-        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "",
-        myNumber: "", occupation: "システムエンジニア", shopName: "", jan1Address: "",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+        myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア", shopName: "", jan1Address: "",
       },
       figures,
       deductionInputs: EMPTY_DEDUCTION_INPUTS,
@@ -249,5 +251,114 @@ describe("buildXtxFiling", () => {
     expect(xtx).toContain("<ABB01130>175122</ABB01130>");
     // 合計⑫ = 事業所得（12,000,000 − 青色650,000）+ 雑 175,122
     expect(xtx).toContain("<ABB00410>11525122</ABB00410>");
+  });
+});
+
+/** 年分だけ変えた最小の申告データ（バージョン・構造の確認用）。 */
+function buildMinimal(year: number) {
+  const transactions: Transaction[] = [
+    tx({ date: `${year}-06-15`, year, description: "事業売上", amount: 12_000_000, category: "売上高", income_type: "business" }),
+  ];
+  const figures = computeCorrectedFigures(transactions, year);
+  const tax = computeIncomeTax({
+    year,
+    totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+    deductions: EMPTY_DEDUCTION_INPUTS,
+    taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+  });
+  return buildXtxFiling({
+    year,
+    amendment: false,
+    submissionDate: "2026-11-20",
+    taxpayer: {
+      name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+      address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+      phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+      myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア",
+      shopName: "", jan1Address: "",
+    },
+    figures,
+    deductionInputs: EMPTY_DEDUCTION_INPUTS,
+    miscIncome: EMPTY_MISC_INCOME,
+    tax,
+    categoryTotals: { business: {}, realEstate: {} },
+    withholdingTax: 0,
+    prepaidTax: 0,
+    originalThirdPeriodTax: null,
+  });
+}
+
+describe("buildXtxFiling の仕様適合（公式XMLスキーマ準拠）", () => {
+  test("手続バージョンは手続内帳票対応表の組（様式より2世代先）", () => {
+    expect(buildMinimal(2023)).toContain('<RKO0010 VR="23.1.1"');
+    expect(buildMinimal(2023)).toContain('<KOA020 VR="21.0"');
+    expect(buildMinimal(2024)).toContain('<RKO0010 VR="24.0.1"');
+    expect(buildMinimal(2024)).toContain('<KOA020 VR="22.0"');
+    expect(buildMinimal(2025)).toContain('<RKO0010 VR="25.0.1"');
+    expect(buildMinimal(2025)).toContain('<KOA020 VR="23.0"');
+  });
+
+  test("DATA・RKO0010 のデフォルト名前空間は shotoku", () => {
+    const xtx = buildMinimal(2023);
+    expect(xtx).toContain('<DATA id="DATA" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">');
+    expect(xtx).toContain('xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku" xmlns:gen=');
+    expect(xtx).not.toContain("XSD/kyotsu");
+  });
+
+  test("IT部は ITdefinition.xsd のシーケンス順で必須要素を含む", () => {
+    const xtx = buildSample(true);
+    const order = [
+      "ZEIMUSHO", "TEISYUTSU_DAY", "NOZEISHA_ID", "NOZEISHA_NM_KN", "NOZEISHA_NM",
+      "NOZEISHA_ZIP", "NOZEISHA_ADR", "NOZEISHA_TEL", "BIRTHDAY", "SHOKUGYO",
+      "TETSUZUKI", "NENBUN", "SHINKOKU_KBN",
+    ];
+    const positions = order.map((tag) => xtx.indexOf(`<${tag} ID=`));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(xtx).toContain('<NOZEISHA_ID ID="NOZEISHA_ID">1234567890123456</NOZEISHA_ID>');
+    expect(xtx).toContain('<TETSUZUKI ID="TETSUZUKI"><procedure_CD>RKO0010</procedure_CD></TETSUZUKI>');
+    // ZEIMUSHO の子要素名は XSD 定義どおり先頭小文字
+    expect(xtx).toContain("<gen:zeimusho_CD>08121</gen:zeimusho_CD>");
+    expect(xtx).toContain("<gen:zeimusho_NM>尾道</gen:zeimusho_NM>");
+    expect(xtx).not.toContain("<gen:ZEIMUSHO_CD>");
+    expect(xtx).not.toContain("<gen:ZEIMUSHO_NM>");
+  });
+
+  test("CATALOG の FORM_SEC に様式IDを列挙する", () => {
+    const xtx = buildSample(true);
+    expect(xtx).toContain("<rdf:li>KOA020</rdf:li>");
+    expect(xtx).toContain("<rdf:li>KOA210</rdf:li>");
+    expect(xtx).toContain("<rdf:li>KOA220</rdf:li>");
+  });
+
+  test("利用者識別番号が無ければ例外（IT部の必須要素）", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
+    const tax = computeIncomeTax({
+      year: 2023,
+      totalIncome: 0,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    expect(() =>
+      buildXtxFiling({
+        year: 2023,
+        amendment: false,
+        submissionDate: "2026-11-20",
+        taxpayer: {
+          name: "テスト太郎", nameKana: "", zipCode: "", address: "広島県尾道市向東町3567-1",
+          addressLine2: "", birthDate: "", phone: "", taxOfficeName: "尾道",
+          taxOfficeCode: "08121", myNumber: "", userId: "", occupation: "",
+          shopName: "", jan1Address: "",
+        },
+        figures,
+        deductionInputs: EMPTY_DEDUCTION_INPUTS,
+        miscIncome: EMPTY_MISC_INCOME,
+        tax,
+        categoryTotals: { business: {}, realEstate: {} },
+        withholdingTax: 0,
+        prepaidTax: 0,
+        originalThirdPeriodTax: null,
+      }),
+    ).toThrow(/利用者識別番号/);
   });
 });

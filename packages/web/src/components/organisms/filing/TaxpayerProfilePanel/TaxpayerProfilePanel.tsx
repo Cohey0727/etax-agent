@@ -28,6 +28,7 @@ const TEXT_FIELDS: readonly {
   { key: "jan1_address", label: "1月1日の住所（任意）", placeholder: "現住所と違う場合のみ" },
   { key: "invoice_number", label: "インボイス登録番号", placeholder: "T1234567890123" },
   { key: "my_number", label: "個人番号（任意）", placeholder: "マイナンバー12桁" },
+  { key: "user_id", label: "利用者識別番号", placeholder: "e-Taxの16桁" },
 ];
 
 /** 異動・変更前の納税地（納税地の異動申出書の出力に使う）。 */

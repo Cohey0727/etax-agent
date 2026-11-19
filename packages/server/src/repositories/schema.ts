@@ -83,6 +83,8 @@ export const taxpayerProfilesTable = sqliteTable("taxpayer_profiles", {
   taxOfficeName: text("tax_office_name").notNull().default(""),
   taxOfficeCode: text("tax_office_code").notNull().default(""),
   myNumber: text("my_number").notNull().default(""),
+  /** 利用者識別番号（e-Tax、16桁）。XTX の IT 部必須要素 NOZEISHA_ID 用。 */
+  userId: text("user_id").notNull().default(""),
   occupation: text("occupation").notNull().default(""),
   shopName: text("shop_name").notNull().default(""),
   jan1Address: text("jan1_address").notNull().default(""),

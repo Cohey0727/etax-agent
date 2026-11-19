@@ -125,6 +125,7 @@ export async function ensureTables(): Promise<void> {
       tax_office_name text NOT NULL DEFAULT '',
       tax_office_code text NOT NULL DEFAULT '',
       my_number text NOT NULL DEFAULT '',
+      user_id text NOT NULL DEFAULT '',
       occupation text NOT NULL DEFAULT '',
       shop_name text NOT NULL DEFAULT '',
       jan1_address text NOT NULL DEFAULT '',
@@ -141,6 +142,9 @@ export async function ensureTables(): Promise<void> {
   }
   if (!taxpayerColumns.some((c) => c.name === "previous_address")) {
     db.run(sql`ALTER TABLE taxpayer_profiles ADD COLUMN previous_address text NOT NULL DEFAULT ''`);
+  }
+  if (!taxpayerColumns.some((c) => c.name === "user_id")) {
+    db.run(sql`ALTER TABLE taxpayer_profiles ADD COLUMN user_id text NOT NULL DEFAULT ''`);
   }
   db.run(sql`
     CREATE TABLE IF NOT EXISTS filing_snapshots (

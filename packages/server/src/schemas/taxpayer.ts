@@ -19,6 +19,8 @@ export const TaxpayerProfileSchema = z
     tax_office_name: z.string(),
     tax_office_code: z.string(),
     my_number: z.string(),
+    /** 利用者識別番号（e-Tax、16桁）。XTX の IT 部必須要素 NOZEISHA_ID 用。 */
+    user_id: z.string(),
     occupation: z.string(),
     shop_name: z.string(),
     jan1_address: z.string(),
