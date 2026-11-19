@@ -5,4 +5,5 @@ export * from "./deductions";
 export * from "./ledger";
 export * from "./sample";
 export * from "./xtx";
+export * from "./taxpayerNormalize";
 export * from "./xtxShohi";

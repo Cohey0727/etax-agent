@@ -19,7 +19,6 @@ import {
 XtxTaxpayer,
 amount,
 amountAlways,
-assertXtxTaxpayer,
 esc,
 kubun,
 nozeishaIdXml,
@@ -29,6 +28,7 @@ yymmddXml,
 zeimushoXml,
 zipXml,
 } from "./xtx";
+import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
 import { Transaction } from "./types";
 
 const SOFT_NAME = "eTaxAgent";
@@ -624,11 +624,19 @@ parts.join("") +
 * 生成物は署名なしの組み込み用データで、送信は e-Tax 側で本人が行う。
 */
 export function buildConsumptionXtx(data: ConsumptionXtxData): string {
-assertXtxTaxpayer(data.taxpayer);
+// 納税者情報は正規化＋完全性検証を通してから使う。欠けていれば例外で止まり、
+// 部分的なXTXは決して出ない（taxpayerNormalize が恒常対策の正本）。
+const taxpayer = normalizeXtxTaxpayer(data.taxpayer, {
+submissionDate: data.submissionDate,
+periodFrom: data.periodFrom,
+periodTo: data.periodTo,
+filingKind: data.filingKind,
+});
+const normalized: ConsumptionXtxData = { ...data, taxpayer };
 const forms: { id: string; xml: string }[] = [
-{ id: "SHA010", xml: buildSha010(data) },
-{ id: "SHB017", xml: buildShb017(data) },
-{ id: "SHB033", xml: buildShb033(data) },
+{ id: "SHA010", xml: buildSha010(normalized) },
+{ id: "SHB017", xml: buildShb017(normalized) },
+{ id: "SHB033", xml: buildShb033(normalized) },
 ];
 const catalog =
 `<CATALOG id="CATALOG">` +
@@ -649,7 +657,7 @@ return (
 `<DATA id="DATA" xmlns="${SHOHI_NS}">` +
 `<RSH0010 VR="26.0.0" id="RSH0010" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
 catalog +
-`<CONTENTS id="CONTENTS">${buildShohiIt(data)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
+`<CONTENTS id="CONTENTS">${buildShohiIt(normalized)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
 `</RSH0010></DATA>`
 );
 }

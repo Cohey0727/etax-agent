@@ -30,8 +30,15 @@
  */
 import { DeductionInputs, IncomeTaxResult, MiscIncomeInput } from "./deductions";
 import { CorrectedFigures } from "./taxcalc";
+import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
 
-/** 納税者情報（XTXのIT部と申告書見出し部に入る）。すべて任意項目は空文字で省略できる。 */
+/**
+ * 納税者情報（XTXのIT部と申告書見出し部に入る）。
+ * 氏名・フリガナ・郵便番号・住所・電話番号・税務署（名称・コード）・
+ * 利用者識別番号は必須で、生成時に taxpayerNormalize で正規化と
+ * 完全性検証を通す（欠けていれば生成自体が例外で止まる）。
+ * それ以外の任意項目は空文字で省略できる。
+ */
 export interface XtxTaxpayer {
   /** 氏名 */
   name: string;
@@ -233,23 +240,6 @@ export function zipXml(zipCode: string): string {
 // ---------------------------------------------------------------------------
 // IT部
 // ---------------------------------------------------------------------------
-
-/**
- * IT部の必須項目（ITdefinition.xsd で必須の要素に対応する納税者情報）が
- * 欠けていれば例外を投げる。欠けたまま生成すると e-Tax 側で読み込めない。
- */
-export function assertXtxTaxpayer(t: XtxTaxpayer): void {
-  const missing: string[] = [];
-  if (!t.name) missing.push("氏名");
-  if (!t.address) missing.push("住所");
-  if (!t.taxOfficeName || !t.taxOfficeCode) missing.push("提出先税務署（名称・コード）");
-  if (!t.userId.replace(/\D/g, "")) missing.push("利用者識別番号");
-  if (missing.length > 0) {
-    throw new Error(
-      `XTX出力に必要な納税者情報が不足しています: ${missing.join("、")}（納税者情報で入力してください）`,
-    );
-  }
-}
 
 /** 税務署要素（ZEIMUSHO）。子要素名は XSD 定義どおり先頭小文字の zeimusho_CD / zeimusho_NM。 */
 export function zeimushoXml(t: XtxTaxpayer): string {
@@ -655,19 +645,27 @@ export function buildXtxFiling(data: XtxFilingData): string {
       `XTX出力に対応していない年分です: ${data.year}（対応: ${xtxSupportedYears().join(", ")}）`,
     );
   }
-  assertXtxTaxpayer(data.taxpayer);
-  const t = data.taxpayer;
+  // 納税者情報は正規化＋完全性検証を通してから使う。欠けていれば例外で止まり、
+  // 部分的なXTXは決して出ない（taxpayerNormalize が恒常対策の正本）。
+  const taxpayer = normalizeXtxTaxpayer(data.taxpayer, {
+    submissionDate: data.submissionDate,
+    periodFrom: null,
+    periodTo: null,
+    filingKind: null,
+  });
+  const normalized: XtxFilingData = { ...data, taxpayer };
+  const t = taxpayer;
   const forms: { id: string; xml: string }[] = [];
   forms.push({
     id: "KOA020",
     xml:
-      `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(data)}${buildKoa020Face2(data)}</KOA020>`,
+      `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}</KOA020>`,
   });
   if (data.figures.business_revenue > 0 || data.figures.business_expenses > 0) {
-    forms.push({ id: "KOA210", xml: buildKoa210(data) });
+    forms.push({ id: "KOA210", xml: buildKoa210(normalized) });
   }
   if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0) {
-    forms.push({ id: "KOA220", xml: buildKoa220(data) });
+    forms.push({ id: "KOA220", xml: buildKoa220(normalized) });
   }
 
   const catalog =
@@ -690,7 +688,7 @@ export function buildXtxFiling(data: XtxFilingData): string {
     `<DATA id="DATA" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">` +
     `<RKO0010 VR="${versions.procedure}" id="RKO0010" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
     catalog +
-    `<CONTENTS id="CONTENTS">${buildIt(data)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
+    `<CONTENTS id="CONTENTS">${buildIt(normalized)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
     `</RKO0010></DATA>`
   );
 }
