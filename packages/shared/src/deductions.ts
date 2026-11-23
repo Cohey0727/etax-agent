@@ -27,6 +27,7 @@
  * - 医療費控除とセルフメディケーション税制は選択制。本モジュールは
  *   通常の医療費控除のみを計算する。
  */
+import { lookupTier, taxParametersFor } from "./taxParameters";
 
 /** 円未満を切り捨てる。浮動小数の誤差吸収つき（taxcalc.ts と同じ流儀）。 */
 function floorYen(x: number): number {
@@ -55,7 +56,8 @@ function count(x: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * 基礎控除。合計所得金額と年分で決まる。
+ * 基礎控除。合計所得金額と年分で決まる。年度ごとの段階表は
+ * taxParameters（TAX_PARAMETERS）が持ち、ここでは引いて適用するだけ。
  * - 令和5・6年分: 48万円（2,400万円超で逓減、2,500万円超は0）
  * - 令和7年分: 本則58万円への改正＋令和7・8年分限りの上乗せ特例で、
  *   132万円以下は95万円になる（措法41条の16の2）
@@ -63,39 +65,7 @@ function count(x: number): number {
  * - 令和9年分以降: 上乗せなし（本則のみ。655万円超も58万円）
  */
 export function basicDeduction(year: number, totalIncome: number): number {
-  const t = amount(totalIncome);
-  if (year >= 2027) {
-    if (t <= 24_000_000) return 580_000;
-    if (t <= 24_500_000) return 320_000;
-    if (t <= 25_000_000) return 160_000;
-    return 0;
-  }
-  if (year === 2026) {
-    if (t <= 1_320_000) return 780_000;
-    if (t <= 3_360_000) return 710_000;
-    if (t <= 4_890_000) return 630_000;
-    if (t <= 23_500_000) return 580_000;
-    if (t <= 24_000_000) return 480_000;
-    if (t <= 24_500_000) return 320_000;
-    if (t <= 25_000_000) return 160_000;
-    return 0;
-  }
-  if (year === 2025) {
-    if (t <= 1_320_000) return 950_000;
-    if (t <= 3_360_000) return 880_000;
-    if (t <= 4_890_000) return 680_000;
-    if (t <= 6_550_000) return 630_000;
-    if (t <= 23_500_000) return 580_000;
-    if (t <= 24_000_000) return 480_000;
-    if (t <= 24_500_000) return 320_000;
-    if (t <= 25_000_000) return 160_000;
-    return 0;
-  }
-  // 令和5・6年分（およびそれ以前）
-  if (t <= 24_000_000) return 480_000;
-  if (t <= 24_500_000) return 320_000;
-  if (t <= 25_000_000) return 160_000;
-  return 0;
+  return lookupTier(taxParametersFor(year).basicDeductionTiers, amount(totalIncome));
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +120,7 @@ export function spouseSpecialDeduction(
 ): number {
   if (spouseTotalIncome === null) return 0;
   const s = amount(spouseTotalIncome);
-  const lowerBound = year >= 2025 ? 580_000 : 480_000;
+  const lowerBound = taxParametersFor(year).spouseIncomeLimit;
   if (s <= lowerBound) return 0; // 配偶者控除の側（または対象外）
   const t = amount(totalIncome);
   if (t > 10_000_000) return 0;
@@ -165,24 +135,11 @@ export function spouseSpecialDeduction(
 // 特定親族特別控除（No.1177、令和7年分新設）
 // ---------------------------------------------------------------------------
 
-/** 特定親族特別控除の段階表: [特定親族の合計所得の上限, 控除額]（令和7年分） */
-const SPECIAL_RELATIVE_TIERS: { upTo: number; deduction: number }[] = [
-  { upTo: 850_000, deduction: 630_000 },
-  { upTo: 900_000, deduction: 610_000 },
-  { upTo: 950_000, deduction: 510_000 },
-  { upTo: 1_000_000, deduction: 410_000 },
-  { upTo: 1_050_000, deduction: 310_000 },
-  { upTo: 1_100_000, deduction: 210_000 },
-  { upTo: 1_150_000, deduction: 110_000 },
-  { upTo: 1_200_000, deduction: 60_000 },
-  { upTo: 1_230_000, deduction: 30_000 },
-];
-
 /**
  * 特定親族特別控除。19歳以上23歳未満の親族（配偶者・専従者等を除く）が
- * 扶養控除の対象にならない場合に、その親族の合計所得金額（58万円超
- * 123万円以下）に応じて適用される。令和7年分のみ対応（令和8年分は
- * 段階表の所得基準が異なるため 0 を返す）。対象が複数いる場合は
+ * 扶養控除の対象にならない場合に、その親族の合計所得金額に応じて
+ * 適用される。段階表は年度パラメータ（taxParameters）が持ち、制度が
+ * 無い・段階表が未収録の年分は 0 を返す。対象が複数いる場合は
  * 呼び出し側で1人ずつ計算して合計すること。
  * relativeTotalIncome が null なら 0。
  */
@@ -191,13 +148,11 @@ export function specialRelativeDeduction(
   relativeTotalIncome: number | null,
 ): number {
   if (relativeTotalIncome === null) return 0;
-  if (year !== 2025) return 0;
+  const params = taxParametersFor(year);
+  if (!params.specialRelativeTiers) return 0;
   const s = amount(relativeTotalIncome);
-  if (s <= 580_000) return 0; // 扶養控除の側（または対象外）
-  for (const tier of SPECIAL_RELATIVE_TIERS) {
-    if (s <= tier.upTo) return tier.deduction;
-  }
-  return 0;
+  if (s <= params.specialRelativeLowerBound) return 0; // 扶養控除の側（または対象外）
+  return lookupTier(params.specialRelativeTiers, s);
 }
 
 // ---------------------------------------------------------------------------
