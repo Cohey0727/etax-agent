@@ -1,14 +1,15 @@
 /**
- * xtxXsd.test.ts — 生成 XTX の公式 XML スキーマ検証（任意・環境変数ゲート）。
+ * xtxXsd.test.ts — 生成 XTX の公式 XML スキーマ検証（常時実行）。
  *
- * 環境変数 ETAX_XSD_DIR に e-Tax 仕様書「19 XMLスキーマ」を展開した
- * 「19XMLスキーマ」フォルダのパスを設定したときだけ実行する（未設定なら
- * スキップ）。検証には python3 + lxml が必要。
+ * 公式 XSD は fixtures/etax-xsd に取り込み済み（e-Tax 仕様書「19 XML
+ * スキーマ」令和8年9月版から、検証対象の手続が参照する 296 ファイルの
+ * 閉包のみ）。環境変数 ETAX_XSD_DIR があればそちらを優先する。
+ * 検証には python3 + lxml が必要（無い環境ではスキップ扱いで通過）。
  *
  * 2026-11-19、WEB版「作成済みデータの利用」で SE00S170 になった原因は
  * この検証で特定した（手続VR・名前空間・IT部の必須要素と並び順・
  * zeimusho の表記）。構造面の常時チェックは xtx.test.ts /
- * xtxShohi.test.ts 側にある。
+ * xtxShohi.test.ts 側にもある。
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
@@ -33,8 +34,8 @@ import {
   depreciationDetailRow,
 } from "../src";
 
-const XSD_DIR = process.env.ETAX_XSD_DIR ?? "";
-const maybe = XSD_DIR ? test : test.skip;
+const XSD_DIR = process.env.ETAX_XSD_DIR ?? join(import.meta.dir, "fixtures/etax-xsd");
+const maybe = existsSync(join(XSD_DIR, "shotoku/RKO0010-250.xsd")) ? test : test.skip;
 
 const TAXPAYER: XtxTaxpayer = {
   name: "テスト太郎",
@@ -268,7 +269,7 @@ function special20Sample(): string {
   });
 }
 
-describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => {
+describe("公式XMLスキーマ検証", () => {
   maybe("所得税 2023〜2026 と消費税の生成物が公式XSDを通る", () => {
     const dir = mkdtempSync(join(tmpdir(), "xtx-xsd-"));
     const samples: [string, string, string][] = [
