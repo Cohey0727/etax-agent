@@ -1,6 +1,7 @@
 export * from "./types";
 export * from "./text";
 export * from "./taxcalc";
+export * from "./taxParameters";
 export * from "./deductions";
 export * from "./ledger";
 export * from "./sample";
