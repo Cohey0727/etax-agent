@@ -1,0 +1,26 @@
+# Garage（S3互換ファイルサーバー）の設定サンプル。
+# 使い方: このファイルを garage.toml にコピーし、rpc_secret と admin_token を
+# ランダムな値に差し替えて、リポジトリ直下（docker-compose.yml の隣）に置く。
+# garage.toml 自体は秘密を含むため Git 管理しない（.gitignore 対象）。
+#
+#   rpc_secret  : openssl rand -hex 32
+#   admin_token : openssl rand -hex 32
+
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "REPLACE_WITH_RANDOM_HEX_64"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+# 署名付きURLのホスト検証・仮想ホスト形式のために公開ドメインを宣言する。
+root_domain = ".mini-files.spaghetti-monster.com"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "REPLACE_WITH_RANDOM_HEX_64"

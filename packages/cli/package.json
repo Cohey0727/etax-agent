@@ -1,0 +1,1 @@
+{"dependencies":{"@etax/shared":"workspace:*"},"name":"@etax/cli","private":true,"scripts":{"cli":"bun run src/cli.ts"},"type":"module","version":"0.1.0"}

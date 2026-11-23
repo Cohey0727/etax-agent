@@ -1,0 +1,10 @@
+name = "etax-agent"
+main = "src/worker.ts"
+compatibility_date = "2025-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 画面（packages/web のビルド成果物）を同一ドメインで配信する。
+# 先に `bun run build`（web）で dist を作ってからデプロイすること。
+[assets]
+directory = "../web/dist"
+binding = "ASSETS"

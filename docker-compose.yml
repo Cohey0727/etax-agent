@@ -1,0 +1,25 @@
+services:
+  # アプリ本体（Hono サーバー + 画面配信）。
+  # DB は SQLite（データフォルダ内のファイル）、ファイル保存もローカル
+  # フォルダのため、DB・ストレージのコンテナは持たない（同梱アプリと同じ構成）。
+  app:
+    build: .
+    container_name: etax-agent-app
+    # 再起動後も自動で戻る（Docker Desktop が起動していれば）。
+    restart: unless-stopped
+    # AGENT_API_KEY など秘密はホスト側の .env から読む（Git管理外）。
+    env_file:
+      - packages/server/.env
+    environment:
+      PORT: "43107"
+      # SystemOne（Ollama）はホスト側で動くため、ホストゲートウェイ経由で引く。
+      SYSTEMONE_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      # Cloudflare Tunnel の etax サービスがこのポートへ流す。
+      - "127.0.0.1:43107:43107"
+    volumes:
+      # サーバー運用データ（SQLite DB・アップロードファイル・freee試算表・
+      # 科目判定の学習履歴）はホスト側に残す。
+      - ./packages/server/data:/app/packages/server/data

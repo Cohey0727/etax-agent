@@ -1,0 +1,10 @@
+# ビルドコンテキストから外すもの。
+# .env は秘密を含むため絶対にイメージへ入れない（実行時に compose から渡す）。
+**/.env
+**/node_modules
+**/dist
+.git
+*.log
+*.tar.gz
+# サーバー運用データはホスト側ボリューム（bind mount）で渡す。
+packages/server/data

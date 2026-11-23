@@ -1,0 +1,311 @@
+/**
+ * deductions.test.ts — 所得控除・税額控除・所得税額の検証（bun test）。
+ * 検証する主な税務ルール（国税庁タックスアンサー準拠、令和5〜7年分）:
+ *   (a) 基礎控除: 令和6年分 所得500万円 → 48万円 / 令和7年分 所得100万円 → 95万円
+ *   (b) 配偶者特別控除の段階表（配偶者所得100万円・本人所得800万円 → 36万円）
+ *   (c) 特定親族特別控除は令和7年分のみ（所得70万円 → 63万円）
+ *   (d) 生命保険料控除の新旧合算ルール（旧保険料6万円超は旧式のみ）
+ *   (e) 所得税額の全計算（速算表 → 税額控除 → 復興特別所得税 → 100円未満切捨て）
+ */
+import { describe, expect, test } from "bun:test";
+import {
+  basicDeduction,
+  casualtyLossDeduction,
+  certifiedNpoDonationCredit,
+  computeIncomeDeductions,
+  computeIncomeTax,
+  dependentDeduction,
+  disabilityDeduction,
+  dividendCredit,
+  donationDeduction,
+  earthquakeInsuranceDeduction,
+  foreignTaxCredit,
+  housingLoanCredit,
+  incomeTaxOnTaxableIncome,
+  lifeInsuranceDeduction,
+  medicalDeduction,
+  politicalDonationCredit,
+  seismicRetrofitCredit,
+  specialRelativeDeduction,
+  spouseDeduction,
+  spouseSpecialDeduction,
+  EMPTY_DEDUCTION_INPUTS,
+  EMPTY_TAX_CREDIT_INPUTS,
+} from "../src/index";
+
+describe("基礎控除", () => {
+  test("令和6年分: 所得500万円 → 48万円", () => {
+    expect(basicDeduction(2024, 5_000_000)).toBe(480_000);
+  });
+  test("令和7年分: 所得100万円 → 95万円（改正＋上乗せ）", () => {
+    expect(basicDeduction(2025, 1_000_000)).toBe(950_000);
+  });
+  test("令和7年分: 所得1,044万円 → 58万円", () => {
+    expect(basicDeduction(2025, 10_444_000)).toBe(580_000);
+  });
+  test("令和7年分: 所得2,430万円 → 32万円", () => {
+    expect(basicDeduction(2025, 24_300_000)).toBe(320_000);
+  });
+  test("令和6年分: 所得2,600万円 → 0円", () => {
+    expect(basicDeduction(2024, 26_000_000)).toBe(0);
+  });
+  test("令和8年分: 所得100万円 → 78万円（上乗せ縮小）", () => {
+    expect(basicDeduction(2026, 1_000_000)).toBe(780_000);
+  });
+  test("令和9年分: 所得100万円 → 58万円（本則のみ）", () => {
+    expect(basicDeduction(2027, 1_000_000)).toBe(580_000);
+  });
+});
+
+describe("配偶者控除・配偶者特別控除", () => {
+  test("配偶者控除: 一般・本人所得800万円 → 38万円", () => {
+    expect(spouseDeduction("general", 8_000_000)).toBe(380_000);
+  });
+  test("配偶者控除: 老人・本人所得800万円 → 48万円", () => {
+    expect(spouseDeduction("elderly", 8_000_000)).toBe(480_000);
+  });
+  test("配偶者控除: 一般・本人所得930万円 → 26万円", () => {
+    expect(spouseDeduction("general", 9_300_000)).toBe(260_000);
+  });
+  test("配偶者控除: 本人所得1,050万円 → 0円", () => {
+    expect(spouseDeduction("general", 10_500_000)).toBe(0);
+  });
+  test("配偶者特別控除: 配偶者所得100万円・本人800万円 → 36万円", () => {
+    expect(spouseSpecialDeduction(2024, 1_000_000, 8_000_000)).toBe(360_000);
+  });
+  test("配偶者特別控除: 配偶者所得100万円・本人930万円 → 24万円", () => {
+    expect(spouseSpecialDeduction(2024, 1_000_000, 9_300_000)).toBe(240_000);
+  });
+  test("配偶者特別控除: 配偶者所得が下限以下 → 0円（配偶者控除の側）", () => {
+    expect(spouseSpecialDeduction(2024, 480_000, 8_000_000)).toBe(0);
+    expect(spouseSpecialDeduction(2025, 580_000, 8_000_000)).toBe(0);
+  });
+  test("配偶者特別控除: 令和7年分は下限が58万円超から", () => {
+    expect(spouseSpecialDeduction(2025, 590_000, 8_000_000)).toBe(380_000);
+  });
+  test("配偶者特別控除: 配偶者所得133万円 → 3万円、134万円 → 0円", () => {
+    expect(spouseSpecialDeduction(2024, 1_330_000, 8_000_000)).toBe(30_000);
+    expect(spouseSpecialDeduction(2024, 1_340_000, 8_000_000)).toBe(0);
+  });
+  test("配偶者特別控除: 配偶者なし（null） → 0円", () => {
+    expect(spouseSpecialDeduction(2024, null, 8_000_000)).toBe(0);
+  });
+});
+
+describe("特定親族特別控除", () => {
+  test("令和7年分: 親族所得70万円 → 63万円", () => {
+    expect(specialRelativeDeduction(2025, 700_000)).toBe(630_000);
+  });
+  test("令和7年分: 親族所得123万円 → 3万円", () => {
+    expect(specialRelativeDeduction(2025, 1_230_000)).toBe(30_000);
+  });
+  test("令和7年分: 親族所得58万円以下 → 0円（扶養控除の側）", () => {
+    expect(specialRelativeDeduction(2025, 580_000)).toBe(0);
+  });
+  test("令和6年分は制度なし → 0円", () => {
+    expect(specialRelativeDeduction(2024, 700_000)).toBe(0);
+  });
+});
+
+describe("扶養控除・障害者控除", () => {
+  test("扶養控除: 一般・特定・老人・同居老親等 各1人 → 207万円", () => {
+    expect(
+      dependentDeduction({ general: 1, specific: 1, elderly: 1, elderlyCohabiting: 1 }),
+    ).toBe(2_070_000);
+  });
+  test("障害者控除: 障害者・特別・同居特別 各1人 → 142万円", () => {
+    expect(disabilityDeduction({ general: 1, special: 1, specialCohabiting: 1 })).toBe(1_420_000);
+  });
+});
+
+describe("生命保険料控除", () => {
+  const empty = { newGeneral: 0, newCareMedical: 0, newPension: 0, oldGeneral: 0, oldPension: 0 };
+  test("新契約のみ: 一般3万円 → 2.5万円", () => {
+    expect(lifeInsuranceDeduction({ ...empty, newGeneral: 30_000 })).toBe(25_000);
+  });
+  test("新契約のみ: 一般8万円 → 4万円（上限）", () => {
+    expect(lifeInsuranceDeduction({ ...empty, newGeneral: 80_000 })).toBe(40_000);
+  });
+  test("旧契約のみ: 一般10万円 → 5万円（上限）", () => {
+    expect(lifeInsuranceDeduction({ ...empty, oldGeneral: 100_000 })).toBe(50_000);
+  });
+  test("新旧両方・旧6万円以下: 合算して上限4万円", () => {
+    // 新4万円 → 3万円、旧5万円 → 3.75万円、合算 6.75万円 → 上限 4万円
+    expect(lifeInsuranceDeduction({ ...empty, newGeneral: 40_000, oldGeneral: 50_000 })).toBe(40_000);
+  });
+  test("新旧両方・旧6万円超: 旧契約の式のみ（7万円 → 4.25万円）", () => {
+    expect(lifeInsuranceDeduction({ ...empty, newGeneral: 40_000, oldGeneral: 70_000 })).toBe(42_500);
+  });
+  test("全体の上限12万円", () => {
+    expect(
+      lifeInsuranceDeduction({
+        newGeneral: 200_000,
+        newCareMedical: 200_000,
+        newPension: 200_000,
+        oldGeneral: 0,
+        oldPension: 0,
+      }),
+    ).toBe(120_000);
+  });
+});
+
+describe("地震保険料控除", () => {
+  test("地震部分6万円 → 5万円（上限）", () => {
+    expect(earthquakeInsuranceDeduction({ earthquake: 60_000, oldLongTerm: 0 })).toBe(50_000);
+  });
+  test("旧長期2万円 → 1.5万円", () => {
+    expect(earthquakeInsuranceDeduction({ earthquake: 0, oldLongTerm: 20_000 })).toBe(15_000);
+  });
+  test("両方: 地震3万円 + 旧長期2万円 → 4.5万円", () => {
+    expect(earthquakeInsuranceDeduction({ earthquake: 30_000, oldLongTerm: 20_000 })).toBe(45_000);
+  });
+});
+
+describe("医療費控除・寄附金控除・雑損控除", () => {
+  test("医療費: 支払30万円・補填5万円・所得1,000万円 → 15万円", () => {
+    expect(medicalDeduction(300_000, 50_000, 10_000_000)).toBe(150_000);
+  });
+  test("医療費: 所得150万円なら足切りは所得の5%（7.5万円）", () => {
+    expect(medicalDeduction(300_000, 50_000, 1_500_000)).toBe(175_000);
+  });
+  test("医療費: 足切り以下 → 0円", () => {
+    expect(medicalDeduction(50_000, 0, 10_000_000)).toBe(0);
+  });
+  test("寄附金: 10万円・所得1,000万円 → 98,000円", () => {
+    expect(donationDeduction(100_000, 10_000_000)).toBe(98_000);
+  });
+  test("寄附金: 所得10万円なら総所得の40%が上限 → 38,000円", () => {
+    expect(donationDeduction(100_000, 100_000)).toBe(38_000);
+  });
+  test("雑損: 損害100万円・災害関連20万円・補填10万円・所得500万円 → 60万円", () => {
+    expect(
+      casualtyLossDeduction(
+        { damageAmount: 1_000_000, disasterRelatedExpenses: 200_000, otherRelatedExpenses: 0, compensation: 100_000 },
+        5_000_000,
+      ),
+    ).toBe(600_000);
+  });
+  test("雑損: 災害関連支出の式が大きい場合（取壊し30万円のみ） → 25万円", () => {
+    expect(
+      casualtyLossDeduction(
+        { damageAmount: 0, disasterRelatedExpenses: 300_000, otherRelatedExpenses: 0, compensation: 0 },
+        10_000_000,
+      ),
+    ).toBe(250_000);
+  });
+});
+
+describe("税額控除", () => {
+  test("住宅ローン: 残高3,000万円・限度35万円 → 21万円", () => {
+    expect(housingLoanCredit(30_000_000, 350_000)).toBe(210_000);
+  });
+  test("住宅ローン: 限度額が上限（限度14万円 → 14万円）", () => {
+    expect(housingLoanCredit(30_000_000, 140_000)).toBe(140_000);
+  });
+  test("住宅ローン: 2021年以前の居住は1%（残高22,131,745円・限度40万円 → 221,300円）", () => {
+    expect(housingLoanCredit(22_131_745, 400_000, 0.01)).toBe(221_300);
+  });
+  test("住宅ローン: 1%でも限度額が上限（限度20万円 → 20万円）", () => {
+    expect(housingLoanCredit(22_131_745, 200_000, 0.01)).toBe(200_000);
+  });
+  test("定額減税: 税額控除の合計に算入される", () => {
+    const result = computeIncomeTax({
+      year: 2024,
+      totalIncome: 5_446_922,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, flatReduction: 30_000 },
+    });
+    expect(result.taxCredits.flatReduction).toBe(30_000);
+    expect(result.taxCreditsTotal).toBe(30_000);
+  });
+  test("配当控除: 課税総所得1,000万円以下なら配当20万円 → 2万円", () => {
+    expect(dividendCredit(200_000, 0, 7_854_000)).toBe(20_000);
+  });
+  test("配当控除: 課税総所得が1,000万円超なら半率 → 1万円", () => {
+    expect(dividendCredit(200_000, 0, 12_000_000)).toBe(10_000);
+  });
+  test("配当控除: 証券投資信託の分配10万円 → 5,000円", () => {
+    expect(dividendCredit(0, 100_000, 5_000_000)).toBe(5_000);
+  });
+  test("政党等寄附金: 10.2万円 → 3万円", () => {
+    expect(politicalDonationCredit(102_000, 1_000_000)).toBe(30_000);
+  });
+  test("認定NPO寄附金: 10.2万円 → 4万円、上限は所得税額の25%", () => {
+    expect(certifiedNpoDonationCredit(102_000, 1_000_000)).toBe(40_000);
+    expect(certifiedNpoDonationCredit(1_002_000, 1_000_000)).toBe(250_000);
+  });
+  test("耐震改修: 標準費用200万円・その他100万円 → 25万円", () => {
+    expect(seismicRetrofitCredit(2_000_000, 1_000_000)).toBe(250_000);
+  });
+  test("外国税額: 限度額 = 所得税額 × 国外所得/所得総額", () => {
+    expect(foreignTaxCredit(100_000, 2_000_000, 10_000_000, 1_500_000)).toBe(100_000);
+    expect(foreignTaxCredit(500_000, 2_000_000, 10_000_000, 1_500_000)).toBe(300_000);
+  });
+});
+
+describe("所得税額の計算", () => {
+  test("速算表の境界: 課税所得194.9万円 → 97,450円、195万円 → 97,500円", () => {
+    expect(incomeTaxOnTaxableIncome(1_949_000)).toBe(97_450);
+    expect(incomeTaxOnTaxableIncome(1_950_000)).toBe(97_500);
+  });
+
+  test("全計算（令和5年分）: 所得1,044.4万円、社会保険料120万円・小規模共済84万円・生命保険料（新・一般12万円）・地震3万円", () => {
+    const result = computeIncomeTax({
+      year: 2023,
+      totalIncome: 10_444_000,
+      deductions: {
+        ...EMPTY_DEDUCTION_INPUTS,
+        socialInsurancePaid: 1_200_000,
+        smallBusinessMutualAidPaid: 840_000,
+        lifeInsurance: { newGeneral: 120_000, newCareMedical: 0, newPension: 0, oldGeneral: 0, oldPension: 0 },
+        earthquakeInsurance: { earthquake: 30_000, oldLongTerm: 0 },
+      },
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    // 所得控除: 120万 + 84万 + 4万 + 3万 + 基礎48万 = 259万円
+    expect(result.deductionsTotal).toBe(2_590_000);
+    expect(result.taxableIncome).toBe(7_854_000);
+    // 785.4万円 × 23% − 636,000 = 1,170,420円
+    expect(result.incomeTaxBase).toBe(1_170_420);
+    // 復興特別所得税: 1,170,420 × 2.1% = 24,578円（円未満切捨て）
+    expect(result.reconstructionTax).toBe(24_578);
+    // 確定税額: 1,194,998 → 100円未満切捨て 1,194,900円
+    expect(result.finalTax).toBe(1_194_900);
+  });
+
+  test("全計算（令和7年分）: 所得100万円・控除なし → 基礎控除95万円で課税所得5万円、税額2,500円", () => {
+    const result = computeIncomeTax({
+      year: 2025,
+      totalIncome: 1_000_000,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    expect(result.deductionsTotal).toBe(950_000);
+    expect(result.taxableIncome).toBe(50_000);
+    expect(result.incomeTaxBase).toBe(2_500);
+    expect(result.finalTax).toBe(2_500);
+  });
+
+  test("全計算（令和5年分）: 住宅ローン控除が税額から引かれ、復興税は控除後の額にかかる", () => {
+    const result = computeIncomeTax({
+      year: 2023,
+      totalIncome: 10_444_000,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, housingLoanBalance: 30_000_000, housingLoanLimit: 210_000 },
+    });
+    // 基礎控除のみ: 課税所得 996.4万円 → 税額 996.4万 × 33% − 1,536,000 = 1,752,120円
+    expect(result.taxableIncome).toBe(9_964_000);
+    expect(result.incomeTaxBase).toBe(1_752_120);
+    expect(result.taxCreditsTotal).toBe(210_000);
+    // 復興税: (1,752,120 − 210,000) × 2.1% = 32,384円
+    expect(result.reconstructionTax).toBe(32_384);
+    // 確定税額: 1,574,504 → 1,574,500円
+    expect(result.finalTax).toBe(1_574_500);
+  });
+
+  test("所得控除の合算に基礎控除が自動で入る", () => {
+    const breakdown = computeIncomeDeductions(2023, 10_444_000, EMPTY_DEDUCTION_INPUTS);
+    expect(breakdown.basic).toBe(480_000);
+    expect(breakdown.total).toBe(480_000);
+  });
+});

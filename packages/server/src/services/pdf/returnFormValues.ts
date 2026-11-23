@@ -1,0 +1,194 @@
+/**
+ * returnFormValues.ts — 申告書第一表・第二表の紙イメージに載せる値の組み立て（services/pdf）。
+ *
+ * 計算エンジン（@etax/shared）の結果を、様式のセル単位の値へ変換する。
+ * 金額の意味と端数処理は XTX ビルダー（buildXtxFiling）と揃えてある:
+ * 差引所得税額は外国税額控除を除いた税額控除で引き、申告納税額は
+ * 100円未満切捨て（還付側は切捨てなし）、第3期分は予定納税との精算。
+ */
+import {
+  CorrectedFigures,
+  DeductionInputs,
+  IncomeTaxResult,
+  MiscIncomeInput,
+  XtxTaxpayer,
+} from "@etax/shared";
+
+/** 紙イメージの金額セル識別子。buildReturnPdf のレイアウト表と対応する。 */
+export type ReturnAmountKey =
+  | "revBusiness"
+  | "revRealEstate"
+  | "revMiscOther"
+  | "incBusiness"
+  | "incRealEstate"
+  | "incMiscOther"
+  | "incMiscSubtotal"
+  | "incTotal"
+  | "dedSocial"
+  | "dedSmall"
+  | "dedLife"
+  | "dedEarthquake"
+  | "dedWidowSingle"
+  | "dedWorkDisability"
+  | "dedSpouse"
+  | "dedDependents"
+  | "dedSpecialRelative"
+  | "dedBasic"
+  | "dedSubtotal"
+  | "dedCasualty"
+  | "dedMedical"
+  | "dedDonations"
+  | "dedTotal"
+  | "taxTaxable"
+  | "taxBase"
+  | "creditDividend"
+  | "creditOther"
+  | "creditHousing"
+  | "creditPolitical"
+  | "creditSeismic"
+  | "taxAfterCredits"
+  | "taxAfterCredits2"
+  | "taxReconstruction"
+  | "taxTotal"
+  | "creditForeign"
+  | "withholding"
+  | "declaredTax"
+  | "prepaid"
+  | "thirdPay"
+  | "thirdRefund"
+  | "amendOriginal"
+  | "amendIncrease"
+  | "blueDeduction"
+  | "dueByDeadline";
+
+/** 紙イメージ1件分の入力。見出し情報＋セル金額＋第二表の内訳。 */
+export interface ReturnFormValues {
+  /** 対象年（西暦）。見出しの「令和◯年分」に使う。 */
+  year: number;
+  amendment: boolean;
+  /** 提出日（ISO: YYYY-MM-DD）。空文字なら未記入。 */
+  submissionDate: string;
+  taxpayer: XtxTaxpayer;
+  amounts: Partial<Record<ReturnAmountKey, number>>;
+  /** その他の税額控除（定額減税）の名称ラベル。該当がなければ空文字。 */
+  otherCreditName: string;
+  /** 第二表: 社会保険料の内訳1行目の種類名。 */
+  socialLabel: string;
+  socialPaid: number;
+  smallBusinessPaid: number;
+  lifePremiums: {
+    newGeneral: number;
+    oldGeneral: number;
+    newPension: number;
+    oldPension: number;
+    newCareMedical: number;
+  };
+  earthquakePremiums: { earthquake: number; oldLongTerm: number };
+  /** 第二表: 寄附金の支払額（控除額ではなく寄附金額）。 */
+  donationsPaid: number;
+}
+
+export interface ReturnFormSource {
+  year: number;
+  amendment: boolean;
+  submissionDate: string;
+  taxpayer: XtxTaxpayer;
+  figures: CorrectedFigures;
+  tax: IncomeTaxResult;
+  /** 雑所得（その他）。第一表ク・⑨・⑩に載せる。 */
+  miscIncome: MiscIncomeInput;
+  deductionInputs: DeductionInputs;
+  withholdingTax: number;
+  prepaidTax: number;
+  originalThirdPeriodTax: number | null;
+}
+
+/** 計算結果から紙イメージの値を組み立てる。 */
+export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValues {
+  const { figures, tax, deductionInputs } = source;
+  const d = tax.deductions;
+  const c = tax.taxCredits;
+  const nonForeignCredits = c.total - c.foreignTax;
+  const afterCredits = Math.max(tax.incomeTaxBase - nonForeignCredits, 0);
+  const taxTotal = afterCredits + tax.reconstructionTax;
+  const declaredRaw = taxTotal - c.foreignTax - source.withholdingTax;
+  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : 0;
+  const thirdPeriod = declaredTax - source.prepaidTax + Math.min(declaredRaw, 0);
+  const increase =
+    source.amendment && source.originalThirdPeriodTax !== null
+      ? Math.max(thirdPeriod - source.originalThirdPeriodTax, 0)
+      : 0;
+
+  const amounts: Partial<Record<ReturnAmountKey, number>> = {
+    revBusiness: figures.business_revenue,
+    revRealEstate: figures.real_estate_revenue,
+    revMiscOther: source.miscIncome.revenue,
+    incBusiness: figures._detail.business_income,
+    incRealEstate: figures._detail.real_estate_income,
+    incMiscOther: source.miscIncome.income,
+    incMiscSubtotal: source.miscIncome.income,
+    incTotal: tax.totalIncome,
+    dedSocial: d.socialInsurance,
+    dedSmall: d.smallBusinessMutualAid,
+    dedLife: d.lifeInsurance,
+    dedEarthquake: d.earthquakeInsurance,
+    dedWidowSingle: d.widow + d.singleParent,
+    dedWorkDisability: d.workingStudent + d.disability,
+    dedSpouse: d.spouse + d.spouseSpecial,
+    dedDependents: d.dependents,
+    dedSpecialRelative: d.specialRelative,
+    dedBasic: d.basic,
+    dedSubtotal: d.total - d.casualtyLoss - d.medical - d.donations,
+    dedCasualty: d.casualtyLoss,
+    dedMedical: d.medical,
+    dedDonations: d.donations,
+    dedTotal: d.total,
+    taxTaxable: tax.taxableIncome,
+    taxBase: tax.incomeTaxBase,
+    creditDividend: c.dividend,
+    creditOther: c.flatReduction,
+    creditHousing: c.housingLoan,
+    creditPolitical: c.politicalDonations + c.certifiedNpoDonations,
+    creditSeismic: c.seismicRetrofit,
+    taxAfterCredits: afterCredits,
+    taxAfterCredits2: afterCredits,
+    taxReconstruction: tax.reconstructionTax,
+    taxTotal,
+    creditForeign: c.foreignTax,
+    withholding: source.withholdingTax,
+    declaredTax,
+    prepaid: source.prepaidTax,
+    blueDeduction: figures.blue_deduction,
+    dueByDeadline: source.amendment ? increase : Math.max(thirdPeriod, 0),
+  };
+  if (thirdPeriod > 0) amounts.thirdPay = thirdPeriod;
+  if (thirdPeriod < 0) amounts.thirdRefund = -thirdPeriod;
+  if (source.amendment && source.originalThirdPeriodTax !== null) {
+    amounts.amendOriginal = source.originalThirdPeriodTax;
+    amounts.amendIncrease = increase;
+  }
+
+  return {
+    year: source.year,
+    amendment: source.amendment,
+    submissionDate: source.submissionDate,
+    taxpayer: source.taxpayer,
+    amounts,
+    otherCreditName: c.flatReduction > 0 ? "定額減税" : "",
+    socialLabel: "社会保険料",
+    socialPaid: deductionInputs.socialInsurancePaid,
+    smallBusinessPaid: deductionInputs.smallBusinessMutualAidPaid,
+    lifePremiums: {
+      newGeneral: deductionInputs.lifeInsurance.newGeneral,
+      oldGeneral: deductionInputs.lifeInsurance.oldGeneral,
+      newPension: deductionInputs.lifeInsurance.newPension,
+      oldPension: deductionInputs.lifeInsurance.oldPension,
+      newCareMedical: deductionInputs.lifeInsurance.newCareMedical,
+    },
+    earthquakePremiums: {
+      earthquake: deductionInputs.earthquakeInsurance.earthquake,
+      oldLongTerm: deductionInputs.earthquakeInsurance.oldLongTerm,
+    },
+    donationsPaid: deductionInputs.donationsTotal,
+  };
+}
