@@ -11,6 +11,9 @@ const styles = {
   root: style({
     display: "inline-block",
     padding: "2px 10px",
+    // チップのテキストは絶対に折り返さない。
+    whiteSpace: "nowrap",
+    flexShrink: 0,
     borderRadius: theme.borderRadius.pill,
     background: theme.color.accentSoft,
     color: theme.color.accentText,

@@ -96,7 +96,7 @@ export const SetupChecklistPanel = ({ transactions, year, onNavigate }: SetupChe
                   {item.done ? "設定済み" : "未設定"}
                 </span>
               </Text>
-              <Text variant="muted">{item.detail}</Text>
+              <Text variant="muted" className={styles.detail}>{item.detail}</Text>
               {!item.done && onNavigate ? (
                 <Button variant="ghost" size="sm" onClick={() => onNavigate(item.view)}>
                   {item.action}

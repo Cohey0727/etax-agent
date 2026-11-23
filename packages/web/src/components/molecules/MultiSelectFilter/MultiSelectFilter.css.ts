@@ -16,6 +16,8 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "2px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
     background: theme.color.accentSoft,
     color: theme.color.accentText,
     borderRadius: theme.borderRadius.pill,
@@ -53,6 +55,8 @@ const styles = {
     padding: "2px 10px",
     fontSize: theme.fontSizes.xs,
     lineHeight: 1.6,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
     cursor: "pointer",
     selectors: {
       "&:hover": { borderColor: theme.color.borderStrong, background: theme.color.hover },

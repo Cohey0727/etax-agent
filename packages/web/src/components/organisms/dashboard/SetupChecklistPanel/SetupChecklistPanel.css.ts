@@ -15,6 +15,14 @@ const styles = {
     alignItems: "center",
     gap: theme.space.sm,
     fontWeight: theme.fontWeight.semibold,
+    // ラベルとチップは行側で縮めない（詳細テキスト側が折り返して吸収する）。
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  }),
+  // 補足テキスト。残り幅を使い、ここだけが折り返す。
+  detail: style({
+    flex: 1,
+    minWidth: 0,
   }),
   stateDone: style({
     fontSize: theme.fontSizes.xs,
@@ -23,6 +31,8 @@ const styles = {
     backgroundColor: theme.color.accentSoft,
     borderRadius: theme.borderRadius.pill,
     padding: "2px 8px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
   stateTodo: style({
     fontSize: theme.fontSizes.xs,
@@ -31,6 +41,8 @@ const styles = {
     backgroundColor: theme.color.lineSoft,
     borderRadius: theme.borderRadius.pill,
     padding: "2px 8px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
 };
 

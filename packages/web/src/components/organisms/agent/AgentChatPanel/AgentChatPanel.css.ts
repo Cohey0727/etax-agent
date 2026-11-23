@@ -76,6 +76,8 @@ const styles = {
     padding: "2px 8px",
     fontSize: theme.fontSizes.xs,
     lineHeight: 1.6,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
   // 入力欄はパネルの一番下に固定（縮まない）。
   inputRow: style({
