@@ -24,6 +24,8 @@ const allTables = [
   "imports",
   "sessions",
   "api_keys",
+  "magic_link_tokens",
+  "user_identities",
   "users",
   "filing_status",
   "taxpayer_profiles",

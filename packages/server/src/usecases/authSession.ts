@@ -6,11 +6,23 @@
  * API キーを Bearer で送る想定。
  */
 import { Context } from "hono";
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie } from "hono/cookie";
 import { Db } from "../lib/db";
-import { resolveApiKeyUserId, resolveSessionUserId } from "../repositories/userRepository";
+import { createSession, resolveApiKeyUserId, resolveSessionUserId } from "../repositories/userRepository";
 
 export const SESSION_COOKIE = "etax_session";
+
+/** セッションを発行し、httpOnly Cookie とレスポンス用トークンを返す。 */
+export async function issueSession(c: Context, db: Db, userId: number): Promise<string> {
+  const token = await createSession(db, userId);
+  setCookie(c, SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 30 * 24 * 60 * 60,
+  });
+  return token;
+}
 
 /** リクエストの資格情報からユーザーIDを解決する。無ければ undefined。 */
 export async function resolveRequestUserId(

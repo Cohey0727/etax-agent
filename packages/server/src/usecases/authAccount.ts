@@ -5,13 +5,13 @@
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { Context } from "hono";
-import { deleteCookie, setCookie } from "hono/cookie";
+import { deleteCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
+import { issueChallenge } from "../lib/loginChallenge";
 import { currentUserId } from "../lib/tenantContext";
 import { usersTable } from "../repositories/schema";
 import {
-  createSession,
   createUser,
   deleteSession,
   getUserByEmail,
@@ -21,22 +21,14 @@ import {
   AuthSessionResponseSchema,
   LoginRequestSchema,
   RegisterRequestSchema,
+  TotpChallengeResponseSchema,
 } from "../schemas/auth";
-import { SESSION_COOKIE, requestSessionToken } from "./authSession";
+import { SESSION_COOKIE, issueSession, requestSessionToken } from "./authSession";
 
 function requireDb(c: Context) {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
   return db;
-}
-
-function setSessionCookie(c: Context, token: string): void {
-  setCookie(c, SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "Lax",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60,
-  });
 }
 
 export const registerRoute = createRoute({
@@ -69,9 +61,8 @@ export const registerHandler: RouteHandler<typeof registerRoute> = async (c) => 
     throw new HTTPException(409, { message: "このメールアドレスは登録済みです" });
   }
   const user = await createUser(db, email, password);
-  const token = await createSession(db, user.id);
-  setSessionCookie(c, token);
-  return c.json({ user: { id: user.id, email: user.email }, token });
+  const token = await issueSession(c, db, user.id);
+  return c.json({ user: { id: user.id, email: user.email, totp_enabled: false }, token });
 };
 
 export const loginRoute = createRoute({
@@ -82,8 +73,12 @@ export const loginRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: AuthSessionResponseSchema } },
-      description: "ログインし、セッションを発行した",
+      content: {
+        "application/json": {
+          schema: AuthSessionResponseSchema.or(TotpChallengeResponseSchema),
+        },
+      },
+      description: "ログインした（TOTP 有効時はチャレンジを返す）",
     },
   },
 });
@@ -99,9 +94,18 @@ export const loginHandler: RouteHandler<typeof loginRoute> = async (c) => {
   if (!user || !(await verifyUserPassword(user, password))) {
     throw new HTTPException(401, { message: "メールアドレスまたはパスワードが違います" });
   }
-  const token = await createSession(db, user.id);
-  setSessionCookie(c, token);
-  return c.json({ user: { id: user.id, email: user.email }, token });
+  // TOTP が有効なユーザーは、コード検証が済むまでセッションを発行しない
+  if (user.totpEnabled) {
+    return c.json({
+      totp_required: true as const,
+      challenge: issueChallenge(user.id, "totp-login"),
+    });
+  }
+  const token = await issueSession(c, db, user.id);
+  return c.json({
+    user: { id: user.id, email: user.email, totp_enabled: user.totpEnabled },
+    token,
+  });
 };
 
 export const logoutRoute = createRoute({
@@ -142,5 +146,7 @@ export const meHandler: RouteHandler<typeof meRoute> = async (c) => {
   }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
   if (!user) throw new HTTPException(401, { message: "ログインしていません" });
-  return c.json({ user: { id: user.id, email: user.email } });
+  return c.json({
+    user: { id: user.id, email: user.email, totp_enabled: user.totpEnabled },
+  });
 };

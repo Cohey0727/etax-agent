@@ -19,11 +19,74 @@ export const LoginRequestSchema = z
 
 export const AuthSessionResponseSchema = z
   .object({
-    user: z.object({ id: z.number(), email: z.string() }),
+    user: z.object({
+      id: z.number(),
+      email: z.string(),
+      totp_enabled: z.boolean().optional(),
+    }),
     /** セッショントークン（Cookie にも同じ値を設定する） */
     token: z.string(),
   })
   .openapi("AuthSessionResponse");
+
+/** ログインで TOTP が必要なときの応答（セッションはまだ発行しない）。 */
+export const TotpChallengeResponseSchema = z
+  .object({
+    totp_required: z.literal(true),
+    /** 2段階目の検証に渡す短期チャレンジ */
+    challenge: z.string(),
+  })
+  .openapi("TotpChallengeResponse");
+
+export const LoginTotpRequestSchema = z
+  .object({
+    challenge: z.string().openapi({ description: "ログイン応答のチャレンジ" }),
+    code: z.string().openapi({ description: "Authenticator アプリの6桁コード" }),
+  })
+  .openapi("LoginTotpRequest");
+
+export const TotpCodeRequestSchema = z
+  .object({
+    code: z.string().openapi({ description: "Authenticator アプリの6桁コード" }),
+  })
+  .openapi("TotpCodeRequest");
+
+export const TotpSetupResponseSchema = z
+  .object({
+    /** 登録用 otpauth URL（QRコード化してアプリで読み取る） */
+    otpauth_url: z.string(),
+    /** 手入力用の秘密（Base32） */
+    secret: z.string(),
+  })
+  .openapi("TotpSetupResponse");
+
+export const MagicLinkRequestSchema = z
+  .object({
+    email: z.string().email().openapi({ description: "メールアドレス" }),
+  })
+  .openapi("MagicLinkRequest");
+
+export const MagicLinkConsumeRequestSchema = z
+  .object({
+    token: z.string().openapi({ description: "メールで受け取ったトークン" }),
+  })
+  .openapi("MagicLinkConsumeRequest");
+
+/** 認証まわりの公開設定（画面が表示方法を決めるために使う）。 */
+export const AuthConfigResponseSchema = z
+  .object({
+    /** ETAX_AUTH_MODE=required か（true ならログイン必須） */
+    required: z.boolean(),
+    methods: z.object({
+      password: z.boolean(),
+      magic_link: z.boolean(),
+      totp: z.boolean(),
+      passkey: z.boolean(),
+      google: z.boolean(),
+      github: z.boolean(),
+    }),
+  })
+  .openapi("AuthConfigResponse");
 
 export const CreateApiKeyRequestSchema = z
   .object({

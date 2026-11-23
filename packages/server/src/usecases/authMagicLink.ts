@@ -1,0 +1,94 @@
+/**
+ * authMagicLink.ts — メールリンクによるログイン（usecases）。
+ * リクエストでは登録の有無を明かさず常に同じ応答を返す。リンクの有効期限は
+ * 15分・1回限り。未登録のメールアドレスなら、消費時にパスワードなしの
+ * ユーザーを作る（パスワードレス登録）。送信は Resend（services/email）。
+ * リンクの宛先は ETAX_PUBLIC_URL（未設定時はリクエストの Origin）で組み立てる。
+ */
+import { createRoute, RouteHandler } from "@hono/zod-openapi";
+import { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { getDb } from "../lib/db";
+import {
+  consumeMagicLinkToken,
+  createMagicLinkToken,
+  createPasswordlessUser,
+  getUserByEmail,
+} from "../repositories/userRepository";
+import {
+  AuthSessionResponseSchema,
+  MagicLinkConsumeRequestSchema,
+  MagicLinkRequestSchema,
+} from "../schemas/auth";
+import { sendMail } from "../services/email/mailer";
+import { issueSession } from "./authSession";
+
+function requireDb(c: Context) {
+  const db = getDb();
+  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
+  return db;
+}
+
+export const magicLinkRequestRoute = createRoute({
+  method: "post",
+  path: "/api/auth/magic-link",
+  request: {
+    body: { content: { "application/json": { schema: MagicLinkRequestSchema } }, required: true },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: AuthSessionResponseSchema.partial() } },
+      description: "リンクを送信した（登録の有無は明かさない）",
+    },
+  },
+});
+
+export const magicLinkRequestHandler: RouteHandler<typeof magicLinkRequestRoute> = async (c) => {
+  const db = requireDb(c);
+  const body = (await c.req.json().catch(() => null)) as { email?: unknown } | null;
+  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (email.includes("@")) {
+    const token = await createMagicLinkToken(db, email);
+    const base = process.env.ETAX_PUBLIC_URL || c.req.header("Origin") || "";
+    const link = `${base}/?magic=${encodeURIComponent(token)}`;
+    await sendMail({
+      to: email,
+      subject: "eTaxAgent ログインリンク",
+      text: `eTaxAgent へのログインリンクです（15分間有効・1回限り）。\n\n${link}\n\n心当たりがない場合は、このメールを無視してください。`,
+    });
+  }
+  return c.json({});
+};
+
+export const magicLinkConsumeRoute = createRoute({
+  method: "post",
+  path: "/api/auth/magic-link/consume",
+  request: {
+    body: {
+      content: { "application/json": { schema: MagicLinkConsumeRequestSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: AuthSessionResponseSchema } },
+      description: "リンクを消費し、セッションを発行した",
+    },
+  },
+});
+
+export const magicLinkConsumeHandler: RouteHandler<typeof magicLinkConsumeRoute> = async (c) => {
+  const db = requireDb(c);
+  const body = (await c.req.json().catch(() => null)) as { token?: unknown } | null;
+  const token = typeof body?.token === "string" ? body.token : "";
+  const email = token ? await consumeMagicLinkToken(db, token) : undefined;
+  if (!email) {
+    throw new HTTPException(401, { message: "リンクが無効か期限切れです" });
+  }
+  const user = (await getUserByEmail(db, email)) ?? (await createPasswordlessUser(db, email));
+  const sessionToken = await issueSession(c, db, user.id);
+  return c.json({
+    user: { id: user.id, email: user.email, totp_enabled: user.totpEnabled },
+    token: sessionToken,
+  });
+};
