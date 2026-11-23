@@ -275,6 +275,12 @@ export const AgentChatPanel = ({
                 「『よどばし』を消耗品費にする分類ルールを追加して」
               </Text>
             ) : null}
+            {messages.length === 0 && !loading ? (
+              <Text variant="muted">
+                ※ このアシスタントは税制の一般的な説明と、帳簿の集計・計算・操作の代行を行います。
+                個別の取引が経費にできるか等の税務判断は行いません。個別の判断が必要な場合は税理士へご相談ください。
+              </Text>
+            ) : null}
             <MessageBubbles items={messages} />
             {loading && (
               <div className={clsx(styles.bubble, styles.role[ChatRole.Assistant])}>
