@@ -34,13 +34,10 @@ services:
       PORT: "43107"
       # DB は compose 内の db サービスへ。認証情報は db と同じ変数から組み立てる。
       DATABASE_URL: postgres://${POSTGRES_USER:-etax}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-etaxagent}
-      # SystemOne（Ollama）はホスト側で動くため、ホストゲートウェイ経由で引く。
-      # VPS 等ホストに Ollama が無い環境では、.env の SYSTEMONE_BASE_URL で
-      # 別エンドポイントに差し替えるか、空にして無効化できる（判定はルールへ
-      # フォールバックする）。
-      SYSTEMONE_BASE_URL: ${SYSTEMONE_BASE_URL:-http://host.docker.internal:11434}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    # SystemOne（Ollama 等のローカルLLM）はデプロイ構成に含めない（重いため、
+    # 使う場合は別PCで運用する前提）。未接続でもアプリは正常に動作し、
+    # 科目判定は履歴・ルールへフォールバックする。接続先が要る場合だけ
+    # packages/server/.env の SYSTEMONE_BASE_URL で指定する。
     ports:
       # Cloudflare Tunnel の etax サービスがこのポートへ流す。
       - "127.0.0.1:43107:43107"
