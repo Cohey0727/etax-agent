@@ -26,6 +26,7 @@ export const importsTable = sqliteTable("imports", {
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
 export const transactionsTable = sqliteTable("transactions", {
@@ -59,6 +60,7 @@ export const transactionsTable = sqliteTable("transactions", {
    * 要件のため、取引は物理削除せずこの列で削除済みにする。
    */
   deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
 /**
@@ -95,6 +97,7 @@ export const filingStatusTable = sqliteTable("filing_status", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
 /**
@@ -128,6 +131,7 @@ export const taxpayerProfilesTable = sqliteTable("taxpayer_profiles", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
 /**
@@ -146,6 +150,7 @@ export const filingSnapshotsTable = sqliteTable("filing_snapshots", {
     .$defaultFn(() => new Date()),
   /** 確定時点の計算結果（FilingSnapshotFigures の JSON） */
   figures: text("figures", { mode: "json" }).notNull(),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
 /**
@@ -201,6 +206,7 @@ export const fixedAssetsTable = sqliteTable("fixed_assets", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
 export type ImportRow = typeof importsTable.$inferSelect;
@@ -233,10 +239,58 @@ export const receiptsTable = sqliteTable("receipts", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
 export type ReceiptRow = typeof receiptsTable.$inferSelect;
 export type NewReceiptRow = typeof receiptsTable.$inferInsert;
+
+/**
+ * ユーザー（SaaS のマルチテナントの単位）。
+ * ローカル運用（認証オフ）では行を作らず、データの所有者は既定の 1 として扱う。
+ */
+export const usersTable = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  /** Bun.password（argon2id）のハッシュ */
+  passwordHash: text("password_hash").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/** ログインセッション。トークン自体は保存せず SHA-256 ハッシュで持つ。 */
+export const sessionsTable = sqliteTable("sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/** 外部エージェント（MCP）接続用の API キー。キー自体は保存せずハッシュで持つ。 */
+export const apiKeysTable = sqliteTable("api_keys", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id),
+  name: text("name").notNull().default(""),
+  keyHash: text("key_hash").notNull().unique(),
+  /** 表示用の接頭辞（例: etax_ Ab3dEf5） */
+  keyPrefix: text("key_prefix").notNull().default(""),
+  lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type UserRow = typeof usersTable.$inferSelect;
+export type SessionRow = typeof sessionsTable.$inferSelect;
+export type ApiKeyRow = typeof apiKeysTable.$inferSelect;
 
 export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
 export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;

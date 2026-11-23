@@ -26,8 +26,8 @@ function createTestDb(): Db {
       extracted text,
       transaction_id integer,
       created_at integer NOT NULL,
-      updated_at integer NOT NULL
-    );
+      updated_at integer NOT NULL,
+      owner_user_id integer NOT NULL DEFAULT 1);
   `);
   return drizzle(client, { schema }) as Db;
 }

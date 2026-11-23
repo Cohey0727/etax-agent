@@ -1,0 +1,38 @@
+/**
+ * authSession.ts — リクエストからセッション/APIキーを解決する共通処理（usecases）。
+ *
+ * Authorization: Bearer <token>（セッショントークン、または etax_ で始まる
+ * API キー）と Cookie（etax_session）の両方を受ける。MCP クライアントは
+ * API キーを Bearer で送る想定。
+ */
+import { Context } from "hono";
+import { getCookie } from "hono/cookie";
+import { Db } from "../lib/db";
+import { resolveApiKeyUserId, resolveSessionUserId } from "../repositories/userRepository";
+
+export const SESSION_COOKIE = "etax_session";
+
+/** リクエストの資格情報からユーザーIDを解決する。無ければ undefined。 */
+export async function resolveRequestUserId(
+  db: Db,
+  c: Context,
+): Promise<number | undefined> {
+  const authorization = c.req.header("Authorization");
+  const bearer = authorization?.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : undefined;
+  const token = bearer ?? getCookie(c, SESSION_COOKIE);
+  if (!token) return undefined;
+  if (token.startsWith("etax_")) return resolveApiKeyUserId(db, token);
+  return resolveSessionUserId(db, token);
+}
+
+/** リクエストのセッショントークン（ログアウト用）。 */
+export function requestSessionToken(c: Context): string | undefined {
+  const authorization = c.req.header("Authorization");
+  if (authorization?.startsWith("Bearer ")) {
+    const token = authorization.slice("Bearer ".length).trim();
+    if (!token.startsWith("etax_")) return token;
+  }
+  return getCookie(c, SESSION_COOKIE);
+}
