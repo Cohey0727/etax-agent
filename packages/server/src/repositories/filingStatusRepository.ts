@@ -4,9 +4,9 @@
  * 状態は「済ませた日時」で持ち、null が未了を表す。行 → API 形式への
  * 変換もここで行う（boolean は日時の有無から導く）。
  */
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { Db } from "../lib/db";
-import { ownerIdForWrite } from "../lib/tenantContext";
+import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { FilingStatusResponse } from "../schemas/filingStatus";
 import { FilingStatusRow, filingStatusTable } from "./schema";
 
@@ -23,9 +23,13 @@ export function filingStatusToApi(row: FilingStatusRow): FilingStatusResponse {
   };
 }
 
-/** 全年度の申告ステータスを年の昇順で取得する。 */
+/** 全年度の申告ステータスを年の昇順で取得する（テナント文脈があれば所有者で絞る）。 */
 export async function listFilingStatusRows(db: Db): Promise<FilingStatusRow[]> {
-  return db.select().from(filingStatusTable).orderBy(asc(filingStatusTable.year));
+  const owner = currentUserId();
+  const query = db.select().from(filingStatusTable);
+  const filtered =
+    owner !== undefined ? query.where(eq(filingStatusTable.ownerUserId, owner)) : query;
+  return filtered.orderBy(asc(filingStatusTable.year));
 }
 
 export interface FilingStatusPatch {

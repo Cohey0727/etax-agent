@@ -25,9 +25,18 @@
  *   DATABASE_URL  : PostgreSQL の接続文字列（DB機能に必須）。
  */
 import { join } from "node:path";
+import { currentUserId, LEGACY_OWNER_ID } from "./tenantContext";
 
 /** 設定不備を表す例外。instanceof 判定のための慣用としてクラスで定義する。 */
 export class ConfigError extends Error {}
+
+/**
+ * 設定の上書きを所有者（テナント）ごとに引くためのキー。
+ * テナント文脈が無い場合（起動時・認証オフ運用）は既定ユーザーを指す。
+ */
+function settingsOwnerId(): number {
+  return currentUserId() ?? LEGACY_OWNER_ID;
+}
 
 export type AgentSchema = "openai" | "claude";
 
@@ -94,51 +103,77 @@ export interface SystemOneOverrides {
   model?: string;
 }
 
-let systemOneOverrides: SystemOneOverrides = {};
+/** 所有者ごとの SystemOne 設定の上書き（テナント分離）。 */
+const systemOneOverridesByOwner = new Map<number, SystemOneOverrides>();
 
-/** 保存済み設定の上書きを差し替える（systemOneSettingsRepository が使う）。 */
+/** 保存済み設定の上書きを差し替える（現在のテナントの所有者として保持する）。 */
 export function setSystemOneOverrides(overrides: SystemOneOverrides): void {
-  systemOneOverrides = overrides;
+  setSystemOneOverridesForOwner(settingsOwnerId(), overrides);
 }
 
-/** 現在の上書き（保存済み設定）を読む。 */
+/** 所有者を指定して上書きを差し替える（起動時の全所有者読み込み用）。 */
+export function setSystemOneOverridesForOwner(
+  ownerId: number,
+  overrides: SystemOneOverrides,
+): void {
+  systemOneOverridesByOwner.set(ownerId, overrides);
+}
+
+/** 現在のテナントの上書き（保存済み設定）を読む。 */
 export function getSystemOneOverrides(): SystemOneOverrides {
-  return systemOneOverrides;
+  return systemOneOverridesByOwner.get(settingsOwnerId()) ?? {};
 }
 
 /**
  * 設定画面で編集された jev 用プロンプトの上書き（空文字＝未設定）。
  * 設定がある間は、学習履歴から自動生成されるプロンプトより優先される。
+ * 所有者ごとに保持する（テナント分離）。
  */
-let jevPromptOverride = "";
+const jevPromptOverrideByOwner = new Map<number, string>();
 
 /** 保存済みの jev 用プロンプト上書きを差し替える（jevPromptRepository が使う）。 */
 export function setJevPromptOverride(prompt: string): void {
-  jevPromptOverride = prompt;
+  setJevPromptOverrideForOwner(settingsOwnerId(), prompt);
 }
 
-/** 現在の jev 用プロンプト上書きを読む（未設定なら空文字）。 */
+/** 所有者を指定して jev 用プロンプト上書きを差し替える（起動時の全所有者読み込み用）。 */
+export function setJevPromptOverrideForOwner(ownerId: number, prompt: string): void {
+  jevPromptOverrideByOwner.set(ownerId, prompt);
+}
+
+/** 現在のテナントの jev 用プロンプト上書きを読む（未設定なら空文字）。 */
 export function getJevPromptOverride(): string {
-  return jevPromptOverride;
+  return jevPromptOverrideByOwner.get(settingsOwnerId()) ?? "";
 }
 
 /**
  * 設定画面で編集された正規表現ルールの上書き（null＝未設定）。
  * 設定がある間は、学習履歴から自動生成されるルールより優先される
- * （実効ルールはこのリストそのものになる）。
+ * （実効ルールはこのリストそのものになる）。所有者ごとに保持する。
  */
-let regexRulesOverride: { pattern: string; category: string }[] | null = null;
+const regexRulesOverrideByOwner = new Map<
+  number,
+  { pattern: string; category: string }[] | null
+>();
 
 /** 保存済みの正規表現ルール上書きを差し替える（regexRulesRepository が使う）。 */
 export function setRegexRulesOverride(
   rules: { pattern: string; category: string }[] | null,
 ): void {
-  regexRulesOverride = rules;
+  setRegexRulesOverrideForOwner(settingsOwnerId(), rules);
 }
 
-/** 現在の正規表現ルール上書きを読む（未設定なら null）。 */
+/** 所有者を指定して正規表現ルール上書きを差し替える（起動時の全所有者読み込み用）。 */
+export function setRegexRulesOverrideForOwner(
+  ownerId: number,
+  rules: { pattern: string; category: string }[] | null,
+): void {
+  regexRulesOverrideByOwner.set(ownerId, rules);
+}
+
+/** 現在のテナントの正規表現ルール上書きを読む（未設定なら null）。 */
 export function getRegexRulesOverride(): { pattern: string; category: string }[] | null {
-  return regexRulesOverride;
+  return regexRulesOverrideByOwner.get(settingsOwnerId()) ?? null;
 }
 
 /**
@@ -146,14 +181,15 @@ export function getRegexRulesOverride(): { pattern: string; category: string }[]
  * 設定画面で保存された値があれば、環境変数より優先する。
  */
 export function loadSystemOneConfig(): SystemOneConfig {
+  const overrides = getSystemOneOverrides();
   return {
     baseUrl: (
-      systemOneOverrides.baseUrl ||
+      overrides.baseUrl ||
       process.env.SYSTEMONE_BASE_URL ||
       "http://127.0.0.1:11434"
     ).replace(/\/+$/, ""),
-    apiKey: systemOneOverrides.apiKey || process.env.SYSTEMONE_API_KEY || null,
-    model: systemOneOverrides.model || process.env.SYSTEMONE_MODEL || null,
+    apiKey: overrides.apiKey || process.env.SYSTEMONE_API_KEY || null,
+    model: overrides.model || process.env.SYSTEMONE_MODEL || null,
   };
 }
 

@@ -1,9 +1,10 @@
 /**
  * importRepository.ts — 取込履歴（imports）テーブルへのデータアクセス（repositories）。
  */
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Transaction } from "@etax/shared";
 import { Db } from "../lib/db";
+import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { CsvMapping } from "../schemas/importCsv";
 import { ImportRecordResponse } from "../schemas/importRecord";
 import { ImportRow, importsTable, transactionHistoryTable, transactionsTable } from "./schema";
@@ -21,9 +22,13 @@ export function importToApi(row: ImportRow): ImportRecordResponse {
   };
 }
 
-/** 取込履歴を新しい順に最大100件取得する。 */
+/** 取込履歴を新しい順に最大100件取得する（テナント文脈があれば所有者で絞る）。 */
 export async function listImportRows(db: Db): Promise<ImportRow[]> {
-  return db.select().from(importsTable).orderBy(desc(importsTable.id)).limit(100);
+  const owner = currentUserId();
+  const query = db.select().from(importsTable);
+  const filtered =
+    owner !== undefined ? query.where(eq(importsTable.ownerUserId, owner)) : query;
+  return filtered.orderBy(desc(importsTable.id)).limit(100);
 }
 
 /**
@@ -39,6 +44,7 @@ export async function createImportWithTransactions(
     transactions: Transaction[];
   },
 ): Promise<number | undefined> {
+  const ownerUserId = ownerIdForWrite();
   const [imp] = await db
     .insert(importsTable)
     .values({
@@ -46,6 +52,7 @@ export async function createImportWithTransactions(
       sourceName: input.sourceName,
       mapping: input.mapping as unknown as Record<string, unknown>,
       rowCount: input.transactions.length,
+      ownerUserId,
     })
     .returning({ id: importsTable.id });
   const importId = imp?.id;
@@ -62,6 +69,7 @@ export async function createImportWithTransactions(
           incomeType: t.income_type,
           taxCategory: t.tax_category,
           importId,
+          ownerUserId,
         })),
       )
       .returning();
