@@ -45,6 +45,8 @@ import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
 import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { ensureTables, getDb, isDatabaseConfigured } from "./lib/db";
+import { billingEnabled } from "./gateways/stripeGateway";
+import { hasActivePlan } from "./repositories/subscriptionRepository";
 import { authRequired, runWithTenant } from "./lib/tenantContext";
 import { resolveRequestUserId } from "./usecases/authSession";
 import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
@@ -55,6 +57,7 @@ import { loadJevPromptOverride } from "./repositories/jevPromptRepository";
 import { loadRegexRulesOverride } from "./repositories/regexRulesRepository";
 import agentRoutes from "./routes/agent";
 import authRoutes from "./routes/auth";
+import billingRoutes from "./routes/billing";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
 import etaxRoutes from "./routes/etax";
@@ -86,7 +89,8 @@ async function authMiddleware(
   next: Next,
 ): Promise<Response | void> {
   const path = c.req.path;
-  const isPublic = path.startsWith("/api/auth/") || path === "/api/health";
+  const isPublic =
+    path.startsWith("/api/auth/") || path === "/api/health" || path === "/api/billing/webhook";
   const db = getDb();
   const userId = db ? await resolveRequestUserId(db, c) : undefined;
   if (userId === undefined) {
@@ -100,8 +104,26 @@ async function authMiddleware(
 app.use("/api/*", authMiddleware);
 app.use("/mcp", authMiddleware);
 
+/**
+ * プランゲート: SaaS モード（認証必須＋課金有効）のときだけ、XTX 出力などの
+ * 有料機能は有効なプラン（active / trialing）を必須にする。
+ * ローカル運用・課金未設定では制限しない。
+ */
+async function planGateMiddleware(c: Context, next: Next): Promise<Response | void> {
+  if (!authRequired() || !billingEnabled()) return next();
+  const db = getDb();
+  if (!db) return next();
+  if (await hasActivePlan(db)) return next();
+  return c.json(
+    { message: "この機能は有料プラン（月額490円）への加入が必要です" },
+    402,
+  );
+}
+app.use("/api/etax/*", planGateMiddleware);
+
 app.route("/", healthRoutes);
 app.route("/", authRoutes);
+app.route("/", billingRoutes);
 app.route("/", calcRoutes);
 app.route("/", transactionsRoutes);
 app.route("/", importsRoutes);

@@ -203,6 +203,17 @@ export async function ensureTables(): Promise<void> {
     )
   `);
   db.run(sql`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      owner_user_id integer NOT NULL UNIQUE,
+      stripe_customer_id text NOT NULL DEFAULT '',
+      stripe_subscription_id text NOT NULL DEFAULT '',
+      status text NOT NULL DEFAULT 'none',
+      current_period_end integer,
+      updated_at integer NOT NULL
+    )
+  `);
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS filing_inputs (
       owner_user_id integer NOT NULL DEFAULT 1,
       year integer NOT NULL,
