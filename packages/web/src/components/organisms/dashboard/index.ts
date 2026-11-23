@@ -1,4 +1,5 @@
 export * from "./DashboardPanel";
+export * from "./SetupChecklistPanel";
 export * from "./DashboardSkeleton";
 export * from "./YearlyTrendPanel";
 export * from "./BreakdownPanel";

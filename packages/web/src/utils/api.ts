@@ -369,6 +369,34 @@ export interface TaxpayerProfileResult {
 }
 
 /** 納税者プロフィール（年度別・DB保存）を取得する。取得できない場合は null。 */
+/** 対象年の申告入力（控除・税額控除・雑所得・申告種別）をDBから取得する。未保存・失敗時は null。 */
+export async function fetchFilingInputs(
+  year: number,
+): Promise<{ state: unknown } | null> {
+  try {
+    const resp = await fetch(`/api/filing-inputs/${year}`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { state: unknown };
+    return data.state === null || data.state === undefined ? null : { state: data.state };
+  } catch {
+    return null;
+  }
+}
+
+/** 対象年の申告入力をDBへ保存する。失敗した場合は false。 */
+export async function saveFilingInputs(year: number, state: unknown): Promise<boolean> {
+  try {
+    const resp = await fetch(`/api/filing-inputs/${year}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state }),
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchTaxpayerProfile(
   year: number,
 ): Promise<TaxpayerProfileResult | null> {

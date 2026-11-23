@@ -203,6 +203,15 @@ export async function ensureTables(): Promise<void> {
     )
   `);
   db.run(sql`
+    CREATE TABLE IF NOT EXISTS filing_inputs (
+      owner_user_id integer NOT NULL DEFAULT 1,
+      year integer NOT NULL,
+      state text NOT NULL,
+      updated_at integer NOT NULL,
+      PRIMARY KEY (owner_user_id, year)
+    )
+  `);
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS users (
       id integer PRIMARY KEY AUTOINCREMENT,
       email text NOT NULL UNIQUE,

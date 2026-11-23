@@ -8,7 +8,7 @@ import {
   TaxCreditInputs,
   Transaction,
 } from "@etax/shared";
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import { Tabs } from "@components/molecules";
 import {
@@ -34,6 +34,7 @@ import {
   BreakdownEntry,
   DeductionState,
   applyBreakdownEntries,
+  hydrateDeductionStateFromServer,
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
@@ -94,6 +95,16 @@ const FilingWorkspace = ({
   const [deductionState, setDeductionState] = useState<DeductionState>(() =>
     loadDeductionState(year),
   );
+  // 申告入力の正はサーバーDB。表示時にサーバー値を取り込んでから再読込する。
+  useEffect(() => {
+    let cancelled = false;
+    void hydrateDeductionStateFromServer(year).then(() => {
+      if (!cancelled) setDeductionState(loadDeductionState(year));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [year]);
   const filingOptions: BlueDeductionOptions = {
     filingType: deductionState.filingType,
     realEstateBusinessScale: deductionState.realEstateBusinessScale,

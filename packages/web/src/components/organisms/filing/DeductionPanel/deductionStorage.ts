@@ -1,5 +1,11 @@
 /**
- * deductionStorage.ts — 控除・税額控除の入力を年度ごとに端末へ保存する。
+ * deductionStorage.ts — 控除・税額控除・雑所得・申告種別の入力（年度別）。
+ *
+ * 保存先はサーバーのDB（filing_inputs）。端末の localStorage は同期読み出し
+ * 用のキャッシュとして併用する: 保存は両方へ書き、画面表示時は
+ * hydrateDeductionStateFromServer でサーバー値をキャッシュへ取り込む。
+ * サーバーに無く端末にだけ値がある場合は、取り込み時にサーバーへ移行する
+ * （旧 localStorage 保存からの移行は一度きり）。
  * 保存値が壊れていても空の入力にフォールバックする。
  */
 import {
@@ -11,6 +17,7 @@ import {
   MiscIncomeInput,
   TaxCreditInputs,
 } from "@etax/shared";
+import { fetchFilingInputs, saveFilingInputs } from "@utils/api";
 
 /**
  * 内訳の1件（名称と金額）。寄附金・社会保険料・小規模企業共済等・医療費の
@@ -180,45 +187,64 @@ function parseBreakdownEntries(raw: unknown): BreakdownEntry[] {
   return entries;
 }
 
-export function loadDeductionState(year: number): DeductionState {
+/** パース済みの保存値を検証して DeductionState にする。 */
+export function parseDeductionState(parsed: Partial<DeductionState>): DeductionState {
   const base = freshDeductionState();
+  const d = (parsed.deductions ?? {}) as Partial<DeductionInputs>;
+  const deductions: DeductionInputs = {
+    ...base.deductions,
+    ...d,
+    lifeInsurance: { ...base.deductions.lifeInsurance, ...(d.lifeInsurance ?? {}) },
+    earthquakeInsurance: {
+      ...base.deductions.earthquakeInsurance,
+      ...(d.earthquakeInsurance ?? {}),
+    },
+    dependents: { ...base.deductions.dependents, ...(d.dependents ?? {}) },
+    disability: { ...base.deductions.disability, ...(d.disability ?? {}) },
+    casualtyLoss: d.casualtyLoss ?? null,
+    spouseCategory:
+      d.spouseCategory === "general" || d.spouseCategory === "elderly"
+        ? d.spouseCategory
+        : "none",
+  };
+  return {
+    deductions,
+    taxCredits: { ...base.taxCredits, ...(parsed.taxCredits ?? {}) },
+    miscIncome: parseMiscIncome(parsed.miscIncome),
+    filingType: FILING_TYPES.includes(parsed.filingType as FilingType)
+      ? (parsed.filingType as FilingType)
+      : "blue65",
+    realEstateBusinessScale: parsed.realEstateBusinessScale === true,
+    donationEntries: parseBreakdownEntries(parsed.donationEntries),
+    socialInsuranceEntries: parseBreakdownEntries(parsed.socialInsuranceEntries),
+    mutualAidEntries: parseBreakdownEntries(parsed.mutualAidEntries),
+    medicalEntries: parseBreakdownEntries(parsed.medicalEntries),
+  };
+}
+
+export function loadDeductionState(year: number): DeductionState {
   try {
     const raw = localStorage.getItem(storageKey(year));
-    if (!raw) return base;
-    const parsed = JSON.parse(raw) as Partial<DeductionState>;
-    const d = (parsed.deductions ?? {}) as Partial<DeductionInputs>;
-    const deductions: DeductionInputs = {
-      ...base.deductions,
-      ...d,
-      lifeInsurance: { ...base.deductions.lifeInsurance, ...(d.lifeInsurance ?? {}) },
-      earthquakeInsurance: {
-        ...base.deductions.earthquakeInsurance,
-        ...(d.earthquakeInsurance ?? {}),
-      },
-      dependents: { ...base.deductions.dependents, ...(d.dependents ?? {}) },
-      disability: { ...base.deductions.disability, ...(d.disability ?? {}) },
-      casualtyLoss: d.casualtyLoss ?? null,
-      spouseCategory:
-        d.spouseCategory === "general" || d.spouseCategory === "elderly"
-          ? d.spouseCategory
-          : "none",
-    };
-    return {
-      deductions,
-      taxCredits: { ...base.taxCredits, ...(parsed.taxCredits ?? {}) },
-      miscIncome: parseMiscIncome(parsed.miscIncome),
-      filingType: FILING_TYPES.includes(parsed.filingType as FilingType)
-        ? (parsed.filingType as FilingType)
-        : "blue65",
-      realEstateBusinessScale: parsed.realEstateBusinessScale === true,
-      donationEntries: parseBreakdownEntries(parsed.donationEntries),
-      socialInsuranceEntries: parseBreakdownEntries(parsed.socialInsuranceEntries),
-      mutualAidEntries: parseBreakdownEntries(parsed.mutualAidEntries),
-      medicalEntries: parseBreakdownEntries(parsed.medicalEntries),
-    };
+    if (!raw) return freshDeductionState();
+    return parseDeductionState(JSON.parse(raw) as Partial<DeductionState>);
   } catch {
-    return base;
+    return freshDeductionState();
   }
+}
+
+const serverSaveTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+/** サーバーへの保存（失敗しても編集は続けられる。連続保存はまとめる）。 */
+function saveDeductionStateToServer(year: number, state: DeductionState): void {
+  const existing = serverSaveTimers.get(year);
+  if (existing) clearTimeout(existing);
+  serverSaveTimers.set(
+    year,
+    setTimeout(() => {
+      serverSaveTimers.delete(year);
+      void saveFilingInputs(year, state);
+    }, 400),
+  );
 }
 
 export function saveDeductionState(year: number, state: DeductionState): void {
@@ -226,5 +252,35 @@ export function saveDeductionState(year: number, state: DeductionState): void {
     localStorage.setItem(storageKey(year), JSON.stringify(state));
   } catch {
     // 保存できない環境ではそのまま編集を続ける。
+  }
+  saveDeductionStateToServer(year, state);
+}
+
+/**
+ * サーバーの保存値をキャッシュ（localStorage）へ取り込む。
+ * サーバーに値があればそれが正。無ければ端末の値をサーバーへ移行する。
+ */
+export async function hydrateDeductionStateFromServer(year: number): Promise<void> {
+  const remote = await fetchFilingInputs(year);
+  if (remote) {
+    try {
+      localStorage.setItem(storageKey(year), JSON.stringify(remote.state));
+    } catch {
+      // キャッシュへ書けなくても表示はサーバー値で続けられるよう呼び出し側が再読込する。
+    }
+    return;
+  }
+  let localRaw: string | null = null;
+  try {
+    localRaw = localStorage.getItem(storageKey(year));
+  } catch {
+    localRaw = null;
+  }
+  if (localRaw) {
+    try {
+      await saveFilingInputs(year, JSON.parse(localRaw) as unknown);
+    } catch {
+      // 移行できなくても端末の値で編集は続けられる。
+    }
   }
 }

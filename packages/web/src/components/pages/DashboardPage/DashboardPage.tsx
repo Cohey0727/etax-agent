@@ -4,6 +4,7 @@ import {
   DashboardPanel,
   FilingStatusPanel,
   FreeeTrialBalance,
+  SetupChecklistPanel,
   YearlyTrendPanel,
 } from "@components/organisms/dashboard";
 import { ViewPageProps } from "@types";
@@ -15,6 +16,7 @@ import { ViewPageProps } from "@types";
 export const DashboardPage = ({ transactions, year, onNavigate }: ViewPageProps) => {
   return (
     <Col gap="md">
+      <SetupChecklistPanel transactions={transactions} year={year} onNavigate={onNavigate} />
       <YearlyTrendPanel transactions={transactions} />
       <FilingStatusPanel transactions={transactions} year={year} onNavigate={onNavigate} />
       <DashboardPanel transactions={transactions} year={year} />

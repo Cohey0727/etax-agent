@@ -14,7 +14,7 @@
  * fixed_assets      : 固定資産台帳（減価償却の計算と決算書明細の元データ）
  * receipts          : 証憑（領収書画像）と取引の紐付け
  */
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const importsTable = sqliteTable("imports", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -291,6 +291,27 @@ export const apiKeysTable = sqliteTable("api_keys", {
 export type UserRow = typeof usersTable.$inferSelect;
 export type SessionRow = typeof sessionsTable.$inferSelect;
 export type ApiKeyRow = typeof apiKeysTable.$inferSelect;
+
+/**
+ * 申告入力（控除・税額控除・雑所得・申告種別）の年度別保存。
+ * 形は画面側の DeductionState（JSON）で、サーバーは検証せずそのまま持つ。
+ * 以前はブラウザの localStorage に保存していたものをサーバーDBへ移行した。
+ */
+export const filingInputsTable = sqliteTable(
+  "filing_inputs",
+  {
+    ownerUserId: integer("owner_user_id").notNull().default(1),
+    year: integer("year").notNull(),
+    /** DeductionState の JSON */
+    state: text("state").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [primaryKey({ columns: [table.ownerUserId, table.year] })],
+);
+
+export type FilingInputRow = typeof filingInputsTable.$inferSelect;
 
 export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
 export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;
