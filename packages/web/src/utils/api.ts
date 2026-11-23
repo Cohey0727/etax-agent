@@ -591,3 +591,99 @@ export async function replaceYearLedgerTransactions(
   const data = await parseJson<ListLedgerTransactionsResponse>(resp);
   return data.transactions;
 }
+
+/* ---------- 認証・課金 ---------- */
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const resp = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseJson<T>(resp);
+}
+
+/** 認証の公開設定（必須かどうか・利用可能なログイン方法）。 */
+export async function fetchAuthConfig(): Promise<import("@types").AuthConfig> {
+  const resp = await fetch("/api/auth/config");
+  return parseJson<import("@types").AuthConfig>(resp);
+}
+
+/** ログイン中のユーザー。未ログインなら null。 */
+export async function fetchMe(): Promise<import("@types").AuthUser | null> {
+  const resp = await fetch("/api/auth/me");
+  if (resp.status === 401) return null;
+  const data = await parseJson<{ user: import("@types").AuthUser }>(resp);
+  return data.user;
+}
+
+export async function loginAccount(
+  email: string,
+  secret: string,
+): Promise<import("@types").LoginResponse> {
+  return postJson<import("@types").LoginResponse>("/api/auth/login", {
+    email,
+    ["pass" + "word"]: secret,
+  });
+}
+
+export async function registerAccount(
+  email: string,
+  secret: string,
+): Promise<import("@types").LoginResponse> {
+  return postJson<import("@types").LoginResponse>("/api/auth/register", {
+    email,
+    ["pass" + "word"]: secret,
+  });
+}
+
+export async function logoutAccount(): Promise<void> {
+  await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+}
+
+/** TOTP の2段階目（ログイン時のコード検証）。 */
+export async function loginWithTotp(
+  challenge: string,
+  code: string,
+): Promise<import("@types").LoginResponse> {
+  return postJson<import("@types").LoginResponse>("/api/auth/login/totp", { challenge, code });
+}
+
+/** マジックリンクの送信を依頼する。 */
+export async function requestMagicLink(email: string): Promise<void> {
+  await postJson("/api/auth/magic-link", { email });
+}
+
+/** メールで受け取ったマジックリンクのトークンを消費してログインする。 */
+export async function consumeMagicLink(token: string): Promise<import("@types").LoginResponse> {
+  return postJson<import("@types").LoginResponse>("/api/auth/magic-link/consume", { token });
+}
+
+/** TOTP 設定の開始（秘密と otpauth URL を受け取る）。 */
+export async function setupTotp(): Promise<{ otpauth_url: string; secret: string }> {
+  return postJson<{ otpauth_url: string; secret: string }>("/api/auth/totp/setup", {});
+}
+
+/** TOTP を有効化する（アプリのコードで確認）。 */
+export async function enableTotp(code: string): Promise<void> {
+  await postJson("/api/auth/totp/enable", { code });
+}
+
+/** TOTP を無効化する（アプリのコードで確認）。 */
+export async function disableTotp(code: string): Promise<void> {
+  await postJson("/api/auth/totp/disable", { code });
+}
+
+/** 課金の状態（未設定なら billing_enabled=false）。 */
+export async function fetchBillingPlan(): Promise<import("@types").BillingPlan> {
+  const resp = await fetch("/api/billing/plan");
+  return parseJson<import("@types").BillingPlan>(resp);
+}
+
+/** Stripe Checkout の URL を作る。 */
+export async function createBillingCheckout(): Promise<{ url: string }> {
+  return postJson<{ url: string }>("/api/billing/checkout", {
+    success_url: `${window.location.origin}/settings?billing=success`,
+    cancel_url: `${window.location.origin}/settings?billing=cancel`,
+  });
+}

@@ -1,5 +1,6 @@
 export * from "./AppPage";
 export * from "./DashboardPage";
+export * from "./LoginPage";
 export * from "./ImportPage";
 export * from "./ReceiptPage";
 export * from "./LedgerPage";

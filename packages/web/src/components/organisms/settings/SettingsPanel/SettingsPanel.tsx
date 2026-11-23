@@ -3,6 +3,7 @@ import { Button, Card, Col, Icon, IconName, Input, Row, Text } from "@components
 import { AgentConnectionConfig, SendKeyMode, ThemeMode } from "@types";
 import { testAgentSettings } from "@utils";
 import { AiMemoryPanel } from "../AiMemoryPanel";
+import { AccountPanel } from "../AccountPanel";
 import { SystemOneSettingsPanel } from "../SystemOneSettingsPanel";
 import styles from "./SettingsPanel.css";
 
@@ -89,6 +90,7 @@ export const SettingsPanel = ({
   };
   return (
     <Col gap="lg">
+      <AccountPanel />
       <Card>
         <Col gap="md">
           <Text variant="sectionTitle">外観</Text>
