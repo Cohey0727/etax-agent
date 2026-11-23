@@ -46,7 +46,7 @@ LLM は会話・CSVマッピングの判定・ツールの選択だけを担当�
 |---|---|
 | ランタイム / パッケージ | Bun 1.4+（workspaces モノレポ） |
 | バックエンド | TypeScript + Hono（port 3001） |
-| DB | PostgreSQL 16 + Drizzle ORM（postgres.js ドライバ） |
+| DB | PostgreSQL 19 + Drizzle ORM（node-postgres ドライバ） |
 | フロントエンド | TypeScript + React + Vite（port 5173）+ vanilla-extract |
 
 ※ Next.js は使用していません。
@@ -135,21 +135,29 @@ docker-compose.yml  Postgres 16（ユーザーの Mac 上で使用）
 cd ~/workspace/etax-agent
 bun install
 
-# DB は SQLite（packages/server/data/etax.db）で、起動時に自動で用意される
+# DB は PostgreSQL 19（docker-compose.yml の db サービス）。
+# リポジトリ直下の .env に POSTGRES_PASSWORD を置いてから起動する。
 cp .env.example .env
 
+# アプリ＋DB をまとめて起動（本番相当。画面＋API は 43107）
+docker compose up -d
+
 # 開発サーバー（API: 3001 / Web: 5173、Web は /api を API へプロキシ）
+# ※ DB が要る場合は DATABASE_URL で PostgreSQL を指す
 bun run dev
 ```
 
-DB（SQLite）が開けない場合でもサーバーは起動し、計算・CSV取込（プレビュー）・画面はそのまま使えます。
+DATABASE_URL が未設定、または DB に接続できない場合でもサーバーは起動し、計算・CSV取込（プレビュー）・画面はそのまま使えます。
 取引の保存などDBが必要な API は 503 で理由を返します。
 
 ### 環境変数
 
 | 変数 | 意味 |
 |---|---|
-| `ETAX_DATA_DIR` | 運用データ（SQLite DB・アップロードファイル）の置き場。既定は `packages/server/data` |
+| `DATABASE_URL` | PostgreSQL の接続文字列（DB機能に必須）。compose 起動時は自動で組み立てられる |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | compose の db サービス用（リポジトリ直下の `.env` に置く）。既定は `etax` / （必須） / `etaxagent` |
+| `TEST_DATABASE_URL` | テスト用 PostgreSQL の接続文字列。既定は `postgres://etax:etax@127.0.0.1:5432/etaxagent_test`（使い捨てのテスト専用DBを指すこと） |
+| `ETAX_DATA_DIR` | 運用データ（アップロードファイル・学習履歴）の置き場。既定は `packages/server/data` |
 | `PORT` | APIサーバーのポート（既定 3001） |
 | `AGENT_SCHEMA` | `openai`（OpenAI互換）または `claude`（Anthropic）。既定は `openai` |
 | `AGENT_API_KEY` | APIキー。CSVのAIマッピングと対話エージェントでのみ使用 |
@@ -235,7 +243,7 @@ XTX出力（export_xtx）・申告ステータス（get/set_filing_status）・
 ## 税務知識ベース
 
 エージェント（アプリ内・MCP 共通）が税制のルールや手続きの確認に使う知識ベース。
-国税庁タックスアンサー86件を SQLite（FTS5・trigram）に収録し、
+国税庁タックスアンサー86件を PostgreSQL（pg_trgm の部分一致検索）に収録し、
 `search_tax_knowledge` ツールで検索する。エージェントは不確かな点を推測で答えず、
 検索して出典（タックスアンサー No.XXXX）を添える。
 法改正時の再収集手順など詳細は [docs/tax-knowledge-base.md](docs/tax-knowledge-base.md)。
@@ -266,9 +274,8 @@ bun run build      # web の vite build
 - 非標準ヘッダー（お取引日/ご利用内容/お支払い金額/お預かり金額/差引残高）の
   Shift_JIS 銀行風CSVを、キー無し・自動マッピングで正しく符号つき取引に変換できることを確認
 
-※ この開発VMには Postgres / Docker が無いため、実DBへの保存とマイグレーション適用は
-未検証です（マイグレーションSQLの生成までは確認済み）。Mac 側で
-`docker compose up -d db && bun run db:migrate` を実行して確認してください。
+※ サーバーのテスト（packages/server/test）は PostgreSQL に対して実行します。
+`TEST_DATABASE_URL` が指すテスト専用DB（使い捨て前提）を用意してください。
 AIマッピングも実キーでの疎通は未検証です（検証ロジックとフォールバックは実装済み）。
 
 ## 計算の前提（重要な仮定）

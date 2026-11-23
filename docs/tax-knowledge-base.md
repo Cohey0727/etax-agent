@@ -15,9 +15,9 @@
 | 要素 | 実装 |
 |---|---|
 | 同梱データ | `packages/server/src/services/knowledge/taxKnowledgeData.ts`（番号・タイトル・分野・出典URL・本文） |
-| DB | `knowledge_docs` テーブル＋ `knowledge_fts`（SQLite FTS5、`tokenize='trigram'` で日本語の部分一致検索） |
-| シード | サーバー起動時に `ensureTables` の後で `seedTaxKnowledge()` が同梱データを upsert し、FTS を全再構築する（冪等）。起動ログに「税務知識ベースを準備しました（N件）」が出る |
-| 検索 | `packages/server/src/services/knowledge/searchTaxKnowledge.ts`。FTS の bm25 順が主、3文字未満の語は LIKE で補完、4桁の出典番号は完全一致を優先 |
+| DB | `knowledge_docs` テーブル（PostgreSQL。title / content の pg_trgm GIN インデックス＋ ILIKE で日本語の部分一致検索） |
+| シード | サーバー起動時に `ensureTables` の後で `seedTaxKnowledge()` が同梱データを upsert する（冪等。インデックスは自動維持）。起動ログに「税務知識ベースを準備しました（N件）」が出る |
+| 検索 | `packages/server/src/services/knowledge/searchTaxKnowledge.ts`。trigram 部分一致（タイトル一致・出現位置順）が主、3文字未満の語は ILIKE で補完、4桁の出典番号は完全一致を優先 |
 | ツール | アプリ内エージェント・MCP の双方に `search_tax_knowledge`（query, limit?） |
 
 収録分野：所得税の基本／必要経費・減価償却／青色申告・記帳／所得控除／税額控除／
