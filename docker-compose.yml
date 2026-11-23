@@ -1,17 +1,39 @@
 services:
+  # データベース（PostgreSQL 19）。データは名前付きボリュームで永続化する。
+  db:
+    image: postgres:19
+    container_name: etax-agent-db
+    restart: unless-stopped
+    # 認証情報はリポジトリ直下の .env（Git管理外）から読む。直書きしない。
+    # POSTGRES_PASSWORD は URL に組み込むため、英数字のみにする。
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-etax}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD を .env に設定してください}
+      POSTGRES_DB: ${POSTGRES_DB:-etaxagent}
+    volumes:
+      # postgres:18以降の推奨レイアウト（データは 19/docker 配下に入る）。
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-etax} -d $${POSTGRES_DB:-etaxagent}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   # アプリ本体（Hono サーバー + 画面配信）。
-  # DB は SQLite（データフォルダ内のファイル）、ファイル保存もローカル
-  # フォルダのため、DB・ストレージのコンテナは持たない（同梱アプリと同じ構成）。
   app:
     build: .
     container_name: etax-agent-app
-    # 再起動後も自動で戻る（Docker Desktop が起動していれば）。
     restart: unless-stopped
-    # AGENT_API_KEY など秘密はホスト側の .env から読む（Git管理外）。
+    depends_on:
+      db:
+        condition: service_healthy
+    # AGENT_API_KEY・ETAX_ENCRYPTION_KEY など秘密はホスト側の .env から読む（Git管理外）。
     env_file:
       - packages/server/.env
     environment:
       PORT: "43107"
+      # DB は compose 内の db サービスへ。認証情報は db と同じ変数から組み立てる。
+      DATABASE_URL: postgres://${POSTGRES_USER:-etax}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-etaxagent}
       # SystemOne（Ollama）はホスト側で動くため、ホストゲートウェイ経由で引く。
       SYSTEMONE_BASE_URL: http://host.docker.internal:11434
     extra_hosts:
@@ -20,6 +42,10 @@ services:
       # Cloudflare Tunnel の etax サービスがこのポートへ流す。
       - "127.0.0.1:43107:43107"
     volumes:
-      # サーバー運用データ（SQLite DB・アップロードファイル・freee試算表・
-      # 科目判定の学習履歴）はホスト側に残す。
+      # サーバー運用データ（アップロードファイル・freee試算表・科目判定の
+      # 学習履歴）はホスト側に残す。DB は db サービス側のボリューム。
       - ./packages/server/data:/app/packages/server/data
+
+volumes:
+  pgdata:
+    name: etax-pgdata
