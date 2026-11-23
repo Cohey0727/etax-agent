@@ -4,7 +4,9 @@ import {
   computeIncomeTax,
   DeductionInputs,
   MiscIncomeInput,
+  SalaryIncomeInput,
   filterYear,
+  salaryIncomeAmount,
   TaxCreditInputs,
   Transaction,
 } from "@etax/shared";
@@ -21,6 +23,7 @@ import {
   FilingStatusToggle,
   MiscIncomePanel,
   MonthlyBalance,
+  SalaryPanel,
   TaxCreditPanel,
   TaxpayerPanel,
 } from "@components/organisms/filing";
@@ -129,6 +132,11 @@ const FilingWorkspace = ({
     setDeductionState(state);
     saveDeductionState(year, state);
   };
+  const updateSalaryIncome = (next: SalaryIncomeInput) => {
+    const state = { ...deductionState, salaryIncome: next };
+    setDeductionState(state);
+    saveDeductionState(year, state);
+  };
   const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => {
     const state = applyBreakdownEntries(deductionState, key, entries);
     setDeductionState(state);
@@ -152,7 +160,8 @@ const FilingWorkspace = ({
   const totalIncome =
     computed._detail.business_income +
     computed._detail.real_estate_income +
-    deductionState.miscIncome.income;
+    deductionState.miscIncome.income +
+    salaryIncomeAmount(year, deductionState.salaryIncome.revenue);
   const taxResult = useMemo(
     () =>
       computeIncomeTax({
@@ -203,6 +212,7 @@ const FilingWorkspace = ({
           deductions={deductionState.deductions}
           taxCredits={deductionState.taxCredits}
           miscIncome={deductionState.miscIncome}
+          salaryIncome={deductionState.salaryIncome}
           filingType={deductionState.filingType}
           realEstateBusinessScale={deductionState.realEstateBusinessScale}
           originalIncomeTax={null}
@@ -237,6 +247,7 @@ const FilingWorkspace = ({
     ),
     deductions: (
       <>
+        <SalaryPanel year={year} salaryIncome={deductionState.salaryIncome} onChange={updateSalaryIncome} />
         <MiscIncomePanel miscIncome={deductionState.miscIncome} onChange={updateMiscIncome} />
         <DeductionPanel
           year={year}

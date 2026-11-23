@@ -22,6 +22,17 @@ export function lookupTier(tiers: readonly IncomeTier[], value: number): number 
   return 0;
 }
 
+/** 給与所得控除の段階（収入金額の上限ごとに、定額または 率＋調整額）。 */
+export interface SalaryDeductionTier {
+  upTo: number;
+  /** 定額の控除額（率方式の段階では未設定） */
+  amount?: number;
+  /** 率方式の率（例: 0.3） */
+  rate?: number;
+  /** 率方式の調整額（例: 80,000 / -100,000） */
+  adjust?: number;
+}
+
 /** 1年分の税務パラメータ。 */
 export interface YearTaxParameters {
   /** 基礎控除の段階表（合計所得金額 → 控除額）。 */
@@ -35,9 +46,39 @@ export interface YearTaxParameters {
   specialRelativeTiers: readonly IncomeTier[] | null;
   /** 特定親族特別控除の下限（この額以下は扶養控除の側）。 */
   specialRelativeLowerBound: number;
+  /** 給与所得控除の段階表（国税庁 No.1410 の速算表）。 */
+  salaryDeductionTiers: readonly SalaryDeductionTier[];
 }
 
 const INF = Number.POSITIVE_INFINITY;
+
+/** 給与所得控除の段階表（令和2〜6年分。最低保障額55万円）。 */
+const SALARY_TIERS_2023_2024: readonly SalaryDeductionTier[] = [
+  { upTo: 1_625_000, amount: 550_000 },
+  { upTo: 1_800_000, rate: 0.4, adjust: -100_000 },
+  { upTo: 3_600_000, rate: 0.3, adjust: 80_000 },
+  { upTo: 6_600_000, rate: 0.2, adjust: 440_000 },
+  { upTo: 8_500_000, rate: 0.1, adjust: 1_100_000 },
+  { upTo: INF, amount: 1_950_000 },
+];
+
+/** 給与所得控除の段階表（令和7年分。最低保障額65万円）。 */
+const SALARY_TIERS_2025: readonly SalaryDeductionTier[] = [
+  { upTo: 1_900_000, amount: 650_000 },
+  { upTo: 3_600_000, rate: 0.3, adjust: 80_000 },
+  { upTo: 6_600_000, rate: 0.2, adjust: 440_000 },
+  { upTo: 8_500_000, rate: 0.1, adjust: 1_100_000 },
+  { upTo: INF, amount: 1_950_000 },
+];
+
+/** 給与所得控除の段階表（令和8・9年分。最低保障額74万円）。 */
+const SALARY_TIERS_2026_2027: readonly SalaryDeductionTier[] = [
+  { upTo: 2_200_000, amount: 740_000 },
+  { upTo: 3_600_000, rate: 0.3, adjust: 80_000 },
+  { upTo: 6_600_000, rate: 0.2, adjust: 440_000 },
+  { upTo: 8_500_000, rate: 0.1, adjust: 1_100_000 },
+  { upTo: INF, amount: 1_950_000 },
+];
 
 /** 令和5・6年分の基礎控除（48万円、本則）。 */
 const BASIC_TIERS_2023_2024: readonly IncomeTier[] = [
@@ -67,12 +108,14 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     spouseIncomeLimit: 480_000,
     specialRelativeTiers: null,
     specialRelativeLowerBound: 480_000,
+    salaryDeductionTiers: SALARY_TIERS_2023_2024,
   },
   2024: {
     basicDeductionTiers: BASIC_TIERS_2023_2024,
     spouseIncomeLimit: 480_000,
     specialRelativeTiers: null,
     specialRelativeLowerBound: 480_000,
+    salaryDeductionTiers: SALARY_TIERS_2023_2024,
   },
   2025: {
     // 本則58万円＋令和7・8年分限りの上乗せ特例（措法41条の16の2）
@@ -90,6 +133,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     spouseIncomeLimit: 580_000,
     specialRelativeTiers: SPECIAL_RELATIVE_TIERS_2025,
     specialRelativeLowerBound: 580_000,
+    salaryDeductionTiers: SALARY_TIERS_2025,
   },
   2026: {
     // 上乗せ特例が縮小（132万円以下は78万円）
@@ -107,6 +151,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     // 令和8年分の段階表は所得基準が異なるため未収録（従来どおり控除 0）
     specialRelativeTiers: null,
     specialRelativeLowerBound: 580_000,
+    salaryDeductionTiers: SALARY_TIERS_2026_2027,
   },
   2027: {
     // 上乗せ特例なし（本則のみ）
@@ -119,6 +164,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     spouseIncomeLimit: 580_000,
     specialRelativeTiers: null,
     specialRelativeLowerBound: 580_000,
+    salaryDeductionTiers: SALARY_TIERS_2026_2027,
   },
 };
 

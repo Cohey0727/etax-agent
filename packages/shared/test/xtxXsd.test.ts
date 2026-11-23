@@ -32,6 +32,7 @@ import {
   computeSimplifiedConsumptionReturn,
   computeSpecial20ConsumptionReturn,
   depreciationDetailRow,
+  salaryIncomeAmount,
 } from "../src";
 
 const XSD_DIR = process.env.ETAX_XSD_DIR ?? join(import.meta.dir, "fixtures/etax-xsd");
@@ -97,6 +98,47 @@ function incomeSample(year: number): string {
     withholdingTax: 0,
     prepaidTax: 0,
     originalThirdPeriodTax: 1_000_000,
+  });
+}
+
+function salarySample(year: number): string {
+  const transactions: Transaction[] = [
+    {
+      date: `${year}-06-15`,
+      year,
+      description: "事業売上",
+      amount: 3_000_000,
+      account: "普通預金",
+      category: "売上高",
+      income_type: "business",
+      tax_category: "",
+    },
+  ];
+  const figures = computeCorrectedFigures(transactions, year);
+  const salaryRevenue = 5_000_000;
+  const tax = computeIncomeTax({
+    year,
+    totalIncome:
+      figures._detail.business_income +
+      figures._detail.real_estate_income +
+      salaryIncomeAmount(year, salaryRevenue),
+    deductions: EMPTY_DEDUCTION_INPUTS,
+    taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+  });
+  return buildXtxFiling({
+    year,
+    amendment: false,
+    submissionDate: "2026-03-10",
+    taxpayer: TAXPAYER,
+    figures,
+    deductionInputs: EMPTY_DEDUCTION_INPUTS,
+    miscIncome: EMPTY_MISC_INCOME,
+    salaryIncome: { revenue: salaryRevenue },
+    tax,
+    categoryTotals: { business: {}, realEstate: {} },
+    withholdingTax: 500_000,
+    prepaidTax: 0,
+    originalThirdPeriodTax: null,
   });
 }
 
@@ -277,6 +319,7 @@ describe("公式XMLスキーマ検証", () => {
       ["shotoku2024.xtx", incomeSample(2024), "shotoku/RKO0010-240.xsd"],
       ["shotoku2025.xtx", incomeSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuWhite2025.xtx", whiteSample(2025), "shotoku/RKO0010-250.xsd"],
+      ["shotokuSalary2025.xtx", salarySample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuDepBs2025.xtx", depBsSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
       ["shohiSpecial20.xtx", special20Sample(), "shohi/RSH0010-260.xsd"],

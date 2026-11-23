@@ -48,6 +48,15 @@ export const MiscIncomeSchema = z
 
 export type MiscIncomeRequest = z.infer<typeof MiscIncomeSchema>;
 
+/** 給与所得の入力（収入金額のみ。所得金額は給与所得控除で計算する）。 */
+export const SalaryIncomeSchema = z
+  .object({
+    revenue: z.number(),
+  })
+  .openapi("SalaryIncome");
+
+export type SalaryIncomeRequest = z.infer<typeof SalaryIncomeSchema>;
+
 /** 減価償却明細の元になる固定資産の入力（XTX出力用。台帳DBとは別に直接渡せる）。 */
 export const XtxFixedAssetSchema = z
   .object({
@@ -96,6 +105,7 @@ export const ExportXtxRequestSchema = z
     deductions: DeductionInputsSchema,
     tax_credits: TaxCreditInputsSchema,
     misc_income: MiscIncomeSchema.optional(),
+    salary_income: SalaryIncomeSchema.optional(),
     filing_type: z.enum(["blue65", "blue55", "blue10", "white"]).optional(),
     real_estate_business_scale: z.boolean().optional(),
     withholding_tax: z.number(),

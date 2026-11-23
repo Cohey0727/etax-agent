@@ -28,7 +28,7 @@
  * CATALOG（管理用部分）の RDF は CATALOG.xsd が lax のため骨格のみとし、
  * FORM_SEC には様式IDを列挙する。帳票の中身は CONTENTS 側が正。
  */
-import { DeductionInputs, IncomeTaxResult, MiscIncomeInput } from "./deductions";
+import { DeductionInputs, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, salaryIncomeAmount } from "./deductions";
 import { CorrectedFigures, FilingType } from "./taxcalc";
 import { DepreciationDetailRow } from "./depreciation";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
@@ -103,6 +103,8 @@ export interface XtxFilingData {
   deductionInputs: DeductionInputs;
   /** 雑所得（その他）の入力。第一表ク・⑨・⑩に出力する。 */
   miscIncome: MiscIncomeInput;
+  /** 給与所得の入力（収入金額）。第一表オ・⑥に出力する。省略時は給与なし。 */
+  salaryIncome?: SalaryIncomeInput;
   /** 所得税の計算結果（控除・税額控除の内訳を含む） */
   tax: IncomeTaxResult;
   /** 勘定科目別の経費合計（決算書の経費欄に振り分ける） */
@@ -393,6 +395,9 @@ function buildKoa020Face1(data: XtxFilingData): string {
     revenues.push(`<ABB00020>${amount("ABB00030", f.business_revenue)}</ABB00020>`);
   }
   revenues.push(amount("ABB00050", f.real_estate_revenue));
+  if (data.salaryIncome && data.salaryIncome.revenue > 0) {
+    revenues.push(amountAlways("ABB00080", data.salaryIncome.revenue));
+  }
   if (data.miscIncome.revenue > 0) {
     const misc: string[] = [];
     if (data.miscIncome.kubun > 0) misc.push(`<ABB00107>${data.miscIncome.kubun}</ABB00107>`);
@@ -407,6 +412,11 @@ function buildKoa020Face1(data: XtxFilingData): string {
     incomes.push(`<ABB00280>${amountAlways("ABB00300", f._detail.business_income)}</ABB00280>`);
   }
   incomes.push(amountAlways("ABB00340", f._detail.real_estate_income));
+  if (data.salaryIncome && data.salaryIncome.revenue > 0) {
+    incomes.push(
+      amountAlways("ABB00370", salaryIncomeAmount(data.year, data.salaryIncome.revenue)),
+    );
+  }
   if (data.miscIncome.income > 0) {
     // 雑（その他）: ⑨その他 + ⑩（⑦〜⑨の計）。公的年金等・業務はないため計は⑨と同額。
     incomes.push(

@@ -673,6 +673,47 @@ export interface MiscIncomeInput {
 
 export const EMPTY_MISC_INCOME: MiscIncomeInput = { revenue: 0, income: 0, kubun: 0 };
 
+/**
+ * 給与所得の入力。帳簿（事業・不動産）には載らない給与を申告書へ
+ * 反映するための手入力で、第一表の「給与」（オ・⑥）に対応する。
+ * 所得金額は給与所得控除を引いて決定的に計算する（salaryIncomeAmount）。
+ */
+export interface SalaryIncomeInput {
+  /** 給与等の収入金額（源泉徴収票の支払金額） */
+  revenue: number;
+}
+
+export const EMPTY_SALARY_INCOME: SalaryIncomeInput = { revenue: 0 };
+
+/**
+ * 給与所得の金額（No.1410 / No.1400）。段階表は年度パラメータ
+ * （taxParameters）が持つ。収入金額が660万円未満のときは、所得税法
+ * 別表第五の方式（収入金額を4で割って千円未満切捨て→×4した金額を
+ * 基準額として表を引き、所得金額 = 基準額 − 控除額）で求める。
+ */
+export function salaryIncomeAmount(year: number, revenue: number): number {
+  const r = amount(revenue);
+  if (r <= 0) return 0;
+  const tiers = taxParametersFor(year).salaryDeductionTiers;
+  const base = r < 6_600_000 ? Math.floor(r / 4000) * 4000 : r;
+  for (const tier of tiers) {
+    if (base <= tier.upTo) {
+      const deduction =
+        tier.amount !== undefined
+          ? tier.amount
+          : Math.floor(base * (tier.rate ?? 0)) + (tier.adjust ?? 0);
+      return Math.max(base - deduction, 0);
+    }
+  }
+  return 0;
+}
+
+/** 給与所得控除額（収入金額 − 給与所得の金額）。 */
+export function salaryDeductionAmount(year: number, revenue: number): number {
+  const r = amount(revenue);
+  return r - salaryIncomeAmount(year, r);
+}
+
 export interface IncomeTaxOptions {
   year: number;
   /** 合計所得金額（青色申告特別控除後・所得控除前） */
