@@ -10,7 +10,9 @@ import {
   CorrectedFigures,
   DeductionInputs,
   IncomeTaxResult,
+  ManualIncomeBreakdown,
   MiscIncomeInput,
+  SalaryIncomeInput,
   XtxTaxpayer,
 } from "@etax/shared";
 
@@ -18,9 +20,15 @@ import {
 export type ReturnAmountKey =
   | "revBusiness"
   | "revRealEstate"
+  | "revSalary"
+  | "revPension"
+  | "revMiscBusiness"
   | "revMiscOther"
   | "incBusiness"
   | "incRealEstate"
+  | "incSalary"
+  | "incPension"
+  | "incMiscBusiness"
   | "incMiscOther"
   | "incMiscSubtotal"
   | "incTotal"
@@ -95,8 +103,12 @@ export interface ReturnFormSource {
   taxpayer: XtxTaxpayer;
   figures: CorrectedFigures;
   tax: IncomeTaxResult;
-  /** 雑所得（その他）。第一表ク・⑨・⑩に載せる。 */
+  /** 雑所得の入力。第一表カ〜ク・⑦〜⑩に載せる。 */
   miscIncome: MiscIncomeInput;
+  /** 給与所得の入力。第一表オに載せる。 */
+  salaryIncome: SalaryIncomeInput;
+  /** 給与・雑所得の計算内訳（computeManualIncomes の結果）。 */
+  manual: ManualIncomeBreakdown;
   deductionInputs: DeductionInputs;
   withholdingTax: number;
   prepaidTax: number;
@@ -122,11 +134,17 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
   const amounts: Partial<Record<ReturnAmountKey, number>> = {
     revBusiness: figures.business_revenue,
     revRealEstate: figures.real_estate_revenue,
+    revSalary: source.salaryIncome.revenue,
+    revPension: source.miscIncome.pensionRevenue,
+    revMiscBusiness: source.miscIncome.businessRevenue,
     revMiscOther: source.miscIncome.revenue,
     incBusiness: figures._detail.business_income,
     incRealEstate: figures._detail.real_estate_income,
-    incMiscOther: source.miscIncome.income,
-    incMiscSubtotal: source.miscIncome.income,
+    incSalary: source.manual.salary,
+    incPension: source.manual.pension,
+    incMiscBusiness: source.manual.miscBusiness,
+    incMiscOther: source.manual.miscOther,
+    incMiscSubtotal: source.manual.miscTotal,
     incTotal: tax.totalIncome,
     dedSocial: d.socialInsurance,
     dedSmall: d.smallBusinessMutualAid,

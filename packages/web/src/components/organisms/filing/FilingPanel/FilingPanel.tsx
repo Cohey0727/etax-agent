@@ -1,4 +1,4 @@
-import { BlueDeductionOptions, IncomeTaxResult, MiscIncomeInput, Transaction } from "@etax/shared";
+import { BlueDeductionOptions, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, Transaction } from "@etax/shared";
 import { Fragment, useMemo } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
 import {
@@ -65,8 +65,10 @@ export interface FilingPanelProps {
   taxResult?: IncomeTaxResult;
   /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
   filingOptions?: BlueDeductionOptions;
-  /** 雑所得（その他）。所得の要約で合計に含める。 */
+  /** 雑所得。所得の要約で合計に含める。 */
   miscIncome?: MiscIncomeInput;
+  /** 給与所得。所得の要約で合計に含める。 */
+  salaryIncome?: SalaryIncomeInput;
   /** 総合タブから各タブへ遷移する（確定申告画面内のタブ切替）。 */
   onOpenSection?: (section: FilingSection) => void;
 }
@@ -82,13 +84,14 @@ export const FilingPanel = ({
   taxResult,
   filingOptions,
   miscIncome,
+  salaryIncome,
   onOpenSection,
 }: FilingPanelProps) => {
   const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
   const { snapshots, refresh: refreshSnapshots } = useFilingSnapshots(year);
   const currentFigures = useMemo(
-    () => buildSnapshotFigures(transactions, year, filingOptions, miscIncome, taxResult),
-    [transactions, year, filingOptions, miscIncome, taxResult],
+    () => buildSnapshotFigures(transactions, year, filingOptions, miscIncome, taxResult, salaryIncome),
+    [transactions, year, filingOptions, miscIncome, taxResult, salaryIncome],
   );
 
   // 「控除・計算」を確定するときは、その時点の計算結果をスナップショットとして
@@ -157,7 +160,7 @@ export const FilingPanel = ({
                 </div>
                 {item.key === "confirmed" ? (
                   <div className={styles.figuresBlock}>
-                    <IncomeSummary transactions={transactions} year={year} filingOptions={filingOptions} miscIncome={miscIncome} />
+                    <IncomeSummary transactions={transactions} year={year} filingOptions={filingOptions} miscIncome={miscIncome} salaryIncome={salaryIncome} />
                   </div>
                 ) : null}
                 {item.key === "calculated" && taxResult ? (

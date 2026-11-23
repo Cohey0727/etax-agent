@@ -7,9 +7,8 @@
 import {
   BalanceSheetAccount,
   DepreciationDetailRow,
-  EMPTY_MISC_INCOME,
-  EMPTY_SALARY_INCOME,
-  salaryIncomeAmount,
+  normalizeMiscIncomeInput,
+  normalizeSalaryIncomeInput,
   Transaction,
   XtxBalanceSheetInput,
   XtxTaxpayer,
@@ -17,6 +16,7 @@ import {
   categoryTotals,
   computeCorrectedFigures,
   computeIncomeTax,
+  computeManualIncomes,
   depreciationDetailRow,
   filterYear,
   normalizeTransactions,
@@ -154,15 +154,18 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
   });
   const depreciation = depreciationFromWire(body);
   const balanceSheet = balanceSheetFromWire(body);
-  const miscIncome = body.misc_income ?? EMPTY_MISC_INCOME;
-  const salaryIncome = body.salary_income ?? EMPTY_SALARY_INCOME;
+  const miscIncome = normalizeMiscIncomeInput(body.misc_income);
+  const salaryIncome = normalizeSalaryIncomeInput(body.salary_income);
+  const manual = computeManualIncomes(
+    body.year,
+    salaryIncome,
+    miscIncome,
+    figures._detail.business_income + figures._detail.real_estate_income,
+  );
   const tax = computeIncomeTax({
     year: body.year,
     totalIncome:
-      figures._detail.business_income +
-      figures._detail.real_estate_income +
-      miscIncome.income +
-      salaryIncomeAmount(body.year, salaryIncome.revenue),
+      figures._detail.business_income + figures._detail.real_estate_income + manual.total,
     deductions: body.deductions,
     taxCredits: body.tax_credits,
   });

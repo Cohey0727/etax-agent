@@ -172,6 +172,7 @@ function parseSalaryIncome(raw: unknown): SalaryIncomeInput {
   const s = raw as Partial<SalaryIncomeInput>;
   return {
     revenue: typeof s.revenue === "number" && Number.isFinite(s.revenue) ? Math.trunc(s.revenue) : 0,
+    adjustmentEligible: s.adjustmentEligible === true,
   };
 }
 
@@ -181,7 +182,16 @@ function parseMiscIncome(raw: unknown): MiscIncomeInput {
   const m = raw as Partial<MiscIncomeInput>;
   const num = (v: unknown): number =>
     typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0;
-  return { revenue: num(m.revenue), income: num(m.income), kubun: num(m.kubun) };
+  return {
+    revenue: num(m.revenue),
+    income: num(m.income),
+    kubun: num(m.kubun),
+    pensionRevenue: num(m.pensionRevenue),
+    pensionOver65: m.pensionOver65 === true,
+    businessRevenue: num(m.businessRevenue),
+    businessIncome: num(m.businessIncome),
+    businessKubun: num(m.businessKubun),
+  };
 }
 
 /** 保存済みの内訳を検証して取り出す。壊れた要素は捨てる。 */

@@ -658,29 +658,87 @@ export function incomeTaxOnTaxableIncome(taxableIncome: number): number {
 }
 
 /**
- * 雑所得（その他）の入力。帳簿（事業・不動産）には載らない所得を申告書へ
- * 反映するための手入力で、第一表の「雑・その他」（ク・⑨）に対応する。
- * 公的年金等・業務は対象外（必要になったら項目を足す）。
+ * 雑所得の入力。帳簿（事業・不動産）には載らない所得を申告書へ反映する
+ * ための手入力で、第一表の「雑」欄に対応する。3区分を持つ:
+ * - 公的年金等（収入金額カ・所得金額⑦）: 所得金額は公的年金等控除を
+ *   引いて決定的に計算する（publicPensionIncome）。
+ * - 業務（収入金額キ・所得金額⑧）: 副業など営利目的で継続的なもの。
+ *   所得金額は収入金額 − 必要経費を手入力する。
+ * - その他（収入金額ク・所得金額⑨）: 上記以外の雑所得。所得金額は手入力。
  */
 export interface MiscIncomeInput {
-  /** 収入金額（第一表ク） */
+  /** その他: 収入金額（第一表ク） */
   revenue: number;
-  /** 所得金額（第一表⑨）。収入金額から必要経費を引いた額 */
+  /** その他: 所得金額（第一表⑨）。収入金額から必要経費を引いた額 */
   income: number;
   /** その他区分（第一表クの区分）。0 は未設定（出力しない） */
   kubun: number;
+  /** 公的年金等: 収入金額（第一表カ） */
+  pensionRevenue: number;
+  /** 公的年金等: その年の12月31日時点で65歳以上か（控除額の年齢区分） */
+  pensionOver65: boolean;
+  /** 業務: 収入金額（第一表キ） */
+  businessRevenue: number;
+  /** 業務: 所得金額（第一表⑧）。収入金額から必要経費を引いた額 */
+  businessIncome: number;
+  /** 業務区分（第一表キの区分。現金主義の特例は 1）。0 は未設定 */
+  businessKubun: number;
 }
 
-export const EMPTY_MISC_INCOME: MiscIncomeInput = { revenue: 0, income: 0, kubun: 0 };
+export const EMPTY_MISC_INCOME: MiscIncomeInput = {
+  revenue: 0,
+  income: 0,
+  kubun: 0,
+  pensionRevenue: 0,
+  pensionOver65: false,
+  businessRevenue: 0,
+  businessIncome: 0,
+  businessKubun: 0,
+};
+
+/** 部分的な雑所得入力（API の任意項目など）を完全な入力へ寄せる。 */
+export function normalizeMiscIncomeInput(partial: Partial<MiscIncomeInput> | undefined): MiscIncomeInput {
+  if (!partial) return { ...EMPTY_MISC_INCOME };
+  const num = (v: number | undefined): number => (typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0);
+  return {
+    revenue: num(partial.revenue),
+    income: num(partial.income),
+    kubun: num(partial.kubun),
+    pensionRevenue: num(partial.pensionRevenue),
+    pensionOver65: partial.pensionOver65 === true,
+    businessRevenue: num(partial.businessRevenue),
+    businessIncome: num(partial.businessIncome),
+    businessKubun: num(partial.businessKubun),
+  };
+}
+
+/** 部分的な給与所得入力（API の任意項目など）を完全な入力へ寄せる。 */
+export function normalizeSalaryIncomeInput(partial: Partial<SalaryIncomeInput> | undefined): SalaryIncomeInput {
+  if (!partial) return { ...EMPTY_SALARY_INCOME };
+  return {
+    revenue:
+      typeof partial.revenue === "number" && Number.isFinite(partial.revenue)
+        ? Math.trunc(partial.revenue)
+        : 0,
+    adjustmentEligible: partial.adjustmentEligible === true,
+  };
+}
 
 /**
  * 給与所得の入力。帳簿（事業・不動産）には載らない給与を申告書へ
  * 反映するための手入力で、第一表の「給与」（オ・⑥）に対応する。
- * 所得金額は給与所得控除を引いて決定的に計算する（salaryIncomeAmount）。
+ * 所得金額は給与所得控除と所得金額調整控除を引いて決定的に計算する
+ * （computeManualIncomes）。
  */
 export interface SalaryIncomeInput {
   /** 給与等の収入金額（源泉徴収票の支払金額） */
   revenue: number;
+  /**
+   * 所得金額調整控除（子ども・特別障害者等）の対象か。本人が特別障害者、
+   * 23歳未満の扶養親族がいる、特別障害者である同一生計配偶者・扶養親族が
+   * いる、のいずれかに該当し、かつ給与収入が850万円を超える場合に適用。
+   */
+  adjustmentEligible?: boolean;
 }
 
 export const EMPTY_SALARY_INCOME: SalaryIncomeInput = { revenue: 0 };
@@ -712,6 +770,146 @@ export function salaryIncomeAmount(year: number, revenue: number): number {
 export function salaryDeductionAmount(year: number, revenue: number): number {
   const r = amount(revenue);
   return r - salaryIncomeAmount(year, r);
+}
+
+/**
+ * 所得金額調整控除（子ども・特別障害者等を有する者等、No.1411）。
+ * 給与等の収入金額が850万円を超え、対象者（特別障害者本人／23歳未満の
+ * 扶養親族あり／特別障害者である同一生計配偶者・扶養親族あり）の場合に、
+ * 給与所得の金額から控除する。
+ * 控除額 = { min(収入金額, 1,000万円) − 850万円 } × 10%（1円未満切上げ）。
+ */
+export function salaryAdjustmentDeduction1(revenue: number, eligible: boolean): number {
+  const r = amount(revenue);
+  if (!eligible || r <= 8_500_000) return 0;
+  return Math.ceil((Math.min(r, 10_000_000) - 8_500_000) * 0.1);
+}
+
+/**
+ * 所得金額調整控除（給与所得と年金所得の両方を有する者、No.1411）。
+ * 給与所得（調整控除①適用後）と公的年金等雑所得の両方があり、合計が
+ * 10万円を超える場合に、給与所得の金額から控除する。
+ * 控除額 = min(給与所得, 10万円) + min(年金雑所得, 10万円) − 10万円。
+ */
+export function salaryAdjustmentDeduction2(salaryIncomeAfterAdj1: number, pensionIncome: number): number {
+  const s = amount(salaryIncomeAfterAdj1);
+  const p = amount(pensionIncome);
+  if (s <= 0 || p <= 0 || s + p <= 100_000) return 0;
+  return Math.min(s, 100_000) + Math.min(p, 100_000) - 100_000;
+}
+
+/**
+ * 公的年金等控除額（No.1600 の速算表・令和2年分以後）。
+ * 「公的年金等に係る雑所得以外の合計所得金額」が1,000万円以下の区分を
+ * 基準に、1,000万円超2,000万円以下では一律10万円、2,000万円超では
+ * 一律20万円、控除額が縮小する。
+ */
+export function publicPensionDeduction(revenue: number, over65: boolean, otherTotalIncome: number): number {
+  const a = amount(revenue);
+  if (a <= 0) return 0;
+  let deduction: number;
+  if (over65) {
+    if (a <= 1_100_000) deduction = a;
+    else if (a < 3_300_000) deduction = 1_100_000;
+    else if (a < 4_100_000) deduction = a * 0.25 + 275_000;
+    else if (a < 7_700_000) deduction = a * 0.15 + 685_000;
+    else if (a < 10_000_000) deduction = a * 0.05 + 1_455_000;
+    else deduction = 1_955_000;
+  } else {
+    if (a <= 600_000) deduction = a;
+    else if (a < 1_300_000) deduction = 600_000;
+    else if (a < 4_100_000) deduction = a * 0.25 + 275_000;
+    else if (a < 7_700_000) deduction = a * 0.15 + 685_000;
+    else if (a < 10_000_000) deduction = a * 0.05 + 1_455_000;
+    else deduction = 1_955_000;
+  }
+  const other = amount(otherTotalIncome);
+  if (other > 20_000_000) deduction -= 200_000;
+  else if (other > 10_000_000) deduction -= 100_000;
+  // 控除額は収入金額を超えず、マイナスにもならない
+  return Math.min(Math.max(Math.floor(deduction), 0), a);
+}
+
+/** 公的年金等に係る雑所得の金額（収入金額 − 公的年金等控除額、0未満は0）。 */
+export function publicPensionIncome(revenue: number, over65: boolean, otherTotalIncome: number): number {
+  const a = amount(revenue);
+  if (a <= 0) return 0;
+  return Math.max(a - publicPensionDeduction(a, over65, otherTotalIncome), 0);
+}
+
+/** 手入力所得（給与＋雑3区分）の計算内訳。 */
+export interface ManualIncomeBreakdown {
+  /** 給与所得の金額（給与所得控除後・調整控除前） */
+  salaryBase: number;
+  /** 所得金額調整控除（子ども・特別障害者等） */
+  salaryAdjustment1: number;
+  /** 所得金額調整控除（給与＋年金） */
+  salaryAdjustment2: number;
+  /** 給与所得の金額（第一表⑥、調整控除適用後） */
+  salary: number;
+  /** 公的年金等に係る雑所得（第一表⑦） */
+  pension: number;
+  /** 業務に係る雑所得（第一表⑧） */
+  miscBusiness: number;
+  /** その他の雑所得（第一表⑨） */
+  miscOther: number;
+  /** 雑所得の計（第一表⑩ = ⑦+⑧+⑨） */
+  miscTotal: number;
+  /** 手入力所得の合計（給与＋雑計）。帳簿の事業・不動産は含まない */
+  total: number;
+}
+
+/**
+ * 給与・雑所得の最終金額を決定的に計算する。
+ * 公的年金等控除の区分は「公的年金等以外の合計所得金額」で決まるため、
+ * 帳簿側の所得合計（事業＋不動産）を引数で受ける。調整控除②が給与所得を
+ * 減らすと区分が動き得るため、年金所得と調整控除②は安定するまで
+ * 繰り返して確定させる（区分境界は1,000万円/2,000万円、調整控除②は
+ * 最大10万円なので数回で必ず安定する）。
+ */
+export function computeManualIncomes(
+  year: number,
+  salaryInput: SalaryIncomeInput,
+  miscInput: MiscIncomeInput,
+  ledgerIncomeTotal: number,
+): ManualIncomeBreakdown {
+  const salaryBase = salaryIncomeAmount(year, salaryInput.revenue);
+  const adjustment1 = salaryAdjustmentDeduction1(
+    salaryInput.revenue,
+    salaryInput.adjustmentEligible === true,
+  );
+  const salaryAfterAdj1 = Math.max(salaryBase - adjustment1, 0);
+  const miscBusiness = amount(miscInput.businessIncome);
+  const miscOther = amount(miscInput.income);
+  const ledger = amount(ledgerIncomeTotal);
+
+  let pension = 0;
+  let adjustment2 = 0;
+  for (let i = 0; i < 4; i++) {
+    const otherTotal = ledger + salaryAfterAdj1 - adjustment2 + miscBusiness + miscOther;
+    const nextPension = publicPensionIncome(miscInput.pensionRevenue, miscInput.pensionOver65, otherTotal);
+    const nextAdjustment2 = salaryAdjustmentDeduction2(salaryAfterAdj1, nextPension);
+    if (nextPension === pension && nextAdjustment2 === adjustment2) {
+      pension = nextPension;
+      adjustment2 = nextAdjustment2;
+      break;
+    }
+    pension = nextPension;
+    adjustment2 = nextAdjustment2;
+  }
+  const salary = Math.max(salaryAfterAdj1 - adjustment2, 0);
+  const miscTotal = pension + miscBusiness + miscOther;
+  return {
+    salaryBase,
+    salaryAdjustment1: adjustment1,
+    salaryAdjustment2: adjustment2,
+    salary,
+    pension,
+    miscBusiness,
+    miscOther,
+    miscTotal,
+    total: salary + miscTotal,
+  };
 }
 
 export interface IncomeTaxOptions {

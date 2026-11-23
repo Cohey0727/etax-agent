@@ -2,11 +2,11 @@ import {
   BlueDeductionOptions,
   computeCorrectedFigures,
   computeIncomeTax,
+  computeManualIncomes,
   DeductionInputs,
   MiscIncomeInput,
   SalaryIncomeInput,
   filterYear,
-  salaryIncomeAmount,
   TaxCreditInputs,
   Transaction,
 } from "@etax/shared";
@@ -157,11 +157,14 @@ const FilingWorkspace = ({
     onNavigate?.(AppView.Ledger);
   };
 
+  const manualIncomes = computeManualIncomes(
+    year,
+    deductionState.salaryIncome,
+    deductionState.miscIncome,
+    computed._detail.business_income + computed._detail.real_estate_income,
+  );
   const totalIncome =
-    computed._detail.business_income +
-    computed._detail.real_estate_income +
-    deductionState.miscIncome.income +
-    salaryIncomeAmount(year, deductionState.salaryIncome.revenue);
+    computed._detail.business_income + computed._detail.real_estate_income + manualIncomes.total;
   const taxResult = useMemo(
     () =>
       computeIncomeTax({
@@ -177,8 +180,16 @@ const FilingWorkspace = ({
   // どちらからでも行えるため、保存処理はここに寄せて両方から使う。
   const { snapshots, refresh: refreshSnapshots } = useFilingSnapshots(year);
   const currentFigures = useMemo(
-    () => buildSnapshotFigures(transactions, year, filingOptions, deductionState.miscIncome, taxResult),
-    [transactions, year, filingOptions, deductionState.miscIncome, taxResult],
+    () =>
+      buildSnapshotFigures(
+        transactions,
+        year,
+        filingOptions,
+        deductionState.miscIncome,
+        taxResult,
+        deductionState.salaryIncome,
+      ),
+    [transactions, year, filingOptions, deductionState.miscIncome, taxResult, deductionState.salaryIncome],
   );
   const handleConfirmCalculation = async () => {
     if (!currentFigures) return;
@@ -204,6 +215,7 @@ const FilingWorkspace = ({
           taxResult={taxResult}
           filingOptions={filingOptions}
           miscIncome={deductionState.miscIncome}
+          salaryIncome={deductionState.salaryIncome}
           onOpenSection={openSection}
         />
         <TaxpayerPanel
@@ -230,6 +242,7 @@ const FilingWorkspace = ({
               year={year}
               filingOptions={filingOptions}
               miscIncome={deductionState.miscIncome}
+              salaryIncome={deductionState.salaryIncome}
               onOpenUnclassified={() => openLedgerFiltered("unclassified")}
             />
             <FilingStatusToggle
