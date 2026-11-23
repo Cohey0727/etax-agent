@@ -87,9 +87,8 @@ export const SetupChecklistPanel = ({ transactions, year, onNavigate }: SetupChe
             申告に必要な設定の一覧です。各項目は独立しているので、どれからでも始められます。
           </Text>
         </Col>
-        <div className={styles.listScroller}>
-          <Col gap="sm">
-            {items.map((item) => (
+        <Col gap="md">
+          {items.map((item) => (
             <div key={item.label} className={styles.row}>
               <Text className={styles.itemLabel}>
                 {item.label}
@@ -105,8 +104,7 @@ export const SetupChecklistPanel = ({ transactions, year, onNavigate }: SetupChe
               ) : null}
             </div>
           ))}
-          </Col>
-        </div>
+        </Col>
       </Col>
     </Card>
   );

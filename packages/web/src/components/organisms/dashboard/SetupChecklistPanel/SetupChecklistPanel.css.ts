@@ -2,20 +2,13 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
-  // 狭幅（スマホ）では行を潰さず、リスト全体を横スクロールさせる。
-  listScroller: style({
-    overflowX: "auto",
-  }),
   // 独立した項目1件分の行。順序は表さず、状態と移動ボタンだけを示す。
+  // ラベル＋チップ／詳細／ボタンを縦に積み、狭幅でも潰さず最初から全て見えるようにする。
   row: style({
     display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: theme.space.md,
-    minHeight: "24px",
-    // ラベル＋チップ＋詳細＋ボタンが自然な比率を保てる最小幅。
-    // これより狭い画面では listScroller 側が横スクロールする。
-    minWidth: "36rem",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: theme.space.sm,
   }),
   itemLabel: style({
     display: "flex",
@@ -26,11 +19,8 @@ const styles = {
     flexShrink: 0,
     whiteSpace: "nowrap",
   }),
-  // 補足テキスト。残り幅を使い、ここだけが折り返す。
-  detail: style({
-    flex: 1,
-    minWidth: 0,
-  }),
+  // 補足テキスト。行の中で自然に折り返す。
+  detail: style({}),
   stateDone: style({
     fontSize: theme.fontSizes.xs,
     fontWeight: theme.fontWeight.semibold,
