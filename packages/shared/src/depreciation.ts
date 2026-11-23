@@ -265,3 +265,74 @@ export function smallSpecialUsage(
   }
   return { total, cap, exceeded: total > cap };
 }
+
+/** 決算書・収支内訳書の「減価償却費の計算」欄に出す1行分。 */
+export interface DepreciationDetailRow {
+  /** 減価償却資産の名称等 */
+  name: string;
+  /** 面積又は数量（任意） */
+  quantity: string;
+  /** 取得年月 "YYYY-MM" */
+  acquisitionYearMonth: string;
+  cost: number;
+  /** 償却保証額（定率法のみ） */
+  guaranteeAmount: number | null;
+  /** 償却の基礎になる金額 */
+  basisAmount: number;
+  method: DepreciationMethod;
+  /** 様式に出す償却方法の表示名 */
+  methodLabel: string;
+  usefulLifeYears: number;
+  /** 償却率又は改定償却率 */
+  rate: number;
+  /** 本年中の償却期間（月） */
+  months: number;
+  /** 本年分の普通償却費 */
+  ordinary: number;
+  /** 本年分の償却費合計（特別償却は未対応のため普通償却費と同額） */
+  total: number;
+  /** 事業専用割合（不動産は貸付割合） */
+  businessRatioPercent: number;
+  /** 本年分の必要経費算入額 */
+  deductible: number;
+  /** 未償却残高（期末） */
+  closingBookValue: number;
+}
+
+const METHOD_LABELS: Record<DepreciationMethod, string> = {
+  straight_line: "定額法",
+  declining_balance: "定率法",
+  lump_sum: "一括償却",
+  small_special: "少額特例",
+};
+
+/** 資産と年から決算書明細の1行を作る。その年に償却が無ければ null。 */
+export function depreciationDetailRow(
+  name: string,
+  asset: FixedAssetInput,
+  year: number,
+  quantity = "",
+): DepreciationDetailRow | null {
+  const result = depreciationForYear(asset, year);
+  if (!result) return null;
+  const acq = parseYearMonth(asset.acquisitionDate);
+  const mm = String(acq.month).padStart(2, "0");
+  return {
+    name,
+    quantity,
+    acquisitionYearMonth: `${acq.year}-${mm}`,
+    cost: asset.cost,
+    guaranteeAmount: result.guaranteeAmount,
+    basisAmount: result.basisAmount,
+    method: asset.method,
+    methodLabel: METHOD_LABELS[asset.method],
+    usefulLifeYears: asset.usefulLifeYears,
+    rate: result.rate,
+    months: result.months,
+    ordinary: result.ordinary,
+    total: result.ordinary,
+    businessRatioPercent: asset.businessRatioPercent,
+    deductible: result.deductible,
+    closingBookValue: result.closingBookValue,
+  };
+}

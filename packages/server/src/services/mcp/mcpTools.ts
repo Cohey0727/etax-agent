@@ -35,8 +35,10 @@ import {
   computeCorrectedFigures,
   computeIncomeTax,
   consumptionTax,
+  depreciationForYear,
   estimateInputTax,
   residentialRentTotal,
+  smallSpecialUsage,
   taxableSalesFromBreakdown,
   xtxSupportedYears,
 } from "@etax/shared";
@@ -62,6 +64,14 @@ import {
   transactionToApi,
   updateTransactionRow,
 } from "../../repositories/transactionRepository";
+import {
+  depreciationDetailRowsForYear,
+  fixedAssetToApi,
+  fixedAssetToInput,
+  insertFixedAssetRow,
+  isActiveInYear,
+  listFixedAssetRows,
+} from "../../repositories/fixedAssetRepository";
 import { classifyAccount } from "../classification/classifyAccount";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
@@ -333,6 +343,45 @@ export const MCP_TOOLS: McpToolDef[] = [
         "sales_incl_10",
         "purchases_incl_10",
       ],
+    },
+  },
+  {
+    name: "register_fixed_asset",
+    description:
+      "固定資産台帳に資産を登録する。method は straight_line（定額法）/ declining_balance（定率法200%）/ lump_sum（一括償却資産）/ small_special（少額減価償却資産の特例）から選ぶ。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "資産の名称等" },
+        quantity: { type: "string", description: "面積又は数量（任意）" },
+        income_type: { type: "string", enum: ["business", "real_estate"], description: "所得区分（既定 business）" },
+        acquisition_date: { type: "string", description: "取得年月日（YYYY-MM-DD）" },
+        service_start_date: { type: "string", description: "事業供用年月日（任意、省略時は取得日）" },
+        cost: { type: "number", description: "取得価額（円）" },
+        useful_life_years: { type: "number", description: "耐用年数（年）" },
+        method: {
+          type: "string",
+          enum: ["straight_line", "declining_balance", "lump_sum", "small_special"],
+          description: "償却方法（既定 straight_line）",
+        },
+        business_ratio_percent: { type: "number", description: "事業専用割合 0〜100（既定100）" },
+      },
+      required: ["name", "acquisition_date", "cost", "useful_life_years"],
+    },
+  },
+  {
+    name: "list_fixed_assets",
+    description: "固定資産台帳の一覧を返す。",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_depreciation",
+    description:
+      "指定年の減価償却を台帳から計算する（資産ごとの普通償却費・必要経費算入額・未償却残高と、所得区分ごとの合計、少額特例の年間300万円上限の使用状況）。",
+    inputSchema: {
+      type: "object",
+      properties: { year: yearProperty },
+      required: ["year"],
     },
   },
   {
@@ -658,6 +707,8 @@ export async function dispatchMcpTool(
           taxCredits,
         });
         const amendment = args["amendment"] === true;
+        const assetRows = await listFixedAssetRows(db);
+        const depreciation = depreciationDetailRowsForYear(assetRows, year);
         const xtx = buildXtxFiling({
           year,
           amendment,
@@ -667,6 +718,10 @@ export async function dispatchMcpTool(
           taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
           figures,
           filingType: filingOptionsArg(args).filingType,
+          depreciation:
+            depreciation.business.length > 0 || depreciation.realEstate.length > 0
+              ? depreciation
+              : undefined,
           deductionInputs: deductions,
           miscIncome,
           tax,
@@ -821,6 +876,76 @@ export async function dispatchMcpTool(
         const limit =
           typeof args["limit"] === "number" ? Math.min(10, Math.max(1, Math.trunc(args["limit"]))) : 5;
         return textResult(await searchTaxKnowledge(query, limit));
+      }
+      case "register_fixed_asset": {
+        const db = requireDb();
+        const name = args["name"];
+        const acquisitionDate = args["acquisition_date"];
+        const cost = args["cost"];
+        const life = args["useful_life_years"];
+        if (typeof name !== "string" || !name) throw new Error("name（資産の名称）が必要です");
+        if (typeof acquisitionDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(acquisitionDate)) {
+          throw new Error("acquisition_date は YYYY-MM-DD 形式で指定してください");
+        }
+        if (typeof cost !== "number" || !(cost > 0)) throw new Error("cost（取得価額）が必要です");
+        if (typeof life !== "number" || !(life >= 1)) throw new Error("useful_life_years（耐用年数）が必要です");
+        const method =
+          typeof args["method"] === "string" ? args["method"] : "straight_line";
+        if (!["straight_line", "declining_balance", "lump_sum", "small_special"].includes(method)) {
+          throw new Error("method が不正です");
+        }
+        const row = await insertFixedAssetRow(db, {
+          name,
+          quantity: typeof args["quantity"] === "string" ? args["quantity"] : "",
+          incomeType: args["income_type"] === "real_estate" ? "real_estate" : "business",
+          acquisitionDate,
+          serviceStartDate:
+            typeof args["service_start_date"] === "string" ? args["service_start_date"] : null,
+          cost: Math.trunc(cost),
+          usefulLifeYears: Math.trunc(life),
+          method,
+          businessRatioPercent:
+            typeof args["business_ratio_percent"] === "number" ? args["business_ratio_percent"] : 100,
+          disposedDate: null,
+        });
+        return textResult({ asset: row ? fixedAssetToApi(row) : null });
+      }
+      case "list_fixed_assets": {
+        const db = requireDb();
+        const rows = await listFixedAssetRows(db);
+        return textResult({ assets: rows.map(fixedAssetToApi) });
+      }
+      case "get_depreciation": {
+        const db = requireDb();
+        const year = Number(args["year"]);
+        const rows = (await listFixedAssetRows(db)).filter((row) => isActiveInYear(row, year));
+        const detail = [];
+        const totals = { business: 0, real_estate: 0 };
+        for (const row of rows) {
+          const dep = depreciationForYear(fixedAssetToInput(row), year);
+          if (!dep) continue;
+          detail.push({
+            asset_id: row.id,
+            name: row.name,
+            income_type: row.incomeType,
+            months: dep.months,
+            opening_book_value: dep.openingBookValue,
+            basis_amount: dep.basisAmount,
+            rate: dep.rate,
+            guarantee_amount: dep.guaranteeAmount,
+            ordinary: dep.ordinary,
+            deductible: dep.deductible,
+            closing_book_value: dep.closingBookValue,
+          });
+          if (row.incomeType === "business") totals.business += dep.deductible;
+          if (row.incomeType === "real_estate") totals.real_estate += dep.deductible;
+        }
+        return textResult({
+          year,
+          rows: detail,
+          deductible_totals: totals,
+          small_special: smallSpecialUsage(rows.map(fixedAssetToInput), year),
+        });
       }
       case "get_filing_status": {
         const db = requireDb();

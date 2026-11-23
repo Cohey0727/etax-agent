@@ -5,13 +5,17 @@
  * データで、送信（マイナンバーカード署名）は e-Tax 側で本人が行う。
  */
 import {
+  BalanceSheetAccount,
+  DepreciationDetailRow,
   EMPTY_MISC_INCOME,
   Transaction,
+  XtxBalanceSheetInput,
   XtxTaxpayer,
   buildXtxFiling,
   categoryTotals,
   computeCorrectedFigures,
   computeIncomeTax,
+  depreciationDetailRow,
   filterYear,
   normalizeTransactions,
 } from "@etax/shared";
@@ -70,6 +74,55 @@ export function statementCategoryTotals(
   return result;
 }
 
+/** リクエストの固定資産入力から減価償却明細行（事業・不動産別）を組み立てる。 */
+function depreciationFromWire(
+  body: ExportXtxRequest,
+): { business: DepreciationDetailRow[]; realEstate: DepreciationDetailRow[] } | undefined {
+  if (!body.fixed_assets || body.fixed_assets.length === 0) return undefined;
+  const business: DepreciationDetailRow[] = [];
+  const realEstate: DepreciationDetailRow[] = [];
+  for (const asset of body.fixed_assets) {
+    const row = depreciationDetailRow(
+      asset.name,
+      {
+        acquisitionDate: asset.acquisition_date,
+        serviceStartDate: asset.service_start_date,
+        cost: asset.cost,
+        usefulLifeYears: asset.useful_life_years,
+        method: asset.method,
+        businessRatioPercent: asset.business_ratio_percent,
+      },
+      body.year,
+      asset.quantity ?? "",
+    );
+    if (!row) continue;
+    if (asset.income_type === "real_estate") realEstate.push(row);
+    else business.push(row);
+  }
+  return { business, realEstate };
+}
+
+/** リクエストの貸借対照表入力を XTX ビルダーの形式へ変換する。 */
+function balanceSheetFromWire(body: ExportXtxRequest): XtxBalanceSheetInput | undefined {
+  const bs = body.balance_sheet;
+  if (!bs) return undefined;
+  return {
+    opening: bs.opening as Partial<Record<BalanceSheetAccount, number>>,
+    closing: bs.closing as Partial<Record<BalanceSheetAccount, number>>,
+    extraAsset: bs.extra_asset
+      ? { name: bs.extra_asset.name, opening: bs.extra_asset.opening, closing: bs.extra_asset.closing }
+      : undefined,
+    extraLiability1: bs.extra_liability1
+      ? { name: bs.extra_liability1.name, opening: bs.extra_liability1.opening, closing: bs.extra_liability1.closing }
+      : undefined,
+    extraLiability2: bs.extra_liability2
+      ? { name: bs.extra_liability2.name, opening: bs.extra_liability2.opening, closing: bs.extra_liability2.closing }
+      : undefined,
+    ownerLoan: bs.owner_loan,
+    ownerBorrowing: bs.owner_borrowing,
+  };
+}
+
 /** ワイヤ形式の納税者情報を XTX ビルダーの形式へ変換する。MCP からも使う。 */
 export function toTaxpayer(t: ExportXtxRequest["taxpayer"]): XtxTaxpayer {
   return {
@@ -97,6 +150,8 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
     filingType: body.filing_type,
     realEstateBusinessScale: body.real_estate_business_scale,
   });
+  const depreciation = depreciationFromWire(body);
+  const balanceSheet = balanceSheetFromWire(body);
   const miscIncome = body.misc_income ?? EMPTY_MISC_INCOME;
   const tax = computeIncomeTax({
     year: body.year,
@@ -114,6 +169,8 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
       taxpayer: toTaxpayer(body.taxpayer),
       figures,
       filingType: body.filing_type,
+      depreciation,
+      balanceSheet,
       deductionInputs: body.deductions,
       miscIncome,
       tax,

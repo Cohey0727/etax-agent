@@ -11,6 +11,7 @@
  * filing_status     : 年度ごとの申告ステータス（確認・控除計算・提出の済み日時）
  * taxpayer_profiles : 年度ごとの納税者プロフィール（申告書の見出し情報）
  * filing_snapshots  : 「控除・計算」を確定した時点の計算結果の控え（確定の履歴）
+ * fixed_assets      : 固定資産台帳（減価償却の計算と決算書明細の元データ）
  */
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -166,6 +167,41 @@ export const knowledgeDocsTable = sqliteTable("knowledge_docs", {
     .$defaultFn(() => new Date()),
 });
 
+/**
+ * 固定資産台帳。減価償却費の計算（shared の depreciation エンジン）と
+ * 決算書・収支内訳書の「減価償却費の計算」欄の元データ。
+ * 除却・売却した資産は disposed_date を入れて残す（台帳から消さない）。
+ */
+export const fixedAssetsTable = sqliteTable("fixed_assets", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** 資産の名称等 */
+  name: text("name").notNull(),
+  /** 面積又は数量（任意の表示用文字列） */
+  quantity: text("quantity").notNull().default(""),
+  /** business / real_estate */
+  incomeType: text("income_type").notNull().default("business"),
+  /** 取得年月日 YYYY-MM-DD */
+  acquisitionDate: text("acquisition_date").notNull(),
+  /** 事業供用年月日 YYYY-MM-DD。未設定なら取得日 */
+  serviceStartDate: text("service_start_date"),
+  /** 取得価額（円） */
+  cost: integer("cost").notNull(),
+  /** 耐用年数（年） */
+  usefulLifeYears: integer("useful_life_years").notNull(),
+  /** straight_line / declining_balance / lump_sum / small_special */
+  method: text("method").notNull().default("straight_line"),
+  /** 事業専用割合（不動産は貸付割合）0〜100 */
+  businessRatioPercent: integer("business_ratio_percent").notNull().default(100),
+  /** 除却・売却日 YYYY-MM-DD。未除却なら null */
+  disposedDate: text("disposed_date"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type ImportRow = typeof importsTable.$inferSelect;
 export type TransactionRow = typeof transactionsTable.$inferSelect;
 export type TransactionHistoryRow = typeof transactionHistoryTable.$inferSelect;
@@ -174,3 +210,5 @@ export type FilingStatusRow = typeof filingStatusTable.$inferSelect;
 export type TaxpayerProfileRow = typeof taxpayerProfilesTable.$inferSelect;
 export type FilingSnapshotRow = typeof filingSnapshotsTable.$inferSelect;
 export type KnowledgeDocRow = typeof knowledgeDocsTable.$inferSelect;
+export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
+export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;

@@ -48,6 +48,44 @@ export const MiscIncomeSchema = z
 
 export type MiscIncomeRequest = z.infer<typeof MiscIncomeSchema>;
 
+/** 減価償却明細の元になる固定資産の入力（XTX出力用。台帳DBとは別に直接渡せる）。 */
+export const XtxFixedAssetSchema = z
+  .object({
+    name: z.string(),
+    quantity: z.string().optional(),
+    income_type: z.enum(["business", "real_estate"]),
+    acquisition_date: z.string(),
+    service_start_date: z.string().optional(),
+    cost: z.number(),
+    useful_life_years: z.number(),
+    method: z.enum(["straight_line", "declining_balance", "lump_sum", "small_special"]),
+    business_ratio_percent: z.number(),
+  })
+  .openapi("XtxFixedAsset");
+
+export type XtxFixedAssetRequest = z.infer<typeof XtxFixedAssetSchema>;
+
+/** 貸借対照表（KOA210 4面）の入力。勘定キーは shared の BalanceSheetAccount と同じ。 */
+export const BalanceSheetInputSchema = z
+  .object({
+    opening: z.record(z.string(), z.number()),
+    closing: z.record(z.string(), z.number()),
+    extra_asset: z
+      .object({ name: z.string(), opening: z.number(), closing: z.number() })
+      .optional(),
+    extra_liability1: z
+      .object({ name: z.string(), opening: z.number(), closing: z.number() })
+      .optional(),
+    extra_liability2: z
+      .object({ name: z.string(), opening: z.number(), closing: z.number() })
+      .optional(),
+    owner_loan: z.number(),
+    owner_borrowing: z.number(),
+  })
+  .openapi("BalanceSheetInput");
+
+export type BalanceSheetInputRequest = z.infer<typeof BalanceSheetInputSchema>;
+
 export const ExportXtxRequestSchema = z
   .object({
     year: z.number(),
@@ -63,6 +101,10 @@ export const ExportXtxRequestSchema = z
     withholding_tax: z.number(),
     prepaid_tax: z.number(),
     original_third_period_tax: z.number().nullable(),
+    /** 固定資産台帳の資産。決算書・収支内訳書の減価償却明細に反映する */
+    fixed_assets: z.array(XtxFixedAssetSchema).optional(),
+    /** 貸借対照表の入力（事業所得分） */
+    balance_sheet: BalanceSheetInputSchema.optional(),
   })
   .openapi("ExportXtxRequest");
 
