@@ -34,6 +34,7 @@ import {
   estimateInputTax,
   residentialRentTotal,
   taxableSalesFromBreakdown,
+  xtxSupportedYears,
 } from "@etax/shared";
 import { createSystemOneClient } from "../../gateways/systemOneGateway";
 import { Db, getDb } from "../../lib/db";
@@ -249,7 +250,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "export_xtx",
     description:
-      "帳簿DBの指定年の取引から、e-Tax ソフト/WEB版に組み込める申告等データ（XTX）を生成する。対応年分は2023〜2025。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。",
+      `帳簿DBの指定年の取引から、e-Tax ソフト/WEB版に組み込める申告等データ（XTX）を生成する。対応年分は${xtxSupportedYears()[0]}〜${xtxSupportedYears().at(-1)}。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。`,
     inputSchema: {
       type: "object",
       properties: {

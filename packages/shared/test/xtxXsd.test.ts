@@ -120,12 +120,13 @@ function shohiSample(): string {
 }
 
 describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => {
-  maybe("所得税 2023/2024/2025 と消費税の生成物が公式XSDを通る", () => {
+  maybe("所得税 2023〜2026 と消費税の生成物が公式XSDを通る", () => {
     const dir = mkdtempSync(join(tmpdir(), "xtx-xsd-"));
     const samples: [string, string, string][] = [
       ["shotoku2023.xtx", incomeSample(2023), "shotoku/RKO0010-231.xsd"],
       ["shotoku2024.xtx", incomeSample(2024), "shotoku/RKO0010-240.xsd"],
       ["shotoku2025.xtx", incomeSample(2025), "shotoku/RKO0010-250.xsd"],
+      ["shotoku2026.xtx", incomeSample(2026), "shotoku/RKO0010-260.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
     ];
     const args: string[] = [join(import.meta.dir, "validate-xtx-xsd.py"), XSD_DIR];
