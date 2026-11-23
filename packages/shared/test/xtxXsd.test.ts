@@ -12,7 +12,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -22,10 +22,12 @@ import {
   Transaction,
   XtxTaxpayer,
   buildConsumptionXtx,
+  buildSimplifiedConsumptionXtx,
   buildXtxFiling,
   computeConsumptionReturn,
   computeCorrectedFigures,
   computeIncomeTax,
+  computeSimplifiedConsumptionReturn,
 } from "../src";
 
 const XSD_DIR = process.env.ETAX_XSD_DIR ?? "";
@@ -119,6 +121,34 @@ function shohiSample(): string {
   });
 }
 
+function kanniSample(): string {
+  const input = {
+    salesByCategory: { 5: { incl10: 16_885_000, incl8: 0 } },
+    nontaxableSales: 0,
+    exemptSales: 0,
+    returnsIncl10: 0,
+    returnsIncl8: 0,
+    badDebtRecoveryTax10: 0,
+    badDebtRecoveryTax8: 0,
+    badDebtTax10: 0,
+    badDebtTax8: 0,
+    interimNational: 0,
+    interimLocal: 0,
+  };
+  return buildSimplifiedConsumptionXtx({
+    taxpayer: TAXPAYER,
+    periodFrom: "2027-01-01",
+    periodTo: "2027-12-31",
+    submissionDate: "2028-02-15",
+    filingKind: 1,
+    basePeriodSales: 12_378_000,
+    input,
+    result: computeSimplifiedConsumptionReturn(input),
+    originalNational: null,
+    originalLocal: null,
+  });
+}
+
 describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => {
   maybe("所得税 2023〜2026 と消費税の生成物が公式XSDを通る", () => {
     const dir = mkdtempSync(join(tmpdir(), "xtx-xsd-"));
@@ -126,9 +156,15 @@ describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => 
       ["shotoku2023.xtx", incomeSample(2023), "shotoku/RKO0010-231.xsd"],
       ["shotoku2024.xtx", incomeSample(2024), "shotoku/RKO0010-240.xsd"],
       ["shotoku2025.xtx", incomeSample(2025), "shotoku/RKO0010-250.xsd"],
-      ["shotoku2026.xtx", incomeSample(2026), "shotoku/RKO0010-260.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
+      ["shohiKanni2027.xtx", kanniSample(), "shohi/RSH0030-260.xsd"],
     ];
+    // 2026年分の所得税XSD（RKO0010-260.xsd）は令和8年9月版の仕様書セット
+    // には未収録（令和9年1月受付開始分で公開予定）。ファイルがある場合のみ
+    // 検証対象に加える。
+    if (existsSync(join(XSD_DIR, "shotoku/RKO0010-260.xsd"))) {
+      samples.push(["shotoku2026.xtx", incomeSample(2026), "shotoku/RKO0010-260.xsd"]);
+    }
     const args: string[] = [join(import.meta.dir, "validate-xtx-xsd.py"), XSD_DIR];
     for (const [name, xml, schema] of samples) {
       const path = join(dir, name);

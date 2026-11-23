@@ -128,6 +128,34 @@ export const ExportConsumptionXtxRequestSchema = z
     interim_local: z.number(),
     original_national: z.number().nullable(),
     original_local: z.number().nullable(),
+    /** 計算方式。省略時は本則（standard）。simplified は簡易課税（手続 RSH0030） */
+    method: z.enum(["standard", "simplified"]).optional(),
+    /**
+     * 簡易課税: 売上の事業区分（1=卸売 2=小売 3=製造等 4=その他 5=サービス等 6=不動産）。
+     * sales_by_category を渡さない場合、全売上をこの区分に寄せる。省略時は 5。
+     */
+    business_category: z
+      .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)])
+      .optional(),
+    /** 簡易課税: 事業区分ごとの課税売上（税込）。キーは区分番号の文字列 */
+    sales_by_category: z
+      .record(
+        z.enum(["1", "2", "3", "4", "5", "6"]),
+        z.object({ incl_10: z.number(), incl_8: z.number() }),
+      )
+      .optional(),
+    /** 簡易課税: 売上対価の返還等の金額（税込）・税率10%分 */
+    returns_incl_10: z.number().optional(),
+    /** 簡易課税: 売上対価の返還等の金額（税込）・軽減税率8%分 */
+    returns_incl_8: z.number().optional(),
+    /** 簡易課税: 貸倒回収に係る消費税額（税額）・税率10%分 */
+    bad_debt_recovery_tax_10: z.number().optional(),
+    /** 簡易課税: 貸倒回収に係る消費税額（税額）・軽減税率8%分 */
+    bad_debt_recovery_tax_8: z.number().optional(),
+    /** 簡易課税: 貸倒れに係る税額（税額）・税率10%分 */
+    bad_debt_tax_10: z.number().optional(),
+    /** 簡易課税: 貸倒れに係る税額（税額）・軽減税率8%分 */
+    bad_debt_tax_8: z.number().optional(),
   })
   .openapi("ExportConsumptionXtxRequest");
 

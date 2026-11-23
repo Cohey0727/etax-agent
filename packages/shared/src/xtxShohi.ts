@@ -11,9 +11,10 @@
 * 規則に従い、生成物は公式 XSD で検証済み。
 *
 * 対象は税率10%・8%（軽減）の本則課税のみ。経過措置対象課税資産の
-* 譲渡等を含む期間（付表1-1/1-2・2-1/2-2）や簡易課税（SHA020）には
-* 対応しない。生成物は署名なしの組み込み用データで、送信（マイナン
-* バーカード署名）は e-Tax 側で本人が行う。
+* 譲渡等を含む期間（付表1-1/1-2・2-1/2-2）には対応しない。
+* 簡易課税（SHA020）は xtxShohiKanni.ts、2割特例は本モジュールの
+* buildSpecial20ConsumptionXtx が担う。生成物は署名なしの組み込み用
+* データで、送信（マイナンバーカード署名）は e-Tax 側で本人が行う。
 */
 import {
 XtxTaxpayer,
@@ -212,16 +213,16 @@ export function summarizeConsumptionTax(
   return summary;
 }
 
-function floor100(x: number): number {
+export function floor100(x: number): number {
 return Math.floor(x / 100) * 100;
 }
 
-function floor1000(x: number): number {
+export function floor1000(x: number): number {
 return Math.floor(x / 1000) * 1000;
 }
 
 /** 税込金額 → 税抜金額（10%: ×100/110、8%: ×100/108、円未満切捨て）。 */
-function exclFromIncl(incl: number, ratePercent: number): number {
+export function exclFromIncl(incl: number, ratePercent: number): number {
 const i = Math.trunc(incl || 0);
 if (i <= 0) return 0;
 return Math.floor((i * 100) / (100 + ratePercent));
@@ -363,7 +364,20 @@ originalLocal: number | null;
 // IT部
 // ---------------------------------------------------------------------------
 
-function buildShohiIt(data: ConsumptionXtxData): string {
+/** IT部の組み立てに必要な最小の入力（本則・簡易で共通）。 */
+export interface ShohiItData {
+taxpayer: XtxTaxpayer;
+/** 課税期間の開始日 "2025-01-01" */
+periodFrom: string;
+/** 課税期間の終了日 "2025-12-31" */
+periodTo: string;
+/** 提出年月日 "2026-11-15" */
+submissionDate: string;
+/** 申告の種類: 1=確定、3=修正確定 */
+filingKind: 1 | 3;
+}
+
+export function buildShohiIt(data: ShohiItData, procedureCd: string): string {
 const t = data.taxpayer;
 // ITdefinition.xsd の ITtype シーケンス順に並べる（xtx.ts の buildIt と同じ規則）。
 const items: string[] = [];
@@ -385,7 +399,7 @@ if (t.address) items.push(`<NOZEISHA_ADR ID="NOZEISHA_ADR">${esc(t.address)}</NO
 if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${esc(t.shopName)}</NOZEISHA_YAGO>`);
 const tel = phoneXml(t.phone);
 if (tel) items.push(`<NOZEISHA_TEL ID="NOZEISHA_TEL">${tel}</NOZEISHA_TEL>`);
-items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>RSH0010</procedure_CD></TETSUZUKI>`);
+items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>${procedureCd}</procedure_CD></TETSUZUKI>`);
 const from = yymmddXml(data.periodFrom);
 if (from) items.push(`<KAZEI_KIKAN_FROM ID="KAZEI_KIKAN_FROM">${from}</KAZEI_KIKAN_FROM>`);
 const to = yymmddXml(data.periodTo);
@@ -657,7 +671,7 @@ return (
 `<DATA id="DATA" xmlns="${SHOHI_NS}">` +
 `<RSH0010 VR="26.0.0" id="RSH0010" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
 catalog +
-`<CONTENTS id="CONTENTS">${buildShohiIt(normalized)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
+`<CONTENTS id="CONTENTS">${buildShohiIt(normalized, "RSH0010")}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
 `</RSH0010></DATA>`
 );
 }

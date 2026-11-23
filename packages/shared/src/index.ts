@@ -7,3 +7,4 @@ export * from "./sample";
 export * from "./xtx";
 export * from "./taxpayerNormalize";
 export * from "./xtxShohi";
+export * from "./xtxShohiKanni";

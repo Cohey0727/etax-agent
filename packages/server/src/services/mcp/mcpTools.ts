@@ -25,9 +25,11 @@ import {
   amendmentDelta,
   blueDeduction,
   buildConsumptionXtx,
+  buildSimplifiedConsumptionXtx,
   buildXtxFiling,
   categoryTotals,
   computeConsumptionReturn,
+  computeSimplifiedConsumptionReturn,
   computeCorrectedFigures,
   computeIncomeTax,
   consumptionTax,
@@ -283,10 +285,20 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "export_consumption_xtx",
     description:
-      "消費税申告書（一般用・本則）の e-Tax 申告等データ（XTX）を生成する。金額は税区分まで確定した税込金額で渡すこと（帳簿の概算は使わない）。課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算する。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。",
+      "消費税申告書の e-Tax 申告等データ（XTX）を生成する。method 省略時は一般用・本則（RSH0010）、method=simplified で簡易課税用（RSH0030、SHA020+付表4-3/5-3）。金額は税区分まで確定した税込金額で渡すこと（帳簿の概算は使わない）。本則は課税売上割合95%以上で全額控除、それ以外は一括比例配分。簡易は business_category（省略時5=サービス業）に全売上を寄せて専業者計算する。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。",
     inputSchema: {
       type: "object",
       properties: {
+        method: {
+          type: "string",
+          enum: ["standard", "simplified"],
+          description: "計算方式: standard=本則（既定）、simplified=簡易課税",
+        },
+        business_category: {
+          type: "integer",
+          description:
+            "簡易課税の事業区分（1=卸売 2=小売 3=製造等 4=その他 5=サービス等 6=不動産、省略時5）",
+        },
         taxpayer: {
           type: "object",
           description:
@@ -681,6 +693,54 @@ export async function dispatchMcpTool(
         const filingKind = numArg(args, "filing_kind", 1);
         if (filingKind !== 1 && filingKind !== 3) {
           throw new Error("filing_kind は 1（確定）か 3（修正確定）で渡してください");
+        }
+        const submissionDate = typeof args["submission_date"] === "string"
+          ? args["submission_date"]
+          : todayInTokyo();
+        if (args["method"] === "simplified") {
+          const category = numArg(args, "business_category", 5);
+          if (category < 1 || category > 6) {
+            throw new Error("business_category は 1〜6 で渡してください");
+          }
+          const simplifiedInput = {
+            salesByCategory: {
+              [category]: {
+                incl10: numArg(args, "sales_incl_10"),
+                incl8: numArg(args, "sales_incl_8"),
+              },
+            },
+            nontaxableSales: numArg(args, "nontaxable_sales"),
+            exemptSales: numArg(args, "exempt_sales"),
+            returnsIncl10: numArg(args, "returns_incl_10"),
+            returnsIncl8: numArg(args, "returns_incl_8"),
+            badDebtRecoveryTax10: numArg(args, "bad_debt_recovery_tax_10"),
+            badDebtRecoveryTax8: numArg(args, "bad_debt_recovery_tax_8"),
+            badDebtTax10: numArg(args, "bad_debt_tax_10"),
+            badDebtTax8: numArg(args, "bad_debt_tax_8"),
+            interimNational: numArg(args, "interim_national"),
+            interimLocal: numArg(args, "interim_local"),
+          };
+          const simplifiedResult = computeSimplifiedConsumptionReturn(simplifiedInput);
+          const xtx = buildSimplifiedConsumptionXtx({
+            taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
+            periodFrom,
+            periodTo,
+            submissionDate,
+            filingKind: filingKind as 1 | 3,
+            basePeriodSales: numArg(args, "base_period_sales_thousands") * 1000,
+            input: simplifiedInput,
+            result: simplifiedResult,
+            originalNational: nullableNumArg(args, "original_national"),
+            originalLocal: nullableNumArg(args, "original_local"),
+          });
+          return textResult({
+            filename: `etax-shohi-${periodFrom.slice(0, 4)}-kanni${filingKind === 3 ? "-shusei" : "-kakutei"}.xtx`,
+            total_payable: simplifiedResult.totalPayable,
+            method: "simplified",
+            business_category: category,
+            input_tax: simplifiedResult.inputTax,
+            xtx,
+          });
         }
         const input = {
           salesIncl10: numArg(args, "sales_incl_10"),
