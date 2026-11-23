@@ -120,17 +120,23 @@ export interface XtxFilingData {
 interface YearVersions {
   procedure: string;
   koa020: string;
+  koa210: string;
+  koa220: string;
 }
 
-/** 年分 → 手続バージョン / KOA020 様式バージョン。対応外の年は生成できない。 */
+/**
+ * 年分 → 手続・様式バージョン（手続内帳票対応表の組）。対応外の年は生成できない。
+ * 2026年分は e-Tax 公式「令和9年1月受付開始予定の帳票一覧」で確認:
+ * KOA020=24.0、KOA210=12.0、KOA220=9.0。手続VRは 25.0.1 からの
+ * 連番パターンで 26.0.1（XSD は RKO0010-260.xsd）。
+ */
 const YEAR_VERSIONS: Record<number, YearVersions> = {
-  2023: { procedure: "23.1.1", koa020: "21.0" },
-  2024: { procedure: "24.0.1", koa020: "22.0" },
-  2025: { procedure: "25.0.1", koa020: "23.0" },
+  2023: { procedure: "23.1.1", koa020: "21.0", koa210: "11.0", koa220: "8.0" },
+  2024: { procedure: "24.0.1", koa020: "22.0", koa210: "11.0", koa220: "8.0" },
+  2025: { procedure: "25.0.1", koa020: "23.0", koa210: "11.0", koa220: "8.0" },
+  2026: { procedure: "26.0.1", koa020: "24.0", koa210: "12.0", koa220: "9.0" },
 };
 
-const KOA210_VR = "11.0";
-const KOA220_VR = "8.0";
 const SOFT_NAME = "eTaxAgent";
 
 /** XTX生成に対応している年分の一覧。 */
@@ -498,7 +504,7 @@ const KOA210_EXPENSE_LINES: [string, string][] = [
   ["雑費", "AMF00370"],
 ];
 
-function buildKoa210(data: XtxFilingData): string {
+function buildKoa210(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
   const totals = data.categoryTotals.business;
@@ -556,7 +562,7 @@ function buildKoa210(data: XtxFilingData): string {
   pl.push(`<AMF00090>${amounts.join("")}</AMF00090>`);
   parts.push(`<AMF00000><AMF00010>${pl.join("")}</AMF00010></AMF00000>`);
 
-  return `<KOA210 VR="${KOA210_VR}" id="KOA210" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA210-1 page="1">${parts.join("")}</KOA210-1></KOA210>`;
+  return `<KOA210 VR="${vr}" id="KOA210" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA210-1 page="1">${parts.join("")}</KOA210-1></KOA210>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -574,7 +580,7 @@ const KOA220_EXPENSE_LINES: [string, string][] = [
   ["給料賃金", "ANF00190"],
 ];
 
-function buildKoa220(data: XtxFilingData): string {
+function buildKoa220(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
   const totals = data.categoryTotals.realEstate;
@@ -627,7 +633,7 @@ function buildKoa220(data: XtxFilingData): string {
   pl.push(amountAlways("ANF00270", f._detail.real_estate_income));
   parts.push(`<ANF00000><ANF00010>${pl.join("")}</ANF00010></ANF00000>`);
 
-  return `<KOA220 VR="${KOA220_VR}" id="KOA220" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA220-1 page="1">${parts.join("")}</KOA220-1></KOA220>`;
+  return `<KOA220 VR="${vr}" id="KOA220" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA220-1 page="1">${parts.join("")}</KOA220-1></KOA220>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -662,10 +668,10 @@ export function buildXtxFiling(data: XtxFilingData): string {
       `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}</KOA020>`,
   });
   if (data.figures.business_revenue > 0 || data.figures.business_expenses > 0) {
-    forms.push({ id: "KOA210", xml: buildKoa210(normalized) });
+    forms.push({ id: "KOA210", xml: buildKoa210(normalized, versions.koa210) });
   }
   if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0) {
-    forms.push({ id: "KOA220", xml: buildKoa220(normalized) });
+    forms.push({ id: "KOA220", xml: buildKoa220(normalized, versions.koa220) });
   }
 
   const catalog =

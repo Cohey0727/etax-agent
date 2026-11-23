@@ -97,8 +97,8 @@ function buildSample(amendment: boolean) {
 }
 
 describe("buildXtxFiling", () => {
-  test("対応年分は 2023〜2025", () => {
-    expect(xtxSupportedYears()).toEqual([2023, 2024, 2025]);
+  test("対応年分は 2023〜2026", () => {
+    expect(xtxSupportedYears()).toEqual([2023, 2024, 2025, 2026]);
   });
 
   test("修正申告のXTXに手続・様式バージョンと主要金額が入る", () => {
@@ -173,16 +173,16 @@ describe("buildXtxFiling", () => {
   test("対応外の年分は例外", () => {
     const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
     const tax = computeIncomeTax({
-      year: 2026,
+      year: 2027,
       totalIncome: 0,
       deductions: EMPTY_DEDUCTION_INPUTS,
       taxCredits: EMPTY_TAX_CREDIT_INPUTS,
     });
     expect(() =>
       buildXtxFiling({
-        year: 2026,
+        year: 2027,
         amendment: false,
-        submissionDate: "2027-02-01",
+        submissionDate: "2028-02-01",
         taxpayer: {
           name: "",
           nameKana: "",
@@ -296,6 +296,45 @@ describe("buildXtxFiling の仕様適合（公式XMLスキーマ準拠）", () =
     expect(buildMinimal(2024)).toContain('<KOA020 VR="22.0"');
     expect(buildMinimal(2025)).toContain('<RKO0010 VR="25.0.1"');
     expect(buildMinimal(2025)).toContain('<KOA020 VR="23.0"');
+    expect(buildMinimal(2026)).toContain('<RKO0010 VR="26.0.1"');
+    expect(buildMinimal(2026)).toContain('<KOA020 VR="24.0"');
+    expect(buildMinimal(2026)).toContain('<KOA210 VR="12.0"');
+  });
+
+  test("2026年分の決算書バージョンは KOA210=12.0 / KOA220=9.0（令和9年1月受付開始の帳票一覧）", () => {
+    const transactions: Transaction[] = [
+      tx({ date: "2026-06-15", year: 2026, description: "事業売上", amount: 12_000_000, category: "売上高", income_type: "business" }),
+      tx({ date: "2026-06-15", year: 2026, description: "家賃収入", amount: 1_764_000, category: "家賃収入", income_type: "real_estate" }),
+    ];
+    const figures = computeCorrectedFigures(transactions, 2026);
+    const tax = computeIncomeTax({
+      year: 2026,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const xtx = buildXtxFiling({
+      year: 2026,
+      amendment: false,
+      submissionDate: "2027-02-01",
+      taxpayer: {
+        name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+        myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア",
+        shopName: "", jan1Address: "",
+      },
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: {}, realEstate: { 家賃収入: 1_764_000 } },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    expect(xtx).toContain('<KOA210 VR="12.0"');
+    expect(xtx).toContain('<KOA220 VR="9.0"');
   });
 
   test("DATA・RKO0010 のデフォルト名前空間は shotoku", () => {
