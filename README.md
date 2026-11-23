@@ -126,6 +126,11 @@ docker-compose.yml  Postgres 16（ユーザーの Mac 上で使用）
 
 ## セットアップ
 
+### 前提条件
+
+- ランタイムは **Bun のみ**。アプリ本体は Bun + TypeScript で動き、Python は使用していない。
+- 例外はテストの一部だけ：XTX の公式 XSD 検証テスト（`packages/shared/test/xtxXsd.test.ts`）は python3 + lxml を使う。無い環境ではそのテストはスキップ扱いで通過する。本番コンテナにも Python は不要。
+
 ```bash
 cd ~/workspace/etax-agent
 bun install
