@@ -7,6 +7,7 @@
  */
 import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { Db } from "../lib/db";
+import { decryptField, encryptField } from "../lib/encryption";
 import { TaxpayerProfile } from "../schemas/taxpayer";
 import { TaxpayerProfileRow, taxpayerProfilesTable } from "./schema";
 
@@ -48,8 +49,8 @@ export function taxpayerProfileToApi(row: TaxpayerProfileRow): TaxpayerProfile {
     phone: row.phone,
     tax_office_name: row.taxOfficeName,
     tax_office_code: row.taxOfficeCode,
-    my_number: row.myNumber,
-    user_id: row.userId,
+    my_number: decryptField(row.myNumber),
+    user_id: decryptField(row.userId),
     occupation: row.occupation,
     shop_name: row.shopName,
     jan1_address: row.jan1Address,
@@ -107,8 +108,8 @@ export async function upsertTaxpayerProfileRow(
     phone: profile.phone,
     taxOfficeName: profile.tax_office_name,
     taxOfficeCode: profile.tax_office_code,
-    myNumber: profile.my_number,
-    userId: profile.user_id,
+    myNumber: encryptField(profile.my_number),
+    userId: encryptField(profile.user_id),
     occupation: profile.occupation,
     shopName: profile.shop_name,
     jan1Address: profile.jan1_address,
