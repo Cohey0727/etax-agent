@@ -3,13 +3,16 @@
  * トークンと API キーは平文を保存せず SHA-256 ハッシュで照合する。
  */
 import { createHash, randomBytes } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { Db } from "../lib/db";
+import { decryptField, encryptField } from "../lib/encryption";
 import {
   ApiKeyRow,
   UserRow,
   apiKeysTable,
+  magicLinkTokensTable,
   sessionsTable,
+  userIdentitiesTable,
   usersTable,
 } from "./schema";
 
@@ -35,9 +38,109 @@ export async function createUser(db: Db, email: string, password: string): Promi
   return row;
 }
 
-/** パスワードを照合する。 */
+/** パスワードを照合する。パスワード未設定（OAuth等のみ）のユーザーは常に false。 */
 export async function verifyUserPassword(user: UserRow, password: string): Promise<boolean> {
+  if (!user.passwordHash) return false;
   return Bun.password.verify(password, user.passwordHash);
+}
+
+/** パスワードなしのユーザーを作る（マジックリンク・OAuth 用）。 */
+export async function createPasswordlessUser(db: Db, email: string): Promise<UserRow> {
+  const [row] = await db.insert(usersTable).values({ email, passwordHash: "" }).returning();
+  return row;
+}
+
+/** TOTP 秘密を保存する（保存時暗号化）。有効化は別途 setUserTotpEnabled で行う。 */
+export async function setUserTotpSecret(db: Db, userId: number, secretBase32: string): Promise<void> {
+  await db
+    .update(usersTable)
+    .set({ totpSecret: encryptField(secretBase32) })
+    .where(eq(usersTable.id, userId));
+}
+
+/** 保存済みの TOTP 秘密を復号して返す。未設定は null。 */
+export function readUserTotpSecret(user: UserRow): string | null {
+  if (!user.totpSecret) return null;
+  try {
+    return decryptField(user.totpSecret);
+  } catch {
+    return null;
+  }
+}
+
+/** TOTP の有効・無効を切り替える。無効化では秘密も消す。 */
+export async function setUserTotpEnabled(db: Db, userId: number, enabled: boolean): Promise<void> {
+  await db
+    .update(usersTable)
+    .set(enabled ? { totpEnabled: true } : { totpEnabled: false, totpSecret: "" })
+    .where(eq(usersTable.id, userId));
+}
+
+const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
+
+/** マジックリンク用トークンを発行し、平文を返す（DBにはハッシュだけを保存）。 */
+export async function createMagicLinkToken(db: Db, email: string): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  await db.insert(magicLinkTokensTable).values({
+    email,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + MAGIC_LINK_TTL_MS),
+  });
+  return token;
+}
+
+/**
+ * マジックリンク用トークンを消費し、メールアドレスを返す。
+ * 不明・期限切れ・使用済みは undefined。消費は1回限り。
+ */
+export async function consumeMagicLinkToken(
+  db: Db,
+  token: string,
+): Promise<string | undefined> {
+  const [row] = await db
+    .select()
+    .from(magicLinkTokensTable)
+    .where(eq(magicLinkTokensTable.tokenHash, hashToken(token)));
+  if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) return undefined;
+  await db
+    .update(magicLinkTokensTable)
+    .set({ usedAt: new Date() })
+    .where(and(eq(magicLinkTokensTable.id, row.id), isNull(magicLinkTokensTable.usedAt)));
+  return row.email;
+}
+
+/**
+ * OAuth の外部IDからユーザーを引く。無ければメールで既存ユーザーを引き、
+ * それも無ければ新規ユーザーを作って外部IDを結び付ける。
+ */
+export async function findOrCreateOAuthUser(
+  db: Db,
+  provider: string,
+  providerUserId: string,
+  email: string,
+): Promise<UserRow> {
+  const [identity] = await db
+    .select()
+    .from(userIdentitiesTable)
+    .where(
+      and(
+        eq(userIdentitiesTable.provider, provider),
+        eq(userIdentitiesTable.providerUserId, providerUserId),
+      ),
+    );
+  if (identity) {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, identity.userId));
+    if (user) return user;
+  }
+  const existing = await getUserByEmail(db, email);
+  const user = existing ?? (await createPasswordlessUser(db, email));
+  if (!identity) {
+    await db
+      .insert(userIdentitiesTable)
+      .values({ userId: user.id, provider, providerUserId })
+      .onConflictDoNothing();
+  }
+  return user;
 }
 
 /** セッションを発行し、平文トークンを返す（DBにはハッシュだけを保存）。 */

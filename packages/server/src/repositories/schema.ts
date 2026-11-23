@@ -14,7 +14,7 @@
  * fixed_assets      : 固定資産台帳（減価償却の計算と決算書明細の元データ）
  * receipts          : 証憑（領収書画像）と取引の紐付け
  */
-import { integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 /** 日時カラム（timestamptz、Date として読み書きする）。 */
 const timestampColumn = (name: string) =>
@@ -265,8 +265,37 @@ export type NewReceiptRow = typeof receiptsTable.$inferInsert;
 export const usersTable = pgTable("users", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   email: text("email").notNull().unique(),
-  /** Bun.password（argon2id）のハッシュ */
-  passwordHash: text("password_hash").notNull(),
+  /** Bun.password（argon2id）のハッシュ。OAuth・マジックリンクのみのユーザーは空 */
+  passwordHash: text("password_hash").notNull().default(""),
+  /** TOTP 秘密（保存時暗号化した Base32）。未設定は空文字 */
+  totpSecret: text("totp_secret").notNull().default(""),
+  /** TOTP 2要素認証が有効か */
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/** マジックリンクのログイン用トークン。平文は保存せず SHA-256 ハッシュで持つ。 */
+export const magicLinkTokensTable = pgTable("magic_link_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  email: text("email").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestampColumn("expires_at").notNull(),
+  usedAt: timestampColumn("used_at"),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/** OAuth（Google / GitHub）の外部IDとユーザーの対応。 */
+export const userIdentitiesTable = pgTable("user_identities", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id),
+  provider: text("provider").notNull(),
+  providerUserId: text("provider_user_id").notNull(),
   createdAt: timestampColumn("created_at")
     .notNull()
     .$defaultFn(() => new Date()),
@@ -302,6 +331,8 @@ export const apiKeysTable = pgTable("api_keys", {
 });
 
 export type UserRow = typeof usersTable.$inferSelect;
+export type MagicLinkTokenRow = typeof magicLinkTokensTable.$inferSelect;
+export type UserIdentityRow = typeof userIdentitiesTable.$inferSelect;
 export type SessionRow = typeof sessionsTable.$inferSelect;
 export type ApiKeyRow = typeof apiKeysTable.$inferSelect;
 
