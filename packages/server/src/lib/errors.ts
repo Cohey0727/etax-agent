@@ -8,7 +8,7 @@
 
 /** DB を開けなかった時に DB 必須エンドポイントが返す文言。 */
 export const databaseUnavailableMessage =
-  "データフォルダ内のDB（SQLite）を開けないためDB機能は利用できません。ETAX_DATA_DIR の書き込み権限を確認してください。";
+  "データベース（PostgreSQL）に接続できないためDB機能は利用できません。DATABASE_URL の設定を確認してください。";
 
 /** 未知の例外から表示用メッセージを取り出す。 */
 export function errorMessage(e: unknown): string {

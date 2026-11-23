@@ -20,9 +20,9 @@
  *   SYSTEMONE_MODEL    : 任意。判定モデル名の上書き
  *
  * データフォルダの環境変数:
- *   ETAX_DATA_DIR : 運用データ（SQLite DB・アップロードファイル・学習履歴・
+ *   ETAX_DATA_DIR : 運用データ（アップロードファイル・学習履歴・
  *                   freee試算表）の置き場。未指定なら packages/server/data。
- *   ETAX_DB_FILE  : 任意。SQLite ファイルのパスの上書き。
+ *   DATABASE_URL  : PostgreSQL の接続文字列（DB機能に必須）。
  */
 import { join } from "node:path";
 

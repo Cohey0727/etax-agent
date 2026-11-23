@@ -32,7 +32,7 @@
  *   POST   /api/etax/export-xtx     e-Tax 申告等データ（XTX）の出力（DB不要・ステートレス）
  *   ALL    /mcp                     MCP（外部エージェント連携。MCP_TOKEN 設定時は Bearer 認証）
  *
- * DB はデータフォルダ内の SQLite ファイルで、起動時にテーブルを自己修復する。
+ * DB は PostgreSQL（DATABASE_URL）で、起動時にテーブルを自己修復する。
  * 起動時は packages/web のビルド成果物（dist）も同一ポートで配信する
  * （React は静的ファイルなので、公開するポートはこの1つで足りる）。
  * 最終提出（e-Tax）は本サーバーでは行わない（納税者本人の操作）。
@@ -175,7 +175,7 @@ app.notFound(async (c) => {
 const port = Number(process.env.PORT ?? 3001);
 console.log(`eTaxAgent server listening on http://localhost:${port}`);
 
-// 起動時に帳簿DB（SQLite）のテーブルを自己修復しておく。
+// 起動時に帳簿DB（PostgreSQL）のテーブルを自己修復しておく。
 // 失敗してもサーバー自体は起動を続け、DB必須の処理だけが 503 になる。
 void (async () => {
   try {
