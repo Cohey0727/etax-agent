@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>eTaxAgent — 確定申告の準備を、正式な税務処理で</title>
+    <meta
+      name="description"
+      content="個人事業主のための確定申告準備ツール。明細の取り込みから e-Tax 用申告データ（XTX）の生成まで、決定的な計算エンジンと AI エージェント連携で支援します。月額490円。"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --bg: #f3f3f9;
+        --surface: #ffffff;
+        --ink: #1c1c28;
+        --muted: #5d5d72;
+        --accent: #4a3aff;
+        --accent-soft: #eceaff;
+        --border: #e4e4f0;
+        --radius: 18px;
+        --shadow: 0 10px 30px rgba(38, 32, 110, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
+          "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: var(--accent);
+      }
+      .wrap {
+        max-width: 1024px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        background: rgba(243, 243, 249, 0.85);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--border);
+        z-index: 10;
+      }
+      .header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 1.15rem;
+        color: var(--ink);
+        text-decoration: none;
+      }
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 1rem;
+        box-shadow: var(--shadow);
+      }
+      .header-link {
+        font-weight: 600;
+        text-decoration: none;
+        padding: 8px 16px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--ink);
+      }
+      .hero {
+        padding: 72px 0 56px;
+        text-align: center;
+      }
+      .eyebrow {
+        display: inline-block;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 4px 14px;
+        border-radius: 999px;
+        margin-bottom: 20px;
+      }
+      h1 {
+        font-size: clamp(1.9rem, 5vw, 3rem);
+        line-height: 1.35;
+        margin: 0 0 20px;
+        letter-spacing: 0.01em;
+      }
+      .hero-sub {
+        color: var(--muted);
+        font-size: 1.05rem;
+        max-width: 640px;
+        margin: 0 auto 32px;
+      }
+      .cta-row {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .cta {
+        display: inline-block;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+        text-decoration: none;
+        padding: 14px 32px;
+        border-radius: 999px;
+        box-shadow: var(--shadow);
+        transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .cta:hover {
+        transform: translateY(-2px) scale(1.02);
+      }
+      .cta-note {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      section {
+        padding: 40px 0;
+      }
+      h2 {
+        font-size: 1.5rem;
+        margin: 0 0 8px;
+        text-align: center;
+      }
+      .section-sub {
+        color: var(--muted);
+        text-align: center;
+        margin: 0 auto 28px;
+        max-width: 620px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 26px;
+        box-shadow: var(--shadow);
+      }
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 1.1rem;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      .card .icon {
+        font-size: 1.6rem;
+        display: block;
+        margin-bottom: 12px;
+      }
+      .feature-list {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 12px 28px;
+      }
+      .feature-list ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .feature-list li {
+        padding: 14px 0 14px 30px;
+        position: relative;
+        border-bottom: 1px solid var(--border);
+      }
+      .feature-list li:last-child {
+        border-bottom: none;
+      }
+      .feature-list li::before {
+        content: "✓";
+        position: absolute;
+        left: 2px;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .feature-list .detail {
+        color: var(--muted);
+        font-size: 0.92rem;
+        display: block;
+      }
+      .price-card {
+        max-width: 480px;
+        margin: 0 auto;
+        text-align: center;
+        background: var(--surface);
+        border: 2px solid var(--accent);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 36px 28px;
+      }
+      .price {
+        font-size: 2.6rem;
+        font-weight: 800;
+        margin: 8px 0;
+      }
+      .price small {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .price-card p {
+        color: var(--muted);
+        margin: 6px 0;
+      }
+      .notice {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px 28px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .notice strong {
+        color: var(--ink);
+      }
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 32px 0 48px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        text-align: center;
+      }
+      footer p {
+        margin: 4px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap header-inner">
+        <a class="brand" href="/lp.html">
+          <span class="brand-mark">e</span>
+          eTaxAgent
+        </a>
+        <a class="header-link" href="/">アプリを開く</a>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="hero">
+        <span class="eyebrow">個人事業主のための確定申告準備ツール</span>
+        <h1>確定申告の準備を、<br />正式な税務処理で。</h1>
+        <p class="hero-sub">
+          銀行・カード明細の取り込みから、e-Tax
+          用の申告データ生成まで。税額の計算は法令パラメータに基づく決定的なエンジンが行うので、数字がブレません。
+        </p>
+        <div class="cta-row">
+          <span class="cta" aria-disabled="true">近日公開</span>
+          <span class="cta-note">2026年分の申告シーズンに向けて公開準備中です</span>
+        </div>
+      </div>
+
+      <section>
+        <h2>eTaxAgent の考え方</h2>
+        <p class="section-sub">
+          「AI に計算させる」のではなく、「AI
+          が操作し、計算はエンジンが担う」設計です。
+        </p>
+        <div class="cards">
+          <div class="card">
+            <span class="icon">🧮</span>
+            <h3>決定的な計算エンジン</h3>
+            <p>
+              所得税・消費税の計算は、年度ごとの法令パラメータに基づく決定的な処理で行います。同じ入力からは必ず同じ結果が返るので、検算も再現もできます。
+            </p>
+          </div>
+          <div class="card">
+            <span class="icon">🤖</span>
+            <h3>AI エージェント連携</h3>
+            <p>
+              Claude Code・Codex・Muse などの外部エージェントから API / MCP
+              で接続できます。お使いの LLM
+              契約のまま、帳簿の操作や集計をエージェントに任せられます。
+            </p>
+          </div>
+          <div class="card">
+            <span class="icon">📜</span>
+            <h3>正式な手続きに沿った処理</h3>
+            <p>
+              簡易課税や各種特例、減価償却、電子帳簿保存法の訂正・削除履歴まで、正式な税務処理の要件に沿ってサポートします。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>主な機能</h2>
+        <p class="section-sub">日々の帳簿付けから申告データの生成まで。</p>
+        <div class="feature-list">
+          <ul>
+            <li>
+              明細の取り込みと自動分類
+              <span class="detail"
+                >銀行・カードの CSV を取り込み、AI
+                による列マッピングとルールベースの2段階分類で仕訳を提案します。</span
+              >
+            </li>
+            <li>
+              申告データ（XTX）の生成
+              <span class="detail"
+                >所得税・消費税の申告データを生成し、e-Tax
+                WEB版からそのまま提出できます。</span
+              >
+            </li>
+            <li>
+              簡易課税と各種特例
+              <span class="detail"
+                >簡易課税のみなし仕入率、2割特例、複数事業の75%特例に対応します。</span
+              >
+            </li>
+            <li>
+              給与・年金などの所得にも対応
+              <span class="detail"
+                >給与所得、公的年金等の雑所得、業務区分、所得金額調整控除まで扱えます。</span
+              >
+            </li>
+            <li>
+              固定資産台帳と減価償却
+              <span class="detail"
+                >定額法・定率法・一括償却・少額減価償却資産の特例に対応した台帳管理ができます。</span
+              >
+            </li>
+            <li>
+              電子帳簿保存法への対応
+              <span class="detail"
+                >取引の訂正・削除は履歴として残ります。証憑（レシート等）と取引の紐付けもできます。</span
+              >
+            </li>
+            <li>
+              白色申告の収支内訳書
+              <span class="detail">青色・白色どちらの申告にも対応します。</span>
+            </li>
+            <li>
+              充実したログイン保護
+              <span class="detail"
+                >認証アプリによる2要素認証、マジックリンク、Google / GitHub
+                ログインに対応します。</span
+              >
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>料金</h2>
+        <p class="section-sub">プランはひとつだけ。シンプルに。</p>
+        <div class="price-card">
+          <div>月額プラン</div>
+          <div class="price">490<small> 円 / 月</small></div>
+          <p>全機能が使えます。</p>
+          <p>税務シーズンだけの利用も OK。月単位でいつでも解約できます。</p>
+        </div>
+      </section>
+
+      <section>
+        <div class="notice">
+          <strong>ご利用にあたって：</strong>
+          eTaxAgent
+          は申告書の作成を支援するソフトウェアです。税務代理や、個別の事情に基づく税務相談は行いません。申告データの提出はご本人が行ってください。判断に迷う場合は、税理士などの専門家にご相談ください。
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <p>運営：合同会社オッカム</p>
+        <p>
+          特定商取引法に基づく表記・利用規約・プライバシーポリシーは、正式公開時に本ページへ掲載します。
+        </p>
+        <p>© 合同会社オッカム</p>
+      </div>
+    </footer>
+  </body>
+</html>
