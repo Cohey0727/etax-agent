@@ -8,20 +8,14 @@ const skeletonPulse = keyframes({
 });
 
 const styles = {
-  // 狭幅（スマホ）では行を潰さず、リスト全体を横スクロールさせる。
-  listScroller: style({
-    overflowX: "auto",
-  }),
   // 独立した項目1件分の行。順序は表さず、状態だけを示す。
-  // 項目名・状態・補足は左に寄せて並べる（両端に散らすと隙間が開きすぎる）。
+  // 項目名＋チップと状態テキストを縦に積み、狭幅でも潰さず最初から全て見えるようにする。
   statusRow: style({
     display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: theme.space.md,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: theme.space.sm,
     minHeight: "24px",
-    // ラベル＋チップ＋状態テキストが潰れない最小幅（これより狭ければ横スクロール）。
-    minWidth: "24rem",
   }),
   // 項目名＋状態チップ。
   itemLabel: style({
