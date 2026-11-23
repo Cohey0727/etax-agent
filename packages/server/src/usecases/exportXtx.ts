@@ -113,6 +113,7 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
       submissionDate: body.submission_date,
       taxpayer: toTaxpayer(body.taxpayer),
       figures,
+      filingType: body.filing_type,
       deductionInputs: body.deductions,
       miscIncome,
       tax,

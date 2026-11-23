@@ -98,6 +98,45 @@ function incomeSample(year: number): string {
   });
 }
 
+function whiteSample(year: number): string {
+  const transactions: Transaction[] = [
+    { date: `${year}-06-15`, year, description: "事業売上", amount: 12_000_000, account: "普通預金", category: "売上高", income_type: "business", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "仕入", amount: -1_000_000, account: "普通預金", category: "仕入高", income_type: "business", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "通信費", amount: -300_000, account: "普通預金", category: "通信費", income_type: "business", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "固定資産税", amount: -50_000, account: "普通預金", category: "租税公課", income_type: "business", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "会議費", amount: -20_000, account: "普通預金", category: "会議費", income_type: "business", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "雑費", amount: -10_000, account: "普通預金", category: "雑費", income_type: "business", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "家賃収入", amount: 1_764_000, account: "普通預金", category: "家賃収入", income_type: "real_estate", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "修繕費", amount: -100_000, account: "普通預金", category: "修繕費", income_type: "real_estate", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "管理費", amount: -60_000, account: "普通預金", category: "管理費", income_type: "real_estate", tax_category: "" },
+  ];
+  const figures = computeCorrectedFigures(transactions, year, { filingType: "white" });
+  const tax = computeIncomeTax({
+    year,
+    totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+    deductions: EMPTY_DEDUCTION_INPUTS,
+    taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+  });
+  return buildXtxFiling({
+    year,
+    amendment: false,
+    submissionDate: "2026-03-10",
+    taxpayer: TAXPAYER,
+    figures,
+    filingType: "white",
+    deductionInputs: EMPTY_DEDUCTION_INPUTS,
+    miscIncome: EMPTY_MISC_INCOME,
+    tax,
+    categoryTotals: {
+      business: { 仕入高: 1_000_000, 通信費: 300_000, 租税公課: 50_000, 会議費: 20_000, 雑費: 10_000 },
+      realEstate: { 家賃収入: 1_764_000, 修繕費: 100_000, 管理費: 60_000 },
+    },
+    withholdingTax: 0,
+    prepaidTax: 0,
+    originalThirdPeriodTax: null,
+  });
+}
+
 function shohiSample(): string {
   const input = {
     salesIncl10: 15_352_564,
@@ -187,6 +226,7 @@ describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => 
       ["shotoku2023.xtx", incomeSample(2023), "shotoku/RKO0010-231.xsd"],
       ["shotoku2024.xtx", incomeSample(2024), "shotoku/RKO0010-240.xsd"],
       ["shotoku2025.xtx", incomeSample(2025), "shotoku/RKO0010-250.xsd"],
+      ["shotokuWhite2025.xtx", whiteSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
       ["shohiSpecial20.xtx", special20Sample(), "shohi/RSH0010-260.xsd"],
       ["shohiKanni2027.xtx", kanniSample(), "shohi/RSH0030-260.xsd"],

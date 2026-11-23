@@ -666,6 +666,7 @@ export async function dispatchMcpTool(
             : todayInTokyo(),
           taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
           figures,
+          filingType: filingOptionsArg(args).filingType,
           deductionInputs: deductions,
           miscIncome,
           tax,
