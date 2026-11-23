@@ -38,12 +38,15 @@
  * 最終提出（e-Tax）は本サーバーでは行わない（納税者本人の操作）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { Context, Next } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
 import { ACCOUNT_CRITERIA } from "@etax/shared";
-import { ensureTables, isDatabaseConfigured } from "./lib/db";
+import { ensureTables, getDb, isDatabaseConfigured } from "./lib/db";
+import { authRequired, runWithTenant } from "./lib/tenantContext";
+import { resolveRequestUserId } from "./usecases/authSession";
 import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
 import { createSystemOneClient } from "./gateways/systemOneGateway";
 import { loadSystemOneConfig } from "./lib/config";
@@ -51,6 +54,7 @@ import { loadSystemOneSettings } from "./repositories/systemOneSettingsRepositor
 import { loadJevPromptOverride } from "./repositories/jevPromptRepository";
 import { loadRegexRulesOverride } from "./repositories/regexRulesRepository";
 import agentRoutes from "./routes/agent";
+import authRoutes from "./routes/auth";
 import calcRoutes from "./routes/calc";
 import classifyRoutes from "./routes/classify";
 import etaxRoutes from "./routes/etax";
@@ -70,7 +74,33 @@ import transactionsRoutes from "./routes/transactions";
 const app = new OpenAPIHono();
 app.use("/api/*", cors());
 
+/**
+ * 認証ミドルウェア: セッション/APIキーからユーザーを解決し、テナント文脈を
+ * 載せて後続を実行する。ETAX_AUTH_MODE=required（SaaS）のときは認証の無い
+ * リクエストを 401 にする（/api/auth/* と /api/health は除く）。
+ * 認証オフ（既定）のローカル運用では文脈だけ載せて素通しする。
+ */
+async function authMiddleware(
+  c: Context,
+  next: Next,
+): Promise<Response | void> {
+  const path = c.req.path;
+  const isPublic = path.startsWith("/api/auth/") || path === "/api/health";
+  const db = getDb();
+  const userId = db ? await resolveRequestUserId(db, c) : undefined;
+  if (userId === undefined) {
+    if (authRequired() && !isPublic) {
+      return c.json({ message: "ログインが必要です" }, 401);
+    }
+    return next();
+  }
+  return runWithTenant(userId, () => next());
+}
+app.use("/api/*", authMiddleware);
+app.use("/mcp", authMiddleware);
+
 app.route("/", healthRoutes);
+app.route("/", authRoutes);
 app.route("/", calcRoutes);
 app.route("/", transactionsRoutes);
 app.route("/", importsRoutes);

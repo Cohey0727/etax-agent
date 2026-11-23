@@ -34,8 +34,8 @@ function createTestDb(): Db {
       import_id integer,
       created_at integer NOT NULL,
       updated_at integer NOT NULL DEFAULT 0,
-      deleted_at integer
-    );
+      deleted_at integer,
+      owner_user_id integer NOT NULL DEFAULT 1);
     CREATE TABLE transaction_history (
       id integer PRIMARY KEY AUTOINCREMENT,
       transaction_id integer NOT NULL REFERENCES transactions(id),

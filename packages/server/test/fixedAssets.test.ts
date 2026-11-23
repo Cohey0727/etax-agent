@@ -31,8 +31,8 @@ function createTestDb(): Db {
       business_ratio_percent integer NOT NULL DEFAULT 100,
       disposed_date text,
       created_at integer NOT NULL,
-      updated_at integer NOT NULL
-    );
+      updated_at integer NOT NULL,
+      owner_user_id integer NOT NULL DEFAULT 1);
   `);
   return drizzle(client, { schema }) as Db;
 }

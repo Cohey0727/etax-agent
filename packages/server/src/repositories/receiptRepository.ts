@@ -7,6 +7,7 @@
  */
 import { desc, eq } from "drizzle-orm";
 import { Db } from "../lib/db";
+import { currentUserId } from "../lib/tenantContext";
 import { AnalyzeReceiptResponse, ReceiptResponse } from "../schemas/receipt";
 import { ReceiptRow, receiptsTable } from "./schema";
 
@@ -52,7 +53,12 @@ export async function getReceiptRowByFileId(db: Db, fileId: string): Promise<Rec
 }
 
 export async function listReceiptRows(db: Db): Promise<ReceiptRow[]> {
-  return db.select().from(receiptsTable).orderBy(desc(receiptsTable.createdAt));
+  const owner = currentUserId();
+  const query = db.select().from(receiptsTable);
+  const scoped = owner !== undefined
+    ? query.where(eq(receiptsTable.ownerUserId, owner))
+    : query;
+  return scoped.orderBy(desc(receiptsTable.createdAt));
 }
 
 export async function listReceiptRowsForTransaction(

@@ -9,6 +9,7 @@
 import { asc, eq } from "drizzle-orm";
 import { DepreciationDetailRow, DepreciationMethod, FixedAssetInput, depreciationDetailRow } from "@etax/shared";
 import { Db } from "../lib/db";
+import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { FixedAssetResponse } from "../schemas/fixedAsset";
 import { FixedAssetRow, NewFixedAssetRow, fixedAssetsTable } from "./schema";
 
@@ -50,10 +51,12 @@ export function isActiveInYear(row: FixedAssetRow, year: number): boolean {
 }
 
 export async function listFixedAssetRows(db: Db): Promise<FixedAssetRow[]> {
-  return db
-    .select()
-    .from(fixedAssetsTable)
-    .orderBy(asc(fixedAssetsTable.acquisitionDate), asc(fixedAssetsTable.id));
+  const owner = currentUserId();
+  const query = db.select().from(fixedAssetsTable);
+  const scoped = owner !== undefined
+    ? query.where(eq(fixedAssetsTable.ownerUserId, owner))
+    : query;
+  return scoped.orderBy(asc(fixedAssetsTable.acquisitionDate), asc(fixedAssetsTable.id));
 }
 
 export async function getFixedAssetRow(db: Db, id: number): Promise<FixedAssetRow | null> {
@@ -65,7 +68,10 @@ export async function insertFixedAssetRow(
   db: Db,
   values: Omit<NewFixedAssetRow, "id" | "createdAt" | "updatedAt">,
 ): Promise<FixedAssetRow | null> {
-  const inserted = await db.insert(fixedAssetsTable).values(values).returning();
+  const inserted = await db
+    .insert(fixedAssetsTable)
+    .values({ ...values, ownerUserId: ownerIdForWrite() })
+    .returning();
   return inserted[0] ?? null;
 }
 

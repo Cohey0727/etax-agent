@@ -10,6 +10,7 @@
  */
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { Db } from "../lib/db";
+import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import {
   TransactionHistoryEntryResponse,
   TransactionResponse,
@@ -83,10 +84,13 @@ async function getActiveTransactionRow(
   db: Db,
   id: number,
 ): Promise<TransactionRow | undefined> {
+  const owner = currentUserId();
+  const conditions = [eq(transactionsTable.id, id), isNull(transactionsTable.deletedAt)];
+  if (owner !== undefined) conditions.push(eq(transactionsTable.ownerUserId, owner));
   const [row] = await db
     .select()
     .from(transactionsTable)
-    .where(and(eq(transactionsTable.id, id), isNull(transactionsTable.deletedAt)));
+    .where(and(...conditions));
   return row;
 }
 
@@ -103,13 +107,14 @@ export async function listTransactionRows(
   db: Db,
   incomeType?: string,
 ): Promise<TransactionRow[]> {
-  const where = incomeType
-    ? and(eq(transactionsTable.incomeType, incomeType), isNull(transactionsTable.deletedAt))
-    : isNull(transactionsTable.deletedAt);
+  const owner = currentUserId();
+  const conditions = [isNull(transactionsTable.deletedAt)];
+  if (incomeType) conditions.push(eq(transactionsTable.incomeType, incomeType));
+  if (owner !== undefined) conditions.push(eq(transactionsTable.ownerUserId, owner));
   return db
     .select()
     .from(transactionsTable)
-    .where(where)
+    .where(and(...conditions))
     .orderBy(asc(transactionsTable.date), asc(transactionsTable.id));
 }
 
@@ -139,7 +144,10 @@ export async function insertTransactionRow(
     taxCategory: string;
   },
 ): Promise<TransactionRow | undefined> {
-  const [row] = await db.insert(transactionsTable).values(values).returning();
+  const [row] = await db
+    .insert(transactionsTable)
+    .values({ ...values, ownerUserId: ownerIdForWrite() })
+    .returning();
   if (row) {
     await recordTransactionHistory(db, row.id, "created", null, transactionToApi(row));
   }
@@ -248,18 +256,20 @@ export async function replaceYearTransactionRows(
   // （await を挟むと "Transaction function cannot return a promise" になる）。
   return db.transaction((tx) => {
     const now = new Date();
+    const owner = currentUserId();
+    const yearConditions = [
+      eq(transactionsTable.fiscalYear, year),
+      isNull(transactionsTable.deletedAt),
+    ];
+    if (owner !== undefined) yearConditions.push(eq(transactionsTable.ownerUserId, owner));
     const beforeRows = tx
       .select()
       .from(transactionsTable)
-      .where(
-        and(eq(transactionsTable.fiscalYear, year), isNull(transactionsTable.deletedAt)),
-      )
+      .where(and(...yearConditions))
       .all();
     tx.update(transactionsTable)
       .set({ deletedAt: now, updatedAt: now })
-      .where(
-        and(eq(transactionsTable.fiscalYear, year), isNull(transactionsTable.deletedAt)),
-      )
+      .where(and(...yearConditions))
       .run();
     for (const beforeRow of beforeRows) {
       tx.insert(transactionHistoryTable)
@@ -272,9 +282,10 @@ export async function replaceYearTransactionRows(
         .run();
     }
     if (values.length === 0) return [];
+    const ownerUserId = ownerIdForWrite();
     const inserted = tx
       .insert(transactionsTable)
-      .values([...values])
+      .values(values.map((v) => ({ ...v, ownerUserId })))
       .returning()
       .all();
     for (const row of inserted) {

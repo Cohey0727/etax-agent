@@ -203,6 +203,74 @@ export async function ensureTables(): Promise<void> {
     )
   `);
   db.run(sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      email text NOT NULL UNIQUE,
+      password_hash text NOT NULL,
+      created_at integer NOT NULL
+    )
+  `);
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      user_id integer NOT NULL REFERENCES users(id),
+      token_hash text NOT NULL UNIQUE,
+      expires_at integer NOT NULL,
+      created_at integer NOT NULL
+    )
+  `);
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      user_id integer NOT NULL REFERENCES users(id),
+      name text NOT NULL DEFAULT '',
+      key_hash text NOT NULL UNIQUE,
+      key_prefix text NOT NULL DEFAULT '',
+      last_used_at integer,
+      created_at integer NOT NULL
+    )
+  `);
+  // マルチテナント化: 既存テーブルへ所有者列を追加（既存行は既定ユーザー=1）。
+  for (const table of [
+    "transactions",
+    "imports",
+    "taxpayer_profiles",
+    "fixed_assets",
+    "receipts",
+    "filing_status",
+    "filing_snapshots",
+  ]) {
+    const columns = db.all<{ name: string }>(
+      sql.raw(`PRAGMA table_info(${table})`),
+    ) as { name: string }[];
+    if (!columns.some((c) => c.name === "owner_user_id")) {
+      db.run(sql.raw(`ALTER TABLE ${table} ADD COLUMN owner_user_id integer NOT NULL DEFAULT 1`));
+    }
+  }
+  // マルチテナント化: 年度キーのテーブルは主キーを (owner_user_id, year) へ
+  // 作り替える（既存行は所有者=1 で移行）。主キーが year 単独のときだけ実行。
+  const rebuildYearKeyed = (table: string, columnsSql: string) => {
+    const info = db.all<{ name: string; pk: number }>(
+      sql.raw(`PRAGMA table_info(${table})`),
+    ) as { name: string; pk: number }[];
+    const pkColumns = info.filter((c) => c.pk > 0).map((c) => c.name);
+    if (pkColumns.length === 1 && pkColumns[0] === "year") {
+      const columnList = info.map((c) => c.name).join(", ");
+      db.run(sql.raw(`CREATE TABLE ${table}_mt (${columnsSql}, PRIMARY KEY (owner_user_id, year))`));
+      db.run(sql.raw(`INSERT INTO ${table}_mt (${columnList}) SELECT ${columnList} FROM ${table}`));
+      db.run(sql.raw(`DROP TABLE ${table}`));
+      db.run(sql.raw(`ALTER TABLE ${table}_mt RENAME TO ${table}`));
+    }
+  };
+  rebuildYearKeyed(
+    "taxpayer_profiles",
+    `year integer NOT NULL, owner_user_id integer NOT NULL DEFAULT 1, name text NOT NULL DEFAULT '', name_kana text NOT NULL DEFAULT '', zip_code text NOT NULL DEFAULT '', address text NOT NULL DEFAULT '', address_line2 text NOT NULL DEFAULT '', birth_date text NOT NULL DEFAULT '', phone text NOT NULL DEFAULT '', tax_office_name text NOT NULL DEFAULT '', tax_office_code text NOT NULL DEFAULT '', my_number text NOT NULL DEFAULT '', user_id text NOT NULL DEFAULT '', occupation text NOT NULL DEFAULT '', shop_name text NOT NULL DEFAULT '', jan1_address text NOT NULL DEFAULT '', invoice_number text NOT NULL DEFAULT '', previous_zip_code text NOT NULL DEFAULT '', previous_address text NOT NULL DEFAULT '', updated_at integer NOT NULL`,
+  );
+  rebuildYearKeyed(
+    "filing_status",
+    `year integer NOT NULL, owner_user_id integer NOT NULL DEFAULT 1, confirmed_at integer, calculated_at integer, submitted_at integer, updated_at integer NOT NULL`,
+  );
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS knowledge_docs (
       id integer PRIMARY KEY AUTOINCREMENT,
       slug text NOT NULL UNIQUE,

@@ -8,6 +8,7 @@
 import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { Db } from "../lib/db";
 import { decryptField, encryptField } from "../lib/encryption";
+import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { TaxpayerProfile } from "../schemas/taxpayer";
 import { TaxpayerProfileRow, taxpayerProfilesTable } from "./schema";
 
@@ -65,10 +66,13 @@ export async function getTaxpayerProfileRow(
   db: Db,
   year: number,
 ): Promise<TaxpayerProfileRow | undefined> {
+  const owner = currentUserId();
+  const conditions = [eq(taxpayerProfilesTable.year, year)];
+  if (owner !== undefined) conditions.push(eq(taxpayerProfilesTable.ownerUserId, owner));
   const [row] = await db
     .select()
     .from(taxpayerProfilesTable)
-    .where(eq(taxpayerProfilesTable.year, year));
+    .where(and(...conditions));
   return row;
 }
 
@@ -77,15 +81,16 @@ export async function findTaxpayerCarryRow(
   db: Db,
   year: number,
 ): Promise<TaxpayerProfileRow | undefined> {
+  const owner = currentUserId();
+  const conditions = [
+    lt(taxpayerProfilesTable.year, year),
+    gte(taxpayerProfilesTable.year, year - CARRY_SEARCH_YEARS),
+  ];
+  if (owner !== undefined) conditions.push(eq(taxpayerProfilesTable.ownerUserId, owner));
   const [row] = await db
     .select()
     .from(taxpayerProfilesTable)
-    .where(
-      and(
-        lt(taxpayerProfilesTable.year, year),
-        gte(taxpayerProfilesTable.year, year - CARRY_SEARCH_YEARS),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(desc(taxpayerProfilesTable.year))
     .limit(1);
   return row;
@@ -99,6 +104,7 @@ export async function upsertTaxpayerProfileRow(
 ): Promise<TaxpayerProfileRow | undefined> {
   const values = {
     year,
+    ownerUserId: ownerIdForWrite(),
     name: profile.name,
     nameKana: profile.name_kana,
     zipCode: profile.zip_code,
@@ -118,11 +124,14 @@ export async function upsertTaxpayerProfileRow(
     previousAddress: profile.previous_address,
     updatedAt: new Date(),
   };
-  const { year: _year, ...updates } = values;
+  const { year: _year, ownerUserId: _owner, ...updates } = values;
   const [row] = await db
     .insert(taxpayerProfilesTable)
     .values(values)
-    .onConflictDoUpdate({ target: taxpayerProfilesTable.year, set: updates })
+    .onConflictDoUpdate({
+      target: [taxpayerProfilesTable.ownerUserId, taxpayerProfilesTable.year],
+      set: updates,
+    })
     .returning();
   return row;
 }
