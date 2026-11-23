@@ -37,11 +37,17 @@ describe("償却率表", () => {
     expect(decliningBalanceRates(5)).toEqual({ rate: 0.4, revisedRate: 0.5, guaranteeRate: 0.108 });
     expect(decliningBalanceRates(6)).toEqual({ rate: 0.333, revisedRate: 0.334, guaranteeRate: 0.09911 });
     expect(decliningBalanceRates(10)).toEqual({ rate: 0.2, revisedRate: 0.25, guaranteeRate: 0.06552 });
+    // 2026-11-23 に別表第十（e-Gov原文＋2ソース照合）から転記した範囲
+    expect(decliningBalanceRates(16)).toEqual({ rate: 0.125, revisedRate: 0.143, guaranteeRate: 0.04294 });
+    expect(decliningBalanceRates(19)).toEqual({ rate: 0.105, revisedRate: 0.112, guaranteeRate: 0.03693 });
+    expect(decliningBalanceRates(28)).toEqual({ rate: 0.071, revisedRate: 0.072, guaranteeRate: 0.02568 });
+    expect(decliningBalanceRates(50)).toEqual({ rate: 0.04, revisedRate: 0.042, guaranteeRate: 0.0144 });
+    expect(decliningBalanceRates(100)).toEqual({ rate: 0.02, revisedRate: 0.02, guaranteeRate: 0.00742 });
   });
 
   test("率表に無い年数の定率法は例外（推測しない）", () => {
-    expect(() => decliningBalanceRates(16)).toThrow();
-    expect(() => decliningBalanceRates(30)).toThrow();
+    expect(() => decliningBalanceRates(101)).toThrow();
+    expect(() => decliningBalanceRates(1)).toThrow();
   });
 });
 
