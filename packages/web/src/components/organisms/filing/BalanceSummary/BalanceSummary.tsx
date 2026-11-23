@@ -1,7 +1,11 @@
 import {
   BlueDeductionOptions,
+  EMPTY_MISC_INCOME,
+  EMPTY_SALARY_INCOME,
   MiscIncomeInput,
+  SalaryIncomeInput,
   computeCorrectedFigures,
+  computeManualIncomes,
   filterYear,
   Transaction,
 } from "@etax/shared";
@@ -22,8 +26,10 @@ export interface BalanceSummaryProps {
   year: number;
   /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
   filingOptions?: BlueDeductionOptions;
-  /** 雑所得（その他）。帳簿に載らない所得として合計に含める。 */
+  /** 雑所得。帳簿に載らない所得として合計に含める。 */
   miscIncome?: MiscIncomeInput;
+  /** 給与所得。帳簿に載らない所得として合計に含める。 */
+  salaryIncome?: SalaryIncomeInput;
   /** 未分類の警告から、帳簿を年度＋未分類フィルターで開く。 */
   onOpenUnclassified?: () => void;
 }
@@ -36,7 +42,7 @@ export interface BalanceSummaryProps {
  * MonthlyBalance と BalanceRecords がそれぞれ別カードで並べる。
  * 未分類が残っていれば注意も出す。
  */
-export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome, onOpenUnclassified }: BalanceSummaryProps) => {
+export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome, salaryIncome, onOpenUnclassified }: BalanceSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
@@ -70,8 +76,13 @@ export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome, 
     };
   }, [yearTransactions]);
   const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
-  const misc = miscIncome?.income ?? 0;
-  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
+  const manual = computeManualIncomes(
+    year,
+    salaryIncome ?? EMPTY_SALARY_INCOME,
+    miscIncome ?? EMPTY_MISC_INCOME,
+    figures._detail.business_income + figures._detail.real_estate_income,
+  );
+  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + manual.total;
   const businessBalance = figures.business_revenue - figures.business_expenses;
   const realEstateBalance = figures.real_estate_revenue - figures.real_estate_expenses;
 
@@ -95,7 +106,10 @@ export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome, 
       label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
       amount: -figures.blue_deduction,
     },
-    ...(misc > 0 ? [{ label: "雑所得", amount: misc }] : []),
+    ...(manual.salary > 0 ? [{ label: "給与所得", amount: manual.salary }] : []),
+    ...(manual.pension > 0 ? [{ label: "雑所得（公的年金等）", amount: manual.pension }] : []),
+    ...(manual.miscBusiness > 0 ? [{ label: "雑所得（業務）", amount: manual.miscBusiness }] : []),
+    ...(manual.miscOther > 0 ? [{ label: "雑所得（その他）", amount: manual.miscOther }] : []),
   ];
 
   return (

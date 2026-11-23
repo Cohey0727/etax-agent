@@ -7,6 +7,7 @@ import {
   buildXtxFiling,
   computeCorrectedFigures,
   computeIncomeTax,
+  computeManualIncomes,
   xtxSupportedYears,
 } from "../src";
 
@@ -357,7 +358,7 @@ describe("buildXtxFiling", () => {
       tx({ date: "2025-06-15", year: 2025, description: "事業売上", amount: 12_000_000, category: "売上高", income_type: "business" }),
     ];
     const figures = computeCorrectedFigures(transactions, 2025);
-    const miscIncome = { revenue: 175_122, income: 175_122, kubun: 2 };
+    const miscIncome = { ...EMPTY_MISC_INCOME, revenue: 175_122, income: 175_122, kubun: 2 };
     const tax = computeIncomeTax({
       year: 2025,
       totalIncome:
@@ -392,6 +393,72 @@ describe("buildXtxFiling", () => {
     expect(xtx).toContain("<ABB01130>175122</ABB01130>");
     // 合計⑫ = 事業所得（12,000,000 − 青色650,000）+ 雑 175,122
     expect(xtx).toContain("<ABB00410>11525122</ABB00410>");
+  });
+
+  test("給与（調整控除）・公的年金等・業務は第一表の各欄に出て、合計⑫に含まれる", () => {
+    const transactions: Transaction[] = [
+      tx({ date: "2025-06-15", year: 2025, description: "事業売上", amount: 12_000_000, category: "売上高", income_type: "business" }),
+    ];
+    const figures = computeCorrectedFigures(transactions, 2025);
+    // 給与収入900万円・調整控除の対象 → 給与所得控除195万円、調整控除①5万円
+    const salaryIncome = { revenue: 9_000_000, adjustmentEligible: true };
+    // 公的年金等350万円（65歳以上）。年金以外の合計所得が1,000万円超
+    // 2,000万円以下の区分になるため控除は10万円縮小し、年金雑所得は
+    // 245万円。調整控除②10万円。業務は収入50万円・所得30万円。
+    const miscIncome = {
+      ...EMPTY_MISC_INCOME,
+      pensionRevenue: 3_500_000,
+      pensionOver65: true,
+      businessRevenue: 500_000,
+      businessIncome: 300_000,
+    };
+    const manual = computeManualIncomes(
+      2025,
+      salaryIncome,
+      miscIncome,
+      figures._detail.business_income + figures._detail.real_estate_income,
+    );
+    expect(manual.salary).toBe(6_900_000);
+    expect(manual.pension).toBe(2_450_000);
+    expect(manual.miscTotal).toBe(2_750_000);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome:
+        figures._detail.business_income + figures._detail.real_estate_income + manual.total,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: false,
+      submissionDate: "2026-11-20",
+      taxpayer: {
+        name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+        myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア", shopName: "", jan1Address: "",
+      },
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome,
+      salaryIncome,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    // 収入金額等: 給与オ・公的年金等カ・業務キ
+    expect(xtx).toContain("<ABB00080>9000000</ABB00080>");
+    expect(xtx).toContain("<ABB00100>3500000</ABB00100>");
+    expect(xtx).toContain("<ABB00105>500000</ABB00105>");
+    // 所得金額等: 給与⑥（調整控除①②適用後）・年金⑦・業務⑧・計⑩
+    expect(xtx).toContain("<ABB00370>6900000</ABB00370>");
+    expect(xtx).toContain("<ABB01060>2450000</ABB01060>");
+    expect(xtx).toContain("<ABB01090>300000</ABB01090>");
+    expect(xtx).toContain("<ABB01130>2750000</ABB01130>");
+    // 合計⑫ = 事業所得 11,350,000 + 給与 6,900,000 + 雑計 2,750,000
+    expect(xtx).toContain("<ABB00410>21000000</ABB00410>");
   });
 });
 

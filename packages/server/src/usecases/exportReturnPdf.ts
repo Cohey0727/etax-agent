@@ -6,9 +6,11 @@
  * 提出データは XTX 出力を使う（案内はクライアント側の文言で示す）。
  */
 import {
-  EMPTY_MISC_INCOME,
+  normalizeMiscIncomeInput,
+  normalizeSalaryIncomeInput,
   computeCorrectedFigures,
   computeIncomeTax,
+  computeManualIncomes,
   filterYear,
   normalizeTransactions,
 } from "@etax/shared";
@@ -74,11 +76,18 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     filingType: body.filing_type,
     realEstateBusinessScale: body.real_estate_business_scale,
   });
-  const miscIncome = body.misc_income ?? EMPTY_MISC_INCOME;
+  const miscIncome = normalizeMiscIncomeInput(body.misc_income);
+  const salaryIncome = normalizeSalaryIncomeInput(body.salary_income);
+  const manual = computeManualIncomes(
+    body.year,
+    salaryIncome,
+    miscIncome,
+    figures._detail.business_income + figures._detail.real_estate_income,
+  );
   const tax = computeIncomeTax({
     year: body.year,
     totalIncome:
-      figures._detail.business_income + figures._detail.real_estate_income + miscIncome.income,
+      figures._detail.business_income + figures._detail.real_estate_income + manual.total,
     deductions: body.deductions,
     taxCredits: body.tax_credits,
   });
@@ -90,6 +99,8 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     figures,
     tax,
     miscIncome,
+    salaryIncome,
+    manual,
     deductionInputs: body.deductions,
     withholdingTax: body.withholding_tax,
     prepaidTax: body.prepaid_tax,

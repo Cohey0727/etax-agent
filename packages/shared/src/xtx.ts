@@ -28,7 +28,7 @@
  * CATALOG（管理用部分）の RDF は CATALOG.xsd が lax のため骨格のみとし、
  * FORM_SEC には様式IDを列挙する。帳票の中身は CONTENTS 側が正。
  */
-import { DeductionInputs, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, salaryIncomeAmount } from "./deductions";
+import { DeductionInputs, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, computeManualIncomes } from "./deductions";
 import { CorrectedFigures, FilingType } from "./taxcalc";
 import { DepreciationDetailRow } from "./depreciation";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
@@ -101,7 +101,7 @@ export interface XtxFilingData {
   figures: CorrectedFigures;
   /** 控除の入力値（第二表の保険料明細・区分判定に使う） */
   deductionInputs: DeductionInputs;
-  /** 雑所得（その他）の入力。第一表ク・⑨・⑩に出力する。 */
+  /** 雑所得の入力（公的年金等・業務・その他）。第一表カ〜ク・⑦〜⑩に出力する。 */
   miscIncome: MiscIncomeInput;
   /** 給与所得の入力（収入金額）。第一表オ・⑥に出力する。省略時は給与なし。 */
   salaryIncome?: SalaryIncomeInput;
@@ -389,6 +389,14 @@ function buildKoa020Face1(data: XtxFilingData): string {
   // --- 申告内容 ---
   const body: string[] = [];
 
+  // 給与・雑所得の最終金額（調整控除・公的年金等控除を含む決定的計算）
+  const manual = computeManualIncomes(
+    data.year,
+    data.salaryIncome ?? { revenue: 0 },
+    data.miscIncome,
+    f._detail.business_income + f._detail.real_estate_income,
+  );
+
   // 収入金額等
   const revenues: string[] = [];
   if (f.business_revenue) {
@@ -398,10 +406,23 @@ function buildKoa020Face1(data: XtxFilingData): string {
   if (data.salaryIncome && data.salaryIncome.revenue > 0) {
     revenues.push(amountAlways("ABB00080", data.salaryIncome.revenue));
   }
-  if (data.miscIncome.revenue > 0) {
+  if (
+    data.miscIncome.pensionRevenue > 0 ||
+    data.miscIncome.businessRevenue > 0 ||
+    data.miscIncome.revenue > 0
+  ) {
     const misc: string[] = [];
-    if (data.miscIncome.kubun > 0) misc.push(`<ABB00107>${data.miscIncome.kubun}</ABB00107>`);
-    misc.push(amountAlways("ABB00110", data.miscIncome.revenue));
+    if (data.miscIncome.pensionRevenue > 0) {
+      misc.push(amountAlways("ABB00100", data.miscIncome.pensionRevenue));
+    }
+    if (data.miscIncome.businessRevenue > 0) {
+      if (data.miscIncome.businessKubun > 0) misc.push(`<ABB00103>${data.miscIncome.businessKubun}</ABB00103>`);
+      misc.push(amountAlways("ABB00105", data.miscIncome.businessRevenue));
+    }
+    if (data.miscIncome.revenue > 0) {
+      if (data.miscIncome.kubun > 0) misc.push(`<ABB00107>${data.miscIncome.kubun}</ABB00107>`);
+      misc.push(amountAlways("ABB00110", data.miscIncome.revenue));
+    }
     revenues.push(`<ABB00090>${misc.join("")}</ABB00090>`);
   }
   if (revenues.length > 0) body.push(`<ABB00010>${revenues.join("")}</ABB00010>`);
@@ -413,15 +434,20 @@ function buildKoa020Face1(data: XtxFilingData): string {
   }
   incomes.push(amountAlways("ABB00340", f._detail.real_estate_income));
   if (data.salaryIncome && data.salaryIncome.revenue > 0) {
-    incomes.push(
-      amountAlways("ABB00370", salaryIncomeAmount(data.year, data.salaryIncome.revenue)),
-    );
+    incomes.push(amountAlways("ABB00370", manual.salary));
   }
-  if (data.miscIncome.income > 0) {
-    // 雑（その他）: ⑨その他 + ⑩（⑦〜⑨の計）。公的年金等・業務はないため計は⑨と同額。
-    incomes.push(
-      `<ABB01050><ABB01100>${amountAlways("ABB01120", data.miscIncome.income)}</ABB01100>${amountAlways("ABB01130", data.miscIncome.income)}</ABB01050>`,
-    );
+  if (manual.miscTotal > 0 || data.miscIncome.pensionRevenue > 0 || data.miscIncome.businessRevenue > 0) {
+    // 雑: ⑦公的年金等 + ⑧業務 + ⑨その他 + ⑩（⑦〜⑨の計）
+    const miscParts: string[] = [];
+    if (manual.pension > 0) miscParts.push(amountAlways("ABB01060", manual.pension));
+    if (manual.miscBusiness > 0) {
+      miscParts.push(`<ABB01070>${amountAlways("ABB01090", manual.miscBusiness)}</ABB01070>`);
+    }
+    if (manual.miscOther > 0) {
+      miscParts.push(`<ABB01100>${amountAlways("ABB01120", manual.miscOther)}</ABB01100>`);
+    }
+    miscParts.push(amountAlways("ABB01130", manual.miscTotal));
+    incomes.push(`<ABB01050>${miscParts.join("")}</ABB01050>`);
   }
   incomes.push(amountAlways("ABB00410", data.tax.totalIncome));
   body.push(`<ABB00270>${incomes.join("")}</ABB00270>`);

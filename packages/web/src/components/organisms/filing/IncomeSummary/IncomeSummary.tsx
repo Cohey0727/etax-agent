@@ -1,8 +1,12 @@
 import {
   BlueDeductionOptions,
+  EMPTY_MISC_INCOME,
+  EMPTY_SALARY_INCOME,
   MiscIncomeInput,
+  SalaryIncomeInput,
   Transaction,
   computeCorrectedFigures,
+  computeManualIncomes,
   filterYear,
 } from "@etax/shared";
 import { useMemo } from "react";
@@ -16,15 +20,17 @@ export interface IncomeSummaryProps {
   year: number;
   /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
   filingOptions?: BlueDeductionOptions;
-  /** 雑所得（その他）。帳簿に載らない所得として合計に含める。 */
+  /** 雑所得。帳簿に載らない所得として合計に含める。 */
   miscIncome?: MiscIncomeInput;
+  /** 給与所得。帳簿に載らない所得として合計に含める。 */
+  salaryIncome?: SalaryIncomeInput;
 }
 
 /**
  * 「収支」行の直下に置く収支の要約。収支（収入・支出・差引）を見直したら、
  * その結果である所得の数字を真下で確認して、そのまま「確定」にできるようにする。
  */
-export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }: IncomeSummaryProps) => {
+export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome, salaryIncome }: IncomeSummaryProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
@@ -44,8 +50,13 @@ export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }:
 
   const isWhite = filingOptions?.filingType === "white";
   const suffix = isWhite ? "" : "（青色控除後）";
-  const misc = miscIncome?.income ?? 0;
-  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + misc;
+  const manual = computeManualIncomes(
+    year,
+    salaryIncome ?? EMPTY_SALARY_INCOME,
+    miscIncome ?? EMPTY_MISC_INCOME,
+    figures._detail.business_income + figures._detail.real_estate_income,
+  );
+  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + manual.total;
   const statCards: readonly { label: string; value: string }[] = [
     { label: "収入合計", value: formatYen(incomeTotal) },
     { label: "支出合計", value: formatYen(expenseTotal) },
@@ -59,7 +70,10 @@ export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome }:
       label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
       amount: -figures.blue_deduction,
     },
-    ...(misc > 0 ? [{ label: "雑所得", amount: misc }] : []),
+    ...(manual.salary > 0 ? [{ label: "給与所得", amount: manual.salary }] : []),
+    ...(manual.pension > 0 ? [{ label: "雑所得（公的年金等）", amount: manual.pension }] : []),
+    ...(manual.miscBusiness > 0 ? [{ label: "雑所得（業務）", amount: manual.miscBusiness }] : []),
+    ...(manual.miscOther > 0 ? [{ label: "雑所得（その他）", amount: manual.miscOther }] : []),
   ];
 
   return (

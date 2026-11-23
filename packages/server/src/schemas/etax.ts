@@ -37,21 +37,27 @@ export const XtxTaxpayerSchema = z
 
 export type XtxTaxpayerRequest = z.infer<typeof XtxTaxpayerSchema>;
 
-/** 雑所得（その他）の入力。帳簿に載らない所得を第一表ク・⑨へ反映する。 */
+/** 雑所得の入力（公的年金等・業務・その他）。帳簿に載らない所得を第一表へ反映する。 */
 export const MiscIncomeSchema = z
   .object({
     revenue: z.number(),
     income: z.number(),
     kubun: z.number(),
+    pensionRevenue: z.number().optional(),
+    pensionOver65: z.boolean().optional(),
+    businessRevenue: z.number().optional(),
+    businessIncome: z.number().optional(),
+    businessKubun: z.number().optional(),
   })
   .openapi("MiscIncome");
 
 export type MiscIncomeRequest = z.infer<typeof MiscIncomeSchema>;
 
-/** 給与所得の入力（収入金額のみ。所得金額は給与所得控除で計算する）。 */
+/** 給与所得の入力（収入金額と調整控除の対象可否。所得金額は控除を引いて計算する）。 */
 export const SalaryIncomeSchema = z
   .object({
     revenue: z.number(),
+    adjustmentEligible: z.boolean().optional(),
   })
   .openapi("SalaryIncome");
 

@@ -40,7 +40,7 @@ import {
   depreciationForYear,
   estimateInputTax,
   residentialRentTotal,
-  salaryIncomeAmount,
+  computeManualIncomes,
   smallSpecialUsage,
   taxableSalesFromBreakdown,
   xtxSupportedYears,
@@ -288,11 +288,13 @@ export const MCP_TOOLS: McpToolDef[] = [
         tax_credits: { type: "object", description: "税額控除の入力（任意）" },
         misc_income: {
           type: "object",
-          description: "雑所得（その他）の入力（任意）: revenue（収入金額）, income（所得金額）, kubun（その他区分）",
+          description:
+            "雑所得の入力（任意）: revenue/income/kubun（その他）, pensionRevenue（公的年金等の収入金額）/pensionOver65（65歳以上か）, businessRevenue/businessIncome/businessKubun（業務）",
         },
         salary_income: {
           type: "object",
-          description: "給与所得の入力（任意）: revenue（給与等の収入金額）。所得金額は給与所得控除で自動計算する",
+          description:
+            "給与所得の入力（任意）: revenue（給与等の収入金額）, adjustmentEligible（所得金額調整控除の対象か）。所得金額は給与所得控除と調整控除で自動計算する",
         },
         filing_type: filingTypeProperty,
         real_estate_business_scale: realEstateScaleProperty,
@@ -525,13 +527,22 @@ function filingOptionsArg(args: Record<string, unknown>): BlueDeductionOptions {
   };
 }
 
-/** 雑所得（その他）の引数を入力形式に変換する。未指定・不正なら空。 */
+/** 雑所得の引数を入力形式に変換する。未指定・不正なら空。 */
 function miscIncomeArg(args: Record<string, unknown>): MiscIncomeInput {
   const raw = args["misc_income"];
   if (typeof raw !== "object" || raw === null) return EMPTY_MISC_INCOME;
   const rec = raw as Record<string, unknown>;
   const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0);
-  return { revenue: num(rec["revenue"]), income: num(rec["income"]), kubun: num(rec["kubun"]) };
+  return {
+    revenue: num(rec["revenue"]),
+    income: num(rec["income"]),
+    kubun: num(rec["kubun"]),
+    pensionRevenue: num(rec["pensionRevenue"]),
+    pensionOver65: rec["pensionOver65"] === true,
+    businessRevenue: num(rec["businessRevenue"]),
+    businessIncome: num(rec["businessIncome"]),
+    businessKubun: num(rec["businessKubun"]),
+  };
 }
 
 /** 給与所得の引数を入力形式に変換する。未指定・不正なら空。 */
@@ -543,6 +554,7 @@ function salaryIncomeArg(args: Record<string, unknown>): SalaryIncomeInput {
     revenue: typeof rec["revenue"] === "number" && Number.isFinite(rec["revenue"])
       ? Math.trunc(rec["revenue"])
       : 0,
+    adjustmentEligible: rec["adjustmentEligible"] === true,
   };
 }
 
@@ -620,12 +632,16 @@ export async function dispatchMcpTool(
         const year = Number(args["year"]);
         const tx = await ledgerTransactions(db, year);
         const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
+        const manual = computeManualIncomes(
+          year,
+          salaryIncomeArg(args),
+          miscIncomeArg(args),
+          figures._detail.business_income + figures._detail.real_estate_income,
+        );
         const result = computeIncomeTax({
           year,
           totalIncome:
-            figures._detail.business_income +
-            figures._detail.real_estate_income +
-            miscIncomeArg(args).income,
+            figures._detail.business_income + figures._detail.real_estate_income + manual.total,
           deductions: mergeDeductionInputs(args["deductions"]),
           taxCredits: mergeTaxCreditInputs(args["tax_credits"]),
         });
@@ -741,13 +757,16 @@ export async function dispatchMcpTool(
         const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
         const miscIncome = miscIncomeArg(args);
         const salaryIncome = salaryIncomeArg(args);
+        const manual = computeManualIncomes(
+          year,
+          salaryIncome,
+          miscIncome,
+          figures._detail.business_income + figures._detail.real_estate_income,
+        );
         const tax = computeIncomeTax({
           year,
           totalIncome:
-            figures._detail.business_income +
-            figures._detail.real_estate_income +
-            miscIncome.income +
-            salaryIncomeAmount(year, salaryIncome.revenue),
+            figures._detail.business_income + figures._detail.real_estate_income + manual.total,
           deductions,
           taxCredits,
         });
