@@ -192,6 +192,17 @@ export async function ensureTables(): Promise<void> {
     )
   `);
   db.run(sql`
+    CREATE TABLE IF NOT EXISTS receipts (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      file_id text NOT NULL UNIQUE,
+      mime_type text NOT NULL DEFAULT '',
+      extracted text,
+      transaction_id integer REFERENCES transactions(id),
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
+    )
+  `);
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS knowledge_docs (
       id integer PRIMARY KEY AUTOINCREMENT,
       slug text NOT NULL UNIQUE,

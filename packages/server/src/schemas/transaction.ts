@@ -90,6 +90,8 @@ export const CreateTransactionRequestSchema = z
     category: z.string().optional().catch(undefined),
     income_type: z.string().optional().catch(undefined),
     tax_category: z.string().optional().catch(undefined),
+    /** 登録と同時に紐付ける証憑のファイルID（任意） */
+    receipt_file_ids: z.array(z.string()).optional().catch(undefined),
   })
   .openapi("CreateTransactionRequest");
 

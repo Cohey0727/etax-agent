@@ -12,6 +12,7 @@
  * taxpayer_profiles : 年度ごとの納税者プロフィール（申告書の見出し情報）
  * filing_snapshots  : 「控除・計算」を確定した時点の計算結果の控え（確定の履歴）
  * fixed_assets      : 固定資産台帳（減価償却の計算と決算書明細の元データ）
+ * receipts          : 証憑（領収書画像）と取引の紐付け
  */
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -210,5 +211,32 @@ export type FilingStatusRow = typeof filingStatusTable.$inferSelect;
 export type TaxpayerProfileRow = typeof taxpayerProfilesTable.$inferSelect;
 export type FilingSnapshotRow = typeof filingSnapshotsTable.$inferSelect;
 export type KnowledgeDocRow = typeof knowledgeDocsTable.$inferSelect;
+/**
+ * 証憑（領収書画像など）と取引の紐付け。
+ * 画像そのものはストレージ（files/receipts/<fileId>）にあり、本テーブルは
+ * ファイルID・解析結果・紐付け先の取引を持つ。解析（/api/receipts/analyze）
+ * のたびに fileId で upsert し、帳簿への追加や管理画面から取引へ紐付ける。
+ * 電子帳簿保存法の「書類と取引の相互関連性」のための記録。
+ */
+export const receiptsTable = sqliteTable("receipts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** ストレージ上のファイルID（アップロード時に発行される UUID） */
+  fileId: text("file_id").notNull().unique(),
+  mimeType: text("mime_type").notNull().default(""),
+  /** 解析結果（AnalyzeReceiptResponse の JSON）。未解析なら null */
+  extracted: text("extracted", { mode: "json" }),
+  /** 紐付け先の取引。未紐付けなら null */
+  transactionId: integer("transaction_id").references(() => transactionsTable.id),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type ReceiptRow = typeof receiptsTable.$inferSelect;
+export type NewReceiptRow = typeof receiptsTable.$inferInsert;
+
 export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
 export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;

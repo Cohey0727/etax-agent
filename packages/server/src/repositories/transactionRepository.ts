@@ -90,6 +90,11 @@ async function getActiveTransactionRow(
   return row;
 }
 
+/** 削除されていない取引を1件取得する（他リポジトリ・ユースケース用）。無ければ null。 */
+export async function getTransactionRow(db: Db, id: number): Promise<TransactionRow | null> {
+  return (await getActiveTransactionRow(db, id)) ?? null;
+}
+
 /**
  * 取引を日付・id 順に取得する（削除済みは含まない）。incomeType があれば
  * SQL で絞り込む（対象年の絞り込みは従来どおり呼び出し側で行う）。

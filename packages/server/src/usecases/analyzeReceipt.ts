@@ -25,7 +25,9 @@ import {
   loadStorageConfig,
   loadSystemOneConfig,
 } from "../lib/config";
+import { getDb } from "../lib/db";
 import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
+import { upsertReceiptExtraction } from "../repositories/receiptRepository";
 import { ErrorSchema } from "../schemas/common";
 import { AnalyzeReceiptRequestSchema, AnalyzeReceiptResponseSchema } from "../schemas/receipt";
 import { classifyAccount } from "../services/classification/classifyAccount";
@@ -144,5 +146,16 @@ export const analyzeReceiptHandler: RouteHandler<typeof analyzeReceiptRoute> = a
     jevPromptOverride: getJevPromptOverride(),
     regexRulesOverride: getRegexRulesOverride(),
   });
-  return c.json({ ...extracted, classification }, 200);
+  const result = { ...extracted, classification };
+  // 証憑と取引の紐付けの土台として、fileId 経路の解析結果を証憑台帳へ
+  // 記録する（DB未設定・記録失敗でも解析自体は成功として返す）。
+  if (body.fileId) {
+    try {
+      const db = getDb();
+      if (db) await upsertReceiptExtraction(db, body.fileId, image.mimeType, result);
+    } catch {
+      // 証憑台帳への記録は付随処理のため、失敗しても解析結果は返す
+    }
+  }
+  return c.json(result, 200);
 };
