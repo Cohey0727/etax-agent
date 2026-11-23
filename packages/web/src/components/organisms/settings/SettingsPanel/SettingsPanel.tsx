@@ -162,7 +162,7 @@ export const SettingsPanel = ({
               onChange={(e) =>
                 onAgentConnectionChange({ ...agentConnection, model: e.target.value })
               }
-              placeholder="glm-5.2"
+              placeholder="deepseek-v4.1-flash"
               autoComplete="off"
             />
           </Col>
