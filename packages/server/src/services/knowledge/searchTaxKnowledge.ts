@@ -2,15 +2,15 @@
  * searchTaxKnowledge.ts — 税務知識ベースの検索（services/knowledge）。
  *
  * エージェント（アプリ内・MCP）が税制のルールや手続きで迷ったときに引く検索口。
- * FTS5（trigram）の bm25 ランキングを主にし、3文字未満の語しか無い場合や
- * FTS で引けない場合は LIKE 検索にフォールバックする。出典番号（例: 2072）が
- * クエリに含まれていれば、そのドキュメントを先頭に置く。
+ * pg_trgm インデックスを使った部分一致検索を主にし、3文字未満の語しか
+ * 無い場合や trigram で引けない場合は ILIKE 検索にフォールバックする。
+ * 出典番号（例: 2072）がクエリに含まれていれば、そのドキュメントを先頭に置く。
  */
 import { getDb } from "../../lib/db";
 import {
   findKnowledgeDocByNumber,
-  searchKnowledgeFts,
   searchKnowledgeLike,
+  searchKnowledgeTrgm,
 } from "../../repositories/knowledgeRepository";
 import { KnowledgeDocRow } from "../../repositories/schema";
 
@@ -91,27 +91,29 @@ export async function searchTaxKnowledge(
     }
   }
 
-  // trigram は3文字以上の語で引く。bm25 の順に並べる。
-  const ftsTerms = terms.filter((term) => term.length >= 3);
-  if (ftsTerms.length > 0) {
-    const matchQuery = ftsTerms.map((term) => `"${term}"`).join(" OR ");
+  // trigram は3文字以上の語で引く。タイトル一致・出現位置の順に並べる。
+  const trgmTerms = terms.filter((term) => term.length >= 3);
+  if (trgmTerms.length > 0) {
     try {
-      for (const row of searchKnowledgeFts(db, matchQuery, limit + hits.length)) {
-        if (seen.has(row.id)) continue;
-        seen.add(row.id);
-        hits.push(toHit(row, terms));
+      for (const term of trgmTerms) {
         if (hits.length >= limit) break;
+        for (const row of await searchKnowledgeTrgm(db, term, limit + hits.length)) {
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          hits.push(toHit(row, terms));
+          if (hits.length >= limit) break;
+        }
       }
     } catch {
-      // FTS が使えない環境では LIKE に落とす（下で実行される）。
+      // trigram 検索が使えない環境では ILIKE に落とす（下で実行される）。
     }
   }
 
-  // FTS で不足する場合は LIKE で補う（2文字の語はこちらでしか引けない）。
+  // trigram で不足する場合は ILIKE で補う（2文字の語はこちらでしか引けない）。
   if (hits.length < limit) {
     for (const term of terms) {
       if (hits.length >= limit) break;
-      for (const row of searchKnowledgeLike(db, term, limit)) {
+      for (const row of await searchKnowledgeLike(db, term, limit)) {
         if (seen.has(row.id)) continue;
         seen.add(row.id);
         hits.push(toHit(row, terms));

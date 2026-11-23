@@ -1,9 +1,10 @@
 /**
- * knowledgeRepository.ts — 税務知識ベース（knowledge_docs / knowledge_fts）への
+ * knowledgeRepository.ts — 税務知識ベース（knowledge_docs）への
  * データアクセス（repositories）。
  *
- * 全文検索は FTS5 の trigram インデックス（knowledge_fts、rowid = knowledge_docs.id）。
- * trigram は3文字未満の語を引けないため、短い語は LIKE 検索で補う。
+ * 部分一致検索は pg_trgm の GIN インデックス（title / content）で
+ * 高速化した ILIKE で行う。trigram インデックスは3文字未満の語を
+ * 引けないため、短い語も同じ ILIKE 検索（逐次スキャン）で補う。
  */
 import { eq, sql } from "drizzle-orm";
 import { Db } from "../lib/db";
@@ -36,15 +37,6 @@ export async function upsertKnowledgeDoc(db: Db, doc: KnowledgeDocInput): Promis
     });
 }
 
-/** FTSインデックスを knowledge_docs の内容で作り直す（件数が小さいので全再構築で足りる）。 */
-export function rebuildKnowledgeFts(db: Db): void {
-  db.run(sql`DELETE FROM knowledge_fts`);
-  db.run(sql`
-    INSERT INTO knowledge_fts (rowid, title, content)
-    SELECT id, title, content FROM knowledge_docs
-  `);
-}
-
 /** 知識ドキュメントの件数を返す。 */
 export async function countKnowledgeDocs(db: Db): Promise<number> {
   const rows = await db.select({ id: knowledgeDocsTable.id }).from(knowledgeDocsTable);
@@ -64,30 +56,50 @@ export async function findKnowledgeDocByNumber(
   return rows[0] ?? null;
 }
 
-export interface KnowledgeFtsHit extends KnowledgeDocRow {
-  /** bm25 のスコア（小さいほど関連が強い）。 */
+export interface KnowledgeSearchHit extends KnowledgeDocRow {
+  /** 並び順のキー（0 = タイトル一致、1 = 本文のみ一致。小さいほど関連が強い）。 */
   rank: number;
 }
 
-/** FTS5（trigram）で検索する。matchQuery は呼び出し側で組み立てる。 */
-export function searchKnowledgeFts(db: Db, matchQuery: string, limit: number): KnowledgeFtsHit[] {
-  return db.all<KnowledgeFtsHit>(sql`
-    SELECT d.*, bm25(knowledge_fts) AS rank
-    FROM knowledge_fts
-    JOIN knowledge_docs d ON d.id = knowledge_fts.rowid
-    WHERE knowledge_fts MATCH ${matchQuery}
-    ORDER BY rank
+/**
+ * 生SQLの結果行を KnowledgeDocRow の形（camelCase）にそろえるための列リスト。
+ * raw クエリはドライバの列名（snake_case）がそのまま返るため、明示的に alias する。
+ */
+const docColumns = sql`id, slug, number, title, category, source_url AS "sourceUrl", content, updated_at AS "updatedAt"`;
+
+/**
+ * trigram インデックスを使った部分一致検索（3文字以上の語向け）。
+ * タイトル一致を優先し、本文中の出現位置が早いものを上位にする。
+ */
+export async function searchKnowledgeTrgm(
+  db: Db,
+  term: string,
+  limit: number,
+): Promise<KnowledgeSearchHit[]> {
+  const pattern = `%${term}%`;
+  const result = await db.execute(sql`
+    SELECT ${docColumns}, (CASE WHEN title ILIKE ${pattern} THEN 0 ELSE 1 END) AS rank
+    FROM knowledge_docs
+    WHERE title ILIKE ${pattern} OR content ILIKE ${pattern}
+    ORDER BY rank, COALESCE(NULLIF(strpos(content, ${term}), 0), 2147483647), id
     LIMIT ${limit}
   `);
+  return result.rows as unknown as KnowledgeSearchHit[];
 }
 
-/** LIKE による部分一致検索（trigram で引けない2文字の語などの補完）。タイトル一致を先に並べる。 */
-export function searchKnowledgeLike(db: Db, term: string, limit: number): KnowledgeDocRow[] {
+/** ILIKE による部分一致検索（trigram で引けない2文字の語などの補完）。タイトル一致を先に並べる。 */
+export async function searchKnowledgeLike(
+  db: Db,
+  term: string,
+  limit: number,
+): Promise<KnowledgeDocRow[]> {
   const pattern = `%${term}%`;
-  return db.all<KnowledgeDocRow>(sql`
-    SELECT * FROM knowledge_docs
-    WHERE title LIKE ${pattern} OR content LIKE ${pattern}
-    ORDER BY (CASE WHEN title LIKE ${pattern} THEN 0 ELSE 1 END), id
+  const result = await db.execute(sql`
+    SELECT ${docColumns}
+    FROM knowledge_docs
+    WHERE title ILIKE ${pattern} OR content ILIKE ${pattern}
+    ORDER BY (CASE WHEN title ILIKE ${pattern} THEN 0 ELSE 1 END), id
     LIMIT ${limit}
   `);
+  return result.rows as unknown as KnowledgeDocRow[];
 }
