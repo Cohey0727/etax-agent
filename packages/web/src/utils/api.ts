@@ -25,6 +25,8 @@ import {
   LedgerTransactionInput,
   ListLedgerTransactionsResponse,
   PresignUploadFileResponse,
+  ReceiptListResponse,
+  ReceiptRecord,
   SystemOneSettings,
   SystemOneTestResult,
   XtxTaxpayerInput,
@@ -251,6 +253,41 @@ async function analyzeReceiptViaStorage(file: File): Promise<AnalyzeReceiptRespo
     body: JSON.stringify({ fileId: presign.fileId }),
   });
   return parseJson<AnalyzeReceiptResponse>(resp);
+}
+
+/** 証憑の一覧を取得する。帳簿DBが未接続（503）の場合は null。 */
+export async function fetchReceipts(): Promise<ReceiptRecord[] | null> {
+  try {
+    const resp = await fetch("/api/receipts");
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as ReceiptListResponse;
+    return data.receipts;
+  } catch {
+    return null;
+  }
+}
+
+/** 証憑を取引へ紐付ける。 */
+export async function linkReceipt(fileId: string, transactionId: number): Promise<ReceiptRecord> {
+  const resp = await fetch(`/api/receipts/${fileId}/link`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ transaction_id: transactionId }),
+  });
+  const data = await parseJson<{ receipt: ReceiptRecord | null }>(resp);
+  if (!data.receipt) throw new Error("証憑の紐付けに失敗しました");
+  return data.receipt;
+}
+
+/** 証憑と取引の紐付けを外す。 */
+export async function unlinkReceipt(fileId: string): Promise<void> {
+  const resp = await fetch(`/api/receipts/${fileId}/link`, { method: "DELETE" });
+  await parseJson<{ receipt: ReceiptRecord | null }>(resp);
+}
+
+/** 証憑画像の表示URL。 */
+export function receiptContentUrl(fileId: string): string {
+  return `/api/receipts/${fileId}/content`;
 }
 
 /** freee試算表（取り込み済みの実績データ）。未取り込みなら null。 */

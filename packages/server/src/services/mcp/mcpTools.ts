@@ -72,6 +72,11 @@ import {
   isActiveInYear,
   listFixedAssetRows,
 } from "../../repositories/fixedAssetRepository";
+import {
+  linkReceiptRow,
+  listReceiptRows,
+  receiptToApi,
+} from "../../repositories/receiptRepository";
 import { classifyAccount } from "../classification/classifyAccount";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
@@ -382,6 +387,23 @@ export const MCP_TOOLS: McpToolDef[] = [
       type: "object",
       properties: { year: yearProperty },
       required: ["year"],
+    },
+  },
+  {
+    name: "list_receipts",
+    description: "証憑（領収書画像）の一覧を返す。各証憑の解析結果と、紐付いている取引IDを含む。",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "link_receipt",
+    description: "証憑（file_id）を取引（transaction_id）へ紐付ける。帳簿から証憑を辿れるようにするための操作。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file_id: { type: "string", description: "証憑のファイルID" },
+        transaction_id: { type: "number", description: "紐付け先の取引ID" },
+      },
+      required: ["file_id", "transaction_id"],
     },
   },
   {
@@ -946,6 +968,20 @@ export async function dispatchMcpTool(
           deductible_totals: totals,
           small_special: smallSpecialUsage(rows.map(fixedAssetToInput), year),
         });
+      }
+      case "list_receipts": {
+        const db = requireDb();
+        const rows = await listReceiptRows(db);
+        return textResult({ receipts: rows.map(receiptToApi) });
+      }
+      case "link_receipt": {
+        const db = requireDb();
+        const fileId = args["file_id"];
+        const transactionId = args["transaction_id"];
+        if (typeof fileId !== "string" || !fileId) throw new Error("file_id が必要です");
+        if (typeof transactionId !== "number") throw new Error("transaction_id が必要です");
+        const row = await linkReceiptRow(db, fileId, transactionId);
+        return textResult({ receipt: row ? receiptToApi(row) : null });
       }
       case "get_filing_status": {
         const db = requireDb();

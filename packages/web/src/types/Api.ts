@@ -178,6 +178,21 @@ export interface LedgerTransactionInput {
   tax_category: string;
 }
 
+/** 証憑（領収書画像）レコード。サーバーAPIのワイヤ形式（snake_case）。 */
+export interface ReceiptRecord {
+  id: number;
+  file_id: string;
+  mime_type: string;
+  extracted: AnalyzeReceiptResponse | null;
+  transaction_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReceiptListResponse {
+  receipts: ReceiptRecord[];
+}
+
 /** e-Tax XTX出力の納税者情報。サーバーAPIのワイヤ形式（snake_case）。 */
 export interface XtxTaxpayerInput {
   name: string;

@@ -11,6 +11,7 @@ import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { insertTransactionRow, transactionToApi } from "../repositories/transactionRepository";
+import { linkReceiptRow } from "../repositories/receiptRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
   CreateTransactionRequestSchema,
@@ -83,6 +84,16 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
     });
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+  }
+  // 証憑の同時紐付け（領収書から作った取引など）
+  if (row && body.receipt_file_ids && body.receipt_file_ids.length > 0) {
+    try {
+      for (const fileId of body.receipt_file_ids) {
+        await linkReceiptRow(db, fileId, row.id);
+      }
+    } catch (e) {
+      throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+    }
   }
   const response: SingleTransactionResponse = { transaction: row ? transactionToApi(row) : null };
   return c.json(response, 201);
