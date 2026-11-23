@@ -33,8 +33,8 @@ const TRANSACTIONS: Transaction[] = [
   tx({ description: "管理費", amount: -170_000, category: "管理費", income_type: "real_estate" }),
 ];
 
-function buildSample(amendment: boolean) {
-  const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
+function buildSample(amendment: boolean, filingType?: "blue65" | "white") {
+  const figures = computeCorrectedFigures(TRANSACTIONS, 2023, { filingType });
   const tax = computeIncomeTax({
     year: 2023,
     totalIncome:
@@ -73,6 +73,7 @@ function buildSample(amendment: boolean) {
       jan1Address: "",
     },
     figures,
+    filingType,
     miscIncome: EMPTY_MISC_INCOME,
     deductionInputs: {
       ...EMPTY_DEDUCTION_INPUTS,
@@ -168,6 +169,21 @@ describe("buildXtxFiling", () => {
     expect(xtx).toContain("<ABB00435>1</ABB00435>");
     expect(xtx).not.toContain("<ABB00435><kubun_CD>");
     expect(xtx).toContain("<ABB00440>428000</ABB00440>");
+  });
+
+  test("白色申告では決算書の代わりに収支内訳書（KOA110/KOA130）が入る", () => {
+    const white = buildSample(false, "white");
+    expect(white).toContain("<KOA110 ");
+    expect(white).toContain("<KOA130 ");
+    expect(white).not.toContain("<KOA210 ");
+    expect(white).not.toContain("<KOA220 ");
+    expect(white).toContain("<AIG00030>"); // 収支内訳書（一般用）の売上
+    expect(white).toContain("<AKG00030>"); // 収支内訳書（不動産用）の賃貸料
+    const blue = buildSample(false);
+    expect(blue).toContain("<KOA210 ");
+    expect(blue).toContain("<KOA220 ");
+    expect(blue).not.toContain("<KOA110 ");
+    expect(blue).not.toContain("<KOA130 ");
   });
 
   test("対応外の年分は例外", () => {

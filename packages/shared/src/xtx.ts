@@ -29,7 +29,7 @@
  * FORM_SEC には様式IDを列挙する。帳票の中身は CONTENTS 側が正。
  */
 import { DeductionInputs, IncomeTaxResult, MiscIncomeInput } from "./deductions";
-import { CorrectedFigures } from "./taxcalc";
+import { CorrectedFigures, FilingType } from "./taxcalc";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
 
 /**
@@ -115,6 +115,12 @@ export interface XtxFilingData {
   prepaidTax: number;
   /** 修正申告: 修正前の第3期分の税額（申告済みの「納める税金」）。修正でなければ null */
   originalThirdPeriodTax: number | null;
+  /**
+   * 申告の種類。white のときは青色申告決算書（KOA210/KOA220）の代わりに
+   * 収支内訳書（KOA110/KOA130）を添付する。省略時は青色として扱う
+   * （figures の青色申告特別控除もこの区分で計算されている前提）。
+   */
+  filingType?: FilingType;
 }
 
 interface YearVersions {
@@ -122,6 +128,8 @@ interface YearVersions {
   koa020: string;
   koa210: string;
   koa220: string;
+  koa110: string;
+  koa130: string;
 }
 
 /**
@@ -131,10 +139,10 @@ interface YearVersions {
  * 連番パターンで 26.0.1（XSD は RKO0010-260.xsd）。
  */
 const YEAR_VERSIONS: Record<number, YearVersions> = {
-  2023: { procedure: "23.1.1", koa020: "21.0", koa210: "11.0", koa220: "8.0" },
-  2024: { procedure: "24.0.1", koa020: "22.0", koa210: "11.0", koa220: "8.0" },
-  2025: { procedure: "25.0.1", koa020: "23.0", koa210: "11.0", koa220: "8.0" },
-  2026: { procedure: "26.0.1", koa020: "24.0", koa210: "12.0", koa220: "9.0" },
+  2023: { procedure: "23.1.1", koa020: "21.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0" },
+  2024: { procedure: "24.0.1", koa020: "22.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0" },
+  2025: { procedure: "25.0.1", koa020: "23.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0" },
+  2026: { procedure: "26.0.1", koa020: "24.0", koa210: "12.0", koa220: "9.0", koa110: "13.0", koa130: "10.0" },
 };
 
 const SOFT_NAME = "eTaxAgent";
@@ -637,6 +645,196 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// 収支内訳書（白色申告）KOA110 一般用 / KOA130 不動産所得用
+// 項目対応は帳票フィールド仕様書（KOA110 Ver12 / KOA130 Ver9）で確認。
+// 2面（明細書）は入力データを持たないため省略する（全要素 min=0）。
+// ---------------------------------------------------------------------------
+
+/** KOA110 の固定経費行（その他の経費グループ）: [科目名, タグ] */
+const KOA110_OTHER_EXPENSE_LINES: [string, string][] = [
+  ["租税公課", "AIG00220"],
+  ["荷造運賃", "AIG00230"],
+  ["水道光熱費", "AIG00240"],
+  ["旅費交通費", "AIG00250"],
+  ["通信費", "AIG00260"],
+  ["広告宣伝費", "AIG00270"],
+  ["交際費", "AIG00280"],
+  ["損害保険料", "AIG00290"],
+  ["修繕費", "AIG00300"],
+  ["消耗品費", "AIG00310"],
+  ["福利厚生費", "AIG00320"],
+];
+
+/** KOA110（収支内訳書・一般用、白色の事業所得）を組み立てる。 */
+function buildKoa110(data: XtxFilingData, vr: string): string {
+  const t = data.taxpayer;
+  const f = data.figures;
+  const totals = data.categoryTotals.business;
+  const purchases = totals["仕入高"] ?? 0;
+
+  const parts: string[] = [];
+  parts.push(ref("AIA00000", "NENBUN"));
+  const taxpayer: string[] = [];
+  if (t.address) taxpayer.push(`<AIB00010>${esc(t.address)}</AIB00010>`);
+  const nameParts: string[] = [];
+  if (t.nameKana) nameParts.push(ref("AIB00030", "NOZEISHA_NM_KN"));
+  if (t.name) nameParts.push(ref("AIB00040", "NOZEISHA_NM"));
+  if (nameParts.length > 0) taxpayer.push(`<AIB00020>${nameParts.join("")}</AIB00020>`);
+  if (t.occupation) taxpayer.push(ref("AIB00090", "SHOKUGYO"));
+  if (t.shopName) taxpayer.push(ref("AIB00100", "NOZEISHA_YAGO"));
+  if (taxpayer.length > 0) parts.push(`<AIB00000>${taxpayer.join("")}</AIB00000>`);
+  if (toEraDate(data.submissionDate)) parts.push(ref("AIE00000", "TEISYUTSU_DAY"));
+  // 営業等（1）固定: 雑（業務）は雑所得側の様式で扱うため対象外
+  parts.push(`<AIR00000><kubun_CD>1</kubun_CD></AIR00000>`);
+  parts.push(
+    `<AIF00000><AIF00010><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AIF00010><AIF00020><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AIF00020></AIF00000>`,
+  );
+
+  const pl: string[] = [];
+  const revenue: string[] = [];
+  revenue.push(amountAlways("AIG00030", f.business_revenue));
+  revenue.push(amountAlways("AIG00060", f.business_revenue));
+  pl.push(`<AIG00020>${revenue.join("")}</AIG00020>`);
+  if (purchases > 0) {
+    pl.push(
+      `<AIG00070>${amountAlways("AIG00090", purchases)}${amountAlways("AIG00100", purchases)}${amountAlways("AIG00120", purchases)}</AIG00070>`,
+    );
+  }
+  pl.push(amountAlways("AIG00130", f.business_revenue - purchases));
+
+  const mainExpenses: string[] = [];
+  mainExpenses.push(amount("AIG00150", totals["給料賃金"] ?? 0));
+  mainExpenses.push(amount("AIG00160", totals["外注費"] ?? 0));
+  mainExpenses.push(amount("AIG00170", totals["減価償却費"] ?? 0));
+  mainExpenses.push(amount("AIG00180", totals["貸倒金"] ?? 0));
+  mainExpenses.push(amount("AIG00190", totals["地代家賃"] ?? 0));
+  mainExpenses.push(amount("AIG00200", totals["利子割引料"] ?? 0));
+
+  const otherLines: string[] = [];
+  const fixedAccounts = new Set([
+    ...KOA110_OTHER_EXPENSE_LINES.map(([account]) => account),
+    "給料賃金", "外注費", "減価償却費", "貸倒金", "地代家賃", "利子割引料",
+  ]);
+  let otherSubtotal = 0;
+  for (const [account, tag] of KOA110_OTHER_EXPENSE_LINES) {
+    const value = totals[account] ?? 0;
+    otherSubtotal += value;
+    otherLines.push(amount(tag, value));
+  }
+  const extras = Object.entries(totals).filter(
+    ([account, value]) =>
+      value > 0 && !fixedAccounts.has(account) && account !== "仕入高" && account !== "売上高" && account !== "雑費",
+  );
+  for (const [account, value] of extras) {
+    otherSubtotal += value;
+    otherLines.push(
+      `<AIG00325><AIG00010>${esc(account)}</AIG00010>${amountAlways("AIG00330", value)}</AIG00325>`,
+    );
+  }
+  const misc = totals["雑費"] ?? 0;
+  otherSubtotal += misc;
+  otherLines.push(amount("AIG00340", misc));
+  otherLines.push(amountAlways("AIG00350", otherSubtotal));
+  mainExpenses.push(`<AIG00210>${otherLines.join("")}</AIG00210>`);
+
+  const expenseTotal = f.business_expenses - purchases;
+  mainExpenses.push(amountAlways("AIG00360", expenseTotal));
+  pl.push(`<AIG00140>${mainExpenses.join("")}</AIG00140>`);
+  pl.push(amountAlways("AIG00370", f._detail.business_income_before_deduction));
+  pl.push(amountAlways("AIG00400", f._detail.business_income));
+  parts.push(`<AIG00000>${pl.join("")}</AIG00000>`);
+
+  return `<KOA110 VR="${vr}" id="KOA110" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA110-1 page="1">${parts.join("")}</KOA110-1></KOA110>`;
+}
+
+/** KOA130 の固定経費行（その他の経費グループ）: [科目名, タグ] */
+const KOA130_OTHER_EXPENSE_LINES: [string, string][] = [
+  ["租税公課", "AKG00160"],
+  ["損害保険料", "AKG00170"],
+  ["修繕費", "AKG00180"],
+];
+
+/** KOA130（収支内訳書・不動産所得用、白色の不動産所得）を組み立てる。 */
+function buildKoa130(data: XtxFilingData, vr: string): string {
+  const t = data.taxpayer;
+  const f = data.figures;
+  const totals = data.categoryTotals.realEstate;
+  const rent = totals["家賃収入"] ?? 0;
+  const otherIncome = Math.max(0, f.real_estate_revenue - rent);
+
+  // 追加科目は様式上1件だけ（科目名 AKG00010 は様式先頭に1つ）。
+  // 固定科目に当たらない経費の1件目を追加科目にし、2件目以降は雑費に合算する
+  const fixedAccounts = new Set([
+    ...KOA130_OTHER_EXPENSE_LINES.map(([account]) => account),
+    "給料賃金", "減価償却費", "貸倒金", "地代家賃", "利子割引料",
+  ]);
+  const extras = Object.entries(totals).filter(
+    ([account, value]) =>
+      value > 0 && !fixedAccounts.has(account) && account !== "家賃収入" && account !== "雑費",
+  );
+  const extraName = extras.length > 0 ? extras[0][0] : null;
+  const extraAmount = extras.length > 0 ? extras[0][1] : 0;
+  let misc = totals["雑費"] ?? 0;
+  for (const [, value] of extras.slice(1)) misc += value;
+
+  const parts: string[] = [];
+  parts.push(ref("AKA00000", "NENBUN"));
+  const taxpayer: string[] = [];
+  if (t.address) taxpayer.push(ref("AKB00010", "NOZEISHA_ADR"));
+  const nameParts: string[] = [];
+  if (t.nameKana) nameParts.push(ref("AKB00030", "NOZEISHA_NM_KN"));
+  if (t.name) nameParts.push(ref("AKB00040", "NOZEISHA_NM"));
+  if (nameParts.length > 0) taxpayer.push(`<AKB00020>${nameParts.join("")}</AKB00020>`);
+  if (t.occupation) taxpayer.push(ref("AKB00050", "SHOKUGYO"));
+  if (taxpayer.length > 0) parts.push(`<AKB00000>${taxpayer.join("")}</AKB00000>`);
+  if (toEraDate(data.submissionDate)) parts.push(ref("AKE00000", "TEISYUTSU_DAY"));
+  parts.push(
+    `<AKF00000><AKF00010><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AKF00010><AKF00020><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AKF00020></AKF00000>`,
+  );
+
+  const pl: string[] = [];
+  if (extraName) pl.push(`<AKG00010>${esc(extraName)}</AKG00010>`);
+  const revenue: string[] = [];
+  revenue.push(amountAlways("AKG00030", rent));
+  const other: string[] = [];
+  if (otherIncome > 0) other.push(amountAlways("AKG00060", otherIncome));
+  other.push(amountAlways("AKG00070", otherIncome));
+  revenue.push(`<AKG00040>${other.join("")}</AKG00040>`);
+  revenue.push(amountAlways("AKG00080", f.real_estate_revenue));
+  pl.push(`<AKG00020>${revenue.join("")}</AKG00020>`);
+
+  const expenses: string[] = [];
+  expenses.push(amount("AKG00100", totals["給料賃金"] ?? 0));
+  expenses.push(amount("AKG00110", totals["減価償却費"] ?? 0));
+  expenses.push(amount("AKG00120", totals["貸倒金"] ?? 0));
+  expenses.push(amount("AKG00130", totals["地代家賃"] ?? 0));
+  expenses.push(amount("AKG00140", totals["利子割引料"] ?? 0));
+
+  const otherLines: string[] = [];
+  let otherSubtotal = 0;
+  for (const [account, tag] of KOA130_OTHER_EXPENSE_LINES) {
+    const value = totals[account] ?? 0;
+    otherSubtotal += value;
+    otherLines.push(amount(tag, value));
+  }
+  if (extraName) {
+    otherSubtotal += extraAmount;
+    otherLines.push(amountAlways("AKG00190", extraAmount));
+  }
+  otherSubtotal += misc;
+  otherLines.push(amount("AKG00200", misc));
+  otherLines.push(amountAlways("AKG00210", otherSubtotal));
+  expenses.push(`<AKG00150>${otherLines.join("")}</AKG00150>`);
+  expenses.push(amountAlways("AKG00220", f.real_estate_expenses));
+  pl.push(`<AKG00090>${expenses.join("")}</AKG00090>`);
+  pl.push(amountAlways("AKG00230", f._detail.real_estate_income_before_deduction));
+  pl.push(amountAlways("AKG00250", f._detail.real_estate_income));
+  parts.push(`<AKG00000>${pl.join("")}</AKG00000>`);
+
+  return `<KOA130 VR="${vr}" id="KOA130" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA130-1 page="1">${parts.join("")}</KOA130-1></KOA130>`;
+}
+
+// ---------------------------------------------------------------------------
 // 全体
 // ---------------------------------------------------------------------------
 
@@ -667,11 +865,22 @@ export function buildXtxFiling(data: XtxFilingData): string {
     xml:
       `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}</KOA020>`,
   });
+  // 白色申告では青色申告決算書は添付せず、収支内訳書を添付する
+  // （従来は申告種別によらず決算書が含まれていた不整合をここで解消）。
+  const white = data.filingType === "white";
   if (data.figures.business_revenue > 0 || data.figures.business_expenses > 0) {
-    forms.push({ id: "KOA210", xml: buildKoa210(normalized, versions.koa210) });
+    forms.push(
+      white
+        ? { id: "KOA110", xml: buildKoa110(normalized, versions.koa110) }
+        : { id: "KOA210", xml: buildKoa210(normalized, versions.koa210) },
+    );
   }
   if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0) {
-    forms.push({ id: "KOA220", xml: buildKoa220(normalized, versions.koa220) });
+    forms.push(
+      white
+        ? { id: "KOA130", xml: buildKoa130(normalized, versions.koa130) }
+        : { id: "KOA220", xml: buildKoa220(normalized, versions.koa220) },
+    );
   }
 
   const catalog =
