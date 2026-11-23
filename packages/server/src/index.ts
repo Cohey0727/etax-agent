@@ -176,17 +176,27 @@ const port = Number(process.env.PORT ?? 3001);
 console.log(`eTaxAgent server listening on http://localhost:${port}`);
 
 // 起動時に帳簿DB（PostgreSQL）のテーブルを自己修復しておく。
-// 失敗してもサーバー自体は起動を続け、DB必須の処理だけが 503 になる。
+// コンテナ構成では DB の起動完了がアプリより遅れることがあるため、
+// しばらくリトライする。最終的に失敗してもサーバー自体は起動を続け、
+// DB必須の処理だけが 503 になる。
 void (async () => {
-  try {
-    await ensureTables();
-    console.log("帳簿DBのテーブルを確認しました");
-    const knowledgeCount = await seedTaxKnowledge();
-    console.log(`税務知識ベースを準備しました（${knowledgeCount}件）`);
-  } catch (e) {
-    console.warn(
-      `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
-    );
+  const maxAttempts = 15;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await ensureTables();
+      console.log("帳簿DBのテーブルを確認しました");
+      const knowledgeCount = await seedTaxKnowledge();
+      console.log(`税務知識ベースを準備しました（${knowledgeCount}件）`);
+      return;
+    } catch (e) {
+      if (attempt === maxAttempts) {
+        console.warn(
+          `帳簿DBのテーブル確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
 })();
 
