@@ -128,8 +128,8 @@ export const ExportConsumptionXtxRequestSchema = z
     interim_local: z.number(),
     original_national: z.number().nullable(),
     original_local: z.number().nullable(),
-    /** 計算方式。省略時は本則（standard）。simplified は簡易課税（手続 RSH0030） */
-    method: z.enum(["standard", "simplified"]).optional(),
+    /** 計算方式。省略時は本則（standard）。simplified は簡易課税（手続 RSH0030）、special20 は2割特例 */
+    method: z.enum(["standard", "simplified", "special20"]).optional(),
     /**
      * 簡易課税: 売上の事業区分（1=卸売 2=小売 3=製造等 4=その他 5=サービス等 6=不動産）。
      * sales_by_category を渡さない場合、全売上をこの区分に寄せる。省略時は 5。
