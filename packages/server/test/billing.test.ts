@@ -2,12 +2,9 @@
  * billing.test.ts — 課金基盤の検証: Webhook 署名検証と課金状態リポジトリ。
  */
 import { describe, expect, test } from "bun:test";
+import { createTestDb } from "./testDb";
 import { createHmac } from "node:crypto";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
 import { verifyWebhookSignature } from "../src/gateways/stripeGateway";
-import { Db } from "../src/lib/db";
-import * as schema from "../src/repositories/schema";
 import {
   getSubscriptionRow,
   hasActivePlan,
@@ -34,25 +31,9 @@ describe("verifyWebhookSignature", () => {
   });
 });
 
-function createTestDb(): Db {
-  const client = new Database(":memory:");
-  client.exec(`
-    CREATE TABLE subscriptions (
-      id integer PRIMARY KEY AUTOINCREMENT,
-      owner_user_id integer NOT NULL UNIQUE,
-      stripe_customer_id text NOT NULL DEFAULT '',
-      stripe_subscription_id text NOT NULL DEFAULT '',
-      status text NOT NULL DEFAULT 'none',
-      current_period_end integer,
-      updated_at integer NOT NULL
-    );
-  `);
-  return drizzle(client, { schema }) as Db;
-}
-
 describe("課金状態リポジトリ", () => {
   test("契約→有効判定→解約の流れ", async () => {
-    const db = createTestDb();
+    const db = await createTestDb();
     await runWithTenant(3, async () => {
       expect(await hasActivePlan(db)).toBe(false);
       await upsertSubscriptionRow(db, 3, {
