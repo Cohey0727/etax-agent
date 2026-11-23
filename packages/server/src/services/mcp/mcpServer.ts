@@ -17,7 +17,16 @@ import { MCP_TOOLS, dispatchMcpTool } from "./mcpTools";
 export function createMcpServer(): Server {
   const server = new Server(
     { name: "etax-agent", version: "0.1.0" },
-    { capabilities: { tools: {} } },
+    {
+      capabilities: { tools: {} },
+      instructions:
+        "eTaxAgent は確定申告の「決定的な計算エンジン＋帳簿＋XTX生成」です。" +
+        "ツールが返すのは帳簿データの集計・税額計算・申告データ生成の結果だけで、" +
+        "個別の取引や事案に対する税務判断（経費にできるか、課税か非課税か等）は返しません。" +
+        "個別判断が必要な相談には、計算結果と一般的な制度説明までを示し、" +
+        "最終判断は税理士へ相談するよう利用者に案内してください。" +
+        "e-Tax への提出は納税者本人が行うもので、このサーバーは提出を代行しません。",
+    },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: MCP_TOOLS }));
   server.setRequestHandler(CallToolRequestSchema, async (request) => {

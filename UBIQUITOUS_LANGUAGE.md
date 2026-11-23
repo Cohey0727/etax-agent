@@ -291,6 +291,7 @@ grep -rn -F -f <(sed -n '/^```$/,/^```$/p' UBIQUITOUS_LANGUAGE.md) .
 | 取引の変更履歴 | transaction_history / TransactionHistory | テーブル・型 |
 | 固定資産台帳 | fixed_assets / FixedAsset | テーブル・型 |
 | 減価償却 | depreciation | 計算 |
+| 証憑 | receipts / Receipt | テーブル・型 |
 | 摘要 | description | フィールド |
 | 金額 | amount | フィールド |
 | 口座 | account | フィールド |
