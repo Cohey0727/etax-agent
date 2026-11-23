@@ -2,6 +2,7 @@ import {
   DeductionInputs,
   FilingType,
   MiscIncomeInput,
+  SalaryIncomeInput,
   TaxCreditInputs,
   Transaction,
   xtxSupportedYears,
@@ -24,6 +25,8 @@ export interface TaxpayerPanelProps {
   taxCredits: TaxCreditInputs;
   /** 雑所得（その他）。帳簿に載らない所得として申告数値に含める。 */
   miscIncome?: MiscIncomeInput;
+  /** 給与所得。帳簿に載らない給与として申告数値に含める。 */
+  salaryIncome?: SalaryIncomeInput;
   /** 申告の種類（青色申告特別控除の区分）。出力する申告数値の計算に使う。 */
   filingType?: FilingType;
   /** 不動産貸付けが事業的規模か */
@@ -48,6 +51,7 @@ export const TaxpayerPanel = ({
   deductions,
   taxCredits,
   miscIncome,
+  salaryIncome,
   filingType,
   realEstateBusinessScale,
   originalIncomeTax,
@@ -90,6 +94,7 @@ export const TaxpayerPanel = ({
     deductions,
     tax_credits: taxCredits,
     misc_income: miscIncome,
+    salary_income: salaryIncome,
     filing_type: filingType,
     real_estate_business_scale: realEstateBusinessScale,
     withholding_tax: withholdingTax,

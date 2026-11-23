@@ -8,6 +8,8 @@ import {
   BalanceSheetAccount,
   DepreciationDetailRow,
   EMPTY_MISC_INCOME,
+  EMPTY_SALARY_INCOME,
+  salaryIncomeAmount,
   Transaction,
   XtxBalanceSheetInput,
   XtxTaxpayer,
@@ -153,10 +155,14 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
   const depreciation = depreciationFromWire(body);
   const balanceSheet = balanceSheetFromWire(body);
   const miscIncome = body.misc_income ?? EMPTY_MISC_INCOME;
+  const salaryIncome = body.salary_income ?? EMPTY_SALARY_INCOME;
   const tax = computeIncomeTax({
     year: body.year,
     totalIncome:
-      figures._detail.business_income + figures._detail.real_estate_income + miscIncome.income,
+      figures._detail.business_income +
+      figures._detail.real_estate_income +
+      miscIncome.income +
+      salaryIncomeAmount(body.year, salaryIncome.revenue),
     deductions: body.deductions,
     taxCredits: body.tax_credits,
   });
@@ -173,6 +179,7 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
       balanceSheet,
       deductionInputs: body.deductions,
       miscIncome,
+      salaryIncome,
       tax,
       categoryTotals: {
         business: statementCategoryTotals(transactions, "business"),
