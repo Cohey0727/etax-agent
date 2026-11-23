@@ -313,5 +313,24 @@ export const filingInputsTable = sqliteTable(
 
 export type FilingInputRow = typeof filingInputsTable.$inferSelect;
 
+/**
+ * 課金（Stripe サブスクリプション）の状態。所有者ごとに1件。
+ * status は Stripe の subscription.status をそのまま持つ
+ * （active / trialing / past_due / canceled / incomplete 等）。
+ */
+export const subscriptionsTable = sqliteTable("subscriptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerUserId: integer("owner_user_id").notNull().unique(),
+  stripeCustomerId: text("stripe_customer_id").notNull().default(""),
+  stripeSubscriptionId: text("stripe_subscription_id").notNull().default(""),
+  status: text("status").notNull().default("none"),
+  currentPeriodEnd: integer("current_period_end", { mode: "timestamp_ms" }),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type SubscriptionRow = typeof subscriptionsTable.$inferSelect;
+
 export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
 export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;
