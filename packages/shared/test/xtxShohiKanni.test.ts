@@ -111,6 +111,61 @@ describe("computeSimplifiedConsumptionReturn", () => {
     expect(r.payableLocal).toBe(81_800);
     expect(r.totalPayable).toBe(371_800);
   });
+
+  test("75%特例1号: 1事業が75%以上なら、その事業の率を全体に適用する（消令57条3項1号）", () => {
+    const r = computeSimplifiedConsumptionReturn({
+      ...EMPTY_INPUT,
+      salesByCategory: {
+        2: { incl10: 8_250_000, incl8: 0 },
+        4: { incl10: 1_100_000, incl8: 0 },
+      },
+    });
+    // 税抜売上: 第2種 7,500,000（88.2%）・第4種 1,000,000、基礎税額 663,000
+    // 原則: 585,000×80% + 78,000×60% = 514,800
+    expect(r.principleInputTax10).toBe(514_800);
+    // 特例1号: 663,000 × 80% = 530,400（こちらが有利なので選択される）
+    expect(r.appliedRule).toEqual({ kind: "special1", category: 2 });
+    expect(r.inputTax).toBe(530_400);
+    const special1 = r.specialOptions.find((o) => o.rule === "special1");
+    expect(special1?.inputTax10).toBe(530_400);
+  });
+
+  test("75%特例2号: 2事業の合計が75%以上なら、残り全部に低い方の率を適用する（消令57条3項2号）", () => {
+    const r = computeSimplifiedConsumptionReturn({
+      ...EMPTY_INPUT,
+      salesByCategory: {
+        1: { incl10: 5_500_000, incl8: 0 },
+        3: { incl10: 3_300_000, incl8: 0 },
+        5: { incl10: 1_100_000, incl8: 0 },
+      },
+    });
+    // 税抜売上: 第1種 5,000,000・第3種 3,000,000・第5種 1,000,000（合計 9,000,000）
+    // 単独75%以上の事業はない。第1種+第3種 = 88.9% で特例2号が使える
+    // 原則: 390,000×90% + 234,000×70% + 78,000×50% = 553,800
+    expect(r.principleInputTax10).toBe(553_800);
+    // 特例2号: 390,000×90% + (702,000−390,000)×70% = 569,400
+    // （ペア外の第5種にも70%が及ぶ）
+    expect(r.appliedRule).toEqual({ kind: "special2", higher: 1, lower: 3 });
+    expect(r.inputTax).toBe(569_400);
+  });
+
+  test("75%特例が使えても原則が有利なら原則を選ぶ", () => {
+    const r = computeSimplifiedConsumptionReturn({
+      ...EMPTY_INPUT,
+      salesByCategory: {
+        6: { incl10: 8_360_000, incl8: 0 },
+        1: { incl10: 1_320_000, incl8: 0 },
+        5: { incl10: 1_320_000, incl8: 0 },
+      },
+    });
+    // 税抜売上: 第6種 7,600,000（76%）・第1種 1,200,000・第5種 1,200,000
+    // 特例1号（第6種40%を全体に）: 780,000×40% = 312,000
+    // 特例2号（第1種+第6種）: 93,600×90% + 残り×40% = 358,800
+    // 原則: 592,800×40% + 93,600×90% + 93,600×50% = 368,160 が最大
+    expect(r.specialOptions.length).toBeGreaterThan(0);
+    expect(r.appliedRule).toEqual({ kind: "principle" });
+    expect(r.inputTax).toBe(368_160);
+  });
 });
 
 describe("buildSimplifiedConsumptionXtx", () => {
@@ -186,8 +241,66 @@ describe("buildSimplifiedConsumptionXtx", () => {
     expect(xtx).not.toContain("DVC00000");
     expect(xtx).toContain("<DVD00160>1000000</DVD00160>"); // 第2種 税抜売上
     expect(xtx).toContain("<DVD00170>66.6</DVD00170>");
-    expect(xtx).toContain("<DVE00040>81900</DVE00040>"); // 原則計算の按分前
+    expect(xtx).toContain("<DVE00040>81900</DVE00040>"); // 原則計算の金額（この設例では按分前と同額）
     expect(xtx).toContain("<DVE00750>81900</DVE00750>");
+  });
+
+  test("75%特例1号が選ばれると、申告書の特例フラグと付表5-3の特例欄が出る", () => {
+    const input: SimplifiedConsumptionInput = {
+      ...EMPTY_INPUT,
+      salesByCategory: {
+        2: { incl10: 8_250_000, incl8: 0 },
+        4: { incl10: 1_100_000, incl8: 0 },
+      },
+    };
+    const xtx = buildSimplifiedConsumptionXtx({
+      taxpayer: TAXPAYER,
+      periodFrom: "2027-01-01",
+      periodTo: "2027-12-31",
+      submissionDate: "2028-02-15",
+      filingKind: 1,
+      basePeriodSales: 0,
+      input,
+      result: computeSimplifiedConsumptionReturn(input),
+      originalNational: null,
+      originalLocal: null,
+    });
+    // 申告書の参考事項: 特例計算適用（令57条3項）= 有
+    expect(xtx).toContain("<ABL00210><kubun_CD>1</kubun_CD></ABL00210>");
+    // 付表5-3: 原則計算イ 514,800 / 特例（イ）第2種 530,400 / 選択ハ 530,400
+    expect(xtx).toContain("<DVE00040>514800</DVE00040>");
+    expect(xtx).toContain("<DVE00070><kubun_CD>2</kubun_CD></DVE00070>");
+    expect(xtx).toContain("<DVE00100>530400</DVE00100>");
+    expect(xtx).toContain("<DVE00750>530400</DVE00750>");
+    expect(xtx).toContain("<ABI00050>530400</ABI00050>"); // 申告書の控除対象仕入税額
+  });
+
+  test("75%特例2号が選ばれると、付表5-3にペアの特例欄が出る", () => {
+    const input: SimplifiedConsumptionInput = {
+      ...EMPTY_INPUT,
+      salesByCategory: {
+        1: { incl10: 5_500_000, incl8: 0 },
+        3: { incl10: 3_300_000, incl8: 0 },
+        5: { incl10: 1_100_000, incl8: 0 },
+      },
+    };
+    const xtx = buildSimplifiedConsumptionXtx({
+      taxpayer: TAXPAYER,
+      periodFrom: "2027-01-01",
+      periodTo: "2027-12-31",
+      submissionDate: "2028-02-15",
+      filingKind: 1,
+      basePeriodSales: 0,
+      input,
+      result: computeSimplifiedConsumptionReturn(input),
+      originalNational: null,
+      originalLocal: null,
+    });
+    expect(xtx).toContain("<ABL00210><kubun_CD>1</kubun_CD></ABL00210>");
+    // 第1種+第3種のペアは DVE00160 グループ（7.8%分 DVE00180・合計 DVE00190）
+    expect(xtx).toContain("<DVE00180>569400</DVE00180>");
+    expect(xtx).toContain("<DVE00190>569400</DVE00190>");
+    expect(xtx).toContain("<DVE00750>569400</DVE00750>");
   });
 
   test("修正申告では既確定税額との差額欄が出る", () => {

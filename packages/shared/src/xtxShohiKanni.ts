@@ -12,7 +12,11 @@
 * - 事業が1種類だけなら専業者計算（基礎税額 × みなし仕入率）。
 * - 2種類以上は原則計算（事業区分別の売上税額 × みなし仕入率を合計し、
 * 基礎税額との比率で按分する。国税庁の設例の手順どおり）。
-* - 75%特例（消令57条3項）は未対応（原則計算は常に適用できる）。
+* - 75%特例（消令57条3項）: 1事業で75%以上ならその事業の率を全体に
+* 適用（同項1号）、2事業の合計で75%以上なら高い方の率はそのまま、
+* 残り全部に低い方の率を適用（同項2号）。原則・特例は選択適用で、
+* 控除対象仕入税額が最大になる方式を選ぶ（税率区分ごとに異なる
+* 方式は選べないため、10%分と8%分の合計で比較する）。
 * - 売上対価の返還等は税込額から割戻しで税額化し、基礎税額と付表4-3で
 * 控除する。帳簿側で返還等を売上から直接減額している場合は入力不要。
 *
@@ -100,6 +104,28 @@ taxTotal: number;
 sharePercent: number;
 }
 
+/** 控除対象仕入税額の計算方式（消令57条2項・3項）。 */
+export type SimplifiedAppliedRule =
+| { kind: "single" }
+| { kind: "principle" }
+| { kind: "special1"; category: SimplifiedCategory }
+| { kind: "special2"; higher: SimplifiedCategory; lower: SimplifiedCategory };
+
+/** 特例（75%）の選択肢1件分の計算結果（付表5-3 ロへの転記値）。 */
+export interface SimplifiedSpecialOption {
+rule: "special1" | "special2";
+/** special1: 75%以上を占める事業区分 */
+category?: SimplifiedCategory;
+/** special2: ペアのうち率が高い方の事業区分 */
+higher?: SimplifiedCategory;
+/** special2: ペアのうち率が低い方の事業区分 */
+lower?: SimplifiedCategory;
+/** この方式での控除対象仕入税額・軽減税率8%適用分 */
+inputTax8: number;
+/** この方式での控除対象仕入税額・税率10%適用分 */
+inputTax10: number;
+}
+
 /** 簡易課税申告の計算結果（申告書・付表への転記値）。 */
 export interface SimplifiedConsumptionReturn {
 categories: SimplifiedCategoryResult[];
@@ -139,10 +165,18 @@ badDebtTax: number;
 basis10: number;
 /** 控除対象仕入税額の計算の基礎となる消費税額・8%分（付表5-3 ④） */
 basis8: number;
-/** 原則計算の按分前金額・10%分（付表5-3 DVE00030。専業者の場合は 0） */
+/** 原則計算の按分前金額・10%分（付表5-3 DVE00030 の按分前の内訳。専業者の場合は 0） */
 principleRaw10: number;
-/** 原則計算の按分前金額・8%分（付表5-3 DVE00020。専業者の場合は 0） */
+/** 原則計算の按分前金額・8%分（付表5-3 DVE00020 の按分前の内訳。専業者の場合は 0） */
 principleRaw8: number;
+/** 原則計算での控除対象仕入税額・10%分（付表5-3 イ） */
+principleInputTax10: number;
+/** 原則計算での控除対象仕入税額・8%分（付表5-3 イ） */
+principleInputTax8: number;
+/** 適用できる75%特例の選択肢（該当がなければ空） */
+specialOptions: SimplifiedSpecialOption[];
+/** 実際に適用した計算方式（控除対象仕入税額が最大のもの） */
+appliedRule: SimplifiedAppliedRule;
 /** 控除対象仕入税額・10%分 */
 inputTax10: number;
 /** 控除対象仕入税額・8%分 */
@@ -240,20 +274,79 @@ const taxTotal10 = categories.reduce((s, c) => s + c.tax10, 0);
 const taxTotal8 = categories.reduce((s, c) => s + c.tax8, 0);
 let principleRaw10 = 0;
 let principleRaw8 = 0;
+let principleInputTax10 = 0;
+let principleInputTax8 = 0;
 let inputTax10 = 0;
 let inputTax8 = 0;
+const specialOptions: SimplifiedSpecialOption[] = [];
+let appliedRule: SimplifiedAppliedRule = { kind: "principle" };
 if (singleCategory!== null) {
 const rate = deemedRate(singleCategory);
 inputTax10 = Math.floor(basis10 * rate);
 inputTax8 = Math.floor(basis8 * rate);
+appliedRule = { kind: "single" };
 } else if (categories.length > 1) {
 principleRaw10 = categories.reduce(
 (s, c) => s + Math.floor(c.tax10 * c.deemedRate),
 0,
 );
 principleRaw8 = categories.reduce((s, c) => s + Math.floor(c.tax8 * c.deemedRate), 0);
-inputTax10 = taxTotal10 > 0? Math.floor((basis10 * principleRaw10) / taxTotal10): 0;
-inputTax8 = taxTotal8 > 0? Math.floor((basis8 * principleRaw8) / taxTotal8): 0;
+principleInputTax10 = taxTotal10 > 0? Math.floor((basis10 * principleRaw10) / taxTotal10): 0;
+principleInputTax8 = taxTotal8 > 0? Math.floor((basis8 * principleRaw8) / taxTotal8): 0;
+inputTax10 = principleInputTax10;
+inputTax8 = principleInputTax8;
+
+// 75%特例（消令57条3項）。判定割合は課税売上高（税抜）の割合で、
+// 返還等は区分別に分かれていないため控除前の売上高で判定する。
+// 方式の選択は税率区分ごとに分けられないため、合計額で比較する。
+const shareAtLeast75 = (excl: number): boolean => salesExcl > 0 && excl * 4 >= salesExcl * 3;
+for (const c of categories) {
+if (!shareAtLeast75(c.exclTotal)) continue;
+// 特例1号: その事業のみなし仕入率を全体の基礎税額に適用する
+specialOptions.push({
+rule: "special1",
+category: c.category,
+inputTax8: Math.floor(basis8 * c.deemedRate),
+inputTax10: Math.floor(basis10 * c.deemedRate),
+});
+}
+for (let i = 0; i < categories.length; i++) {
+for (let j = i + 1; j < categories.length; j++) {
+const higher = categories[i];
+const lower = categories[j];
+if (!shareAtLeast75(higher.exclTotal + lower.exclTotal)) continue;
+// 特例2号: 高い方の事業はその率、残り全部（第3の事業を含む）に
+// 低い方の率を適用し、原則計算と同じ按分式で求める
+const raw10 =
+Math.floor(higher.tax10 * higher.deemedRate) +
+Math.floor((taxTotal10 - higher.tax10) * lower.deemedRate);
+const raw8 =
+Math.floor(higher.tax8 * higher.deemedRate) +
+Math.floor((taxTotal8 - higher.tax8) * lower.deemedRate);
+specialOptions.push({
+rule: "special2",
+higher: higher.category,
+lower: lower.category,
+inputTax8: taxTotal8 > 0? Math.floor((basis8 * raw8) / taxTotal8): 0,
+inputTax10: taxTotal10 > 0? Math.floor((basis10 * raw10) / taxTotal10): 0,
+});
+}
+}
+// 原則・特例のうち控除対象仕入税額が最大の方式を選ぶ（同額なら原則）
+for (const option of specialOptions) {
+if (option.inputTax8 + option.inputTax10 > inputTax8 + inputTax10) {
+inputTax8 = option.inputTax8;
+inputTax10 = option.inputTax10;
+appliedRule =
+option.rule === "special1"
+? { kind: "special1", category: option.category as SimplifiedCategory }
+: {
+kind: "special2",
+higher: option.higher as SimplifiedCategory,
+lower: option.lower as SimplifiedCategory,
+};
+}
+}
 }
 const inputTax = inputTax10 + inputTax8;
 
@@ -326,6 +419,10 @@ basis10,
 basis8,
 principleRaw10,
 principleRaw8,
+principleInputTax10,
+principleInputTax8,
+specialOptions,
+appliedRule,
 inputTax10,
 inputTax8,
 inputTax,
@@ -470,7 +567,9 @@ categoryBlocks.push(
 if (categoryBlocks.length > 0) {
 abl.push(`<ABL00020>${categoryBlocks.join("")}</ABL00020>`);
 }
-abl.push(kubun("ABL00210", 2)); // 75%特例は適用しない
+abl.push(
+kubun("ABL00210", r.appliedRule.kind === "special1" || r.appliedRule.kind === "special2"? 1: 2),
+); // 特例計算適用（令57条3項）: 1=有、2=無。売上割合は実績値を転記する
 
 const page1 =
 `<SHA020-1 page="1">` +
@@ -589,6 +688,15 @@ const RATE_KUBUN: Record<SimplifiedCategory, number> = {
 6: 6,
 };
 
+/** 付表5-3 特例（ロ）のペア列挙順（高い方の区分, 低い方の区分）。 */
+const SPECIAL2_PAIRS: [SimplifiedCategory, SimplifiedCategory][] = [
+[1, 2], [1, 3], [1, 4], [1, 5], [1, 6],
+[2, 3], [2, 4], [2, 5], [2, 6],
+[3, 4], [3, 5], [3, 6],
+[4, 5], [4, 6],
+[5, 6],
+];
+
 /** 付表5-3 明細の事業区分ごとのタグ組（(1)売上高・(2)消費税額）。 */
 const DVD_SALES_TAGS: Record<
 SimplifiedCategory,
@@ -667,8 +775,35 @@ page1.push(
 const page2: string[] = [];
 if (r.singleCategory === null && r.categories.length > 1) {
 page2.push(
-`<DVE00010>${amount("DVE00020", r.principleRaw8)}${amount("DVE00030", r.principleRaw10)}${amountAlways("DVE00040", r.principleRaw8 + r.principleRaw10)}</DVE00010>`,
+`<DVE00010>${amount("DVE00020", r.principleInputTax8)}${amount("DVE00030", r.principleInputTax10)}${amountAlways("DVE00040", r.principleInputTax8 + r.principleInputTax10)}</DVE00010>`,
 );
+}
+if (r.specialOptions.length > 0) {
+const specialBlocks: string[] = [];
+const special1 = r.specialOptions.find((o) => o.rule === "special1");
+if (special1 && special1.category!== undefined) {
+specialBlocks.push(
+`<DVE00060>${kubun("DVE00070", RATE_KUBUN[special1.category])}${amount("DVE00080", special1.inputTax8)}${amount("DVE00090", special1.inputTax10)}${amountAlways("DVE00100", special1.inputTax8 + special1.inputTax10)}</DVE00060>`,
+);
+}
+const special2Options = r.specialOptions.filter((o) => o.rule === "special2");
+if (special2Options.length > 0) {
+const pairBlocks: string[] = [];
+for (const option of special2Options) {
+const higher = option.higher as SimplifiedCategory;
+const lower = option.lower as SimplifiedCategory;
+// ペアの並びは様式の列挙順（高い方の区分→低い方の区分）。
+// グループタグは DVE00120 から 40 刻みで 15 ペア分が並ぶ。
+const pairIndex = SPECIAL2_PAIRS.findIndex(([h, l]) => h === higher && l === lower);
+const groupNo = 120 + pairIndex * 40;
+const tag = (n: number): string => `DVE${String(n).padStart(5, "0")}`;
+pairBlocks.push(
+`<${tag(groupNo)}>${amount(tag(groupNo + 10), option.inputTax8)}${amount(tag(groupNo + 20), option.inputTax10)}${amountAlways(tag(groupNo + 30), option.inputTax8 + option.inputTax10)}</${tag(groupNo)}>`,
+);
+}
+specialBlocks.push(`<DVE00110>${pairBlocks.join("")}</DVE00110>`);
+}
+page2.push(`<DVE00050>${specialBlocks.join("")}</DVE00050>`);
 }
 page2.push(
 `<DVE00720>${amount("DVE00730", r.inputTax8)}${amount("DVE00740", r.inputTax10)}${amountAlways("DVE00750", r.inputTax)}</DVE00720>`,
