@@ -150,6 +150,9 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: theme.space.xs,
+    // チップ内のテキスト（項目名）は折り返さない。
+    whiteSpace: "nowrap",
+    flexShrink: 0,
     // 中身（Select/Input=controlHeight）に上下 padding と枠線を足した高さで固定し、
     // チップ同士・隣のボタンと高さがズレないようにする。
     height: FILTER_ROW_HEIGHT,

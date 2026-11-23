@@ -23,6 +23,8 @@ const styles = {
     alignItems: "center",
     gap: theme.space.sm,
     fontWeight: theme.fontWeight.semibold,
+    flexShrink: 0,
+    whiteSpace: "nowrap",
   }),
   // 状態（済み）。
   stateDone: style({
@@ -32,6 +34,8 @@ const styles = {
     backgroundColor: theme.color.accentSoft,
     borderRadius: theme.borderRadius.pill,
     padding: "2px 8px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
   // 状態（未）。
   stateTodo: style({
@@ -41,6 +45,8 @@ const styles = {
     backgroundColor: theme.color.lineSoft,
     borderRadius: theme.borderRadius.pill,
     padding: "2px 8px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
   // 読み込み中の状態欄のバー。
   skeletonBar: style({

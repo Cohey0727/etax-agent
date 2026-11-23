@@ -55,6 +55,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
+    // ボタンのテキストは絶対に折り返さない（狭幅で縦折れさせない）。
+    whiteSpace: "nowrap",
+    flexShrink: 0,
     // 高さは Input・Select と共通の controlHeight に固定する（サイズ違いは横 padding と文字サイズだけ）。
     height: theme.component.controlHeight,
     borderRadius: theme.borderRadius.sm,
