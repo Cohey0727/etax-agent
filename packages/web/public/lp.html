@@ -11,19 +11,19 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <style>
       :root {
-        --bg: #f4f5fa;
+        --bg: #f3f3f9;
         --surface: #ffffff;
-        --ink: #17233b;
-        --muted: #5b6a84;
-        --navy: #0d1830;
-        --navy-2: #12234a;
-        --accent: #2f6bff;
+        --ink: #1d1d2b;
+        --muted: #5d5d72;
+        --navy: #221a63;
+        --navy-2: #2c2373;
+        --accent: #4a3aff;
         --accent-2: #4a3aff;
-        --gold: #c9a45c;
-        --border: #e3e7f0;
+        --gold: #8f84ff;
+        --border: #e4e4f0;
         --radius: 18px;
-        --shadow: 0 14px 34px rgba(13, 24, 48, 0.1);
-        --shadow-lg: 0 34px 64px -20px rgba(13, 24, 48, 0.35);
+        --shadow: 0 14px 34px rgba(34, 26, 99, 0.1);
+        --shadow-lg: 0 34px 64px -20px rgba(34, 26, 99, 0.35);
         --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
       }
       * {
@@ -77,9 +77,9 @@
         background:
           linear-gradient(
             100deg,
-            rgba(9, 16, 36, 0.93) 30%,
-            rgba(13, 24, 48, 0.78) 55%,
-            rgba(23, 42, 92, 0.45) 100%
+            rgba(24, 18, 77, 0.93) 30%,
+            rgba(34, 26, 99, 0.78) 55%,
+            rgba(74, 58, 255, 0.45) 100%
           ),
           url("https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=2000&q=80")
             center 30% / cover no-repeat,
@@ -91,7 +91,7 @@
         position: absolute;
         inset: auto 0 0 0;
         height: 120px;
-        background: linear-gradient(180deg, transparent, rgba(9, 16, 36, 0.55));
+        background: linear-gradient(180deg, transparent, rgba(24, 18, 77, 0.55));
         pointer-events: none;
       }
       .hero-top {
@@ -175,7 +175,7 @@
         border: 1px solid rgba(255, 255, 255, 0.35);
         background: rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(4px);
-        color: #dbe6ff;
+        color: #ddd9ff;
         font-weight: 700;
         font-size: 0.83rem;
         padding: 5px 16px;
@@ -198,7 +198,7 @@
         text-shadow: 0 2px 24px rgba(0, 0, 0, 0.3);
       }
       h1 .u {
-        background: linear-gradient(transparent 72%, rgba(201, 164, 92, 0.85) 72%);
+        background: linear-gradient(transparent 72%, rgba(143, 132, 255, 0.85) 72%);
       }
       .hero-sub {
         color: rgba(255, 255, 255, 0.82);
@@ -271,7 +271,7 @@
         width: 62px;
         height: 62px;
         border-radius: 16px;
-        background: linear-gradient(140deg, #eef3ff, #dbe6ff);
+        background: linear-gradient(140deg, #f0eeff, #ddd9ff);
         display: grid;
         place-items: center;
         font-size: 1.8rem;
@@ -429,7 +429,7 @@
         position: relative;
         min-height: 420px;
         background:
-          linear-gradient(160deg, rgba(13, 24, 48, 0.05), rgba(13, 24, 48, 0.28)),
+          linear-gradient(160deg, rgba(34, 26, 99, 0.05), rgba(34, 26, 99, 0.28)),
           url("https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=1400&q=80")
             center / cover no-repeat,
           var(--navy-2);
@@ -490,7 +490,7 @@
       /* ---------- AI連携（ダーク） ---------- */
       .dark {
         background:
-          radial-gradient(720px 340px at 85% -60px, rgba(47, 107, 255, 0.35), transparent 65%),
+          radial-gradient(720px 340px at 85% -60px, rgba(74, 58, 255, 0.35), transparent 65%),
           radial-gradient(620px 320px at 8% 115%, rgba(74, 58, 255, 0.3), transparent 65%),
           var(--navy);
         color: #fff;
@@ -571,8 +571,8 @@
       .bubble .tool {
         display: inline-block;
         margin-top: 6px;
-        background: rgba(201, 164, 92, 0.2);
-        color: #ecd9ac;
+        background: rgba(143, 132, 255, 0.2);
+        color: #ddd9ff;
         font-size: 0.72rem;
         font-weight: 700;
         padding: 2px 10px;
