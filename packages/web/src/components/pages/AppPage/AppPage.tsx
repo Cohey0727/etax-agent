@@ -15,6 +15,8 @@ import { AppTemplate } from "@components/templates";
 import {
   AgentConnectionConfig,
   AppView,
+  AuthConfig,
+  AuthUser,
   ChatMessage,
   FilingTab,
   SendKeyMode,
@@ -29,7 +31,9 @@ import {
   pathForView,
 } from "@utils";
 import {
+  fetchAuthConfig,
   fetchLedgerTransactions,
+  fetchMe,
   ledgerRowToTransaction,
   replaceYearLedgerTransactions,
   transactionToLedgerInput,
@@ -38,6 +42,7 @@ import { DashboardPage } from "../DashboardPage";
 import { FilingPage } from "../FilingPage";
 import { ImportPage } from "../ImportPage";
 import { LedgerPage } from "../LedgerPage";
+import { LoginPage } from "../LoginPage";
 import { ReceiptPage } from "../ReceiptPage";
 import { SettingsPage } from "../SettingsPage";
 import { TaxpayerPage } from "../TaxpayerPage";
@@ -164,6 +169,34 @@ const readStoredAgentConnection = (): AgentConnectionConfig => {
 
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);
+  // 認証ゲート: 設定（必須かどうか）とログイン状態を確認するまで待つ。
+  // 必須でないローカル運用では従来どおりそのまま使う。メールリンク
+  // （?magic=）や外部ログインの戻り（?auth_error=）はログイン画面で受ける。
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const authQueryRef = useRef(
+    typeof window !== "undefined" &&
+      (new URLSearchParams(window.location.search).has("magic") ||
+        new URLSearchParams(window.location.search).has("auth_error")),
+  );
+  const refreshAuth = useCallback(async () => {
+    const [config, me] = await Promise.all([
+      fetchAuthConfig().catch(() => null),
+      fetchMe().catch(() => null),
+    ]);
+    if (config) setAuthConfig(config);
+    setAuthUser(me);
+    setAuthChecked(true);
+    if (me) {
+      // ログインできたらクエリ（magic 等）を消して通常表示に戻す
+      authQueryRef.current = false;
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+  useEffect(() => {
+    void refreshAuth();
+  }, [refreshAuth]);
   // 起動時のURL（/<画面>/<年度>）があれば、保存値より優先して初期状態にする。
   const initialRoute = useMemo(() => parsePath(window.location.pathname), []);
   const initialView =
@@ -373,6 +406,15 @@ export const AppPage = () => {
 
   const active = appViews.find((view) => view.id === activeView) ?? appViews[0];
   const ActiveComponent = active.Component;
+
+  // 認証ゲート: 確認中はスケルトン、必須モードで未ログイン（または
+  // メールリンク等の処理が必要）ならログイン画面を出す。
+  if (!authChecked) {
+    return <DashboardSkeleton year={year} />;
+  }
+  if (authConfig && ((authConfig.required && !authUser) || (authQueryRef.current && !authUser))) {
+    return <LoginPage config={authConfig} onAuthenticated={() => void refreshAuth()} />;
+  }
 
   return (
     <AppTemplate

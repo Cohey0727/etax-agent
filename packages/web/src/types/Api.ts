@@ -290,3 +290,41 @@ export interface ExportConsumptionXtxResponse {
   xtx: string;
   total_payable: number;
 }
+
+/** ログインユーザー（/api/auth/me・ログイン応答）。 */
+export interface AuthUser {
+  id: number;
+  email: string;
+  totp_enabled?: boolean;
+}
+
+/** 利用可能なログイン方法（/api/auth/config）。 */
+export interface AuthMethods {
+  password: boolean;
+  magic_link: boolean;
+  totp: boolean;
+  passkey: boolean;
+  google: boolean;
+  github: boolean;
+}
+
+/** 認証の公開設定（/api/auth/config）。 */
+export interface AuthConfig {
+  required: boolean;
+  methods: AuthMethods;
+}
+
+/** ログイン応答（TOTP 有効時は totp_required + challenge が返る）。 */
+export interface LoginResponse {
+  user?: AuthUser;
+  token?: string;
+  totp_required?: boolean;
+  challenge?: string;
+}
+
+/** 課金の状態（/api/billing/plan）。 */
+export interface BillingPlan {
+  billing_enabled: boolean;
+  status: string;
+  current_period_end: string | null;
+}
