@@ -6,7 +6,8 @@
  * 持ち、読み出し側では Date として扱う（従来の Postgres 実装と同じ感覚）。
  *
  * imports           : CSV取込の記録（ファイル名・自動マッピング結果・件数）
- * transactions      : 取引（取込元 imports への参照つき）
+ * transactions      : 取引（取込元 imports への参照つき。論理削除）
+ * transaction_history : 取引の変更履歴（登録・更新・削除の前後の値）
  * filing_status     : 年度ごとの申告ステータス（確認・控除計算・提出の済み日時）
  * taxpayer_profiles : 年度ごとの納税者プロフィール（申告書の見出し情報）
  * filing_snapshots  : 「控除・計算」を確定した時点の計算結果の控え（確定の履歴）
@@ -45,6 +46,36 @@ export const transactionsTable = sqliteTable("transactions", {
   /** 消費税の税区分（freee表記）。"" は未設定 */
   taxCategory: text("tax_category").notNull().default(""),
   importId: integer("import_id").references(() => importsTable.id),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  /**
+   * 論理削除の日時。null は有効な取引。電子帳簿保存法の訂正・削除履歴の
+   * 要件のため、取引は物理削除せずこの列で削除済みにする。
+   */
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+});
+
+/**
+ * 取引の変更履歴（電子帳簿保存法の訂正・削除履歴）。
+ * 取引の登録・更新・削除のたびに1行残し、変更前後の値を API 形式の
+ * JSON スナップショットで保持する。登録は before が null、削除は
+ * after に削除済みの状態（deleted_at 入り）を持つ。
+ */
+export const transactionHistoryTable = sqliteTable("transaction_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  transactionId: integer("transaction_id")
+    .notNull()
+    .references(() => transactionsTable.id),
+  /** created / updated / deleted */
+  action: text("action").notNull(),
+  /** 変更前の値（TransactionResponse の JSON）。登録時は null */
+  before: text("before", { mode: "json" }),
+  /** 変更後の値（TransactionResponse の JSON） */
+  after: text("after", { mode: "json" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -137,6 +168,7 @@ export const knowledgeDocsTable = sqliteTable("knowledge_docs", {
 
 export type ImportRow = typeof importsTable.$inferSelect;
 export type TransactionRow = typeof transactionsTable.$inferSelect;
+export type TransactionHistoryRow = typeof transactionHistoryTable.$inferSelect;
 export type NewTransactionRow = typeof transactionsTable.$inferInsert;
 export type FilingStatusRow = typeof filingStatusTable.$inferSelect;
 export type TaxpayerProfileRow = typeof taxpayerProfilesTable.$inferSelect;

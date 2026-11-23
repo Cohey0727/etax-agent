@@ -86,7 +86,9 @@ export async function ensureTables(): Promise<void> {
       income_type text NOT NULL DEFAULT 'other',
       tax_category text NOT NULL DEFAULT '',
       import_id integer REFERENCES imports(id),
-      created_at integer NOT NULL
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL DEFAULT 0,
+      deleted_at integer
     )
   `);
   // 既存DBへの列追加（CREATE TABLE IF NOT EXISTS では既存テーブルに列が増えないため）。
@@ -97,6 +99,24 @@ export async function ensureTables(): Promise<void> {
   if (!txColumns.some((c) => c.name === "fiscal_year")) {
     db.run(sql`ALTER TABLE transactions ADD COLUMN fiscal_year integer NOT NULL DEFAULT 0`);
   }
+  if (!txColumns.some((c) => c.name === "updated_at")) {
+    db.run(sql`ALTER TABLE transactions ADD COLUMN updated_at integer NOT NULL DEFAULT 0`);
+    // 既存行の更新日時は登録日時で埋める。
+    db.run(sql`UPDATE transactions SET updated_at = created_at WHERE updated_at = 0`);
+  }
+  if (!txColumns.some((c) => c.name === "deleted_at")) {
+    db.run(sql`ALTER TABLE transactions ADD COLUMN deleted_at integer`);
+  }
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS transaction_history (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      transaction_id integer NOT NULL REFERENCES transactions(id),
+      action text NOT NULL,
+      before text,
+      after text,
+      created_at integer NOT NULL
+    )
+  `);
   // 割り当て年度が未設定（0）の行は、日付の年で埋める（冪等）。
   db.run(sql`
     UPDATE transactions
