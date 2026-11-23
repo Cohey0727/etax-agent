@@ -1,8 +1,9 @@
 /**
  * filingSnapshotRepository.ts — 確定スナップショットテーブルへのデータアクセス（repositories）。
  */
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { Db } from "../lib/db";
+import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { FilingSnapshotFigures, FilingSnapshotResponse } from "../schemas/filingSnapshot";
 import { FilingSnapshotRow, filingSnapshotsTable } from "./schema";
 
@@ -16,15 +17,18 @@ export function filingSnapshotToApi(row: FilingSnapshotRow): FilingSnapshotRespo
   };
 }
 
-/** 対象年の確定スナップショットを確定日時の昇順で取得する。 */
+/** 対象年の確定スナップショットを確定日時の昇順で取得する（テナント文脈があれば所有者で絞る）。 */
 export async function listFilingSnapshotRows(
   db: Db,
   year: number,
 ): Promise<FilingSnapshotRow[]> {
+  const owner = currentUserId();
+  const conditions = [eq(filingSnapshotsTable.year, year)];
+  if (owner !== undefined) conditions.push(eq(filingSnapshotsTable.ownerUserId, owner));
   return db
     .select()
     .from(filingSnapshotsTable)
-    .where(eq(filingSnapshotsTable.year, year))
+    .where(and(...conditions))
     .orderBy(asc(filingSnapshotsTable.id));
 }
 
@@ -36,7 +40,7 @@ export async function insertFilingSnapshotRow(
 ): Promise<FilingSnapshotRow> {
   const inserted = await db
     .insert(filingSnapshotsTable)
-    .values({ year, figures })
+    .values({ year, figures, ownerUserId: ownerIdForWrite() })
     .returning();
   return inserted[0];
 }

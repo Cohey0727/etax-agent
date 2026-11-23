@@ -6,11 +6,14 @@
  * DB（PostgreSQL）とは独立に
  * 未設定でもサーバーが動く）のため、履歴はサーバーのデータディレクトリの
  * JSONファイルに保存する（Git管理外）。
+ * マルチテナント分離のため、ファイルは所有者ごとに分ける
+ * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { normalizeSearchText } from "@etax/shared";
 import { serverDataDir } from "../lib/config";
+import { ownerIdForWrite } from "../lib/tenantContext";
+import { settingsFilePath } from "./settingsFiles";
 
 export interface ClassificationHistoryRecord {
   /** 正規化した摘要（照合キー）。 */
@@ -37,7 +40,7 @@ export function normalizeDescriptionKey(description: string): string {
 }
 
 function historyPath(): string {
-  return join(serverDataDir(), HISTORY_FILENAME);
+  return settingsFilePath(HISTORY_FILENAME, ownerIdForWrite());
 }
 
 /** 学習履歴を全件読み込む。ファイルが無ければ空配列。 */
