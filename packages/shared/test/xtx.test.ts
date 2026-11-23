@@ -97,6 +97,132 @@ function buildSample(amendment: boolean, filingType?: "blue65" | "white") {
   });
 }
 
+describe("buildXtxFiling の減価償却明細と貸借対照表", () => {
+  test("減価償却明細が KOA210-3 に出て、貸借対照表が貸借一致で KOA210-4 に出る", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
+    const tax = computeIncomeTax({
+      year: 2023,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: { ...EMPTY_DEDUCTION_INPUTS },
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const depreciation = {
+      business: [
+        {
+          name: "パソコン",
+          quantity: "1台",
+          acquisitionYearMonth: "2023-04",
+          cost: 600_000,
+          guaranteeAmount: null,
+          basisAmount: 600_000,
+          method: "straight_line" as const,
+          methodLabel: "定額法",
+          usefulLifeYears: 4,
+          rate: 0.25,
+          months: 9,
+          ordinary: 112_500,
+          total: 112_500,
+          businessRatioPercent: 100,
+          deductible: 112_500,
+          closingBookValue: 487_500,
+        },
+      ],
+      realEstate: [],
+    };
+    // 期首: 現金 1,000,000 = 元入金 1,000,000。期末は所得（控除前）を加えた元入金と一致させる
+    const incomeBeforeBlue = figures._detail.business_income_before_deduction;
+    const xtx = buildXtxFiling({
+      year: 2023,
+      amendment: false,
+      submissionDate: "2024-03-10",
+      taxpayer: {
+        name: "テスト太郎",
+        nameKana: "テストタロウ",
+        zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1",
+        addressLine2: "",
+        birthDate: "1980-04-01",
+        phone: "080-2500-7879",
+        taxOfficeName: "尾道",
+        taxOfficeCode: "08121",
+        myNumber: "",
+        userId: "1234567890123456",
+        occupation: "システムエンジニア",
+        shopName: "",
+        jan1Address: "",
+      },
+      figures,
+      deductionInputs: { ...EMPTY_DEDUCTION_INPUTS },
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+      depreciation,
+      balanceSheet: {
+        opening: { cash: 1_000_000, capital: 1_000_000 },
+        closing: { cash: 1_000_000 + incomeBeforeBlue },
+        ownerLoan: 0,
+        ownerBorrowing: 0,
+      },
+    });
+    expect(xtx).toContain("<KOA210-3");
+    expect(xtx).toContain("<AMF01610>パソコン</AMF01610>");
+    expect(xtx).toContain("<AMF01730>112500</AMF01730>");
+    expect(xtx).toContain("<KOA210-4");
+    expect(xtx).toContain("<AMG00230>1000000</AMG00230>");
+    expect(xtx).toContain(`<AMG00740>${1_000_000 + incomeBeforeBlue}</AMG00740>`);
+  });
+
+  test("貸借が一致しない貸借対照表は例外にする", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
+    const tax = computeIncomeTax({
+      year: 2023,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: { ...EMPTY_DEDUCTION_INPUTS },
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    expect(() =>
+      buildXtxFiling({
+        year: 2023,
+        amendment: false,
+        submissionDate: "2024-03-10",
+        taxpayer: {
+          name: "テスト太郎",
+          nameKana: "テストタロウ",
+          zipCode: "7220062",
+          address: "広島県尾道市向東町3567-1",
+          addressLine2: "",
+          birthDate: "1980-04-01",
+          phone: "080-2500-7879",
+          taxOfficeName: "尾道",
+          taxOfficeCode: "08121",
+          myNumber: "",
+          userId: "1234567890123456",
+          occupation: "システムエンジニア",
+          shopName: "",
+          jan1Address: "",
+        },
+        figures,
+        deductionInputs: { ...EMPTY_DEDUCTION_INPUTS },
+        miscIncome: EMPTY_MISC_INCOME,
+        tax,
+        categoryTotals: { business: {}, realEstate: {} },
+        withholdingTax: 0,
+        prepaidTax: 0,
+        originalThirdPeriodTax: null,
+        balanceSheet: {
+          opening: { cash: 500_000, capital: 1_000_000 },
+          closing: { cash: 0 },
+          ownerLoan: 0,
+          ownerBorrowing: 0,
+        },
+      }),
+    ).toThrow();
+  });
+});
+
 describe("buildXtxFiling", () => {
   test("対応年分は 2023〜2026", () => {
     expect(xtxSupportedYears()).toEqual([2023, 2024, 2025, 2026]);
@@ -171,8 +297,7 @@ describe("buildXtxFiling", () => {
     expect(xtx).toContain("<ABB00440>428000</ABB00440>");
   });
 
-  test("白色申告では決算書の代わりに収支内訳書（KOA110/KOA130）が入る", () => {
-    const white = buildSample(false, "white");
+  test("白色申告では決算書の代わりに収支内訳書（KOA110/KOA130）が入る", () => {    const white = buildSample(false, "white");
     expect(white).toContain("<KOA110 ");
     expect(white).toContain("<KOA130 ");
     expect(white).not.toContain("<KOA210 ");

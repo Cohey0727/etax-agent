@@ -30,6 +30,7 @@
  */
 import { DeductionInputs, IncomeTaxResult, MiscIncomeInput } from "./deductions";
 import { CorrectedFigures, FilingType } from "./taxcalc";
+import { DepreciationDetailRow } from "./depreciation";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
 
 /**
@@ -121,6 +122,40 @@ export interface XtxFilingData {
    * （figures の青色申告特別控除もこの区分で計算されている前提）。
    */
   filingType?: FilingType;
+  /**
+   * 減価償却費の計算の明細行（固定資産台帳から作る）。
+   * 事業分は KOA210/KOA110、不動産分は KOA220/KOA130 の明細欄に出力する。
+   */
+  depreciation?: {
+    business: DepreciationDetailRow[];
+    realEstate: DepreciationDetailRow[];
+  };
+  /** 貸借対照表（KOA210 4面）の入力。事業所得分のみ。貸借一致しない場合は例外。 */
+  balanceSheet?: XtxBalanceSheetInput;
+}
+
+/** 貸借対照表の勘定キー */
+export type BalanceSheetAccount =
+  | "cash" | "checking_deposit" | "time_deposit" | "other_deposit"
+  | "notes_receivable" | "accounts_receivable" | "securities" | "inventory"
+  | "prepaid_expenses" | "loans_receivable" | "buildings" | "building_equipment"
+  | "machinery" | "vehicles" | "tools_equipment" | "land"
+  | "notes_payable" | "accounts_payable" | "borrowings" | "other_payables"
+  | "advances_received" | "deposits_received" | "allowance_for_doubtful_accounts"
+  | "capital";
+
+export interface XtxBalanceSheetInput {
+  /** 期首の金額（勘定キー→金額）。元入金は capital に入れる */
+  opening: Partial<Record<BalanceSheetAccount, number>>;
+  /** 期末の金額（資産・負債のみ。元入金は期首・事業主貸借・所得から計算する） */
+  closing: Partial<Record<BalanceSheetAccount, number>>;
+  extraAsset?: { name: string; opening: number; closing: number };
+  extraLiability1?: { name: string; opening: number; closing: number };
+  extraLiability2?: { name: string; opening: number; closing: number };
+  /** 事業主貸（期末・資産の部） */
+  ownerLoan: number;
+  /** 事業主借（期末・負債資本の部の内訳行。期末元入金の計算に使う） */
+  ownerBorrowing: number;
 }
 
 interface YearVersions {
@@ -570,7 +605,10 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
   pl.push(`<AMF00090>${amounts.join("")}</AMF00090>`);
   parts.push(`<AMF00000><AMF00010>${pl.join("")}</AMF00010></AMF00000>`);
 
-  return `<KOA210 VR="${vr}" id="KOA210" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA210-1 page="1">${parts.join("")}</KOA210-1></KOA210>`;
+  const depDetail210 = buildDepreciationDetail(data.depreciation?.business ?? [], DEP_TAGS_KOA210);
+  const page3 = depDetail210 ? `<KOA210-3 page="3">${depDetail210}</KOA210-3>` : "";
+  const page4 = buildBalanceSheetPage(data);
+  return `<KOA210 VR="${vr}" id="KOA210" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA210-1 page="1">${parts.join("")}</KOA210-1>${page3}${page4}</KOA210>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -641,7 +679,9 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
   pl.push(amountAlways("ANF00270", f._detail.real_estate_income));
   parts.push(`<ANF00000><ANF00010>${pl.join("")}</ANF00010></ANF00000>`);
 
-  return `<KOA220 VR="${vr}" id="KOA220" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA220-1 page="1">${parts.join("")}</KOA220-1></KOA220>`;
+  const depDetail220 = buildDepreciationDetail(data.depreciation?.realEstate ?? [], DEP_TAGS_KOA220);
+  const page2_220 = depDetail220 ? `<KOA220-2 page="2">${depDetail220}</KOA220-2>` : "";
+  return `<KOA220 VR="${vr}" id="KOA220" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA220-1 page="1">${parts.join("")}</KOA220-1>${page2_220}</KOA220>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -744,7 +784,9 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
   pl.push(amountAlways("AIG00400", f._detail.business_income));
   parts.push(`<AIG00000>${pl.join("")}</AIG00000>`);
 
-  return `<KOA110 VR="${vr}" id="KOA110" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA110-1 page="1">${parts.join("")}</KOA110-1></KOA110>`;
+  const depDetail110 = buildDepreciationDetail(data.depreciation?.business ?? [], DEP_TAGS_KOA110);
+  const page2_110 = depDetail110 ? `<KOA110-2 page="2">${depDetail110}</KOA110-2>` : "";
+  return `<KOA110 VR="${vr}" id="KOA110" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA110-1 page="1">${parts.join("")}</KOA110-1>${page2_110}</KOA110>`;
 }
 
 /** KOA130 の固定経費行（その他の経費グループ）: [科目名, タグ] */
@@ -831,7 +873,267 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
   pl.push(amountAlways("AKG00250", f._detail.real_estate_income));
   parts.push(`<AKG00000>${pl.join("")}</AKG00000>`);
 
-  return `<KOA130 VR="${vr}" id="KOA130" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA130-1 page="1">${parts.join("")}</KOA130-1></KOA130>`;
+  const depDetail = buildDepreciationDetail(data.depreciation?.realEstate ?? [], DEP_TAGS_KOA130);
+  const page2 = depDetail ? `<KOA130-2 page="2">${depDetail}</KOA130-2>` : "";
+  return `<KOA130 VR="${vr}" id="KOA130" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA130-1 page="1">${parts.join("")}</KOA130-1>${page2}</KOA130>`;
+}
+
+// ---------------------------------------------------------------------------
+// 減価償却費の計算（明細）と貸借対照表
+// ---------------------------------------------------------------------------
+
+/** 様式ごとの減価償却明細のタグ対応 */
+interface DepDetailTags {
+  group: string;
+  row: string;
+  name: string;
+  quantity: string;
+  acquisition: string;
+  cost: string;
+  guarantee: string;
+  basis: string;
+  method: string;
+  life: string;
+  rateWrap: string;
+  rate: string;
+  months: string;
+  ordinary: string;
+  special: string;
+  total: string;
+  ratio: string;
+  deductible: string;
+  closing: string;
+  totalsWrap: string;
+  tOrdinary: string;
+  tSpecial: string;
+  tTotal: string;
+  tDeductible: string;
+  tClosing: string;
+}
+
+const DEP_TAGS_KOA210: DepDetailTags = {
+  group: "AMF01590", row: "AMF01600", name: "AMF01610", quantity: "AMF01620",
+  acquisition: "AMF01630", cost: "AMF01640", guarantee: "AMF01645", basis: "AMF01650",
+  method: "AMF01660", life: "AMF01670", rateWrap: "AMF01680", rate: "AMF01690",
+  months: "AMF01720", ordinary: "AMF01730", special: "AMF01740", total: "AMF01750",
+  ratio: "AMF01760", deductible: "AMF01770", closing: "AMF01780",
+  totalsWrap: "AMF01800", tOrdinary: "AMF01810", tSpecial: "AMF01820",
+  tTotal: "AMF01830", tDeductible: "AMF01840", tClosing: "AMF01850",
+};
+
+const DEP_TAGS_KOA220: DepDetailTags = {
+  group: "ANF00880", row: "ANF00890", name: "ANF00900", quantity: "ANF00910",
+  acquisition: "ANF00920", cost: "ANF00930", guarantee: "ANF00935", basis: "ANF00940",
+  method: "ANF00950", life: "ANF00960", rateWrap: "ANF00970", rate: "ANF00980",
+  months: "ANF01010", ordinary: "ANF01020", special: "ANF01030", total: "ANF01040",
+  ratio: "ANF01050", deductible: "ANF01060", closing: "ANF01070",
+  totalsWrap: "ANF01090", tOrdinary: "ANF01100", tSpecial: "ANF01110",
+  tTotal: "ANF01120", tDeductible: "ANF01130", tClosing: "ANF01140",
+};
+
+const DEP_TAGS_KOA110: DepDetailTags = {
+  group: "AIM00000", row: "AIM00010", name: "AIM00020", quantity: "AIM00030",
+  acquisition: "AIM00050", cost: "AIM00060", guarantee: "AIM00065", basis: "AIM00070",
+  method: "AIM00080", life: "AIM00090", rateWrap: "AIM00100", rate: "AIM00110",
+  months: "AIM00140", ordinary: "AIM00150", special: "AIM00160", total: "AIM00170",
+  ratio: "AIM00180", deductible: "AIM00190", closing: "AIM00200",
+  totalsWrap: "AIM00220", tOrdinary: "AIM00230", tSpecial: "AIM00240",
+  tTotal: "AIM00250", tDeductible: "AIM00260", tClosing: "AIM00270",
+};
+
+const DEP_TAGS_KOA130: DepDetailTags = {
+  group: "AKK00000", row: "AKK00010", name: "AKK00020", quantity: "AKK00030",
+  acquisition: "AKK00050", cost: "AKK00060", guarantee: "AKK00065", basis: "AKK00070",
+  method: "AKK00080", life: "AKK00090", rateWrap: "AKK00100", rate: "AKK00110",
+  months: "AKK00140", ordinary: "AKK00150", special: "AKK00160", total: "AKK00170",
+  ratio: "AKK00180", deductible: "AKK00190", closing: "AKK00200",
+  totalsWrap: "AKK00220", tOrdinary: "AKK00230", tSpecial: "AKK00240",
+  tTotal: "AKK00250", tDeductible: "AKK00260", tClosing: "AKK00270",
+};
+
+/** 取得年月を era + yy + mm の複合型で出す。 */
+function eraYearMonthTag(tag: string, yearMonth: string): string {
+  const era = toEraDate(`${yearMonth}-01`);
+  if (!era) return "";
+  return `<${tag}><gen:era>${era.era}</gen:era><gen:yy>${era.yy}</gen:yy><gen:mm>${era.mm}</gen:mm></${tag}>`;
+}
+
+/** 減価償却費の計算グループ（明細行＋計）を組み立てる。 */
+function buildDepreciationDetail(rows: DepreciationDetailRow[], tags: DepDetailTags): string {
+  if (rows.length === 0) return "";
+  const body: string[] = [];
+  for (const row of rows) {
+    const cells: string[] = [];
+    cells.push(`<${tags.name}>${esc(row.name)}</${tags.name}>`);
+    if (row.quantity) cells.push(`<${tags.quantity}>${esc(row.quantity)}</${tags.quantity}>`);
+    cells.push(eraYearMonthTag(tags.acquisition, row.acquisitionYearMonth));
+    cells.push(amountAlways(tags.cost, row.cost));
+    if (row.guaranteeAmount !== null) cells.push(amountAlways(tags.guarantee, row.guaranteeAmount));
+    cells.push(amountAlways(tags.basis, row.basisAmount));
+    cells.push(`<${tags.method}>${esc(row.methodLabel)}</${tags.method}>`);
+    if (row.method === "straight_line" || row.method === "declining_balance") {
+      cells.push(`<${tags.life}>${row.usefulLifeYears}</${tags.life}>`);
+      cells.push(
+        `<${tags.rateWrap}><${tags.rate}>${row.rate.toFixed(3)}</${tags.rate}></${tags.rateWrap}>`,
+      );
+    }
+    cells.push(`<${tags.months}>${row.months}</${tags.months}>`);
+    cells.push(amountAlways(tags.ordinary, row.ordinary));
+    cells.push(amountAlways(tags.total, row.total));
+    cells.push(`<${tags.ratio}>${row.businessRatioPercent}</${tags.ratio}>`);
+    cells.push(amountAlways(tags.deductible, row.deductible));
+    cells.push(amountAlways(tags.closing, row.closingBookValue));
+    body.push(`<${tags.row}>${cells.join("")}</${tags.row}>`);
+  }
+  const sum = (pick: (r: DepreciationDetailRow) => number) =>
+    rows.reduce((acc, r) => acc + pick(r), 0);
+  body.push(
+    `<${tags.totalsWrap}>` +
+      amountAlways(tags.tOrdinary, sum((r) => r.ordinary)) +
+      amountAlways(tags.tTotal, sum((r) => r.total)) +
+      amountAlways(tags.tDeductible, sum((r) => r.deductible)) +
+      amountAlways(tags.tClosing, sum((r) => r.closingBookValue)) +
+      `</${tags.totalsWrap}>`,
+  );
+  return `<${tags.group}>${body.join("")}</${tags.group}>`;
+}
+
+/** 貸借対照表の資産勘定: [キー, 期首タグ, 期末タグ] */
+const BS_ASSET_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
+  ["cash", "AMG00060", "AMG00260"],
+  ["checking_deposit", "AMG00070", "AMG00270"],
+  ["time_deposit", "AMG00080", "AMG00280"],
+  ["other_deposit", "AMG00090", "AMG00290"],
+  ["notes_receivable", "AMG00100", "AMG00300"],
+  ["accounts_receivable", "AMG00110", "AMG00310"],
+  ["securities", "AMG00120", "AMG00320"],
+  ["inventory", "AMG00130", "AMG00330"],
+  ["prepaid_expenses", "AMG00140", "AMG00340"],
+  ["loans_receivable", "AMG00150", "AMG00350"],
+  ["buildings", "AMG00160", "AMG00360"],
+  ["building_equipment", "AMG00170", "AMG00370"],
+  ["machinery", "AMG00180", "AMG00380"],
+  ["vehicles", "AMG00190", "AMG00390"],
+  ["tools_equipment", "AMG00200", "AMG00400"],
+  ["land", "AMG00210", "AMG00410"],
+];
+
+/** 貸借対照表の負債勘定（貸倒引当金・元入金は別枠）: [キー, 期首タグ, 期末タグ] */
+const BS_LIABILITY_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
+  ["notes_payable", "AMG00510", "AMG00640"],
+  ["accounts_payable", "AMG00520", "AMG00650"],
+  ["borrowings", "AMG00530", "AMG00660"],
+  ["other_payables", "AMG00540", "AMG00670"],
+  ["advances_received", "AMG00550", "AMG00680"],
+  ["deposits_received", "AMG00560", "AMG00690"],
+];
+
+/**
+ * KOA210-4（貸借対照表）を組み立てる。
+ * 期末元入金 = 期首元入金 + 事業主借 − 事業主貸 + 青色申告特別控除前の所得金額。
+ * 貸借が一致しない入力は例外にする（不整合な決算書を出さない）。
+ */
+function buildBalanceSheetPage(data: XtxFilingData): string {
+  const bs = data.balanceSheet;
+  if (!bs) return "";
+  const opening = bs.opening;
+  const closing = bs.closing;
+  const sumOf = (
+    side: Partial<Record<BalanceSheetAccount, number>>,
+    accounts: [BalanceSheetAccount, string, string][],
+  ) => accounts.reduce((acc, [key]) => acc + (side[key] ?? 0), 0);
+
+  const openingAssets = sumOf(opening, BS_ASSET_ACCOUNTS) + (bs.extraAsset?.opening ?? 0);
+  const closingAssets =
+    sumOf(closing, BS_ASSET_ACCOUNTS) + (bs.extraAsset?.closing ?? 0) + bs.ownerLoan;
+  const openingLiabilities =
+    sumOf(opening, BS_LIABILITY_ACCOUNTS) +
+    (opening.allowance_for_doubtful_accounts ?? 0) +
+    (bs.extraLiability1?.opening ?? 0) +
+    (bs.extraLiability2?.opening ?? 0);
+  const closingLiabilities =
+    sumOf(closing, BS_LIABILITY_ACCOUNTS) +
+    (closing.allowance_for_doubtful_accounts ?? 0) +
+    (bs.extraLiability1?.closing ?? 0) +
+    (bs.extraLiability2?.closing ?? 0);
+  const openingCapital = opening.capital ?? 0;
+  const incomeBeforeBlue = data.figures._detail.business_income_before_deduction;
+  const closingCapital = openingCapital + bs.ownerBorrowing - bs.ownerLoan + incomeBeforeBlue;
+
+  if (openingAssets !== openingLiabilities + openingCapital) {
+    throw new Error(
+      `貸借対照表（期首）が貸借一致しません: 資産 ${openingAssets} ≠ 負債・資本 ${openingLiabilities + openingCapital}`,
+    );
+  }
+  if (closingAssets !== closingLiabilities + closingCapital) {
+    throw new Error(
+      `貸借対照表（期末）が貸借一致しません: 資産 ${closingAssets} ≠ 負債・資本 ${closingLiabilities + closingCapital}`,
+    );
+  }
+
+  const era = toEraDate(`${data.year}-12-31`);
+  const parts: string[] = [];
+  if (era) {
+    parts.push(
+      `<AMG00010><gen:era>${era.era}</gen:era><gen:yy>${era.yy}</gen:yy><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AMG00010>`,
+    );
+  }
+  const assetSide: string[] = [];
+  if (bs.extraAsset) {
+    assetSide.push(
+      `<AMG00025><AMG00030>${esc(bs.extraAsset.name)}</AMG00030>` +
+        amountAlways("AMG00220", bs.extraAsset.opening) +
+        amountAlways("AMG00420", bs.extraAsset.closing) +
+        `</AMG00025>`,
+    );
+  }
+  const openingCells: string[] = [`<AMG00050><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AMG00050>`];
+  for (const [key, openTag] of BS_ASSET_ACCOUNTS) openingCells.push(amount(openTag, opening[key] ?? 0));
+  openingCells.push(amountAlways("AMG00230", openingAssets));
+  assetSide.push(`<AMG00040>${openingCells.join("")}</AMG00040>`);
+  const closingCells: string[] = [`<AMG00250><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AMG00250>`];
+  for (const [key, , closeTag] of BS_ASSET_ACCOUNTS) closingCells.push(amount(closeTag, closing[key] ?? 0));
+  closingCells.push(amount("AMG00430", bs.ownerLoan));
+  closingCells.push(amountAlways("AMG00440", closingAssets));
+  assetSide.push(`<AMG00240>${closingCells.join("")}</AMG00240>`);
+  parts.push(`<AMG00020>${assetSide.join("")}</AMG00020>`);
+
+  const liabilitySide: string[] = [];
+  const extras: string[] = [];
+  if (bs.extraLiability1) {
+    extras.push(
+      `<AMG00465><AMG00470>${esc(bs.extraLiability1.name)}</AMG00470>` +
+        amountAlways("AMG00570", bs.extraLiability1.opening) +
+        amountAlways("AMG00700", bs.extraLiability1.closing) +
+        `</AMG00465>`,
+    );
+  }
+  if (bs.extraLiability2) {
+    extras.push(
+      `<AMG00475><AMG00480>${esc(bs.extraLiability2.name)}</AMG00480>` +
+        amountAlways("AMG00590", bs.extraLiability2.opening) +
+        amountAlways("AMG00720", bs.extraLiability2.closing) +
+        `</AMG00475>`,
+    );
+  }
+  if (extras.length > 0) liabilitySide.push(`<AMG00460>${extras.join("")}</AMG00460>`);
+  const openingL: string[] = [`<AMG00500><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AMG00500>`];
+  for (const [key, openTag] of BS_LIABILITY_ACCOUNTS) openingL.push(amount(openTag, opening[key] ?? 0));
+  openingL.push(amount("AMG00580", opening.allowance_for_doubtful_accounts ?? 0));
+  openingL.push(amountAlways("AMG00600", openingCapital));
+  openingL.push(amountAlways("AMG00610", openingLiabilities + openingCapital));
+  liabilitySide.push(`<AMG00490>${openingL.join("")}</AMG00490>`);
+  const closingL: string[] = [`<AMG00630><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AMG00630>`];
+  for (const [key, , closeTag] of BS_LIABILITY_ACCOUNTS) closingL.push(amount(closeTag, closing[key] ?? 0));
+  closingL.push(amount("AMG00710", closing.allowance_for_doubtful_accounts ?? 0));
+  closingL.push(amount("AMG00730", bs.ownerBorrowing));
+  closingL.push(amountAlways("AMG00740", closingCapital));
+  closingL.push(amountAlways("AMG00750", incomeBeforeBlue));
+  closingL.push(amountAlways("AMG00760", closingLiabilities + closingCapital));
+  liabilitySide.push(`<AMG00620>${closingL.join("")}</AMG00620>`);
+  parts.push(`<AMG00450>${liabilitySide.join("")}</AMG00450>`);
+
+  return `<KOA210-4 page="4"><AMG00000>${parts.join("")}</AMG00000></KOA210-4>`;
 }
 
 // ---------------------------------------------------------------------------

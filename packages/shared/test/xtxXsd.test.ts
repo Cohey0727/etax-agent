@@ -30,6 +30,7 @@ import {
   computeIncomeTax,
   computeSimplifiedConsumptionReturn,
   computeSpecial20ConsumptionReturn,
+  depreciationDetailRow,
 } from "../src";
 
 const XSD_DIR = process.env.ETAX_XSD_DIR ?? "";
@@ -137,6 +138,54 @@ function whiteSample(year: number): string {
   });
 }
 
+function depBsSample(year: number): string {
+  const transactions: Transaction[] = [
+    { date: `${year}-06-15`, year, description: "事業売上", amount: 12_000_000, account: "普通預金", category: "売上高", income_type: "business", tax_category: "" },
+    { date: `${year}-06-15`, year, description: "家賃収入", amount: 1_764_000, account: "普通預金", category: "家賃収入", income_type: "real_estate", tax_category: "" },
+  ];
+  const figures = computeCorrectedFigures(transactions, year);
+  const tax = computeIncomeTax({
+    year,
+    totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+    deductions: EMPTY_DEDUCTION_INPUTS,
+    taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+  });
+  const depRow = depreciationDetailRow(
+    "パソコン",
+    {
+      acquisitionDate: `${year}-04-01`,
+      cost: 600_000,
+      usefulLifeYears: 4,
+      method: "straight_line",
+      businessRatioPercent: 100,
+    },
+    year,
+    "1台",
+  );
+  const incomeBeforeBlue = figures._detail.business_income_before_deduction;
+  return buildXtxFiling({
+    year,
+    amendment: false,
+    submissionDate: "2026-03-10",
+    taxpayer: TAXPAYER,
+    figures,
+    deductionInputs: EMPTY_DEDUCTION_INPUTS,
+    miscIncome: EMPTY_MISC_INCOME,
+    tax,
+    categoryTotals: { business: {}, realEstate: { 家賃収入: 1_764_000 } },
+    withholdingTax: 0,
+    prepaidTax: 0,
+    originalThirdPeriodTax: null,
+    depreciation: { business: depRow ? [depRow] : [], realEstate: [] },
+    balanceSheet: {
+      opening: { cash: 1_000_000, capital: 1_000_000 },
+      closing: { cash: 1_000_000 + incomeBeforeBlue },
+      ownerLoan: 0,
+      ownerBorrowing: 0,
+    },
+  });
+}
+
 function shohiSample(): string {
   const input = {
     salesIncl10: 15_352_564,
@@ -227,6 +276,7 @@ describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => 
       ["shotoku2024.xtx", incomeSample(2024), "shotoku/RKO0010-240.xsd"],
       ["shotoku2025.xtx", incomeSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuWhite2025.xtx", whiteSample(2025), "shotoku/RKO0010-250.xsd"],
+      ["shotokuDepBs2025.xtx", depBsSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
       ["shohiSpecial20.xtx", special20Sample(), "shohi/RSH0010-260.xsd"],
       ["shohiKanni2027.xtx", kanniSample(), "shohi/RSH0030-260.xsd"],

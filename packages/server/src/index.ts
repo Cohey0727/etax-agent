@@ -57,6 +57,7 @@ import etaxRoutes from "./routes/etax";
 import filesRoutes from "./routes/files";
 import filingSnapshotsRoutes from "./routes/filingSnapshots";
 import filingStatusRoutes from "./routes/filingStatus";
+import fixedAssetsRoutes from "./routes/fixedAssets";
 import freeeRoutes from "./routes/freee";
 import healthRoutes from "./routes/health";
 import importsRoutes from "./routes/imports";
@@ -82,6 +83,7 @@ app.route("/", freeeRoutes);
 app.route("/", filingStatusRoutes);
 app.route("/", filingSnapshotsRoutes);
 app.route("/", taxpayerRoutes);
+app.route("/", fixedAssetsRoutes);
 app.route("/", etaxRoutes);
 app.route("/", mcpRoutes);
 

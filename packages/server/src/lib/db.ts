@@ -175,6 +175,23 @@ export async function ensureTables(): Promise<void> {
     )
   `);
   db.run(sql`
+    CREATE TABLE IF NOT EXISTS fixed_assets (
+      id integer PRIMARY KEY AUTOINCREMENT,
+      name text NOT NULL,
+      quantity text NOT NULL DEFAULT '',
+      income_type text NOT NULL DEFAULT 'business',
+      acquisition_date text NOT NULL,
+      service_start_date text,
+      cost integer NOT NULL,
+      useful_life_years integer NOT NULL,
+      method text NOT NULL DEFAULT 'straight_line',
+      business_ratio_percent integer NOT NULL DEFAULT 100,
+      disposed_date text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
+    )
+  `);
+  db.run(sql`
     CREATE TABLE IF NOT EXISTS knowledge_docs (
       id integer PRIMARY KEY AUTOINCREMENT,
       slug text NOT NULL UNIQUE,
