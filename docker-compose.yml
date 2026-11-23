@@ -35,7 +35,10 @@ services:
       # DB は compose 内の db サービスへ。認証情報は db と同じ変数から組み立てる。
       DATABASE_URL: postgres://${POSTGRES_USER:-etax}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-etaxagent}
       # SystemOne（Ollama）はホスト側で動くため、ホストゲートウェイ経由で引く。
-      SYSTEMONE_BASE_URL: http://host.docker.internal:11434
+      # VPS 等ホストに Ollama が無い環境では、.env の SYSTEMONE_BASE_URL で
+      # 別エンドポイントに差し替えるか、空にして無効化できる（判定はルールへ
+      # フォールバックする）。
+      SYSTEMONE_BASE_URL: ${SYSTEMONE_BASE_URL:-http://host.docker.internal:11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
