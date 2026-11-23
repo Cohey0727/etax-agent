@@ -2,6 +2,10 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
+  // 狭幅（スマホ）では行を潰さず、リスト全体を横スクロールさせる。
+  listScroller: style({
+    overflowX: "auto",
+  }),
   // 独立した項目1件分の行。順序は表さず、状態と移動ボタンだけを示す。
   row: style({
     display: "flex",
@@ -9,6 +13,9 @@ const styles = {
     justifyContent: "flex-start",
     gap: theme.space.md,
     minHeight: "24px",
+    // ラベル＋チップ＋詳細＋ボタンが自然な比率を保てる最小幅。
+    // これより狭い画面では listScroller 側が横スクロールする。
+    minWidth: "36rem",
   }),
   itemLabel: style({
     display: "flex",

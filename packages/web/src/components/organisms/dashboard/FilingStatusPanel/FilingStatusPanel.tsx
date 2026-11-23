@@ -77,14 +77,16 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
               提出は e-Tax で行います。
             </Text>
           </Col>
-          <Col gap="sm" aria-hidden="true">
-            {SKELETON_LABELS.map((label) => (
-              <div key={label} className={styles.statusRow}>
-                <Text>{label}</Text>
-                <span className={styles.skeletonBar} />
-              </div>
-            ))}
-          </Col>
+          <div className={styles.listScroller}>
+            <Col gap="sm" aria-hidden="true">
+              {SKELETON_LABELS.map((label) => (
+                <div key={label} className={styles.statusRow}>
+                  <Text>{label}</Text>
+                  <span className={styles.skeletonBar} />
+                </div>
+              ))}
+            </Col>
+          </div>
           {onNavigate ? <div className={styles.skeletonFooter} aria-hidden="true" /> : null}
         </Col>
       </Card>
@@ -121,8 +123,9 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
           </Text>
         </Col>
 
-        <Col gap="sm">
-          {rows.map((row) => (
+        <div className={styles.listScroller}>
+          <Col gap="sm">
+            {rows.map((row) => (
             <div key={row.label} className={styles.statusRow}>
               <Text className={styles.itemLabel}>
                 {row.label}
@@ -132,8 +135,9 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
               </Text>
               <Text variant="muted">{row.state}</Text>
             </div>
-          ))}
-        </Col>
+            ))}
+          </Col>
+        </div>
 
         {onNavigate ? (
           <Row gap="sm">
