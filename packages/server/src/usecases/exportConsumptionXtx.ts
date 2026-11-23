@@ -1,11 +1,19 @@
 /**
- * exportConsumptionXtx.ts — 消費税申告書（一般用・本則）の XTX 出力ユースケース。
+ * exportConsumptionXtx.ts — 消費税申告書の XTX 出力ユースケース。
  * DB不要・ステートレス。入力は税区分まで確定した金額（税込）で受け、
- * 申告書の丸め・控除方式の判定は @etax/shared の computeConsumptionReturn、
- * XTXの組み立ては buildConsumptionXtx に委ねる。生成物は署名なしの
+ * 申告書の丸め・控除方式の判定は @etax/shared の決定的な計算関数、
+ * XTXの組み立ては buildConsumptionXtx（本則）/
+ * buildSimplifiedConsumptionXtx（簡易課税）に委ねる。生成物は署名なしの
  * 組み込み用データで、送信（マイナンバーカード署名）は本人が行う。
  */
-import { buildConsumptionXtx, computeConsumptionReturn } from "@etax/shared";
+import {
+  SimplifiedCategory,
+  SimplifiedConsumptionInput,
+  buildConsumptionXtx,
+  buildSimplifiedConsumptionXtx,
+  computeConsumptionReturn,
+  computeSimplifiedConsumptionReturn,
+} from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import {
@@ -21,7 +29,7 @@ export const exportConsumptionXtxRoute = createRoute({
   path: "/api/etax/export-consumption-xtx",
   operationId: "exportConsumptionXtx",
   tags: ["Etax"],
-  summary: "消費税申告書（本則）の e-Tax 申告等データ（XTX）出力（DB不要）",
+  summary: "消費税申告書（本則／簡易課税）の e-Tax 申告等データ（XTX）出力（DB不要）",
   request: {
     body: {
       required: true,
@@ -42,6 +50,64 @@ export const exportConsumptionXtxRoute = createRoute({
 
 export const exportConsumptionXtxHandler: RouteHandler<typeof exportConsumptionXtxRoute> = (c) => {
   const body = c.req.valid("json");
+  const year = body.period_from.slice(0, 4);
+
+  if (body.method === "simplified") {
+    const salesByCategory: SimplifiedConsumptionInput["salesByCategory"] = {};
+    if (body.sales_by_category) {
+      for (const [key, value] of Object.entries(body.sales_by_category)) {
+        salesByCategory[Number(key) as SimplifiedCategory] = {
+          incl10: value.incl_10,
+          incl8: value.incl_8,
+        };
+      }
+    } else {
+      salesByCategory[body.business_category ?? 5] = {
+        incl10: body.sales_incl_10,
+        incl8: body.sales_incl_8,
+      };
+    }
+    const simplifiedInput: SimplifiedConsumptionInput = {
+      salesByCategory,
+      nontaxableSales: body.nontaxable_sales,
+      exemptSales: body.exempt_sales,
+      returnsIncl10: body.returns_incl_10 ?? 0,
+      returnsIncl8: body.returns_incl_8 ?? 0,
+      badDebtRecoveryTax10: body.bad_debt_recovery_tax_10 ?? 0,
+      badDebtRecoveryTax8: body.bad_debt_recovery_tax_8 ?? 0,
+      badDebtTax10: body.bad_debt_tax_10 ?? 0,
+      badDebtTax8: body.bad_debt_tax_8 ?? 0,
+      interimNational: body.interim_national,
+      interimLocal: body.interim_local,
+    };
+    const simplifiedResult = computeSimplifiedConsumptionReturn(simplifiedInput);
+    let xtx: string;
+    try {
+      xtx = buildSimplifiedConsumptionXtx({
+        taxpayer: toTaxpayer(body.taxpayer),
+        periodFrom: body.period_from,
+        periodTo: body.period_to,
+        submissionDate: body.submission_date,
+        filingKind: body.filing_kind,
+        basePeriodSales: body.base_period_sales_thousands * 1000,
+        input: simplifiedInput,
+        result: simplifiedResult,
+        originalNational: body.original_national,
+        originalLocal: body.original_local,
+      });
+    } catch (e) {
+      throw new HTTPException(400, {
+        message: e instanceof Error ? e.message : "消費税XTXの生成に失敗しました",
+      });
+    }
+    const response: ExportConsumptionXtxResponse = {
+      filename: `etax-shohi-${year}-kanni${body.filing_kind === 3 ? "-shusei" : "-kakutei"}.xtx`,
+      xtx,
+      total_payable: simplifiedResult.totalPayable,
+    };
+    return c.json(response, 200);
+  }
+
   const input = {
     salesIncl10: body.sales_incl_10,
     salesIncl8: body.sales_incl_8,
@@ -72,7 +138,6 @@ export const exportConsumptionXtxHandler: RouteHandler<typeof exportConsumptionX
       message: e instanceof Error ? e.message : "消費税XTXの生成に失敗しました",
     });
   }
-  const year = body.period_from.slice(0, 4);
   const response: ExportConsumptionXtxResponse = {
     filename: `etax-shohi-${year}${body.filing_kind === 3 ? "-shusei" : "-kakutei"}.xtx`,
     xtx,
