@@ -6,6 +6,7 @@
  */
 import { asc } from "drizzle-orm";
 import { Db } from "../lib/db";
+import { ownerIdForWrite } from "../lib/tenantContext";
 import { FilingStatusResponse } from "../schemas/filingStatus";
 import { FilingStatusRow, filingStatusTable } from "./schema";
 
@@ -47,13 +48,14 @@ export async function upsertFilingStatusRow(
     .insert(filingStatusTable)
     .values({
       year,
+      ownerUserId: ownerIdForWrite(),
       confirmedAt: patch.confirmed ? now : null,
       calculatedAt: patch.calculated ? now : null,
       submittedAt: patch.submitted ? now : null,
       updatedAt: now,
     })
     .onConflictDoUpdate({
-      target: filingStatusTable.year,
+      target: [filingStatusTable.ownerUserId, filingStatusTable.year],
       set: {
         ...(patch.confirmed !== undefined ? { confirmedAt: patch.confirmed ? now : null } : {}),
         ...(patch.calculated !== undefined
