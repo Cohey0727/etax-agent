@@ -1,5 +1,7 @@
 # eTaxAgent サーバー（API + 画面配信）のコンテナイメージ。
 # モノレポ構成のままビルドし、画面（packages/web/dist）を同一ポートで配信する。
+# ランタイムは Bun のみ（アプリ本体は Python を使わない。python3 + lxml は
+# XSD 検証テスト専用の前提で、イメージには入れない）。
 FROM oven/bun:latest
 
 WORKDIR /app
