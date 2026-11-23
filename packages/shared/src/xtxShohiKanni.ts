@@ -21,7 +21,7 @@
 import { SIMPLIFIED_RATES, BusinessKind} from "./taxcalc";
 import { normalizeXtxTaxpayer} from "./taxpayerNormalize";
 import { XtxTaxpayer, amount, amountAlways, esc, kubun, ref} from "./xtx";
-import { buildShohiIt, exclFromIncl, floor100, floor1000} from "./xtxShohi";
+import { buildShohiIt, exclFromIncl, floor100, floor1000, nationalTaxFromIncl} from "./xtxShohi";
 
 const SOFT_NAME = "eTaxAgent";
 const SHOHI_NS = "http://xml.e-tax.nta.go.jp/XSD/shohi";
@@ -173,13 +173,6 @@ payableLocal: number;
 interimRefundLocal: number;
 /** 消費税及び地方消費税の合計（納付は正、還付は負） */
 totalPayable: number;
-}
-
-/** 税込金額 → 消費税額のうち国税分（10%: ×7.8/110、8%: ×6.24/108、円未満切捨て）。 */
-function nationalTaxFromIncl(incl: number, ratePercent: number): number {
-const i = Math.trunc(incl || 0);
-if (i <= 0) return 0;
-return ratePercent === 10? Math.floor((i * 78) / 1100): Math.floor((i * 624) / 10800);
 }
 
 /** 割合（%）を小数第1位まで（未満切捨て）に丸める。 */

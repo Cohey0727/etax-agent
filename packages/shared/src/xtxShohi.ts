@@ -235,6 +235,13 @@ if (i <= 0) return 0;
 return Math.floor((i * ratePercent) / (100 + ratePercent));
 }
 
+/** 税込金額 → 消費税額のうち国税分（10%: ×7.8/110、8%: ×6.24/108、円未満切捨て）。 */
+export function nationalTaxFromIncl(incl: number, ratePercent: number): number {
+const i = Math.trunc(incl || 0);
+if (i <= 0) return 0;
+return ratePercent === 10 ? Math.floor((i * 78) / 1100) : Math.floor((i * 624) / 10800);
+}
+
 /**
 * 本則課税の申告数値を計算する。
 * 課税売上割合が95%以上（かつ課税売上高5億円以下）なら全額控除、
@@ -414,7 +421,10 @@ return `<IT VR="1.0" id="IT">${items.join("")}</IT>`;
 // SHA010 申告書（一般用）
 // ---------------------------------------------------------------------------
 
-function buildSha010(data: ConsumptionXtxData): string {
+function buildSha010(
+data: ConsumptionXtxData,
+options?: { creditMethodKubun?: number; creditSubtotal?: number },
+): string {
 const r = data.result;
 const interimNational = Math.trunc(data.input.interimNational || 0);
 const interimLocal = Math.trunc(data.input.interimLocal || 0);
@@ -440,7 +450,7 @@ aaj.push(amountAlways("AAJ00010", r.taxBase));
 aaj.push(amountAlways("AAJ00020", r.outputTax));
 const creditBlock: string[] = [];
 creditBlock.push(amount("AAJ00050", r.inputTax));
-creditBlock.push(amountAlways("AAJ00080", r.inputTax));
+creditBlock.push(amountAlways("AAJ00080", options?.creditSubtotal ?? r.inputTax));
 aaj.push(`<AAJ00040>${creditBlock.join("")}</AAJ00040>`);
 aaj.push(amount("AAJ00090", r.refundNational));
 aaj.push(amountAlways("AAJ00100", r.diffNational));
@@ -478,7 +488,7 @@ aak.push(
 aak.push(amountAlways("AAK00130", r.payableNational + r.payableLocal));
 
 const aam: string[] = [];
-aam.push(kubun("AAM00020", r.fullDeduction? 3: 2));
+aam.push(kubun("AAM00020", options?.creditMethodKubun ?? (r.fullDeduction? 3: 2)));
 aam.push(amount("AAM00030", data.basePeriodSalesThousands));
 
 const page1 =
@@ -672,6 +682,371 @@ return (
 `<RSH0010 VR="26.0.0" id="RSH0010" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
 catalog +
 `<CONTENTS id="CONTENTS">${buildShohiIt(normalized, "RSH0010")}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
+`</RSH0010></DATA>`
+);
+}
+
+// ---------------------------------------------------------------------------
+// 2割特例（小規模事業者に係る税額控除に関する経過措置）
+// ---------------------------------------------------------------------------
+
+/** 2割特例申告の入力数値。金額はすべて円単位。仕入税額は使わない。 */
+export interface Special20ConsumptionInput {
+/** 課税売上（税込）・税率10%適用分 */
+salesIncl10: number;
+/** 課税売上（税込）・軽減税率8%適用分 */
+salesIncl8: number;
+/** 非課税売上（対価の額、そのまま） */
+nontaxableSales: number;
+/** 免税売上（対価の額、そのまま） */
+exemptSales: number;
+/** 売上対価の返還等の金額（税込）・税率10%適用分 */
+returnsIncl10: number;
+/** 売上対価の返還等の金額（税込）・軽減税率8%適用分 */
+returnsIncl8: number;
+/** 貸倒回収に係る消費税額（税額そのもの）・税率10%適用分 */
+badDebtRecoveryTax10: number;
+/** 貸倒回収に係る消費税額（税額そのもの）・軽減税率8%適用分 */
+badDebtRecoveryTax8: number;
+/** 貸倒れに係る税額（税額そのもの）・税率10%適用分 */
+badDebtTax10: number;
+/** 貸倒れに係る税額（税額そのもの）・軽減税率8%適用分 */
+badDebtTax8: number;
+/** 中間納付税額（国税）。なければ 0 */
+interimNational: number;
+/** 中間納付譲渡割額（地方）。なければ 0 */
+interimLocal: number;
+}
+
+/** 2割特例申告の計算結果（申告書・付表6への転記値）。 */
+export interface Special20ConsumptionReturn {
+/** 課税売上額（税抜）・10%分 */
+salesExcl10: number;
+/** 課税売上額（税抜）・8%分 */
+salesExcl8: number;
+/** 課税売上額（税抜）合計 */
+salesExcl: number;
+/** 資産の譲渡等の対価の額（税抜・非課税/免税込み） */
+totalSalesExcl: number;
+/** 課税標準額・10%分（千円未満切捨て） */
+base10: number;
+/** 課税標準額・8%分（千円未満切捨て） */
+base8: number;
+/** 課税標準額の合計 */
+taxBase: number;
+/** 消費税額・10%分 */
+outputTax10: number;
+/** 消費税額・8%分 */
+outputTax8: number;
+/** 消費税額の合計 */
+outputTax: number;
+/** 返還等対価に係る税額・10%分 */
+returnsTax10: number;
+/** 返還等対価に係る税額・8%分 */
+returnsTax8: number;
+/** 返還等対価に係る税額の合計 */
+returnsTax: number;
+/** 貸倒回収に係る消費税額の合計 */
+badDebtRecoveryTax: number;
+/** 貸倒れに係る税額の合計 */
+badDebtTax: number;
+/** 特別控除税額の基礎となる消費税額・10%分（付表6 ⑥） */
+basis10: number;
+/** 特別控除税額の基礎となる消費税額・8%分（付表6 ⑥） */
+basis8: number;
+/** 特別控除税額（控除対象仕入税額）・10%分 = 基礎 × 80% */
+specialCredit10: number;
+/** 特別控除税額（控除対象仕入税額）・8%分 */
+specialCredit8: number;
+/** 特別控除税額（控除対象仕入税額）の合計 */
+specialCredit: number;
+/** 控除税額小計（特別控除＋返還等＋貸倒れ） */
+creditSubtotal: number;
+/** 控除不足還付税額（国税。納付の場合は 0） */
+refundNational: number;
+/** 差引税額（国税・100円未満切捨て。納付の場合） */
+diffNational: number;
+/** 納付税額（国税） */
+payableNational: number;
+/** 中間納付還付税額（国税） */
+interimRefundNational: number;
+/** 譲渡割額の還付額（地方。納付の場合は 0） */
+refundLocal: number;
+/** 譲渡割額（地方・中間納付控除前、100円未満切捨て） */
+localTaxGross: number;
+/** 納付譲渡割額（地方・100円未満切捨て） */
+payableLocal: number;
+/** 中間納付還付譲渡割額（地方） */
+interimRefundLocal: number;
+/** 消費税及び地方消費税の合計（納付は正、還付は負） */
+totalPayable: number;
+}
+
+/**
+* 2割特例の申告数値を計算する。控除対象仕入税額は、売上税額
+* （貸倒回収を加え返還等を引いた基礎税額）の 80%（付表6の手順）。
+*/
+export function computeSpecial20ConsumptionReturn(
+input: Special20ConsumptionInput,
+): Special20ConsumptionReturn {
+const salesExcl10 = exclFromIncl(input.salesIncl10, 10);
+const salesExcl8 = exclFromIncl(input.salesIncl8, 8);
+const salesExcl = salesExcl10 + salesExcl8;
+const totalSalesExcl =
+salesExcl + Math.trunc(input.nontaxableSales || 0) + Math.trunc(input.exemptSales || 0);
+const base10 = floor1000(salesExcl10);
+const base8 = floor1000(salesExcl8);
+const outputTax10 = Math.floor(base10 * 0.078);
+const outputTax8 = Math.floor(base8 * 0.0624);
+const outputTax = outputTax10 + outputTax8;
+
+const returnsTax10 = nationalTaxFromIncl(input.returnsIncl10, 10);
+const returnsTax8 = nationalTaxFromIncl(input.returnsIncl8, 8);
+const returnsTax = returnsTax10 + returnsTax8;
+const badDebtRecoveryTax10 = Math.trunc(input.badDebtRecoveryTax10 || 0);
+const badDebtRecoveryTax8 = Math.trunc(input.badDebtRecoveryTax8 || 0);
+const badDebtRecoveryTax = badDebtRecoveryTax10 + badDebtRecoveryTax8;
+const badDebtTax10 = Math.trunc(input.badDebtTax10 || 0);
+const badDebtTax8 = Math.trunc(input.badDebtTax8 || 0);
+const badDebtTax = badDebtTax10 + badDebtTax8;
+
+const basis10 = Math.max(outputTax10 + badDebtRecoveryTax10 - returnsTax10, 0);
+const basis8 = Math.max(outputTax8 + badDebtRecoveryTax8 - returnsTax8, 0);
+const specialCredit10 = Math.floor((basis10 * 80) / 100);
+const specialCredit8 = Math.floor((basis8 * 80) / 100);
+const specialCredit = specialCredit10 + specialCredit8;
+const creditSubtotal = specialCredit + returnsTax + badDebtTax;
+
+const diffRaw = outputTax + badDebtRecoveryTax - creditSubtotal;
+const interimNational = Math.trunc(input.interimNational || 0);
+const interimLocal = Math.trunc(input.interimLocal || 0);
+
+let refundNational = 0;
+let diffNational = 0;
+let payableNational = 0;
+let interimRefundNational = 0;
+let refundLocal = 0;
+let localTaxGross = 0;
+let payableLocal = 0;
+let interimRefundLocal = 0;
+
+if (diffRaw >= 0) {
+diffNational = floor100(diffRaw);
+if (diffNational >= interimNational) {
+payableNational = floor100(diffNational - interimNational);
+} else {
+interimRefundNational = floor100(interimNational - diffNational);
+}
+const localRaw = Math.floor(diffNational * (22 / 78));
+localTaxGross = floor100(localRaw);
+if (localRaw >= interimLocal) {
+payableLocal = floor100(localRaw - interimLocal);
+} else {
+interimRefundLocal = floor100(interimLocal - localRaw);
+}
+} else {
+refundNational = -diffRaw;
+refundLocal = Math.floor(refundNational * (22 / 78));
+if (interimNational > 0) interimRefundNational = floor100(interimNational);
+if (interimLocal > 0) interimRefundLocal = floor100(interimLocal);
+}
+
+const totalPayable =
+payableNational +
+payableLocal -
+refundNational -
+refundLocal -
+interimRefundNational -
+interimRefundLocal;
+
+return {
+salesExcl10,
+salesExcl8,
+salesExcl,
+totalSalesExcl,
+base10,
+base8,
+taxBase: base10 + base8,
+outputTax10,
+outputTax8,
+outputTax,
+returnsTax10,
+returnsTax8,
+returnsTax,
+badDebtRecoveryTax,
+badDebtTax,
+basis10,
+basis8,
+specialCredit10,
+specialCredit8,
+specialCredit,
+creditSubtotal,
+refundNational,
+diffNational,
+payableNational,
+interimRefundNational,
+refundLocal,
+localTaxGross,
+payableLocal,
+interimRefundLocal,
+totalPayable,
+};
+}
+
+/** XTX生成の入力一式（2割特例）。 */
+export interface Special20ConsumptionXtxData {
+taxpayer: XtxTaxpayer;
+/** 課税期間の開始日 "2025-01-01" */
+periodFrom: string;
+/** 課税期間の終了日 "2025-12-31" */
+periodTo: string;
+/** 提出年月日 "2026-11-15" */
+submissionDate: string;
+/** 申告の種類: 1=確定、3=修正確定 */
+filingKind: 1 | 3;
+/** 基準期間の課税売上高（千円単位） */
+basePeriodSalesThousands: number;
+input: Special20ConsumptionInput;
+result: Special20ConsumptionReturn;
+/** 修正申告: 既確定税額（国税）。確定申告なら null */
+originalNational: number | null;
+/** 修正申告: 既確定譲渡割額。確定申告なら null */
+originalLocal: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// SHB070 付表6（税率別消費税額計算表・2割特例用）
+// ---------------------------------------------------------------------------
+
+function buildShb070(data: Special20ConsumptionXtxData): string {
+const r = data.result;
+const badDebtRecovery10 = Math.trunc(data.input.badDebtRecoveryTax10 || 0);
+const badDebtRecovery8 = Math.trunc(data.input.badDebtRecoveryTax8 || 0);
+const badDebtTax10 = Math.trunc(data.input.badDebtTax10 || 0);
+const badDebtTax8 = Math.trunc(data.input.badDebtTax8 || 0);
+const parts: string[] = [];
+parts.push(
+`<AYA00000><AYA00010>${ref("AYA00020", "KAZEI_KIKAN_FROM")}${ref("AYA00030", "KAZEI_KIKAN_TO")}</AYA00010>${ref("AYA00040", "NOZEISHA_NM")}</AYA00000>`,
+);
+parts.push(
+`<AYB00000>` +
+`<AYB00010>${amount("AYB00020", r.salesExcl8)}${amount("AYB00030", r.salesExcl10)}${amountAlways("AYB00040", r.salesExcl)}</AYB00010>` +
+`<AYB00050>${amount("AYB00060", r.base8)}${amount("AYB00070", r.base10)}${amountAlways("AYB00080", r.taxBase)}</AYB00050>` +
+`<AYB00090>${amount("AYB00100", r.outputTax8)}${amount("AYB00110", r.outputTax10)}${amountAlways("AYB00120", r.outputTax)}</AYB00090>` +
+`<AYB00130>${amount("AYB00140", badDebtRecovery8)}${amount("AYB00150", badDebtRecovery10)}${amount("AYB00160", r.badDebtRecoveryTax)}</AYB00130>` +
+`<AYB00170>${amount("AYB00180", r.returnsTax8)}${amount("AYB00190", r.returnsTax10)}${amount("AYB00200", r.returnsTax)}</AYB00170>` +
+`<AYB00210>${amount("AYB00220", r.basis8)}${amount("AYB00230", r.basis10)}${amountAlways("AYB00240", r.basis8 + r.basis10)}</AYB00210>` +
+`</AYB00000>`,
+);
+parts.push(
+`<AYC00000><AYC00010>${amount("AYC00020", r.specialCredit8)}${amount("AYC00030", r.specialCredit10)}${amountAlways("AYC00040", r.specialCredit)}</AYC00010></AYC00000>`,
+);
+parts.push(
+`<AYD00000><AYD00010>${amount("AYD00020", badDebtTax8)}${amount("AYD00030", badDebtTax10)}${amount("AYD00040", r.badDebtTax)}</AYD00010></AYD00000>`,
+);
+return (
+`<SHB070 VR="1.0" id="SHB070" page="1" sakuseiDay="${esc(data.submissionDate)}" ` +
+`sakuseiNM="${esc(data.taxpayer.name)}" softNM="${SOFT_NAME}" xmlns="${SHOHI_NS}">` +
+parts.join("") +
+`</SHB070>`
+);
+}
+
+/**
+* 消費税申告（2割特例）の XTX を生成する。手続は本則と同じ RSH0010 で、
+* 申告書 SHA010 の控除税額の計算方法（AAM00020）に 8（2割特例）を立て、
+* 付表1-3/2-3 の代わりに付表6（SHB070）を組み込む。
+* 生成物は署名なしの組み込み用データで、送信は e-Tax 側で本人が行う。
+*/
+export function buildSpecial20ConsumptionXtx(data: Special20ConsumptionXtxData): string {
+const taxpayer = normalizeXtxTaxpayer(data.taxpayer, {
+submissionDate: data.submissionDate,
+periodFrom: data.periodFrom,
+periodTo: data.periodTo,
+filingKind: data.filingKind,
+});
+const r = data.result;
+// SHA010 の生成は本則と共用する。控除対象仕入税額には特別控除税額を渡す。
+const shaData: ConsumptionXtxData = {
+taxpayer,
+periodFrom: data.periodFrom,
+periodTo: data.periodTo,
+submissionDate: data.submissionDate,
+filingKind: data.filingKind,
+basePeriodSalesThousands: data.basePeriodSalesThousands,
+input: {
+salesIncl10: data.input.salesIncl10,
+salesIncl8: data.input.salesIncl8,
+nontaxableSales: data.input.nontaxableSales,
+exemptSales: data.input.exemptSales,
+purchasesIncl10: 0,
+purchasesIncl8: 0,
+interimNational: data.input.interimNational,
+interimLocal: data.input.interimLocal,
+},
+result: {
+salesExcl10: r.salesExcl10,
+salesExcl8: r.salesExcl8,
+salesExcl: r.salesExcl,
+totalSalesExcl: r.totalSalesExcl,
+ratio: 100,
+fullDeduction: false,
+base10: r.base10,
+base8: r.base8,
+taxBase: r.taxBase,
+outputTax10: r.outputTax10,
+outputTax8: r.outputTax8,
+outputTax: r.outputTax,
+inputTaxRaw10: 0,
+inputTaxRaw8: 0,
+inputTax10: r.specialCredit10,
+inputTax8: r.specialCredit8,
+inputTax: r.specialCredit,
+diffRaw: r.outputTax + r.badDebtRecoveryTax - r.creditSubtotal,
+refundNational: r.refundNational,
+diffNational: r.diffNational,
+payableNational: r.payableNational,
+interimRefundNational: r.interimRefundNational,
+refundLocal: r.refundLocal,
+localTaxGross: r.localTaxGross,
+payableLocal: r.payableLocal,
+interimRefundLocal: r.interimRefundLocal,
+totalPayable: r.totalPayable,
+},
+originalNational: data.originalNational,
+originalLocal: data.originalLocal,
+};
+const normalized: Special20ConsumptionXtxData = { ...data, taxpayer };
+const forms: { id: string; xml: string }[] = [
+{
+id: "SHA010",
+xml: buildSha010(shaData, {
+creditMethodKubun: 8,
+creditSubtotal: r.creditSubtotal,
+}),
+},
+{ id: "SHB070", xml: buildShb070(normalized) },
+];
+const catalog =
+`<CATALOG id="CATALOG">` +
+`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
+`<rdf:Description ID="REPORT">` +
+`<SEND_DATA/>` +
+`<IT_SEC/>` +
+`<FORM_SEC><rdf:Seq>${forms.map((f) => `<rdf:li>${f.id}</rdf:li>`).join("")}</rdf:Seq></FORM_SEC>` +
+`<TENPU_SEC/>` +
+`<XBRL_SEC/>` +
+`<XBRL2_1_SEC/>` +
+`<SOFUSHO_SEC/>` +
+`<ATTACH_SEC/>` +
+`<CSV_SEC/>` +
+`</rdf:Description></rdf:RDF></CATALOG>`;
+return (
+`<?xml version="1.0" encoding="UTF-8"?>\n` +
+`<DATA id="DATA" xmlns="${SHOHI_NS}">` +
+`<RSH0010 VR="26.0.0" id="RSH0010" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
+catalog +
+`<CONTENTS id="CONTENTS">${buildShohiIt(shaData, "RSH0010")}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
 `</RSH0010></DATA>`
 );
 }

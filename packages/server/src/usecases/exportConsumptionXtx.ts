@@ -9,10 +9,13 @@
 import {
   SimplifiedCategory,
   SimplifiedConsumptionInput,
+  Special20ConsumptionInput,
   buildConsumptionXtx,
   buildSimplifiedConsumptionXtx,
+  buildSpecial20ConsumptionXtx,
   computeConsumptionReturn,
   computeSimplifiedConsumptionReturn,
+  computeSpecial20ConsumptionReturn,
 } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
@@ -104,6 +107,49 @@ export const exportConsumptionXtxHandler: RouteHandler<typeof exportConsumptionX
       filename: `etax-shohi-${year}-kanni${body.filing_kind === 3 ? "-shusei" : "-kakutei"}.xtx`,
       xtx,
       total_payable: simplifiedResult.totalPayable,
+    };
+    return c.json(response, 200);
+  }
+
+  if (body.method === "special20") {
+    const specialInput: Special20ConsumptionInput = {
+      salesIncl10: body.sales_incl_10,
+      salesIncl8: body.sales_incl_8,
+      nontaxableSales: body.nontaxable_sales,
+      exemptSales: body.exempt_sales,
+      returnsIncl10: body.returns_incl_10 ?? 0,
+      returnsIncl8: body.returns_incl_8 ?? 0,
+      badDebtRecoveryTax10: body.bad_debt_recovery_tax_10 ?? 0,
+      badDebtRecoveryTax8: body.bad_debt_recovery_tax_8 ?? 0,
+      badDebtTax10: body.bad_debt_tax_10 ?? 0,
+      badDebtTax8: body.bad_debt_tax_8 ?? 0,
+      interimNational: body.interim_national,
+      interimLocal: body.interim_local,
+    };
+    const specialResult = computeSpecial20ConsumptionReturn(specialInput);
+    let xtx: string;
+    try {
+      xtx = buildSpecial20ConsumptionXtx({
+        taxpayer: toTaxpayer(body.taxpayer),
+        periodFrom: body.period_from,
+        periodTo: body.period_to,
+        submissionDate: body.submission_date,
+        filingKind: body.filing_kind,
+        basePeriodSalesThousands: body.base_period_sales_thousands,
+        input: specialInput,
+        result: specialResult,
+        originalNational: body.original_national,
+        originalLocal: body.original_local,
+      });
+    } catch (e) {
+      throw new HTTPException(400, {
+        message: e instanceof Error ? e.message : "消費税XTXの生成に失敗しました",
+      });
+    }
+    const response: ExportConsumptionXtxResponse = {
+      filename: `etax-shohi-${year}-special20${body.filing_kind === 3 ? "-shusei" : "-kakutei"}.xtx`,
+      xtx,
+      total_payable: specialResult.totalPayable,
     };
     return c.json(response, 200);
   }

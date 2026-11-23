@@ -23,11 +23,13 @@ import {
   XtxTaxpayer,
   buildConsumptionXtx,
   buildSimplifiedConsumptionXtx,
+  buildSpecial20ConsumptionXtx,
   buildXtxFiling,
   computeConsumptionReturn,
   computeCorrectedFigures,
   computeIncomeTax,
   computeSimplifiedConsumptionReturn,
+  computeSpecial20ConsumptionReturn,
 } from "../src";
 
 const XSD_DIR = process.env.ETAX_XSD_DIR ?? "";
@@ -149,6 +151,35 @@ function kanniSample(): string {
   });
 }
 
+function special20Sample(): string {
+  const input = {
+    salesIncl10: 15_352_564,
+    salesIncl8: 0,
+    nontaxableSales: 0,
+    exemptSales: 0,
+    returnsIncl10: 0,
+    returnsIncl8: 0,
+    badDebtRecoveryTax10: 0,
+    badDebtRecoveryTax8: 0,
+    badDebtTax10: 0,
+    badDebtTax8: 0,
+    interimNational: 0,
+    interimLocal: 0,
+  };
+  return buildSpecial20ConsumptionXtx({
+    taxpayer: TAXPAYER,
+    periodFrom: "2025-01-01",
+    periodTo: "2025-12-31",
+    submissionDate: "2026-11-15",
+    filingKind: 1,
+    basePeriodSalesThousands: 0,
+    input,
+    result: computeSpecial20ConsumptionReturn(input),
+    originalNational: null,
+    originalLocal: null,
+  });
+}
+
 describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => {
   maybe("所得税 2023〜2026 と消費税の生成物が公式XSDを通る", () => {
     const dir = mkdtempSync(join(tmpdir(), "xtx-xsd-"));
@@ -157,6 +188,7 @@ describe("公式XMLスキーマ検証（ETAX_XSD_DIR 設定時のみ）", () => 
       ["shotoku2024.xtx", incomeSample(2024), "shotoku/RKO0010-240.xsd"],
       ["shotoku2025.xtx", incomeSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
+      ["shohiSpecial20.xtx", special20Sample(), "shohi/RSH0010-260.xsd"],
       ["shohiKanni2027.xtx", kanniSample(), "shohi/RSH0030-260.xsd"],
     ];
     // 2026年分の所得税XSD（RKO0010-260.xsd）は令和8年9月版の仕様書セット

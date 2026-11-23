@@ -26,10 +26,12 @@ import {
   blueDeduction,
   buildConsumptionXtx,
   buildSimplifiedConsumptionXtx,
+  buildSpecial20ConsumptionXtx,
   buildXtxFiling,
   categoryTotals,
   computeConsumptionReturn,
   computeSimplifiedConsumptionReturn,
+  computeSpecial20ConsumptionReturn,
   computeCorrectedFigures,
   computeIncomeTax,
   consumptionTax,
@@ -291,8 +293,8 @@ export const MCP_TOOLS: McpToolDef[] = [
       properties: {
         method: {
           type: "string",
-          enum: ["standard", "simplified"],
-          description: "計算方式: standard=本則（既定）、simplified=簡易課税",
+          enum: ["standard", "simplified", "special20"],
+          description: "計算方式: standard=本則（既定）、simplified=簡易課税、special20=2割特例",
         },
         business_category: {
           type: "integer",
@@ -739,6 +741,42 @@ export async function dispatchMcpTool(
             method: "simplified",
             business_category: category,
             input_tax: simplifiedResult.inputTax,
+            xtx,
+          });
+        }
+        if (args["method"] === "special20") {
+          const specialInput = {
+            salesIncl10: numArg(args, "sales_incl_10"),
+            salesIncl8: numArg(args, "sales_incl_8"),
+            nontaxableSales: numArg(args, "nontaxable_sales"),
+            exemptSales: numArg(args, "exempt_sales"),
+            returnsIncl10: numArg(args, "returns_incl_10"),
+            returnsIncl8: numArg(args, "returns_incl_8"),
+            badDebtRecoveryTax10: numArg(args, "bad_debt_recovery_tax_10"),
+            badDebtRecoveryTax8: numArg(args, "bad_debt_recovery_tax_8"),
+            badDebtTax10: numArg(args, "bad_debt_tax_10"),
+            badDebtTax8: numArg(args, "bad_debt_tax_8"),
+            interimNational: numArg(args, "interim_national"),
+            interimLocal: numArg(args, "interim_local"),
+          };
+          const specialResult = computeSpecial20ConsumptionReturn(specialInput);
+          const xtx = buildSpecial20ConsumptionXtx({
+            taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
+            periodFrom,
+            periodTo,
+            submissionDate,
+            filingKind: filingKind as 1 | 3,
+            basePeriodSalesThousands: numArg(args, "base_period_sales_thousands"),
+            input: specialInput,
+            result: specialResult,
+            originalNational: nullableNumArg(args, "original_national"),
+            originalLocal: nullableNumArg(args, "original_local"),
+          });
+          return textResult({
+            filename: `etax-shohi-${periodFrom.slice(0, 4)}-special20${filingKind === 3 ? "-shusei" : "-kakutei"}.xtx`,
+            total_payable: specialResult.totalPayable,
+            method: "special20",
+            special_credit: specialResult.specialCredit,
             xtx,
           });
         }
