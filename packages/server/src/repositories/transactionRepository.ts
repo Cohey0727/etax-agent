@@ -252,9 +252,9 @@ export async function replaceYearTransactionRows(
     taxCategory: string;
   }[],
 ): Promise<TransactionRow[]> {
-  // better-sqlite3 ドライバではトランザクションのコールバックは同期実行する
-  // （await を挟むと "Transaction function cannot return a promise" になる）。
-  return db.transaction((tx) => {
+  // PostgreSQL ドライバのトランザクションは非同期実行する
+  // （コールバック内のクエリはすべて await する）。
+  return db.transaction(async (tx) => {
     const now = new Date();
     const owner = currentUserId();
     const yearConditions = [
@@ -262,41 +262,35 @@ export async function replaceYearTransactionRows(
       isNull(transactionsTable.deletedAt),
     ];
     if (owner !== undefined) yearConditions.push(eq(transactionsTable.ownerUserId, owner));
-    const beforeRows = tx
+    const beforeRows = await tx
       .select()
       .from(transactionsTable)
-      .where(and(...yearConditions))
-      .all();
-    tx.update(transactionsTable)
+      .where(and(...yearConditions));
+    await tx
+      .update(transactionsTable)
       .set({ deletedAt: now, updatedAt: now })
-      .where(and(...yearConditions))
-      .run();
+      .where(and(...yearConditions));
     for (const beforeRow of beforeRows) {
-      tx.insert(transactionHistoryTable)
-        .values({
-          transactionId: beforeRow.id,
-          action: "deleted",
-          before: transactionToApi(beforeRow),
-          after: { ...transactionToApi(beforeRow), deleted_at: now.toISOString(), updated_at: now.toISOString() },
-        })
-        .run();
+      await tx.insert(transactionHistoryTable).values({
+        transactionId: beforeRow.id,
+        action: "deleted",
+        before: transactionToApi(beforeRow),
+        after: { ...transactionToApi(beforeRow), deleted_at: now.toISOString(), updated_at: now.toISOString() },
+      });
     }
     if (values.length === 0) return [];
     const ownerUserId = ownerIdForWrite();
-    const inserted = tx
+    const inserted = await tx
       .insert(transactionsTable)
       .values(values.map((v) => ({ ...v, ownerUserId })))
-      .returning()
-      .all();
+      .returning();
     for (const row of inserted) {
-      tx.insert(transactionHistoryTable)
-        .values({
-          transactionId: row.id,
-          action: "created",
-          before: null,
-          after: transactionToApi(row),
-        })
-        .run();
+      await tx.insert(transactionHistoryTable).values({
+        transactionId: row.id,
+        action: "created",
+        before: null,
+        after: transactionToApi(row),
+      });
     }
     return inserted.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
   });
