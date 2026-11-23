@@ -6,7 +6,8 @@ import { Transaction } from "@etax/shared";
 import { Db } from "../lib/db";
 import { CsvMapping } from "../schemas/importCsv";
 import { ImportRecordResponse } from "../schemas/importRecord";
-import { ImportRow, importsTable, transactionsTable } from "./schema";
+import { ImportRow, importsTable, transactionHistoryTable, transactionsTable } from "./schema";
+import { transactionToApi } from "./transactionRepository";
 
 /** DB行を API レスポンス形式に変換する（createdAt は ISO 文字列にする）。 */
 export function importToApi(row: ImportRow): ImportRecordResponse {
@@ -49,16 +50,28 @@ export async function createImportWithTransactions(
     .returning({ id: importsTable.id });
   const importId = imp?.id;
   if (input.transactions.length > 0 && importId !== undefined) {
-    await db.insert(transactionsTable).values(
-      input.transactions.map((t) => ({
-        date: t.date,
-        description: t.description,
-        amount: t.amount,
-        account: t.account,
-        category: t.category,
-        incomeType: t.income_type,
-        taxCategory: t.tax_category,
-        importId,
+    const inserted = await db
+      .insert(transactionsTable)
+      .values(
+        input.transactions.map((t) => ({
+          date: t.date,
+          description: t.description,
+          amount: t.amount,
+          account: t.account,
+          category: t.category,
+          incomeType: t.income_type,
+          taxCategory: t.tax_category,
+          importId,
+        })),
+      )
+      .returning();
+    // 取込で登録した取引も変更履歴（登録）を残す（電子帳簿保存法の履歴要件）。
+    await db.insert(transactionHistoryTable).values(
+      inserted.map((row) => ({
+        transactionId: row.id,
+        action: "created",
+        before: null,
+        after: transactionToApi(row) as unknown as Record<string, unknown>,
       })),
     );
   }

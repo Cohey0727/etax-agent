@@ -14,6 +14,10 @@ import {
   exportLedgerPdfHandler,
   exportLedgerPdfRoute,
 } from "../usecases/exportLedgerPdf";
+import {
+  getTransactionHistoryHandler,
+  getTransactionHistoryRoute,
+} from "../usecases/getTransactionHistory";
 import { listTransactionsHandler, listTransactionsRoute } from "../usecases/listTransactions";
 import {
   replaceYearTransactionsHandler,
@@ -31,5 +35,6 @@ app.openapi(createTransactionRoute, createTransactionHandler);
 app.openapi(replaceYearTransactionsRoute, replaceYearTransactionsHandler);
 app.openapi(updateTransactionRoute, updateTransactionHandler);
 app.openapi(deleteTransactionRoute, deleteTransactionHandler);
+app.openapi(getTransactionHistoryRoute, getTransactionHistoryHandler);
 
 export default app;

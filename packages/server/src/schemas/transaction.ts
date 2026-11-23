@@ -22,6 +22,9 @@ export const TransactionSchema = z
     tax_category: z.string(),
     import_id: z.number().nullable(),
     created_at: z.string(),
+    updated_at: z.string(),
+    /** 論理削除の日時。削除済みのときだけ値が入る（通常の一覧では返らない） */
+    deleted_at: z.string().nullable(),
   })
   .openapi("Transaction");
 
@@ -121,4 +124,30 @@ export const ReplaceYearTransactionsRequestSchema = z
 
 export type ReplaceYearTransactionsRequest = z.infer<
   typeof ReplaceYearTransactionsRequestSchema
+>;
+
+/** 取引の変更履歴1件（登録・更新・削除の記録）。 */
+export const TransactionHistoryEntrySchema = z
+  .object({
+    id: z.number(),
+    transaction_id: z.number(),
+    /** created / updated / deleted */
+    action: z.string(),
+    before: TransactionSchema.nullable(),
+    after: TransactionSchema.nullable(),
+    created_at: z.string(),
+  })
+  .openapi("TransactionHistoryEntry");
+
+export type TransactionHistoryEntryResponse = z.infer<typeof TransactionHistoryEntrySchema>;
+
+export const ListTransactionHistoryResponseSchema = z
+  .object({
+    count: z.number(),
+    history: z.array(TransactionHistoryEntrySchema),
+  })
+  .openapi("TransactionHistoryList");
+
+export type ListTransactionHistoryResponse = z.infer<
+  typeof ListTransactionHistoryResponseSchema
 >;
