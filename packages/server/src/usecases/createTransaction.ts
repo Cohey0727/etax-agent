@@ -10,7 +10,10 @@ import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import { insertTransactionRow, transactionToApi } from "../repositories/transactionRepository";
+import {
+  insertTransactionRowWith,
+  transactionToApi,
+} from "../repositories/transactionRepository";
 import { linkReceiptRow } from "../repositories/receiptRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -70,30 +73,31 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
     body.fiscal_year <= 2100
       ? body.fiscal_year
       : Number(date.slice(0, 4));
+  // 取引の登録と証憑の同時紐付けは1トランザクションで行う
+  // （紐付けだけ失敗して取引が残る不整合を防ぐ。Issue #11）。
+  const amount = Math.trunc(body.amount);
   let row;
   try {
-    row = await insertTransactionRow(db, {
-      date,
-      fiscalYear,
-      description: body.description ?? "",
-      amount: Math.trunc(body.amount),
-      account: body.account ?? "",
-      category: body.category ? body.category : "未分類",
-      incomeType: body.income_type ?? "other",
-      taxCategory: body.tax_category ?? "",
+    row = await db.transaction(async (tx) => {
+      const inserted = await insertTransactionRowWith(tx, {
+        date,
+        fiscalYear,
+        description: body.description ?? "",
+        amount,
+        account: body.account ?? "",
+        category: body.category ? body.category : "未分類",
+        incomeType: body.income_type ?? "other",
+        taxCategory: body.tax_category ?? "",
+      });
+      if (inserted && body.receipt_file_ids) {
+        for (const fileId of body.receipt_file_ids) {
+          await linkReceiptRow(tx, fileId, inserted.id);
+        }
+      }
+      return inserted;
     });
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
-  // 証憑の同時紐付け（領収書から作った取引など）
-  if (row && body.receipt_file_ids && body.receipt_file_ids.length > 0) {
-    try {
-      for (const fileId of body.receipt_file_ids) {
-        await linkReceiptRow(db, fileId, row.id);
-      }
-    } catch (e) {
-      throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-    }
   }
   const response: SingleTransactionResponse = { transaction: row ? transactionToApi(row) : null };
   return c.json(response, 201);

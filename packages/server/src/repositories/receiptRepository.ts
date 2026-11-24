@@ -6,7 +6,7 @@
  * link / unlink で付け替える。行 → API 形式への変換もここで行う。
  */
 import { and, desc, eq } from "drizzle-orm";
-import { Db } from "../lib/db";
+import { Db, DbOrTx } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { AnalyzeReceiptResponse, ReceiptResponse } from "../schemas/receipt";
 import { ReceiptRow, receiptsTable } from "./schema";
@@ -26,7 +26,7 @@ export function receiptToApi(row: ReceiptRow): ReceiptResponse {
 
 /** fileId の行を所有者を問わず取得する（所有権判定専用。通常の読み取りには使わない）。 */
 async function getReceiptRowByFileIdUnscoped(
-  db: Db,
+  db: DbOrTx,
   fileId: string,
 ): Promise<ReceiptRow | null> {
   const rows = await db.select().from(receiptsTable).where(eq(receiptsTable.fileId, fileId));
@@ -101,7 +101,7 @@ export async function listReceiptRowsForTransaction(
  * （Base64 経路など解析を経ていない fileId でも紐付けられるように）。
  */
 export async function linkReceiptRow(
-  db: Db,
+  db: DbOrTx,
   fileId: string,
   transactionId: number,
 ): Promise<ReceiptRow | null> {

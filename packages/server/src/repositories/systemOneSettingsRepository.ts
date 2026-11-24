@@ -8,7 +8,8 @@
  * マルチテナント分離のため、ファイルと上書きは所有者ごとに分ける
  * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { writeFileAtomic } from "../lib/atomicFile";
 import {
   serverDataDir,
   setSystemOneOverrides,
@@ -63,6 +64,6 @@ export async function saveSystemOneSettings(
 ): Promise<void> {
   const ownerId = ownerIdForWrite();
   await mkdir(serverDataDir(), { recursive: true });
-  await writeFile(settingsPath(ownerId), JSON.stringify(overrides, null, 2), "utf-8");
+  await writeFileAtomic(settingsPath(ownerId), JSON.stringify(overrides, null, 2));
   setSystemOneOverrides(overrides);
 }

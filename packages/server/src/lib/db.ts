@@ -12,6 +12,12 @@ import * as schema from "../repositories/schema";
 
 export type Db = NodePgDatabase<typeof schema>;
 
+/** db.transaction のコールバックに渡されるトランザクション handle。 */
+export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** DB 本体でもトランザクション内でも実行できる関数の受け口。 */
+export type DbOrTx = Db | DbTx;
+
 let cached: Db | null = null;
 let attempted = false;
 

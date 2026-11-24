@@ -9,7 +9,8 @@
  * マルチテナント分離のため、ファイルは所有者ごとに分ける
  * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { writeFileAtomic } from "../lib/atomicFile";
 import { normalizeSearchText } from "@etax/shared";
 import { serverDataDir } from "../lib/config";
 import { ownerIdForWrite } from "../lib/tenantContext";
@@ -66,7 +67,7 @@ async function saveClassificationHistory(
   records: ClassificationHistoryRecord[],
 ): Promise<ClassificationHistoryRecord[]> {
   await mkdir(serverDataDir(), { recursive: true });
-  await writeFile(historyPath(), JSON.stringify(records, null, 2), "utf-8");
+  await writeFileAtomic(historyPath(), JSON.stringify(records, null, 2));
   return records;
 }
 
