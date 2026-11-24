@@ -11,7 +11,7 @@
     "db:generate": "cd packages/server && bun x drizzle-kit generate",
     "db:migrate": "cd packages/server && bun x drizzle-kit migrate",
     "dev": "sh -c \"(cd packages/server && bun run dev) & (cd packages/web && bun run dev) & wait\"",
-    "test": "bun test packages/shared packages/server packages/web",
+    "test": "bun test packages/shared packages/server packages/web packages/cli",
     "typecheck": "bun x tsc --noEmit -p packages/shared/tsconfig.json && bun x tsc --noEmit -p packages/server/tsconfig.json && bun x tsc --noEmit -p packages/web/tsconfig.json && bun x tsc --noEmit -p packages/cli/tsconfig.json"
   },
   "type": "module",

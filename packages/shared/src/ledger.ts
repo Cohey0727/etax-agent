@@ -16,6 +16,7 @@
  * classifyTransactionRow に一元化し、サーバー側も同じ関数を使う。
  */
 
+import { normalizeSearchText } from "./text";
 import { VALID_INCOME_TYPES, type IncomeType, type Transaction } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -46,9 +47,12 @@ export function suggestCategory(
   description: string,
   rules: CategoryRule[] = CATEGORY_RULES,
 ): string | null {
+  // 照合は正規化して行う（小文字 aws・全角英数・半角カナでも当たるように。
+  // 生の includes では表記ゆれでルールにヒットしない）。
+  const normalizedDescription = normalizeSearchText(description);
   for (const rule of rules) {
     for (const kw of rule.keywords) {
-      if (kw && description.includes(kw)) return rule.category;
+      if (kw && normalizedDescription.includes(normalizeSearchText(kw))) return rule.category;
     }
   }
   return null;
@@ -206,7 +210,9 @@ export function parseCsv(text: string): string[][] {
       i += 1;
       continue;
     }
-    if (ch === '"') {
+    if (ch === '"' && cell === "") {
+      // 引用符はセルの先頭でのみ開始する。セル途中の " （例: 14" MacBook）を
+      // 引用開始とみなすと、以降のカンマ・改行を飲み込んで行が壊れる。
       inQuotes = true;
       i += 1;
       continue;
@@ -264,6 +270,11 @@ export function importCsvText(text: string, rules: CategoryRule[] = CATEGORY_RUL
     const j = idx(name);
     return j >= 0 ? (row[j] ?? "") : "";
   };
+  /** 列の有無を区別する取得。列自体が無ければ null（空欄とは意味が違う）。 */
+  const colOrNull = (row: string[], name: string): string | null => {
+    const j = idx(name);
+    return j >= 0 ? (row[j] ?? "") : null;
+  };
 
   const transactions: Transaction[] = [];
   for (let r = 1; r < rows.length; r++) {
@@ -274,8 +285,19 @@ export function importCsvText(text: string, rules: CategoryRule[] = CATEGORY_RUL
     if (!DATE_RE.test(dateRaw)) {
       throw new Error(`${lineNo}行目 date が YYYY-MM-DD 形式ではありません: ${dateRaw}`);
     }
-    const amountRaw = col(row, "amount").replace(/,/g, "").replace(/¥/g, "").trim();
-    const amount = Number(amountRaw);
+    // 形式だけでなく実在する日付かも検証する（2024-02-30 等を通さない）。
+    const [yy, mm, dd] = dateRaw.split("-").map(Number);
+    const probe = new Date(Date.UTC(yy!, mm! - 1, dd!));
+    if (probe.getUTCFullYear() !== yy || probe.getUTCMonth() !== mm! - 1 || probe.getUTCDate() !== dd) {
+      throw new Error(`${lineNo}行目 date が実在しない日付です: ${dateRaw}`);
+    }
+    // 金額: 全角数字・全角￥も除去/変換する。空欄は Number("") === 0 で
+    // 無言の 0円取込にならないよう、数値でないものとして弾く。
+    const amountRaw = col(row, "amount")
+      .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+      .replace(/[,¥￥]/g, "")
+      .trim();
+    const amount = amountRaw === "" ? Number.NaN : Number(amountRaw);
     if (!Number.isFinite(amount)) {
       throw new Error(`${lineNo}行目 amount が数値ではありません: ${col(row, "amount")}`);
     }
@@ -285,17 +307,26 @@ export function importCsvText(text: string, rules: CategoryRule[] = CATEGORY_RUL
       classified = classifyTransactionRow(
         {
           description,
-          category: col(row, "category"),
-          incomeType: col(row, "income_type"),
+          // 列が無い場合は null を渡し、推定に委ねる（"" を渡すと
+          // 「明示的な空欄」とみなされ推定が働かない）。
+          category: colOrNull(row, "category"),
+          incomeType: colOrNull(row, "income_type"),
         },
         rules,
       );
     } catch (e) {
       throw new Error(`${lineNo}行目 ${e instanceof Error ? e.message : String(e)}`);
     }
+    // year 列があれば割り当て年度として使う（無ければ日付の年）。
+    const yearRaw = colOrNull(row, "year");
+    const yearParsed = yearRaw === null || yearRaw.trim() === "" ? Number.NaN : Number(yearRaw);
+    const year =
+      Number.isInteger(yearParsed) && yearParsed >= 1900 && yearParsed <= 2100
+        ? yearParsed
+        : Number(dateRaw.slice(0, 4));
     transactions.push({
       date: dateRaw,
-      year: Number(dateRaw.slice(0, 4)),
+      year,
       description,
       amount: Math.trunc(amount),
       account: col(row, "account").trim(),
