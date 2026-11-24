@@ -18,7 +18,7 @@
  * 依存（履歴・SystemOneクライアント）は引数で受け取る（規約: services は
  * 依存を引数で受ける純粋な業務関数として書く）。
  */
-import { ACCOUNT_CRITERIA, suggestCategory } from "@etax/shared";
+import { ACCOUNT_CRITERIA, normalizeSearchText, suggestCategory } from "@etax/shared";
 import { SystemOneClient } from "../../gateways/systemOneGateway";
 import { ClassificationHistoryRecord } from "../../repositories/classificationHistoryRepository";
 import { RegexRule, generateRules, matchGeneratedRule } from "./generateRules";
@@ -105,8 +105,16 @@ const STORE_LIKE_KEYS: readonly string[] = [
   "ドーナツ",
 ];
 
+/** 照合用に正規化した店舗キーワード（半角カタカナ等を吸収する）。 */
+const STORE_LIKE_KEYS_NORMALIZED: readonly string[] = STORE_LIKE_KEYS.map((k) =>
+  normalizeSearchText(k),
+);
+
 export function isStoreLikeDescription(description: string): boolean {
-  return STORE_LIKE_KEYS.some((k) => description.includes(k));
+  // 銀行明細の半角カタカナ（例: ｾﾌﾞﾝ-ｲﾚﾌﾞﾝ）を正規化してから照合する。
+  // 生文字列の includes では半角表記が素通りしてしまう（Issue #11）。
+  const normalized = normalizeSearchText(description);
+  return STORE_LIKE_KEYS_NORMALIZED.some((k) => normalized.includes(k));
 }
 
 /**

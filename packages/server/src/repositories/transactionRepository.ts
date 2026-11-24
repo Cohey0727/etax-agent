@@ -8,7 +8,7 @@
  * 論理削除（deleted_at）にし、登録・更新・削除のたびに変更前後の値を
  * transaction_history へ残す。通常の読み取りは削除済みを返さない。
  */
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, or } from "drizzle-orm";
 import { Db, DbOrTx } from "../lib/db";
 
 /**
@@ -114,16 +114,27 @@ export async function getTransactionRow(db: Db, id: number): Promise<Transaction
 }
 
 /**
- * 取引を日付・id 順に取得する（削除済みは含まない）。incomeType があれば
- * SQL で絞り込む（対象年の絞り込みは従来どおり呼び出し側で行う）。
+ * 取引を日付・id 順に取得する（削除済みは含まない）。incomeType / year が
+ * あれば SQL で絞り込む。year は割り当て年度で判定し、未設定（0）の行は
+ * 日付の年で判定する（effectiveFiscalYear と同じ意味論を SQL で表す）。
+ * 全件ロードして JS で絞る従来方式は、件数が増えると無駄が大きい（Issue #11）。
  */
 export async function listTransactionRows(
   db: Db,
   incomeType?: string,
+  year?: number,
 ): Promise<TransactionRow[]> {
   const owner = currentUserId();
   const conditions = [isNull(transactionsTable.deletedAt)];
   if (incomeType) conditions.push(eq(transactionsTable.incomeType, incomeType));
+  if (year !== undefined) {
+    conditions.push(
+      or(
+        eq(transactionsTable.fiscalYear, year),
+        and(eq(transactionsTable.fiscalYear, 0), like(transactionsTable.date, `${year}-%`)),
+      )!,
+    );
+  }
   if (owner !== undefined) conditions.push(eq(transactionsTable.ownerUserId, owner));
   return db
     .select()

@@ -32,7 +32,7 @@ export async function loadDomicileFormTemplate(): Promise<Uint8Array | null> {
     }
   }
   try {
-    const res = await fetch(TEMPLATE_URL);
+    const res = await fetch(TEMPLATE_URL, { signal: AbortSignal.timeout(30_000) });
     if (!res.ok) return null;
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.length < 100_000) return null;

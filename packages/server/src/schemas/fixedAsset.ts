@@ -48,7 +48,9 @@ export const CreateFixedAssetRequestSchema = z
     cost: z.number().int().positive(),
     useful_life_years: z.number().int().min(1),
     method: DepreciationMethodSchema.optional(),
-    business_ratio_percent: z.number().min(0).max(100).optional(),
+    // DB 列は integer。小数を許すと保存時に型エラー（503）になるため、
+    // ここで整数として検証して 400 で返す。
+    business_ratio_percent: z.number().int().min(0).max(100).optional(),
     disposed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   })
   .openapi("CreateFixedAssetRequest");

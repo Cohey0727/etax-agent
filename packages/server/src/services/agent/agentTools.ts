@@ -119,7 +119,10 @@ export function dispatchTool(
         const needle = normalizeSearchText(keyword);
         const matched = ctx.transactions
           .filter((t) => {
-            if (year !== null && Number(t.date.slice(0, 4)) !== year) return false;
+            // 年度は割り当て年度（Transaction.year）で判定する。DB 読み込み
+            // 時は fiscal_year が入り、日付の年とは限らない（書き込み側の
+            // update_transactions と基準を揃える。Issue #11）。
+            if (year !== null && t.year !== year) return false;
             if (direction === "expense" && t.amount >= 0) return false;
             if (direction === "income" && t.amount <= 0) return false;
             return (
@@ -134,7 +137,7 @@ export function dispatchTool(
         let expenseTotal = 0;
         let incomeTotal = 0;
         for (const t of matched) {
-          const yearBucket = (byYear[t.date.slice(0, 4)] ??= { count: 0, expense_total: 0, income_total: 0 });
+          const yearBucket = (byYear[String(t.year)] ??= { count: 0, expense_total: 0, income_total: 0 });
           const categoryBucket = (byCategory[t.category] ??= { count: 0, expense_total: 0, income_total: 0 });
           yearBucket.count += 1;
           categoryBucket.count += 1;

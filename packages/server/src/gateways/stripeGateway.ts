@@ -23,6 +23,7 @@ function secretKey(): string {
 async function stripePost(path: string, params: URLSearchParams): Promise<Record<string, unknown>> {
   const resp = await fetch(`https://api.stripe.com/v1${path}`, {
     method: "POST",
+    signal: AbortSignal.timeout(30_000),
     headers: {
       Authorization: `Bearer ${secretKey()}`,
       "Content-Type": "application/x-www-form-urlencoded",

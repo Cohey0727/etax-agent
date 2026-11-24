@@ -53,6 +53,7 @@ import { hasActivePlan } from "./repositories/subscriptionRepository";
 import { authRequired, runWithTenant } from "./lib/tenantContext";
 import { resolveRequestUserId } from "./usecases/authSession";
 import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
+import { deleteExpiredAuthRows } from "./repositories/userRepository";
 import { createSystemOneClient } from "./gateways/systemOneGateway";
 import { loadSystemOneConfig } from "./lib/config";
 import { loadSystemOneSettings } from "./repositories/systemOneSettingsRepository";
@@ -253,6 +254,15 @@ void (async () => {
       console.log("帳簿DBのテーブルを確認しました");
       const knowledgeCount = await seedTaxKnowledge();
       console.log(`税務知識ベースを準備しました（${knowledgeCount}件）`);
+      // 期限切れセッション/トークンの掃除（起動時＋1時間ごと。Issue #11）。
+      const db = getDb();
+      if (db) {
+        await deleteExpiredAuthRows(db).catch(() => 0);
+        const timer = setInterval(() => {
+          void deleteExpiredAuthRows(db).catch(() => 0);
+        }, 60 * 60 * 1000);
+        timer.unref();
+      }
       return;
     } catch (e) {
       if (attempt === maxAttempts) {

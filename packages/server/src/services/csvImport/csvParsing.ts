@@ -3,7 +3,8 @@
  *
  * 日付・金額を正規化し、内部形式の取引にする。勘定科目・収入区分の分類は
  * shared の classifyTransactionRow が正本（明示列の値が推定より優先される）。
- * 完全重複行は除外する。
+ * ファイル内の同一行はここでは落とさない（同日・同額の正当な別取引が
+ * あり得るため）。重複の除外は DB との多重集合突合（importDedupe）が担う。
  */
 import { classifyTransactionRow, parseCsv, Transaction } from "@etax/shared";
 import { CsvMapping } from "../../schemas/importCsv";
@@ -13,13 +14,14 @@ export interface ParseResult {
   transactions: Transaction[];
   /** 日付や金額が読めず読み飛ばした行数 */
   skippedRows: number;
-  /** 完全重複として除外した行数 */
+  /** 重複として除外した行数（パース段階では落とさないため常に0。
+   * 呼び出し側が DB 突合で除外した件数を加算して報告する） */
   duplicatesSkipped: number;
   /** データ行の総数（ヘッダー除く） */
   totalRows: number;
 }
 
-/** マッピングで全行をパースし、内部形式の取引リストにする。完全重複行は除外する。 */
+/** マッピングで全行をパースし、内部形式の取引リストにする。 */
 export function parseWithMapping(
   rows: string[][],
   mapping: CsvMapping,
@@ -46,9 +48,8 @@ export function parseWithMapping(
 
   const cell = (row: string[], i: number): string => (i >= 0 ? (row[i] ?? "") : "");
   const transactions: Transaction[] = [];
-  const seen = new Set<string>();
   let skippedRows = 0;
-  let duplicatesSkipped = 0;
+  const duplicatesSkipped = 0;
 
   for (const row of dataRows) {
     if (row.every((c) => c.trim() === "")) continue; // 完全な空行は数えない
@@ -94,15 +95,9 @@ export function parseWithMapping(
       income_type,
       tax_category: cell(row, iTaxCategory).trim(),
     };
-    // 重複判定は「行全体が完全一致」した場合だけに限る。日付・金額・摘要が
-    // 同じでも、取引番号や時刻が違えば別の取引（例: PayPay のギフトカード
-    // チャージの連続実行）であり、落としてはいけない。
-    const key = row.join("\u0000");
-    if (seen.has(key)) {
-      duplicatesSkipped++;
-      continue;
-    }
-    seen.add(key);
+    // ファイル内の同一行も落とさない。同日・同額・同摘要の正当な別取引
+    // （例: PayPay のギフトカードチャージの連続実行）があり得るためで、
+    // 再取込時の重複は DB との多重集合突合（importDedupe）が防ぐ。
     transactions.push(tx);
   }
   transactions.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));

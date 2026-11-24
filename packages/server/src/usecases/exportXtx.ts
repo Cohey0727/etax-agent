@@ -84,19 +84,28 @@ function depreciationFromWire(
   const business: DepreciationDetailRow[] = [];
   const realEstate: DepreciationDetailRow[] = [];
   for (const asset of body.fixed_assets) {
-    const row = depreciationDetailRow(
-      asset.name,
-      {
-        acquisitionDate: asset.acquisition_date,
-        serviceStartDate: asset.service_start_date,
-        cost: asset.cost,
-        usefulLifeYears: asset.useful_life_years,
-        method: asset.method,
-        businessRatioPercent: asset.business_ratio_percent,
-      },
-      body.year,
-      asset.quantity ?? "",
-    );
+    // 償却計算が投げる例外を未捕捉の 500 にせず、対象資産が分かる
+    // 400 として返す（Issue #11）。
+    let row: DepreciationDetailRow | null;
+    try {
+      row = depreciationDetailRow(
+        asset.name,
+        {
+          acquisitionDate: asset.acquisition_date,
+          serviceStartDate: asset.service_start_date,
+          cost: asset.cost,
+          usefulLifeYears: asset.useful_life_years,
+          method: asset.method,
+          businessRatioPercent: asset.business_ratio_percent,
+        },
+        body.year,
+        asset.quantity ?? "",
+      );
+    } catch (e) {
+      throw new HTTPException(400, {
+        message: `固定資産「${asset.name}」の減価償却計算に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
     if (!row) continue;
     if (asset.income_type === "real_estate") realEstate.push(row);
     else business.push(row);

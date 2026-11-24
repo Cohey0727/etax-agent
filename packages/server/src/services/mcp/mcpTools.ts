@@ -462,9 +462,9 @@ function rowsToTransactions(rows: TransactionRow[], year: number): Transaction[]
     }));
 }
 
-/** 対象年の帳簿取引（shared 形式）をDBから取る。 */
+/** 対象年の帳簿取引（shared 形式）をDBから取る（年度絞り込みは SQL 側）。 */
 async function ledgerTransactions(db: Db, year: number): Promise<Transaction[]> {
-  return rowsToTransactions(await listTransactionRows(db), year);
+  return rowsToTransactions(await listTransactionRows(db, undefined, year), year);
 }
 
 /** 所得控除の入力を、未指定項目ゼロで補完する（ネストも1段だけ補完）。 */
@@ -684,12 +684,11 @@ export async function dispatchMcpTool(
       }
       case "list_transactions": {
         const db = requireDb();
-        const rows = await listTransactionRows(db);
         const year = typeof args["year"] === "number" ? args["year"] : undefined;
-        const filtered = year ? rows.filter((row) => effectiveFiscalYear(row) === year) : rows;
+        const rows = await listTransactionRows(db, undefined, year);
         return textResult({
-          count: filtered.length,
-          transactions: filtered.map(transactionToApi),
+          count: rows.length,
+          transactions: rows.map(transactionToApi),
         });
       }
       case "add_transaction": {
@@ -697,7 +696,12 @@ export async function dispatchMcpTool(
         const category = typeof args["category"] === "string" && args["category"] !== ""
           ? args["category"]
           : "未分類";
-        const date = String(args["date"]);
+        // 引数の検証（Issue #11: 未検証の String()/Number() 変換で
+        // "undefined" や NaN がそのまま保存されるのを防ぐ）。
+        const date = args["date"];
+        if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          throw new Error("date は YYYY-MM-DD 形式で渡してください");
+        }
         const fiscalYearArg = args["fiscal_year"];
         const row = await insertTransactionRow(db, {
           date,
@@ -708,8 +712,8 @@ export async function dispatchMcpTool(
             fiscalYearArg <= 2100
               ? fiscalYearArg
               : Number(date.slice(0, 4)),
-          description: String(args["description"]),
-          amount: Number(args["amount"]),
+          description: typeof args["description"] === "string" ? args["description"] : "",
+          amount: numArg(args, "amount"),
           account: typeof args["account"] === "string" ? args["account"] : "",
           category,
           incomeType: parseIncomeType(args["income_type"]),
@@ -724,8 +728,14 @@ export async function dispatchMcpTool(
       case "update_transaction": {
         const db = requireDb();
         const id = Number(args["id"]);
+        if (!Number.isInteger(id)) throw new Error("id は整数で渡してください");
         const patch: Partial<TransactionRow> = {};
-        if (typeof args["date"] === "string") patch.date = args["date"];
+        if (typeof args["date"] === "string") {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(args["date"])) {
+            throw new Error("date は YYYY-MM-DD 形式で渡してください");
+          }
+          patch.date = args["date"];
+        }
         if (
           typeof args["fiscal_year"] === "number" &&
           Number.isInteger(args["fiscal_year"]) &&
@@ -735,7 +745,7 @@ export async function dispatchMcpTool(
           patch.fiscalYear = args["fiscal_year"];
         }
         if (typeof args["description"] === "string") patch.description = args["description"];
-        if (typeof args["amount"] === "number") patch.amount = args["amount"];
+        if (args["amount"] !== undefined) patch.amount = numArg(args, "amount");
         if (typeof args["account"] === "string") patch.account = args["account"];
         if (typeof args["category"] === "string") patch.category = args["category"];
         if (args["income_type"] !== undefined) patch.incomeType = parseIncomeType(args["income_type"]);
@@ -750,6 +760,7 @@ export async function dispatchMcpTool(
       case "delete_transaction": {
         const db = requireDb();
         const id = Number(args["id"]);
+        if (!Number.isInteger(id)) throw new Error("id は整数で渡してください");
         const row = await deleteTransactionRow(db, id);
         if (!row) throw new Error(`取引が見つかりません: id=${id}`);
         return textResult({ deleted: transactionToApi(row) });
@@ -757,11 +768,20 @@ export async function dispatchMcpTool(
       case "classify_account": {
         const history = await loadClassificationHistory();
         const systemOne = createSystemOneClient(loadSystemOneConfig());
-        const result = await classifyAccount(String(args["description"]), { history, systemOne, jevPromptOverride: getJevPromptOverride(), regexRulesOverride: getRegexRulesOverride() });
+        const description = args["description"];
+        if (typeof description !== "string" || description === "") {
+          throw new Error("description（摘要）が必要です");
+        }
+        const result = await classifyAccount(description, { history, systemOne, jevPromptOverride: getJevPromptOverride(), regexRulesOverride: getRegexRulesOverride() });
         return textResult(result);
       }
       case "classify_feedback": {
-        await recordClassification(String(args["description"]), String(args["account"]));
+        const description = args["description"];
+        const account = args["account"];
+        if (typeof description !== "string" || description === "" || typeof account !== "string" || account === "") {
+          throw new Error("description（摘要）と account（勘定科目）が必要です");
+        }
+        await recordClassification(description, account);
         return textResult({ ok: true });
       }
       case "export_xtx": {

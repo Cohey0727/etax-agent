@@ -77,11 +77,31 @@ function candidatePatterns(description: string): string[] {
 }
 
 /**
+ * 生成結果のメモ化。履歴は読み込み単位のスナップショットとして扱い、
+ * 同じ配列参照の間は生成し直さない（一括判定で全行ぶん再生成・再集計
+ * する無駄を避ける。Issue #11）。履歴が更新されれば新しい配列になる。
+ */
+const generatedRulesCache = new WeakMap<
+  ClassificationHistoryRecord[],
+  GeneratedRules
+>();
+
+/**
  * 学習履歴から適用ルール一式を生成する。
  * 同じパターンが複数の科目に割れている場合は、最多の科目が次点の2倍以上
  * のときだけ採用する（曖昧なパターンは判定モデルに委ねる）。
  */
 export function generateRules(
+  history: ClassificationHistoryRecord[],
+): GeneratedRules {
+  const cached = generatedRulesCache.get(history);
+  if (cached) return cached;
+  const generated = buildRules(history);
+  generatedRulesCache.set(history, generated);
+  return generated;
+}
+
+function buildRules(
   history: ClassificationHistoryRecord[],
 ): GeneratedRules {
   // パターン × 科目ごとに確定回数を集計する
@@ -165,6 +185,17 @@ function buildJevPrompt(
 /** 照合対象の最大長。バックトラックのコストは入力長に比例するため切り詰める。 */
 const MAX_MATCH_INPUT_LENGTH = 500;
 
+/** コンパイル済み正規表現のキャッシュ（パターン文字列単位）。 */
+const compiledPatternCache = new Map<string, RegExp>();
+
+function compiledPattern(pattern: string): RegExp {
+  const cached = compiledPatternCache.get(pattern);
+  if (cached) return cached;
+  const compiled = new RegExp(pattern);
+  compiledPatternCache.set(pattern, compiled);
+  return compiled;
+}
+
 /** 正規表現ルールに摘要が当たるか（先に並んだルールが優先）。 */
 export function matchGeneratedRule(
   description: string,
@@ -172,7 +203,7 @@ export function matchGeneratedRule(
 ): RegexRule | null {
   const normalized = normalizeDescriptionKey(description).slice(0, MAX_MATCH_INPUT_LENGTH);
   for (const rule of rules) {
-    if (new RegExp(rule.pattern).test(normalized)) return rule;
+    if (compiledPattern(rule.pattern).test(normalized)) return rule;
   }
   return null;
 }

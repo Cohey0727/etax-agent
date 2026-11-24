@@ -109,6 +109,7 @@ async function exchangeCode(
   if (!uri) throw new Error("公開オリジンが設定されていません");
   const res = await fetch(config.tokenUrl, {
     method: "POST",
+    signal: AbortSignal.timeout(15_000),
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({
       client_id: process.env[config.clientIdEnv] as string,
@@ -130,7 +131,7 @@ async function fetchProfile(
 ): Promise<{ providerUserId: string; email: string }> {
   const headers = { Authorization: `Bearer ${accessToken}`, Accept: "application/json" };
   if (provider === "google") {
-    const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers });
+    const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) throw new Error(`userinfo failed: ${res.status}`);
     const data = (await res.json()) as { sub?: string; email?: string; email_verified?: boolean };
     if (!data.sub || !data.email || data.email_verified !== true) {
@@ -138,11 +139,11 @@ async function fetchProfile(
     }
     return { providerUserId: data.sub, email: data.email.toLowerCase() };
   }
-  const userRes = await fetch("https://api.github.com/user", { headers });
+  const userRes = await fetch("https://api.github.com/user", { headers, signal: AbortSignal.timeout(15_000) });
   if (!userRes.ok) throw new Error(`github user failed: ${userRes.status}`);
   const user = (await userRes.json()) as { id?: number };
   if (!user.id) throw new Error("GitHub のユーザーIDが取得できませんでした");
-  const emailsRes = await fetch("https://api.github.com/user/emails", { headers });
+  const emailsRes = await fetch("https://api.github.com/user/emails", { headers, signal: AbortSignal.timeout(15_000) });
   if (!emailsRes.ok) throw new Error(`github emails failed: ${emailsRes.status}`);
   const emails = (await emailsRes.json()) as {
     email: string;

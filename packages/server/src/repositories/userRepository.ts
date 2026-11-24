@@ -3,7 +3,7 @@
  * トークンと API キーは平文を保存せず SHA-256 ハッシュで照合する。
  */
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, lt } from "drizzle-orm";
 import { Db } from "../lib/db";
 import { decryptField, encryptField } from "../lib/encryption";
 import {
@@ -295,4 +295,29 @@ export async function deleteApiKeyRow(db: Db, userId: number, id: number): Promi
   if (!row || row.userId !== userId) return false;
   await db.delete(apiKeysTable).where(eq(apiKeysTable.id, id));
   return true;
+}
+
+/**
+ * 期限切れのセッションと各種トークンを削除する（Issue #11: 定期掃除）。
+ * 放置するとテーブルが単調に増え続けるため、起動時と定期実行で呼ぶ。
+ * 削除した件数を返す。
+ */
+export async function deleteExpiredAuthRows(db: Db, now: Date = new Date()): Promise<number> {
+  let deleted = 0;
+  const sessions = await db
+    .delete(sessionsTable)
+    .where(lt(sessionsTable.expiresAt, now))
+    .returning({ id: sessionsTable.id });
+  deleted += sessions.length;
+  const magic = await db
+    .delete(magicLinkTokensTable)
+    .where(lt(magicLinkTokensTable.expiresAt, now))
+    .returning({ id: magicLinkTokensTable.id });
+  deleted += magic.length;
+  const verification = await db
+    .delete(emailVerificationTokensTable)
+    .where(lt(emailVerificationTokensTable.expiresAt, now))
+    .returning({ id: emailVerificationTokensTable.id });
+  deleted += verification.length;
+  return deleted;
 }

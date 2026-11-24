@@ -58,7 +58,13 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
   if (!parsed.success) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const body = parsed.data;
   const patch: Partial<TransactionRow> = {};
-  if (body.date !== undefined) patch.date = body.date;
+  if (body.date !== undefined) {
+    // 登録時と同じ日付形式チェック（不正な日付で年度判定が壊れるのを防ぐ）。
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+      throw new HTTPException(400, { message: "date は YYYY-MM-DD 形式で指定してください" });
+    }
+    patch.date = body.date;
+  }
   if (
     typeof body.fiscal_year === "number" &&
     Number.isInteger(body.fiscal_year) &&
