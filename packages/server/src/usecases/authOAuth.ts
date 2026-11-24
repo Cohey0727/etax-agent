@@ -7,12 +7,20 @@
  * リダイレクト応答のため、この2つは通常の Hono ハンドラとして登録する。
  */
 import { Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
-import { issueChallenge, verifyChallenge } from "../lib/loginChallenge";
-import { publicBaseUrl } from "../lib/publicUrl";
+import { beginChallengeUse, burnChallenge, issueChallenge } from "../lib/loginChallenge";
+import { isSecureDeployment, publicBaseUrl } from "../lib/publicUrl";
 import { findOrCreateOAuthUser } from "../repositories/userRepository";
 import { issueSession } from "./authSession";
+
+/**
+ * OAuth state を発行したブラウザに紐付ける Cookie。state は署名つきだが
+ * それだけでは他人のブラウザで開始したフローを踏ませるログイン CSRF が
+ * 成立するため、開始時に Cookie へ同じ値を置き、callback で一致を必須にする。
+ */
+const OAUTH_STATE_COOKIE = "etax_oauth_state";
 
 export type OAuthProvider = "google" | "github";
 
@@ -73,12 +81,20 @@ export async function oauthStartHandler(c: Context): Promise<Response> {
     throw new HTTPException(503, { message: "公開オリジン（ETAX_PUBLIC_URL）が設定されていません" });
   }
   const config = PROVIDERS[provider];
+  const state = issueChallenge(0, `oauth:${provider}`, 10 * 60 * 1000);
+  setCookie(c, OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "Lax",
+    path: "/api/auth/oauth",
+    maxAge: 10 * 60,
+    secure: isSecureDeployment(c),
+  });
   const params = new URLSearchParams({
     client_id: process.env[config.clientIdEnv] as string,
     redirect_uri: uri,
     response_type: "code",
     scope: config.scope,
-    state: issueChallenge(0, `oauth:${provider}`, 10 * 60 * 1000),
+    state,
   });
   return c.redirect(`${config.authorizeUrl}?${params.toString()}`);
 }
@@ -145,13 +161,29 @@ export async function oauthCallbackHandler(c: Context): Promise<Response> {
   if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
   const code = c.req.query("code") ?? "";
   const state = c.req.query("state") ?? "";
-  if (!code || verifyChallenge(state, `oauth:${provider}`) === undefined) {
+  // state は開始したブラウザの Cookie と一致し、かつ単回使用であること
+  // （ログイン CSRF と state 再利用の防止）。
+  const stateCookie = getCookie(c, OAUTH_STATE_COOKIE);
+  deleteCookie(c, OAUTH_STATE_COOKIE, { path: "/api/auth/oauth" });
+  if (
+    !code ||
+    !state ||
+    stateCookie !== state ||
+    beginChallengeUse(state, `oauth:${provider}`) === undefined
+  ) {
     return c.redirect("/?auth_error=oauth_state");
   }
+  burnChallenge(state, `oauth:${provider}`);
   try {
     const accessToken = await exchangeCode(c, provider, code);
     const profile = await fetchProfile(provider, accessToken);
     const user = await findOrCreateOAuthUser(db, provider, profile.providerUserId, profile.email);
+    // TOTP 有効なユーザーは OAuth でも2段階目を必須にする（2FA 迂回防止）。
+    // セッションは発行せず、チャレンジを画面へ渡してコード入力を求める。
+    if (user.totpEnabled) {
+      const challenge = issueChallenge(user.id, "totp-login");
+      return c.redirect(`/?totp_challenge=${encodeURIComponent(challenge)}`);
+    }
     await issueSession(c, db, user.id);
     return c.redirect("/");
   } catch {
