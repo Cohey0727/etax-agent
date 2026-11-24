@@ -1,7 +1,8 @@
 services:
   # データベース（PostgreSQL 19）。データは名前付きボリュームで永続化する。
   db:
-    image: postgres:19
+    # イメージはダイジェスト固定（mutable なタグだけに頼らない）。
+    image: postgres:19@sha256:e99b33203b969310f42fd7edf8b3a295ee81a9909a3e2569b3ce87f25b1f4ca0
     container_name: etax-agent-db
     restart: unless-stopped
     # 認証情報はリポジトリ直下の .env（Git管理外）から読む。直書きしない。
@@ -28,6 +29,12 @@ services:
       db:
         condition: service_healthy
     # AGENT_API_KEY・ETAX_ENCRYPTION_KEY など秘密はホスト側の .env から読む（Git管理外）。
+    # 認証まわりは packages/server/.env で必ず明示すること（未設定だと認証なしで
+    # 起動するフェイルオープンになる）:
+    #   ETAX_AUTH_MODE=required   … 公開（SaaS）運用では必須。未設定は単一ユーザー無認証
+    #   ETAX_ENCRYPTION_KEY       … 納税者情報の暗号化鍵（required 時は未設定で起動エラー）
+    #   ETAX_AUTH_SECRET          … セッション署名鍵
+    #   ETAX_PUBLIC_URL           … メール内リンクの生成元オリジン
     env_file:
       - packages/server/.env
     environment:
@@ -44,6 +51,8 @@ services:
     volumes:
       # サーバー運用データ（アップロードファイル・freee試算表・科目判定の
       # 学習履歴）はホスト側に残す。DB は db サービス側のボリューム。
+      # アプリは非 root（bun ユーザー、uid 1000）で動くため、このディレクトリは
+      # uid 1000 が読み書きできる権限にしておくこと。
       - ./packages/server/data:/app/packages/server/data
 
 volumes:
