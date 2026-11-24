@@ -745,14 +745,22 @@ export const EMPTY_SALARY_INCOME: SalaryIncomeInput = { revenue: 0 };
 
 /**
  * 給与所得の金額（No.1410 / No.1400）。段階表は年度パラメータ
- * （taxParameters）が持つ。収入金額が660万円未満のときは、所得税法
- * 別表第五の方式（収入金額を4で割って千円未満切捨て→×4した金額を
- * 基準額として表を引き、所得金額 = 基準額 − 控除額）で求める。
+ * （taxParameters）が持つ。所得税法別表第五の方式:
+ * - 最低保障帯（第一帯）では端数整理をせず、所得金額 = 収入金額 −
+ *   控除額（定額）をそのまま使う（例: 令和7年分・収入1,899,999円 →
+ *   所得 1,249,999円）。
+ * - 率方式の帯で収入金額が660万円未満のときは、収入金額を4で割って
+ *   千円未満切捨て→×4した金額を基準額として表を引き、
+ *   所得金額 = 基準額 − 控除額 で求める。
  */
 export function salaryIncomeAmount(year: number, revenue: number): number {
   const r = amount(revenue);
   if (r <= 0) return 0;
   const tiers = taxParametersFor(year).salaryDeductionTiers;
+  const first = tiers[0];
+  if (first && first.amount !== undefined && r < first.upTo) {
+    return Math.max(r - first.amount, 0);
+  }
   const base = r < 6_600_000 ? Math.floor(r / 4000) * 4000 : r;
   for (const tier of tiers) {
     if (base <= tier.upTo) {
@@ -800,34 +808,35 @@ export function salaryAdjustmentDeduction2(salaryIncomeAfterAdj1: number, pensio
 
 /**
  * 公的年金等控除額（No.1600 の速算表・令和2年分以後）。
- * 「公的年金等に係る雑所得以外の合計所得金額」が1,000万円以下の区分を
- * 基準に、1,000万円超2,000万円以下では一律10万円、2,000万円超では
- * 一律20万円、控除額が縮小する。
+ * 最低帯は定額（65歳以上 110万円 / 65歳未満 60万円）であり、収入金額
+ * そのものではない。順序は: 速算表の控除額を求め → 「公的年金等に係る
+ * 雑所得以外の合計所得金額」が1,000万円超で10万円、2,000万円超で
+ * 20万円を差し引き → 0でフロア → 最後に収入金額でキャップする。
+ * （例: 65歳以上・年金95万円・他所得1,500万円 → 控除 110万−10万 =
+ * 100万円を収入95万円でキャップし、年金所得は 0。）
  */
 export function publicPensionDeduction(revenue: number, over65: boolean, otherTotalIncome: number): number {
   const a = amount(revenue);
   if (a <= 0) return 0;
   let deduction: number;
   if (over65) {
-    if (a <= 1_100_000) deduction = a;
-    else if (a < 3_300_000) deduction = 1_100_000;
-    else if (a < 4_100_000) deduction = a * 0.25 + 275_000;
-    else if (a < 7_700_000) deduction = a * 0.15 + 685_000;
-    else if (a < 10_000_000) deduction = a * 0.05 + 1_455_000;
+    if (a < 3_300_000) deduction = 1_100_000;
+    else if (a < 4_100_000) deduction = Math.floor((a * 25) / 100) + 275_000;
+    else if (a < 7_700_000) deduction = Math.floor((a * 15) / 100) + 685_000;
+    else if (a < 10_000_000) deduction = Math.floor((a * 5) / 100) + 1_455_000;
     else deduction = 1_955_000;
   } else {
-    if (a <= 600_000) deduction = a;
-    else if (a < 1_300_000) deduction = 600_000;
-    else if (a < 4_100_000) deduction = a * 0.25 + 275_000;
-    else if (a < 7_700_000) deduction = a * 0.15 + 685_000;
-    else if (a < 10_000_000) deduction = a * 0.05 + 1_455_000;
+    if (a < 1_300_000) deduction = 600_000;
+    else if (a < 4_100_000) deduction = Math.floor((a * 25) / 100) + 275_000;
+    else if (a < 7_700_000) deduction = Math.floor((a * 15) / 100) + 685_000;
+    else if (a < 10_000_000) deduction = Math.floor((a * 5) / 100) + 1_455_000;
     else deduction = 1_955_000;
   }
   const other = amount(otherTotalIncome);
   if (other > 20_000_000) deduction -= 200_000;
   else if (other > 10_000_000) deduction -= 100_000;
-  // 控除額は収入金額を超えず、マイナスにもならない
-  return Math.min(Math.max(Math.floor(deduction), 0), a);
+  // 他所得区分による縮小を引いた後に 0 でフロアし、収入金額でキャップする
+  return Math.min(Math.max(deduction, 0), a);
 }
 
 /** 公的年金等に係る雑所得の金額（収入金額 − 公的年金等控除額、0未満は0）。 */

@@ -29,6 +29,9 @@ describe("給与所得の金額", () => {
 
   test("令和7年分（最低保障額65万円・190万円まで）", () => {
     expect(salaryIncomeAmount(2025, 1_900_000)).toBe(1_250_000);
+    // 別表第五: 最低保障帯では端数整理（4,000円刻み）をせず 収入 − 65万円
+    expect(salaryIncomeAmount(2025, 1_899_999)).toBe(1_249_999);
+    expect(salaryIncomeAmount(2025, 1_234_567)).toBe(584_567);
     expect(salaryIncomeAmount(2025, 5_000_000)).toBe(3_560_000);
     // 850万円: ×10%+110万円 = 195万円（上限と一致）
     expect(salaryDeductionAmount(2025, 8_500_000)).toBe(1_950_000);
@@ -89,6 +92,13 @@ describe("公的年金等に係る雑所得（No.1600）", () => {
     expect(publicPensionIncome(600_000, false, 0)).toBe(0);
     expect(publicPensionIncome(1_100_000, true, 0)).toBe(0);
     expect(publicPensionIncome(1_000_000, false, 0)).toBe(400_000);
+  });
+
+  test("最低帯は定額控除から他所得区分の縮小を引く（65歳以上・年金95万円・他所得1,500万円 → 所得0）", () => {
+    // 控除 = 110万円 − 10万円 = 100万円 → 収入95万円でキャップされ年金所得は 0
+    expect(publicPensionIncome(950_000, true, 15_000_000)).toBe(0);
+    // 65歳未満・年金50万円・他所得2,500万円 → 控除 60万 − 20万 = 40万円 → 所得10万円
+    expect(publicPensionIncome(500_000, false, 25_000_000)).toBe(100_000);
   });
 
   test("他所得が1,000万円超・2,000万円超で控除が10万円・20万円縮小する", () => {
