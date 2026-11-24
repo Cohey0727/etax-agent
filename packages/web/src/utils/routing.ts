@@ -69,6 +69,23 @@ export interface ParsedRoute {
   filingTab: FilingTab | null;
 }
 
+export interface AuthQuery {
+  /** メールリンクのトークン（?magic=）。無ければ null。 */
+  magic: string | null;
+  /** 外部ログイン失敗の戻り（?auth_error=）。無ければ null。 */
+  authError: string | null;
+}
+
+/**
+ * URLクエリから認証系パラメータを取り出す。アプリのURL同期はパスだけを
+ * 書き換えるため、起動直後にここで捕捉しておかないと、ログイン画面が
+ * 読む前にトークンが消えてしまう（Issue #10-1）。
+ */
+export const parseAuthQuery = (search: string): AuthQuery => {
+  const params = new URLSearchParams(search);
+  return { magic: params.get("magic"), authError: params.get("auth_error") };
+};
+
 /** URLパスから画面と年度を読む。未知のパスは null。/accounts/<年度> だけならその年のダッシュボード。 */
 export const parsePath = (pathname: string): ParsedRoute | null => {
   const parts = pathname.split("/").filter((part) => part.length > 0);
