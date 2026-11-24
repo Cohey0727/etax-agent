@@ -238,8 +238,8 @@ describe("buildXtxFiling", () => {
     // 収入金額等: 事業 12,000,000 / 不動産 1,764,000
     expect(xtx).toContain("<ABB00030>12000000</ABB00030>");
     expect(xtx).toContain("<ABB00050>1764000</ABB00050>");
-    // 青色申告特別控除の合計 750,000
-    expect(xtx).toContain("<ABB00800>750000</ABB00800>");
+    // 青色申告特別控除の合計 650,000（不動産・事業の合算限度、No.2072）
+    expect(xtx).toContain("<ABB00800>650000</ABB00800>");
     // 修正申告欄: 修正前の第3期分の税額
     expect(xtx).toContain("<ABB00765>1480000</ABB00765>");
     // 決算書: 売上・賃貸料
