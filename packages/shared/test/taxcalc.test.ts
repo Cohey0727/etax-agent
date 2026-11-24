@@ -54,11 +54,12 @@ describe("消費税の素計算", () => {
 });
 
 describe("青色申告特別控除の振り分け", () => {
-  test("(c) 不動産30万・事業500万 → 100,000 + 650,000 = 750,000", () => {
+  // No.2072: 65万円控除は不動産＋事業の合計額が限度（不動産→事業の順に控除）
+  test("(c) 不動産30万・事業500万 → 300,000 + 350,000 = 650,000", () => {
     const blue = blueDeduction(300_000, 5_000_000);
-    expect(blue.realEstate).toBe(100_000);
-    expect(blue.business).toBe(650_000);
-    expect(blue.total).toBe(750_000);
+    expect(blue.realEstate).toBe(300_000);
+    expect(blue.business).toBe(350_000);
+    expect(blue.total).toBe(650_000);
   });
 
   test("控除は所得が上限（不動産5万・事業0）", () => {
@@ -67,26 +68,33 @@ describe("青色申告特別控除の振り分け", () => {
     expect(blue.business).toBe(0);
   });
 
-  // 順序依存ケース（Python版テストと同一）: 不動産10万 → 事業65万、合計最大75万
-  test("順序(i) 不動産30万・事業60万 → 100,000 + 600,000 = 700,000", () => {
+  // 順序依存ケース: 合算限度65万円を不動産から先に使い切る
+  test("順序(i) 不動産30万・事業60万 → 300,000 + 350,000 = 650,000", () => {
     const blue = blueDeduction(300_000, 600_000);
-    expect(blue.realEstate).toBe(100_000);
-    expect(blue.business).toBe(600_000);
-    expect(blue.total).toBe(700_000);
+    expect(blue.realEstate).toBe(300_000);
+    expect(blue.business).toBe(350_000);
+    expect(blue.total).toBe(650_000);
   });
 
-  test("順序(ii) 不動産5万・事業500万 → 50,000 + 650,000 = 700,000", () => {
+  test("順序(ii) 不動産5万・事業500万 → 50,000 + 600,000 = 650,000", () => {
     const blue = blueDeduction(50_000, 5_000_000);
     expect(blue.realEstate).toBe(50_000);
-    expect(blue.business).toBe(650_000);
-    expect(blue.total).toBe(700_000);
+    expect(blue.business).toBe(600_000);
+    expect(blue.total).toBe(650_000);
   });
 
-  test("順序(iii) 不動産30万・事業70万 → 合計ちょうど 750,000", () => {
+  test("順序(iii) 不動産30万・事業70万 → 合計ちょうど 650,000", () => {
     const blue = blueDeduction(300_000, 700_000);
+    expect(blue.realEstate).toBe(300_000);
+    expect(blue.business).toBe(350_000);
+    expect(blue.total).toBe(650_000);
+  });
+
+  test("不動産のみ・事業的規模でない → 10万円が限度", () => {
+    const blue = blueDeduction(5_000_000, 0);
     expect(blue.realEstate).toBe(100_000);
-    expect(blue.business).toBe(650_000);
-    expect(blue.total).toBe(750_000);
+    expect(blue.business).toBe(0);
+    expect(blue.total).toBe(100_000);
   });
 
   test("順序(iv) 赤字の区分は控除ゼロ（不動産赤字・事業黒字）", () => {
@@ -99,11 +107,11 @@ describe("青色申告特別控除の振り分け", () => {
     expect(blueDeduction(-1, -1).total).toBe(0);
   });
 
-  test("青色55万円（非事業的規模）→ 100,000 + 550,000 = 650,000", () => {
+  test("青色55万円 → 合算に55万円まで（不動産から先に控除）", () => {
     const blue = blueDeduction(300_000, 5_000_000, { filingType: "blue55" });
-    expect(blue.realEstate).toBe(100_000);
-    expect(blue.business).toBe(550_000);
-    expect(blue.total).toBe(650_000);
+    expect(blue.realEstate).toBe(300_000);
+    expect(blue.business).toBe(250_000);
+    expect(blue.total).toBe(550_000);
   });
 
   test("白色申告 → 控除なし", () => {
@@ -149,7 +157,7 @@ describe("サンプルCSV（2024年分）", () => {
   test("集計の基本（事業所得・不動産所得）", () => {
     expect(b.businessIncome).toBe(9_850_500);
     expect(b.realEstateIncome).toBe(1_487_000);
-    expect(blueDeduction(b.realEstateIncome, b.businessIncome).total).toBe(750_000);
+    expect(blueDeduction(b.realEstateIncome, b.businessIncome).total).toBe(650_000);
   });
 
   test("消費税3方式のサンプル値（本則 879,045 / 簡易 518,181 / 2割 207,272）", () => {
@@ -164,6 +172,27 @@ describe("サンプルCSV（2024年分）", () => {
 
   test("内部形式CSVの再パースでも件数が一致する", () => {
     expect(importCsvText(SAMPLE_CSV)).toHaveLength(54);
+  });
+
+  test("estimateInputTax は台帳の実カテゴリ名の非課税仕入を除外する (#3-5)", () => {
+    const mk = (category: string, amount: number) => ({
+      date: "2024-06-15",
+      year: 2024,
+      description: "テスト",
+      amount,
+      account: "普通預金",
+      category,
+      income_type: "business" as const,
+      tax_category: "",
+    });
+    const txs = [
+      mk("通信費", -110_000), // 課税仕入: 110,000 × 10/110 = 10,000
+      mk("損害保険料", -110_000), // 非課税仕入（旧表記「保険料」では一致しなかった）
+      mk("給料賃金", -110_000), // 非課税仕入（旧表記「給与賃金」では一致しなかった）
+      mk("利子割引料", -110_000),
+      mk("貸倒金", -110_000),
+    ];
+    expect(estimateInputTax(txs)).toBe(10_000);
   });
 });
 
@@ -264,8 +293,8 @@ describe("修正パイプライン（computeCorrectedFigures）", () => {
     expect(figs.real_estate_revenue).toBe(1_764_000);
   });
 
-  test("パイプライン: 青色控除 750,000", () => {
-    expect(figs.blue_deduction).toBe(750_000);
+  test("パイプライン: 青色控除 650,000", () => {
+    expect(figs.blue_deduction).toBe(650_000);
   });
 
   test("パイプライン: 課税売上 11,400,000・非課税 1,764,000", () => {
@@ -285,9 +314,10 @@ describe("修正パイプライン（computeCorrectedFigures）", () => {
     expect(figs.consumption_tax_special20).toBe(207_272);
   });
 
-  test("パイプライン: 控除後所得 事業 9,200,500・不動産 1,387,000", () => {
-    expect(figs._detail.business_income).toBe(9_200_500);
-    expect(figs._detail.real_estate_income).toBe(1_387_000);
+  test("パイプライン: 控除後所得 事業 9,850,500・不動産 837,000", () => {
+    // 青色控除65万円は不動産から先に控除する（No.2072）
+    expect(figs._detail.business_income).toBe(9_850_500);
+    expect(figs._detail.real_estate_income).toBe(837_000);
   });
 
   test("パイプライン差分: 事業収入 -1,764,000", () => {
@@ -295,9 +325,9 @@ describe("修正パイプライン（computeCorrectedFigures）", () => {
     expect(d.fieldDiffs["business_revenue"]?.diff).toBe(-1_764_000);
   });
 
-  test("パイプライン差分: 青色控除 +100,000", () => {
+  test("パイプライン差分: 青色控除は差分なし（修正後も合算限度65万円）", () => {
     const d = amendmentDelta(SAMPLE_ORIGINAL_2024, figs);
-    expect(d.fieldDiffs["blue_deduction"]?.diff).toBe(100_000);
+    expect(d.fieldDiffs["blue_deduction"]).toBeUndefined();
   });
 
   test("パイプライン: 取引から計算できない項目（income_tax 等）は含まない（引き継ぎ前提）", () => {

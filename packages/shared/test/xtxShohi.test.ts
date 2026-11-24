@@ -48,12 +48,26 @@ describe("computeConsumptionReturn", () => {
     expect(result.fullDeduction).toBe(true);
     expect(result.taxBase).toBe(13_956_000);
     expect(result.outputTax).toBe(1_088_568);
-    expect(result.inputTax).toBe(408_749);
-    expect(result.diffRaw).toBe(679_819);
-    expect(result.payableNational).toBe(679_800);
-    expect(result.localTaxGross).toBe(191_700);
-    expect(result.payableLocal).toBe(191_700);
-    expect(result.totalPayable).toBe(871_500);
+    // 仕入税額は国税分（税込 × 7.8/110）: 4,496,249 → 318,824
+    expect(result.inputTax).toBe(318_824);
+    expect(result.diffRaw).toBe(769_744);
+    expect(result.payableNational).toBe(769_700);
+    expect(result.localTaxGross).toBe(217_000);
+    expect(result.payableLocal).toBe(217_000);
+    expect(result.totalPayable).toBe(986_700);
+  });
+
+  test("課税売上割合の分子には免税売上を含める（輸出のみなら割合100%）", () => {
+    const result = computeConsumptionReturn(
+      input({
+        salesIncl10: 1_100_000,
+        exemptSales: 9_000_000,
+        purchasesIncl10: 110_000,
+      }),
+    );
+    expect(result.ratio).toBe(100);
+    expect(result.fullDeduction).toBe(true);
+    expect(result.inputTax).toBe(7_800);
   });
 
   test("課税売上割合95%未満なら一括比例配分する", () => {
@@ -66,10 +80,11 @@ describe("computeConsumptionReturn", () => {
     );
     expect(result.ratio).toBe(90.9);
     expect(result.fullDeduction).toBe(false);
-    expect(result.inputTaxRaw10).toBe(10_000);
-    expect(result.inputTax).toBe(9_090);
-    expect(result.payableNational).toBe(68_900);
-    expect(result.localTaxGross).toBe(19_400);
+    // 仕入税額（国税分）: 110,000 × 7.8/110 = 7,800、割合 90.9% → 7,090
+    expect(result.inputTaxRaw10).toBe(7_800);
+    expect(result.inputTax).toBe(7_090);
+    expect(result.payableNational).toBe(70_900);
+    expect(result.localTaxGross).toBe(19_900);
   });
 });
 
@@ -92,12 +107,12 @@ describe("buildConsumptionXtx", () => {
     expect(xtx).toContain('<SHA010 VR="10.0"');
     expect(xtx).toContain('<SHB017 VR="2.0"');
     expect(xtx).toContain('<SHB033 VR="2.0"');
-    expect(xtx).toContain("<AAJ00120>679800</AAJ00120>");
-    expect(xtx).toContain("<AAK00060>191700</AAK00060>");
-    expect(xtx).toContain("<AAK00130>871500</AAK00130>");
+    expect(xtx).toContain("<AAJ00120>769700</AAJ00120>");
+    expect(xtx).toContain("<AAK00060>217000</AAK00060>");
+    expect(xtx).toContain("<AAK00130>986700</AAK00130>");
     expect(xtx).toContain("<DTD00000>100</DTD00000>");
     expect(xtx).toContain("<AAM00020><kubun_CD>3</kubun_CD></AAM00020>");
-    expect(xtx).toContain("<DTF00030>408749</DTF00030>");
+    expect(xtx).toContain("<DTF00030>318824</DTF00030>");
   });
 
   test("一括比例配分では付表2にDTGを出す", () => {
@@ -119,7 +134,7 @@ describe("buildConsumptionXtx", () => {
       originalLocal: null,
     });
     expect(xtx).toContain("<AAM00020><kubun_CD>2</kubun_CD></AAM00020>");
-    expect(xtx).toContain("<DTG00170>9090</DTG00170>");
+    expect(xtx).toContain("<DTG00170>7090</DTG00170>");
     expect(xtx).not.toContain("<DTF00000>");
   });
 

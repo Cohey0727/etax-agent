@@ -156,7 +156,7 @@ export interface XtxBalanceSheetInput {
   extraLiability2?: { name: string; opening: number; closing: number };
   /** 事業主貸（期末・資産の部） */
   ownerLoan: number;
-  /** 事業主借（期末・負債資本の部の内訳行。期末元入金の計算に使う） */
+  /** 事業主借（期末・負債資本の部の内訳行。期末の負債・資本合計に加える） */
   ownerBorrowing: number;
 }
 
@@ -243,9 +243,12 @@ export function toEraDate(iso: string): EraDate | null {
   const year = Number(m[1]);
   const mm = Number(m[2]);
   const dd = Number(m[3]);
-  if (year >= 2019) return { era: 5, yy: year - 2018, mm, dd };
-  if (year >= 1989) return { era: 4, yy: year - 1988, mm, dd };
-  if (year >= 1927) return { era: 3, yy: year - 1925, mm, dd };
+  // 元号の開始日（改元の月日境界まで含めて判定する）
+  if (iso >= "2019-05-01") return { era: 5, yy: year - 2018, mm, dd }; // 令和
+  if (iso >= "1989-01-08") return { era: 4, yy: year - 1988, mm, dd }; // 平成
+  if (iso >= "1926-12-25") return { era: 3, yy: year - 1925, mm, dd }; // 昭和
+  if (iso >= "1912-07-30") return { era: 2, yy: year - 1911, mm, dd }; // 大正
+  if (iso >= "1868-10-23") return { era: 1, yy: year - 1867, mm, dd }; // 明治
   return null;
 }
 
@@ -381,7 +384,8 @@ function buildKoa020Face1(data: XtxFilingData): string {
   if (t.shopName) taxpayer.push(ref("ABA00170", "NOZEISHA_YAGO"));
   if (toEraDate(t.birthDate)) taxpayer.push(ref("ABA00200", "BIRTHDAY"));
   if (phoneXml(t.phone)) taxpayer.push(ref("ABA00220", "NOZEISHA_TEL"));
-  const kinds: string[] = [kubun("ABA00240", 1)]; // 青色区分: 該当
+  // 申告区分: 青色申告 = 1、白色申告 = 2
+  const kinds: string[] = [kubun("ABA00240", data.filingType === "white" ? 2 : 1)];
   if (data.amendment) kinds.push(kubun("ABA00256", 1)); // 修正区分: 該当
   taxpayer.push(`<ABA00230>${kinds.join("")}</ABA00230>`);
   header.push(`<ABA00050>${taxpayer.join("")}</ABA00050>`);
@@ -432,18 +436,23 @@ function buildKoa020Face1(data: XtxFilingData): string {
   if (f.business_revenue || f.business_expenses) {
     incomes.push(`<ABB00280>${amountAlways("ABB00300", f._detail.business_income)}</ABB00280>`);
   }
-  incomes.push(amountAlways("ABB00340", f._detail.real_estate_income));
+  incomes.push(amount("ABB00340", f._detail.real_estate_income));
   if (data.salaryIncome && data.salaryIncome.revenue > 0) {
     incomes.push(amountAlways("ABB00370", manual.salary));
   }
-  if (manual.miscTotal > 0 || data.miscIncome.pensionRevenue > 0 || data.miscIncome.businessRevenue > 0) {
-    // 雑: ⑦公的年金等 + ⑧業務 + ⑨その他 + ⑩（⑦〜⑨の計）
+  if (
+    manual.miscTotal !== 0 ||
+    data.miscIncome.pensionRevenue > 0 ||
+    data.miscIncome.businessRevenue > 0 ||
+    data.miscIncome.revenue > 0
+  ) {
+    // 雑: ⑦公的年金等 + ⑧業務 + ⑨その他 + ⑩（⑦〜⑨の計）。赤字もそのまま出す
     const miscParts: string[] = [];
     if (manual.pension > 0) miscParts.push(amountAlways("ABB01060", manual.pension));
-    if (manual.miscBusiness > 0) {
+    if (manual.miscBusiness !== 0) {
       miscParts.push(`<ABB01070>${amountAlways("ABB01090", manual.miscBusiness)}</ABB01070>`);
     }
-    if (manual.miscOther > 0) {
+    if (manual.miscOther !== 0) {
       miscParts.push(`<ABB01100>${amountAlways("ABB01120", manual.miscOther)}</ABB01100>`);
     }
     miscParts.push(amountAlways("ABB01130", manual.miscTotal));
@@ -466,44 +475,64 @@ function buildKoa020Face1(data: XtxFilingData): string {
   ded.push(amount("ABB00510", d.workingStudent + d.disability));
   const spouseTotal = d.spouse + d.spouseSpecial;
   if (spouseTotal > 0) {
-    ded.push((d.spouse > 0 ? kubunValue("ABB00515", 1) : "") + amountAlways("ABB00520", spouseTotal));
+    // 区分1は配偶者特別控除がある場合に立てる
+    ded.push((d.spouseSpecial > 0 ? kubunValue("ABB00515", 1) : "") + amountAlways("ABB00520", spouseTotal));
   }
-  ded.push(amount("ABB00540", d.dependents + d.specialRelative));
+  ded.push(amount("ABB00540", d.dependents));
+  if (d.specialRelative > 0) {
+    // 特定親族特別控除（KOA020-023 以降の様式。人数は入力が単一のため 1）
+    ded.push(
+      `<ABB00542>${amountAlways("ABB00546", 1)}${amountAlways("ABB00548", d.specialRelative)}</ABB00542>`,
+    );
+  }
   ded.push(amountAlways("ABB00550", d.basic));
   ded.push(amountAlways("ABB00555", d.total));
   body.push(`<ABB00420>${ded.join("")}</ABB00420>`);
 
   // 税金の計算
   const taxCalc: string[] = [];
-  const nonForeignCredits = c.total - c.foreignTax;
-  const afterCredits = Math.max(data.tax.incomeTaxBase - nonForeignCredits, 0);
-  const taxTotal = afterCredits + data.tax.reconstructionTax;
-  taxCalc.push(amountAlways("ABB00580", data.tax.taxableIncome));
-  taxCalc.push(amountAlways("ABB00590", data.tax.incomeTaxBase));
+  const tax = data.tax;
+  // 差引所得税額は定額減税を引く前の額で示す。令和6年分は
+  // 再差引所得税額・令和6年分特別税額控除の欄を経て、再々差引
+  // 所得税額（基準所得税額）に至るチェーンになる（KOA020-022）。
+  // 復興特別所得税額は基準所得税額 × 2.1%（外国税額控除前）で、
+  // 外国税額控除等は所得税等の額から引く（ABB01040）。
+  const differential = tax.taxAfterOtherCredits + c.flatReduction;
+  const taxTotal = tax.standardIncomeTax + tax.reconstructionTaxGross;
+  taxCalc.push(amountAlways("ABB00580", tax.taxableIncome));
+  taxCalc.push(amountAlways("ABB00590", tax.incomeTaxBase));
   taxCalc.push(amount("ABB00600", c.dividend));
   taxCalc.push(amount("ABB00650", c.housingLoan));
   taxCalc.push(amount("ABB00660", c.politicalDonations + c.certifiedNpoDonations));
   taxCalc.push(amount("ABB00663", c.seismicRetrofit));
-  taxCalc.push(amountAlways("ABB00670", afterCredits));
-  taxCalc.push(amountAlways("ABB01010", afterCredits));
-  taxCalc.push(amountAlways("ABB01020", data.tax.reconstructionTax));
+  taxCalc.push(amountAlways("ABB00670", differential));
+  if (data.year === 2024) {
+    taxCalc.push(amountAlways("ABB00682", tax.standardIncomeTax + c.flatReduction));
+    if (c.flatReduction > 0) {
+      taxCalc.push(
+        `<ABB00684>${amountAlways("ABB00686", Math.trunc(c.flatReduction / 30_000))}${amountAlways("ABB00688", c.flatReduction)}</ABB00684>`,
+      );
+    }
+  }
+  taxCalc.push(amountAlways("ABB01010", tax.standardIncomeTax));
+  taxCalc.push(amountAlways("ABB01020", tax.reconstructionTaxGross));
   taxCalc.push(amountAlways("ABB01030", taxTotal));
   taxCalc.push(amount("ABB01040", c.foreignTax));
   taxCalc.push(amount("ABB00710", data.withholdingTax));
-  // 申告納税額は100円未満切捨て（国税通則法119条）。還付になる場合は切り捨てない。
+  // 申告納税額は100円未満切捨て（国税通則法119条）。還付になる場合は切り捨てず負のまま出す。
   const declaredRaw = taxTotal - c.foreignTax - data.withholdingTax;
-  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : 0;
+  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : declaredRaw;
   taxCalc.push(amountAlways("ABB00720", declaredTax));
   taxCalc.push(amount("ABB00730", data.prepaidTax));
-  // 第3期分: 納付は申告納税額−予定納税額、還付は源泉超過分も含めた過払い全額
-  const thirdPeriod = declaredTax - data.prepaidTax + Math.min(declaredRaw, 0);
+  // 第3期分: 納付は申告納税額−予定納税額、還付は過払い全額
+  const thirdPeriod = declaredTax - data.prepaidTax;
   if (thirdPeriod > 0) taxCalc.push(`<ABB00740>${amountAlways("ABB00750", thirdPeriod)}</ABB00740>`);
   else if (thirdPeriod < 0) taxCalc.push(`<ABB00740>${amountAlways("ABB00760", -thirdPeriod)}</ABB00740>`);
   body.push(`<ABB00570>${taxCalc.join("")}</ABB00570>`);
 
   // 修正申告・その他は「税金の計算」グループの外（申告内容の直下）に置く
   if (data.amendment && data.originalThirdPeriodTax !== null) {
-    const increase = Math.max(thirdPeriod - data.originalThirdPeriodTax, 0);
+    const increase = Math.floor(Math.max(thirdPeriod - data.originalThirdPeriodTax, 0) / 100) * 100;
     body.push(
       `<ABB00763>${amountAlways("ABB00765", data.originalThirdPeriodTax)}${amountAlways("ABB00767", increase)}</ABB00763>`,
     );
@@ -586,7 +615,12 @@ const KOA210_EXPENSE_LINES: [string, string][] = [
 function buildKoa210(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = data.categoryTotals.business;
+  const totals = { ...data.categoryTotals.business };
+  // 分類カテゴリの「外注工賃」は決算書の固定行「外注費」に合算する
+  if (totals["外注工賃"]) {
+    totals["外注費"] = (totals["外注費"] ?? 0) + (totals["外注工賃"] ?? 0);
+    totals["外注工賃"] = 0;
+  }
   const purchases = totals["仕入高"] ?? 0;
 
   const parts: string[] = [];
@@ -623,12 +657,14 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
     ([account, value]) =>
       value > 0 && !fixedAccounts.has(account) && account !== "仕入高" && account !== "売上高",
   );
-  for (const [account, value] of extras) {
+  // 追加科目は様式の上限（AMF00355 の maxOccurs = 6）まで。超過分は雑費に合算する
+  for (const [account, value] of extras.slice(0, 6)) {
     expenseLines.push(
       `<AMF00355><AMF00060>${esc(account)}</AMF00060>${amountAlways("AMF00360", value)}</AMF00355>`,
     );
   }
-  expenseLines.push(amount("AMF00370", totals["雑費"] ?? 0));
+  const extrasOverflow = extras.slice(6).reduce((sum, [, value]) => sum + value, 0);
+  expenseLines.push(amount("AMF00370", (totals["雑費"] ?? 0) + extrasOverflow));
   const expenseTotal = f.business_expenses - purchases;
   expenseLines.push(amountAlways("AMF00380", expenseTotal));
   amounts.push(`<AMF00180>${expenseLines.join("")}</AMF00180>`);
@@ -699,12 +735,14 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
     ([account, value]) =>
       value > 0 && !fixedAccounts.has(account) && account !== "雑費" && account !== "家賃収入",
   );
-  for (const [account, value] of extras) {
+  // 追加科目は様式の上限（ANF00195 の maxOccurs = 5）まで。超過分は雑費に合算する
+  for (const [account, value] of extras.slice(0, 5)) {
     expenseLines.push(
       `<ANF00195><ANF00060>${esc(account)}</ANF00060>${amountAlways("ANF00200", value)}</ANF00195>`,
     );
   }
-  expenseLines.push(amount("ANF00210", totals["雑費"] ?? 0));
+  const extrasOverflow = extras.slice(5).reduce((sum, [, value]) => sum + value, 0);
+  expenseLines.push(amount("ANF00210", (totals["雑費"] ?? 0) + extrasOverflow));
   expenseLines.push(amountAlways("ANF00220", f.real_estate_expenses));
   pl.push(`<ANF00120>${expenseLines.join("")}</ANF00120>`);
 
@@ -745,7 +783,12 @@ const KOA110_OTHER_EXPENSE_LINES: [string, string][] = [
 function buildKoa110(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = data.categoryTotals.business;
+  const totals = { ...data.categoryTotals.business };
+  // 分類カテゴリの「外注工賃」は収支内訳書の固定行「外注費」に合算する
+  if (totals["外注工賃"]) {
+    totals["外注費"] = (totals["外注費"] ?? 0) + (totals["外注工賃"] ?? 0);
+    totals["外注工賃"] = 0;
+  }
   const purchases = totals["仕入高"] ?? 0;
 
   const parts: string[] = [];
@@ -801,13 +844,15 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
     ([account, value]) =>
       value > 0 && !fixedAccounts.has(account) && account !== "仕入高" && account !== "売上高" && account !== "雑費",
   );
-  for (const [account, value] of extras) {
+  // 追加科目は様式の上限（AIG00325 の maxOccurs = 5）まで。超過分は雑費に合算する
+  for (const [account, value] of extras.slice(0, 5)) {
     otherSubtotal += value;
     otherLines.push(
       `<AIG00325><AIG00010>${esc(account)}</AIG00010>${amountAlways("AIG00330", value)}</AIG00325>`,
     );
   }
-  const misc = totals["雑費"] ?? 0;
+  const extrasOverflow = extras.slice(5).reduce((sum, [, value]) => sum + value, 0);
+  const misc = (totals["雑費"] ?? 0) + extrasOverflow;
   otherSubtotal += misc;
   otherLines.push(amount("AIG00340", misc));
   otherLines.push(amountAlways("AIG00350", otherSubtotal));
@@ -920,6 +965,8 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
 
 /** 様式ごとの減価償却明細のタグ対応 */
 interface DepDetailTags {
+  /** 明細行の maxOccurs（同梱 XSD）。超過分は様式に載せられないため例外にする */
+  maxRows: number;
   group: string;
   row: string;
   name: string;
@@ -948,6 +995,7 @@ interface DepDetailTags {
 }
 
 const DEP_TAGS_KOA210: DepDetailTags = {
+  maxRows: 7,
   group: "AMF01590", row: "AMF01600", name: "AMF01610", quantity: "AMF01620",
   acquisition: "AMF01630", cost: "AMF01640", guarantee: "AMF01645", basis: "AMF01650",
   method: "AMF01660", life: "AMF01670", rateWrap: "AMF01680", rate: "AMF01690",
@@ -958,6 +1006,7 @@ const DEP_TAGS_KOA210: DepDetailTags = {
 };
 
 const DEP_TAGS_KOA220: DepDetailTags = {
+  maxRows: 13,
   group: "ANF00880", row: "ANF00890", name: "ANF00900", quantity: "ANF00910",
   acquisition: "ANF00920", cost: "ANF00930", guarantee: "ANF00935", basis: "ANF00940",
   method: "ANF00950", life: "ANF00960", rateWrap: "ANF00970", rate: "ANF00980",
@@ -968,6 +1017,7 @@ const DEP_TAGS_KOA220: DepDetailTags = {
 };
 
 const DEP_TAGS_KOA110: DepDetailTags = {
+  maxRows: 6,
   group: "AIM00000", row: "AIM00010", name: "AIM00020", quantity: "AIM00030",
   acquisition: "AIM00050", cost: "AIM00060", guarantee: "AIM00065", basis: "AIM00070",
   method: "AIM00080", life: "AIM00090", rateWrap: "AIM00100", rate: "AIM00110",
@@ -978,6 +1028,7 @@ const DEP_TAGS_KOA110: DepDetailTags = {
 };
 
 const DEP_TAGS_KOA130: DepDetailTags = {
+  maxRows: 8,
   group: "AKK00000", row: "AKK00010", name: "AKK00020", quantity: "AKK00030",
   acquisition: "AKK00050", cost: "AKK00060", guarantee: "AKK00065", basis: "AKK00070",
   method: "AKK00080", life: "AKK00090", rateWrap: "AKK00100", rate: "AKK00110",
@@ -997,6 +1048,11 @@ function eraYearMonthTag(tag: string, yearMonth: string): string {
 /** 減価償却費の計算グループ（明細行＋計）を組み立てる。 */
 function buildDepreciationDetail(rows: DepreciationDetailRow[], tags: DepDetailTags): string {
   if (rows.length === 0) return "";
+  if (rows.length > tags.maxRows) {
+    throw new Error(
+      `減価償却費の計算明細は様式の上限 ${tags.maxRows} 件までです（${rows.length} 件指定）。明細をまとめてから出力してください`,
+    );
+  }
   const body: string[] = [];
   for (const row of rows) {
     const cells: string[] = [];
@@ -1066,7 +1122,9 @@ const BS_LIABILITY_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
 
 /**
  * KOA210-4（貸借対照表）を組み立てる。
- * 期末元入金 = 期首元入金 + 事業主借 − 事業主貸 + 青色申告特別控除前の所得金額。
+ * 元入金は期首・期末とも期首元入金の額を書く様式で、期末の合計は
+ * 期末負債合計 + 事業主借 + 期首元入金 + 青色申告特別控除前の所得金額
+ * とし、資産側の期末合計（事業主貸を含む）と一致させる。
  * 貸借が一致しない入力は例外にする（不整合な決算書を出さない）。
  */
 function buildBalanceSheetPage(data: XtxFilingData): string {
@@ -1094,16 +1152,18 @@ function buildBalanceSheetPage(data: XtxFilingData): string {
     (bs.extraLiability2?.closing ?? 0);
   const openingCapital = opening.capital ?? 0;
   const incomeBeforeBlue = data.figures._detail.business_income_before_deduction;
-  const closingCapital = openingCapital + bs.ownerBorrowing - bs.ownerLoan + incomeBeforeBlue;
+  // 期末の負債・資本合計 = 期末負債合計 + 事業主借 + 期首元入金 + 所得
+  const closingTotal =
+    closingLiabilities + bs.ownerBorrowing + openingCapital + incomeBeforeBlue;
 
   if (openingAssets !== openingLiabilities + openingCapital) {
     throw new Error(
       `貸借対照表（期首）が貸借一致しません: 資産 ${openingAssets} ≠ 負債・資本 ${openingLiabilities + openingCapital}`,
     );
   }
-  if (closingAssets !== closingLiabilities + closingCapital) {
+  if (closingAssets !== closingTotal) {
     throw new Error(
-      `貸借対照表（期末）が貸借一致しません: 資産 ${closingAssets} ≠ 負債・資本 ${closingLiabilities + closingCapital}`,
+      `貸借対照表（期末）が貸借一致しません: 資産 ${closingAssets} ≠ 負債・資本 ${closingTotal}`,
     );
   }
 
@@ -1163,9 +1223,10 @@ function buildBalanceSheetPage(data: XtxFilingData): string {
   for (const [key, , closeTag] of BS_LIABILITY_ACCOUNTS) closingL.push(amount(closeTag, closing[key] ?? 0));
   closingL.push(amount("AMG00710", closing.allowance_for_doubtful_accounts ?? 0));
   closingL.push(amount("AMG00730", bs.ownerBorrowing));
-  closingL.push(amountAlways("AMG00740", closingCapital));
+  // 元入金は期末欄にも期首元入金の額を書く（様式の取扱い）
+  closingL.push(amountAlways("AMG00740", openingCapital));
   closingL.push(amountAlways("AMG00750", incomeBeforeBlue));
-  closingL.push(amountAlways("AMG00760", closingLiabilities + closingCapital));
+  closingL.push(amountAlways("AMG00760", closingTotal));
   liabilitySide.push(`<AMG00620>${closingL.join("")}</AMG00620>`);
   parts.push(`<AMG00450>${liabilitySide.join("")}</AMG00450>`);
 

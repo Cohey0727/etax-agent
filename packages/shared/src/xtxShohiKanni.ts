@@ -212,7 +212,12 @@ totalPayable: number;
 /** 割合（%）を小数第1位まで（未満切捨て）に丸める。 */
 function percent1(numerator: number, denominator: number): number {
 if (denominator <= 0) return 0;
-return Math.floor((numerator / denominator) * 1000) / 10;
+return Math.floor((numerator * 1000) / denominator) / 10;
+}
+
+/** みなし仕入率の乗算（率は 0.4〜0.9 の10%刻み。整数演算で切り捨てる）。 */
+function floorDeemed(base: number, rate: number): number {
+return Math.floor((base * Math.round(rate * 10)) / 10);
 }
 
 /**
@@ -282,15 +287,15 @@ const specialOptions: SimplifiedSpecialOption[] = [];
 let appliedRule: SimplifiedAppliedRule = { kind: "principle" };
 if (singleCategory!== null) {
 const rate = deemedRate(singleCategory);
-inputTax10 = Math.floor(basis10 * rate);
-inputTax8 = Math.floor(basis8 * rate);
+inputTax10 = floorDeemed(basis10, rate);
+inputTax8 = floorDeemed(basis8, rate);
 appliedRule = { kind: "single" };
 } else if (categories.length > 1) {
 principleRaw10 = categories.reduce(
-(s, c) => s + Math.floor(c.tax10 * c.deemedRate),
+(s, c) => s + floorDeemed(c.tax10, c.deemedRate),
 0,
 );
-principleRaw8 = categories.reduce((s, c) => s + Math.floor(c.tax8 * c.deemedRate), 0);
+principleRaw8 = categories.reduce((s, c) => s + floorDeemed(c.tax8, c.deemedRate), 0);
 principleInputTax10 = taxTotal10 > 0? Math.floor((basis10 * principleRaw10) / taxTotal10): 0;
 principleInputTax8 = taxTotal8 > 0? Math.floor((basis8 * principleRaw8) / taxTotal8): 0;
 inputTax10 = principleInputTax10;
@@ -306,8 +311,8 @@ if (!shareAtLeast75(c.exclTotal)) continue;
 specialOptions.push({
 rule: "special1",
 category: c.category,
-inputTax8: Math.floor(basis8 * c.deemedRate),
-inputTax10: Math.floor(basis10 * c.deemedRate),
+inputTax8: floorDeemed(basis8, c.deemedRate),
+inputTax10: floorDeemed(basis10, c.deemedRate),
 });
 }
 for (let i = 0; i < categories.length; i++) {
@@ -318,11 +323,11 @@ if (!shareAtLeast75(higher.exclTotal + lower.exclTotal)) continue;
 // 特例2号: 高い方の事業はその率、残り全部（第3の事業を含む）に
 // 低い方の率を適用し、原則計算と同じ按分式で求める
 const raw10 =
-Math.floor(higher.tax10 * higher.deemedRate) +
-Math.floor((taxTotal10 - higher.tax10) * lower.deemedRate);
+floorDeemed(higher.tax10, higher.deemedRate) +
+floorDeemed(taxTotal10 - higher.tax10, lower.deemedRate);
 const raw8 =
-Math.floor(higher.tax8 * higher.deemedRate) +
-Math.floor((taxTotal8 - higher.tax8) * lower.deemedRate);
+floorDeemed(higher.tax8, higher.deemedRate) +
+floorDeemed(taxTotal8 - higher.tax8, lower.deemedRate);
 specialOptions.push({
 rule: "special2",
 higher: higher.category,
@@ -372,21 +377,23 @@ diffNational = floor100(diffRaw);
 if (diffNational >= interimNational) {
 payableNational = floor100(diffNational - interimNational);
 } else {
-interimRefundNational = floor100(interimNational - diffNational);
+interimRefundNational = interimNational - diffNational;
 }
-// 地方消費税: 譲渡割額は差引税額（国税）× 22/78
-const localRaw = Math.floor(diffNational * (22 / 78));
+// 地方消費税: 譲渡割額は差引税額（国税）× 22/78。中間納付の差引は
+// 100円未満切捨て後の譲渡割額（localTaxGross）を基準にする
+const localRaw = Math.floor((diffNational * 22) / 78);
 localTaxGross = floor100(localRaw);
-if (localRaw >= interimLocal) {
-payableLocal = floor100(localRaw - interimLocal);
+if (localTaxGross >= interimLocal) {
+payableLocal = floor100(localTaxGross - interimLocal);
 } else {
-interimRefundLocal = floor100(interimLocal - localRaw);
+interimRefundLocal = interimLocal - localTaxGross;
 }
 } else {
 refundNational = -diffRaw;
-refundLocal = Math.floor(refundNational * (22 / 78));
-if (interimNational > 0) interimRefundNational = floor100(interimNational);
-if (interimLocal > 0) interimRefundLocal = floor100(interimLocal);
+refundLocal = Math.floor((refundNational * 22) / 78);
+// 還付側の中間納付還付額は差額そのもの（100円未満切捨てはしない）
+if (interimNational > 0) interimRefundNational = interimNational;
+if (interimLocal > 0) interimRefundLocal = interimLocal;
 }
 
 const totalPayable =
@@ -511,9 +518,8 @@ abi.push(amount("ABI00120", r.payableNational));
 abi.push(amount("ABI00130", r.interimRefundNational));
 let amendmentNational = 0;
 if (data.filingKind === 3 && data.originalNational!== null) {
-amendmentNational = floor100(
-Math.max(r.payableNational + interimNational - data.originalNational, 0),
-);
+// 増加額は今回の納付税額 − 既確定税額（いずれも中間納付控除後の額）
+amendmentNational = floor100(Math.max(r.payableNational - data.originalNational, 0));
 abi.push(
 `<ABI00140>${amountAlways("ABI00150", data.originalNational)}${amountAlways("ABI00160", amendmentNational)}</ABI00140>`,
 );
@@ -533,9 +539,7 @@ abj.push(amount("ABJ00080", r.payableLocal));
 abj.push(amount("ABJ00090", r.interimRefundLocal));
 let amendmentLocal = 0;
 if (data.filingKind === 3 && data.originalLocal!== null) {
-amendmentLocal = floor100(
-Math.max(r.payableLocal + interimLocal - data.originalLocal, 0),
-);
+amendmentLocal = floor100(Math.max(r.payableLocal - data.originalLocal, 0));
 abj.push(
 `<ABJ00100>${amountAlways("ABJ00110", data.originalLocal)}${amountAlways("ABJ00120", amendmentLocal)}</ABJ00100>`,
 );
@@ -599,9 +603,8 @@ abp.push(amountAlways("ABP00060", r.salesExcl));
 const abs: string[] = [];
 abs.push(amount("ABS00040", r.outputTax8));
 abs.push(amount("ABS00050", r.outputTax10));
-// 地方消費税の課税標準となる消費税額（税率別は現行税率分に合算）
-const localBase =
-r.outputTax + r.badDebtRecoveryTax - r.creditSubtotal;
+// 地方消費税の課税標準となる消費税額 = 差引税額（100円未満切捨て後）
+const localBase = r.diffNational;
 
 const page2 =
 `<SHA020-2 page="2">` +

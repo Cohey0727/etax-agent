@@ -43,7 +43,10 @@ function digitsOnly(value: string): string {
  */
 export function normalizeNameKana(value: string): string {
   const wide = value.normalize("NFKC");
-  const katakana = wide.replace(/[ぁ-ゟ]/g, (ch) =>
+  // 変換範囲は ァ行のひらがな（ぁ-ゖ）と繰り返し記号（ゝゞ）に限る。
+  // ゛（U+309B）・゜（U+309C）まで含めると +0x60 で ・（U+30FB）・
+  // ー（U+30FC）に化けてしまうため含めない。
+  const katakana = wide.replace(/[ぁ-ゖゝゞ]/g, (ch) =>
     String.fromCharCode(ch.charCodeAt(0) + 0x60),
   );
   return katakana.replace(/\s/g, "");
@@ -71,6 +74,11 @@ export function normalizePhoneNumber(value: string): string {
   }
   const total = parts.join("").length;
   if (parts.length !== 3 || (total !== 10 && total !== 11)) return "";
+  // 各要素の桁数も検証する（先頭は 0 始まり、末尾は4桁、中間は2〜4桁）
+  const [first, middle, last] = parts as [string, string, string];
+  if (!first.startsWith("0") || first.length < 2 || first.length > 5) return "";
+  if (middle.length < 2 || middle.length > 4) return "";
+  if (last.length !== 4) return "";
   return parts.join("-");
 }
 

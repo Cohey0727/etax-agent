@@ -8,6 +8,8 @@ import {
   computeCorrectedFigures,
   computeIncomeTax,
   computeManualIncomes,
+  depreciationDetailRow,
+  toEraDate,
   xtxSupportedYears,
 } from "../src";
 
@@ -173,7 +175,50 @@ describe("buildXtxFiling の減価償却明細と貸借対照表", () => {
     expect(xtx).toContain("<AMF01730>112500</AMF01730>");
     expect(xtx).toContain("<KOA210-4");
     expect(xtx).toContain("<AMG00230>1000000</AMG00230>");
-    expect(xtx).toContain(`<AMG00740>${1_000_000 + incomeBeforeBlue}</AMG00740>`);
+    // 元入金は期末欄にも期首元入金の額を書き、合計は負債+事業主借+元入金+所得
+    expect(xtx).toContain("<AMG00740>1000000</AMG00740>");
+    expect(xtx).toContain(`<AMG00760>${1_000_000 + incomeBeforeBlue}</AMG00760>`);
+  });
+
+  test("貸借対照表: 事業主貸・事業主借がある場合も様式の合計式で一致する", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
+    const tax = computeIncomeTax({
+      year: 2023,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: { ...EMPTY_DEDUCTION_INPUTS },
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const incomeBeforeBlue = figures._detail.business_income_before_deduction;
+    // 期末資産 = 現金（期首 + 所得 − 20万）+ 事業主貸30万
+    //          = 負債0 + 事業主借10万 + 期首元入金100万 + 所得
+    const xtx = buildXtxFiling({
+      year: 2023,
+      amendment: false,
+      submissionDate: "2024-03-10",
+      taxpayer: {
+        name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+        myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア", shopName: "", jan1Address: "",
+      },
+      figures,
+      deductionInputs: { ...EMPTY_DEDUCTION_INPUTS },
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+      balanceSheet: {
+        opening: { cash: 1_000_000, capital: 1_000_000 },
+        closing: { cash: 800_000 + incomeBeforeBlue },
+        ownerLoan: 300_000,
+        ownerBorrowing: 100_000,
+      },
+    });
+    expect(xtx).toContain("<AMG00730>100000</AMG00730>"); // 事業主借
+    expect(xtx).toContain("<AMG00740>1000000</AMG00740>"); // 元入金は期首額
+    expect(xtx).toContain(`<AMG00760>${1_100_000 + incomeBeforeBlue}</AMG00760>`);
   });
 
   test("貸借が一致しない貸借対照表は例外にする", () => {
@@ -238,8 +283,8 @@ describe("buildXtxFiling", () => {
     // 収入金額等: 事業 12,000,000 / 不動産 1,764,000
     expect(xtx).toContain("<ABB00030>12000000</ABB00030>");
     expect(xtx).toContain("<ABB00050>1764000</ABB00050>");
-    // 青色申告特別控除の合計 750,000
-    expect(xtx).toContain("<ABB00800>750000</ABB00800>");
+    // 青色申告特別控除の合計 650,000（不動産・事業の合算限度、No.2072）
+    expect(xtx).toContain("<ABB00800>650000</ABB00800>");
     // 修正申告欄: 修正前の第3期分の税額
     expect(xtx).toContain("<ABB00765>1480000</ABB00765>");
     // 決算書: 売上・賃貸料
@@ -607,5 +652,230 @@ describe("buildXtxFiling の仕様適合（公式XMLスキーマ準拠）", () =
         originalThirdPeriodTax: null,
       }),
     ).toThrow(/利用者識別番号/);
+  });
+});
+
+describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", () => {
+  const TAXPAYER = {
+    name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+    address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+    phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+    myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア",
+    shopName: "", jan1Address: "",
+  };
+
+  function buildCustom(opts: {
+    year: number;
+    deductions?: Partial<typeof EMPTY_DEDUCTION_INPUTS>;
+    taxCredits?: Partial<typeof EMPTY_TAX_CREDIT_INPUTS>;
+    filingType?: "blue65" | "white";
+    withholdingTax?: number;
+    txs?: Transaction[];
+  }) {
+    const figures = computeCorrectedFigures(opts.txs ?? TRANSACTIONS, opts.year, {
+      filingType: opts.filingType,
+    });
+    const deductionInputs = { ...EMPTY_DEDUCTION_INPUTS, ...opts.deductions };
+    const tax = computeIncomeTax({
+      year: opts.year,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: deductionInputs,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, ...opts.taxCredits },
+    });
+    const xtx = buildXtxFiling({
+      year: opts.year,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: TAXPAYER,
+      figures,
+      filingType: opts.filingType,
+      deductionInputs,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: opts.withholdingTax ?? 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    return { xtx, tax };
+  }
+
+  const tagValue = (xml: string, tag: string) =>
+    Number(xml.match(new RegExp(`<${tag}>(-?\\d+)</${tag}>`))?.[1]);
+
+  test("白色申告は申告区分 ABA00240 = 2", () => {
+    const { xtx } = buildCustom({ year: 2025, filingType: "white" });
+    expect(xtx).toContain("<ABA00240><kubun_CD>2</kubun_CD></ABA00240>");
+  });
+
+  test("令和6年分は定額減税のチェーン（ABB00682/684/686/688）を出す", () => {
+    const { xtx, tax } = buildCustom({ year: 2024, taxCredits: { flatReduction: 60_000 } });
+    expect(tagValue(xtx, "ABB00670")).toBe(tax.taxAfterOtherCredits + 60_000);
+    expect(tagValue(xtx, "ABB00682")).toBe(tax.standardIncomeTax + 60_000);
+    expect(xtx).toContain("<ABB00686>2</ABB00686>"); // 60,000 ÷ 30,000 = 2人
+    expect(xtx).toContain("<ABB00688>60000</ABB00688>");
+    expect(tagValue(xtx, "ABB01010")).toBe(tax.standardIncomeTax);
+  });
+
+  test("特定親族特別控除は ABB00542 グループに出し、扶養控除 ABB00540 と分ける", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2025,
+      deductions: {
+        specialRelativeTotalIncome: 1_000_000,
+        dependents: { general: 1, specific: 0, elderly: 0, elderlyCohabiting: 0 },
+      },
+    });
+    expect(tax.deductions.specialRelative).toBe(410_000);
+    expect(xtx).toContain("<ABB00546>1</ABB00546>");
+    expect(xtx).toContain("<ABB00548>410000</ABB00548>");
+    expect(tagValue(xtx, "ABB00540")).toBe(tax.deductions.dependents);
+  });
+
+  test("外国税額控除があっても ABB01020 = floor(ABB01010 × 2.1%) の検算が成立する", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2025,
+      taxCredits: { foreignTaxPaid: 500_000, foreignIncome: 3_000_000 },
+    });
+    expect(tax.taxCredits.foreignTax).toBeGreaterThan(0);
+    const b = tagValue(xtx, "ABB01010");
+    const r = tagValue(xtx, "ABB01020");
+    expect(b).toBe(tax.standardIncomeTax);
+    expect(r).toBe(Math.floor((b * 21) / 1000));
+    expect(tagValue(xtx, "ABB01040")).toBe(tax.taxCredits.foreignTax);
+    expect(tagValue(xtx, "ABB00720")).toBe(
+      Math.floor((b + r - tax.taxCredits.foreignTax) / 100) * 100,
+    );
+  });
+
+  test("還付になる場合は ABB00720 を負のまま出す（0にクランプしない）", () => {
+    const { xtx, tax } = buildCustom({ year: 2025, withholdingTax: 2_000_000 });
+    const raw = tax.standardIncomeTax + tax.reconstructionTaxGross - 2_000_000;
+    expect(raw).toBeLessThan(0);
+    expect(tagValue(xtx, "ABB00720")).toBe(raw);
+    expect(tagValue(xtx, "ABB00760")).toBe(-raw);
+  });
+
+  test("分類カテゴリ「外注工賃」は固定行「外注費」AMF00320 に合算される", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2025);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: TAXPAYER,
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: { 外注費: 100_000, 外注工賃: 550_000 }, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    expect(xtx).toContain("<AMF00320>650000</AMF00320>");
+    expect(xtx).not.toContain("外注工賃");
+  });
+
+  test("追加科目が様式の上限（6件）を超えたら超過分は雑費に合算される", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2025);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const extras: Record<string, number> = {};
+    for (let i = 1; i <= 8; i++) extras[`追加科目${i}`] = i * 10_000;
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: TAXPAYER,
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: { ...extras, 雑費: 5_000 }, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    expect(xtx.match(/<AMF00355>/g)).toHaveLength(6);
+    // 雑費 = 5,000 + 超過2件（70,000 + 80,000）
+    expect(xtx).toContain("<AMF00370>155000</AMF00370>");
+  });
+
+  test("減価償却明細が様式の上限（KOA210 は7件）を超えたら例外", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2025);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const rows = Array.from({ length: 8 }, (_, i) =>
+      depreciationDetailRow(
+        `資産${i}`,
+        {
+          acquisitionDate: "2025-04-01",
+          cost: 100_000,
+          usefulLifeYears: 4,
+          method: "straight_line",
+          businessRatioPercent: 100,
+        },
+        2025,
+      ),
+    ).filter((r) => r !== null);
+    expect(rows).toHaveLength(8);
+    expect(() =>
+      buildXtxFiling({
+        year: 2025,
+        amendment: false,
+        submissionDate: "2026-03-10",
+        taxpayer: TAXPAYER,
+        figures,
+        deductionInputs: EMPTY_DEDUCTION_INPUTS,
+        miscIncome: EMPTY_MISC_INCOME,
+        tax,
+        categoryTotals: { business: {}, realEstate: {} },
+        withholdingTax: 0,
+        prepaidTax: 0,
+        originalThirdPeriodTax: null,
+        depreciation: { business: rows, realEstate: [] },
+      }),
+    ).toThrow(/上限 7 件/);
+  });
+
+  test("配偶者控除のみ（特別控除なし）では ABB00515 を立てない", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2025,
+      // 配偶者控除は本人の合計所得1,000万円以下が要件なので小さい取引で組む
+      txs: [
+        tx({ date: "2025-06-15", year: 2025, description: "事業売上", amount: 5_000_000, category: "売上高", income_type: "business" }),
+      ],
+      deductions: { spouseCategory: "general", spouseTotalIncome: 400_000 },
+    });
+    expect(tax.deductions.spouse).toBeGreaterThan(0);
+    expect(tax.deductions.spouseSpecial).toBe(0);
+    expect(xtx).not.toContain("ABB00515");
+  });
+});
+
+describe("toEraDate の元号境界 (#3-4)", () => {
+  test("改元の月日境界で元号が切り替わる", () => {
+    expect(toEraDate("2019-04-30")).toEqual({ era: 4, yy: 31, mm: 4, dd: 30 }); // 平成31年
+    expect(toEraDate("2019-05-01")).toEqual({ era: 5, yy: 1, mm: 5, dd: 1 }); // 令和元年
+    expect(toEraDate("1989-01-07")).toEqual({ era: 3, yy: 64, mm: 1, dd: 7 }); // 昭和64年
+    expect(toEraDate("1989-01-08")).toEqual({ era: 4, yy: 1, mm: 1, dd: 8 }); // 平成元年
+    expect(toEraDate("1926-12-24")).toEqual({ era: 2, yy: 15, mm: 12, dd: 24 }); // 大正15年
+    expect(toEraDate("1926-12-25")).toEqual({ era: 3, yy: 1, mm: 12, dd: 25 }); // 昭和元年
+    expect(toEraDate("1912-07-29")).toEqual({ era: 1, yy: 45, mm: 7, dd: 29 }); // 明治45年
+    expect(toEraDate("1912-07-30")).toEqual({ era: 2, yy: 1, mm: 7, dd: 30 }); // 大正元年
+    expect(toEraDate("1868-10-22")).toBeNull();
   });
 });
