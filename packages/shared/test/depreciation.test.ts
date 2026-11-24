@@ -127,3 +127,34 @@ describe("一括償却資産・少額特例", () => {
     expect(smallSpecialUsage(assets, 2026).total).toBe(0);
   });
 });
+
+describe("整数演算化と入力検証 (#3-5)", () => {
+  test("率の乗算は整数演算（10,000 × 0.143 = 1,430、float では 1,429 になる）", () => {
+    const a = asset({ cost: 10_000, usefulLifeYears: 7, acquisitionDate: "2025-01-01" });
+    expect(depreciationForYear(a, 2025)?.ordinary).toBe(1_430);
+  });
+
+  test("定率法の初年度月割も単一フロア（定額法と順序を統一）", () => {
+    // 100,003 × 0.2 × 10/12 = 16,667.16… → 16,667。
+    // 二重フロア（先に年額を切り捨ててから月割）では 16,666 になる
+    const a = asset({
+      cost: 100_003,
+      usefulLifeYears: 10,
+      method: "declining_balance",
+      acquisitionDate: "2025-03-01",
+    });
+    const y = depreciationForYear(a, 2025);
+    expect(y?.months).toBe(10);
+    expect(y?.ordinary).toBe(16_667);
+  });
+
+  test("月の範囲外（13月）は例外", () => {
+    const a = asset({ acquisitionDate: "2025-13-01" });
+    expect(() => depreciationSchedule(a, 2025)).toThrow(/日付の形式が不正/);
+  });
+
+  test("取得価額が NaN なら例外（従来は検証をすり抜けていた）", () => {
+    const a = asset({ cost: Number.NaN });
+    expect(() => depreciationSchedule(a, 2025)).toThrow(/取得価額/);
+  });
+});

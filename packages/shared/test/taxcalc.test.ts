@@ -173,6 +173,27 @@ describe("サンプルCSV（2024年分）", () => {
   test("内部形式CSVの再パースでも件数が一致する", () => {
     expect(importCsvText(SAMPLE_CSV)).toHaveLength(54);
   });
+
+  test("estimateInputTax は台帳の実カテゴリ名の非課税仕入を除外する (#3-5)", () => {
+    const mk = (category: string, amount: number) => ({
+      date: "2024-06-15",
+      year: 2024,
+      description: "テスト",
+      amount,
+      account: "普通預金",
+      category,
+      income_type: "business" as const,
+      tax_category: "",
+    });
+    const txs = [
+      mk("通信費", -110_000), // 課税仕入: 110,000 × 10/110 = 10,000
+      mk("損害保険料", -110_000), // 非課税仕入（旧表記「保険料」では一致しなかった）
+      mk("給料賃金", -110_000), // 非課税仕入（旧表記「給与賃金」では一致しなかった）
+      mk("利子割引料", -110_000),
+      mk("貸倒金", -110_000),
+    ];
+    expect(estimateInputTax(txs)).toBe(10_000);
+  });
 });
 
 describe("ルールによる科目推定", () => {

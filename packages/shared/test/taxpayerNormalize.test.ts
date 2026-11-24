@@ -74,6 +74,15 @@ describe("normalizeNameKana", () => {
     expect(normalizeNameKana("おかもと こうへい")).toBe("オカモトコウヘイ");
     expect(normalizeNameKana("ｵｶﾓﾄ　ｺｳﾍｲ")).toBe("オカモトコウヘイ");
   });
+
+  test("合成できない濁点が別文字に化けない", () => {
+    // セ+゛ は合成形が無い。NFKC で結合濁点（U+3099）になり、そのまま
+    // 残るのが正しい。旧い変換範囲（ぁ-ゟ）では +0x60 の対象になって
+    // 別文字に化けていた
+    const out = normalizeNameKana("セ゛");
+    expect(out).toBe("セ\u3099");
+    expect(out).not.toContain("・");
+  });
 });
 
 describe("normalizePhoneNumber", () => {
@@ -88,6 +97,13 @@ describe("normalizePhoneNumber", () => {
     expect(normalizePhoneNumber("")).toBe("");
     expect(normalizePhoneNumber("080-2500")).toBe("");
     expect(normalizePhoneNumber("12345")).toBe("");
+  });
+
+  test("合計桁数が合っても各要素の桁数が不正なら空文字", () => {
+    expect(normalizePhoneNumber("080-250-07879")).toBe(""); // 末尾5桁
+    expect(normalizePhoneNumber("123-4567-8901")).toBe(""); // 先頭が0始まりでない
+    expect(normalizePhoneNumber("080-25007-879")).toBe(""); // 中間5桁・末尾3桁
+    expect(normalizePhoneNumber("03-1234-5678")).toBe("03-1234-5678"); // 2-4-4 は正
   });
 });
 
