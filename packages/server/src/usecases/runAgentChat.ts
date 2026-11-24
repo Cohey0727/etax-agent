@@ -9,9 +9,10 @@
 import { normalizeTransactions } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { AgentConfig, ConfigError, loadAgentConfig } from "../lib/config";
+import { AgentConfig, ConfigError, loadAgentConfig, pairApiKeyWithBaseUrl } from "../lib/config";
 import { errorMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
+import { assertSafeUserBaseUrl, UnsafeUrlError } from "../lib/ssrfGuard";
 import { AgentChatRequestSchema, AgentChatResponse, AgentChatResponseSchema } from "../schemas/agentChat";
 import { ErrorSchema } from "../schemas/common";
 import { runAgentTurn } from "../services/agent/runAgentTurn";
@@ -55,16 +56,38 @@ export const runAgentChatHandler: RouteHandler<typeof runAgentChatRoute> = async
   }
   const raw = await readJsonBody(c);
   // 設定画面（外部接続）から送られた接続情報があれば、環境変数より優先する。
+  // ただし baseUrl がカスタム宛先の場合、サーバー環境変数のキーは送らない
+  // （キー漏洩防止: pairApiKeyWithBaseUrl）。カスタム宛先は SSRF 検証も行う。
   const override = raw?.agentConfig as
     | { apiKey?: unknown; baseUrl?: unknown; model?: unknown }
     | undefined;
   if (override) {
-    if (typeof override.apiKey === "string" && override.apiKey.trim()) {
-      cfg.apiKey = override.apiKey.trim();
+    const customBaseUrl =
+      typeof override.baseUrl === "string" && override.baseUrl.trim()
+        ? override.baseUrl.trim()
+        : null;
+    const userKey =
+      typeof override.apiKey === "string" && override.apiKey.trim()
+        ? override.apiKey.trim()
+        : null;
+    if (customBaseUrl) {
+      try {
+        await assertSafeUserBaseUrl(customBaseUrl);
+      } catch (e) {
+        if (e instanceof UnsafeUrlError) {
+          throw new HTTPException(400, { message: e.message });
+        }
+        throw e;
+      }
     }
-    if (typeof override.baseUrl === "string" && override.baseUrl.trim()) {
-      cfg.baseUrl = override.baseUrl.trim().replace(/\/+$/, "");
-    }
+    const paired = pairApiKeyWithBaseUrl({
+      customBaseUrl,
+      serverBaseUrl: cfg.baseUrl,
+      userKey,
+      serverKey: cfg.apiKey,
+    });
+    cfg.baseUrl = paired.baseUrl;
+    cfg.apiKey = paired.apiKey;
     if (typeof override.model === "string" && override.model.trim()) {
       cfg.model = override.model.trim();
     }

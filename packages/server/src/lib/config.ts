@@ -177,18 +177,50 @@ export function getRegexRulesOverride(): { pattern: string; category: string }[]
 }
 
 /**
+ * 接続先（baseUrl）と API キーの出所を揃える（Issue #5 のキー漏洩対策）。
+ *
+ * ユーザーが指定した baseUrl へは、サーバー環境変数のキーを決して
+ * 送らない。カスタム baseUrl には、ユーザー自身が設定したキーだけを
+ * 組み合わせる（無ければキー無し）。カスタム baseUrl がサーバー設定と
+ * 同じ宛先を指す場合に限り、サーバーのキーをフォールバックに使える。
+ */
+export function pairApiKeyWithBaseUrl(args: {
+  /** ユーザーが指定した baseUrl（未指定なら undefined / 空）。 */
+  customBaseUrl?: string | null;
+  /** サーバー設定（環境変数・デフォルト）の baseUrl。 */
+  serverBaseUrl: string;
+  /** ユーザー自身が設定したキー（未設定なら undefined / 空）。 */
+  userKey?: string | null;
+  /** サーバー設定（環境変数）のキー。 */
+  serverKey: string | null;
+}): { baseUrl: string; apiKey: string | null } {
+  const serverBaseUrl = args.serverBaseUrl.replace(/\/+$/, "");
+  const custom = args.customBaseUrl?.trim().replace(/\/+$/, "") || null;
+  const userKey = args.userKey?.trim() || null;
+  if (custom && custom !== serverBaseUrl) {
+    return { baseUrl: custom, apiKey: userKey };
+  }
+  return { baseUrl: serverBaseUrl, apiKey: userKey ?? args.serverKey };
+}
+
+/**
  * SystemOne 互換エンドポイントの設定を読み込む。
  * 設定画面で保存された値があれば、環境変数より優先する。
+ * ただし baseUrl がユーザー指定のカスタム宛先の場合、環境変数の
+ * SYSTEMONE_API_KEY は送らない（pairApiKeyWithBaseUrl）。
  */
 export function loadSystemOneConfig(): SystemOneConfig {
   const overrides = getSystemOneOverrides();
+  const serverBaseUrl = process.env.SYSTEMONE_BASE_URL || "http://127.0.0.1:11434";
+  const paired = pairApiKeyWithBaseUrl({
+    customBaseUrl: overrides.baseUrl,
+    serverBaseUrl,
+    userKey: overrides.apiKey,
+    serverKey: process.env.SYSTEMONE_API_KEY || null,
+  });
   return {
-    baseUrl: (
-      overrides.baseUrl ||
-      process.env.SYSTEMONE_BASE_URL ||
-      "http://127.0.0.1:11434"
-    ).replace(/\/+$/, ""),
-    apiKey: overrides.apiKey || process.env.SYSTEMONE_API_KEY || null,
+    baseUrl: paired.baseUrl,
+    apiKey: paired.apiKey,
     model: overrides.model || process.env.SYSTEMONE_MODEL || null,
   };
 }
