@@ -40,14 +40,15 @@ const allTables = [
 
 let shared: Db | null = null;
 
-/** テスト用 DB を返す。初回はスキーマを用意し、2回目以降は全テーブルを空にする。 */
+/** テスト用 DB を返す。スキーマを用意し、毎回全テーブルを空にして返す。 */
 export async function createTestDb(): Promise<Db> {
   if (!shared) {
     const pool = new Pool({ connectionString: testDatabaseUrl });
     shared = drizzle(pool, { schema });
     await applySchema(shared);
-    return shared;
   }
+  // 初回も必ず空にする。前回実行がクラッシュして残ったデータが
+  // 次の実行を不安定にしないため（Issue #14）。
   await shared.execute(
     sql.raw(`TRUNCATE ${allTables.join(", ")} RESTART IDENTITY CASCADE`),
   );
