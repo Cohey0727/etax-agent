@@ -5,6 +5,8 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://etax:etax@localhost:5432/etaxagent",
+    // 接続情報は環境変数から。認証情報を含む既定値は置かない
+    // （未設定なら drizzle-kit が接続エラーで止まる）。
+    url: process.env.DATABASE_URL ?? "postgres://localhost:5432/etaxagent",
   },
 });

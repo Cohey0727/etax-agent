@@ -3,7 +3,6 @@
     "@ai-sdk/anthropic": "^4.0.105",
     "@ai-sdk/openai-compatible": "^3.0.92",
     "@etax/shared": "workspace:*",
-    "@hono/node-server": "^2.1.8",
     "@hono/zod-openapi": "^1.6.3",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@pdf-lib/fontkit": "^1.1.1",
