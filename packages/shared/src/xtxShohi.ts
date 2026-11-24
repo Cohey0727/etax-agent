@@ -423,7 +423,16 @@ return `<IT VR="1.0" id="IT">${items.join("")}</IT>`;
 
 function buildSha010(
 data: ConsumptionXtxData,
-options?: { creditMethodKubun?: number; creditSubtotal?: number },
+options?: {
+creditMethodKubun?: number;
+creditSubtotal?: number;
+/** 返還等対価に係る税額（2割特例など、入力に返還等がある場合） */
+returnsTax?: number;
+/** 貸倒れに係る税額 */
+badDebtTax?: number;
+/** 控除過大調整税額（貸倒回収に係る消費税額） */
+badDebtRecoveryTax?: number;
+},
 ): string {
 const r = data.result;
 const interimNational = Math.trunc(data.input.interimNational || 0);
@@ -448,8 +457,11 @@ aai.push(ref("AAI00150", "SHINKOKU_KBN"));
 const aaj: string[] = [];
 aaj.push(amountAlways("AAJ00010", r.taxBase));
 aaj.push(amountAlways("AAJ00020", r.outputTax));
+aaj.push(amount("AAJ00030", options?.badDebtRecoveryTax ?? 0));
 const creditBlock: string[] = [];
 creditBlock.push(amount("AAJ00050", r.inputTax));
+creditBlock.push(amount("AAJ00060", options?.returnsTax ?? 0));
+creditBlock.push(amount("AAJ00070", options?.badDebtTax ?? 0));
 creditBlock.push(amountAlways("AAJ00080", options?.creditSubtotal ?? r.inputTax));
 aaj.push(`<AAJ00040>${creditBlock.join("")}</AAJ00040>`);
 aaj.push(amount("AAJ00090", r.refundNational));
@@ -458,13 +470,14 @@ aaj.push(amount("AAJ00110", interimNational));
 aaj.push(amount("AAJ00120", r.payableNational));
 aaj.push(amount("AAJ00130", r.interimRefundNational));
 if (data.filingKind === 3 && data.originalNational!== null) {
-const increase = Math.max(r.payableNational + interimNational - data.originalNational, 0);
+// 増加額は今回の納付税額 − 既確定税額（いずれも中間納付控除後の額）
+const increase = Math.max(r.payableNational - data.originalNational, 0);
 aaj.push(
 `<AAJ00140>${amountAlways("AAJ00150", data.originalNational)}${amountAlways("AAJ00160", floor100(increase))}</AAJ00140>`,
 );
 }
 aaj.push(
-`<AAJ00170>${amountAlways("AAJ00180", r.salesExcl)}${amountAlways("AAJ00190", r.totalSalesExcl)}</AAJ00170>`,
+`<AAJ00170>${amountAlways("AAJ00180", r.salesExcl + Math.trunc(data.input.exemptSales || 0))}${amountAlways("AAJ00190", r.totalSalesExcl)}</AAJ00170>`,
 );
 
 const aak: string[] = [];
@@ -480,12 +493,13 @@ aak.push(amount("AAK00070", interimLocal));
 aak.push(amount("AAK00080", r.payableLocal));
 aak.push(amount("AAK00090", r.interimRefundLocal));
 if (data.filingKind === 3 && data.originalLocal!== null) {
-const increaseLocal = Math.max(r.payableLocal + interimLocal - data.originalLocal, 0);
+const increaseLocal = Math.max(r.payableLocal - data.originalLocal, 0);
 aak.push(
 `<AAK00100>${amountAlways("AAK00110", data.originalLocal)}${amountAlways("AAK00120", floor100(increaseLocal))}</AAK00100>`,
 );
 }
-aak.push(amountAlways("AAK00130", r.payableNational + r.payableLocal));
+// 合計欄は納付の場合のみ出す
+aak.push(amount("AAK00130", r.payableNational + r.payableLocal));
 
 const aam: string[] = [];
 aam.push(kubun("AAM00020", options?.creditMethodKubun ?? (r.fullDeduction? 3: 2)));
@@ -513,15 +527,17 @@ aan.push(
 aan.push(ref("AAN00120", "SHINKOKU_KBN"));
 
 const aaq: string[] = [];
-aaq.push(amount("AAQ00050", r.base10));
+// XSD の sequence 順: AAQ00040（6.24%分）→ AAQ00050（7.8%分）
 aaq.push(amount("AAQ00040", r.base8));
+aaq.push(amount("AAQ00050", r.base10));
 aaq.push(amountAlways("AAQ00060", r.taxBase));
 const aat: string[] = [];
-aat.push(amount("AAT00050", r.outputTax10));
 aat.push(amount("AAT00040", r.outputTax8));
+aat.push(amount("AAT00050", r.outputTax10));
+// 地方消費税の課税標準となる消費税額は差引税額（第一表 AAK00030 と同じ）
 const aaw: string[] = [];
-aaw.push(amountAlways("AAW00010", r.outputTax));
-aaw.push(amount("AAW00040", r.outputTax));
+aaw.push(amountAlways("AAW00010", r.diffNational));
+aaw.push(amount("AAW00040", r.diffNational));
 
 const page2 =
 `<SHA010-2 page="2">` +
@@ -530,6 +546,10 @@ amountAlways("AAP00000", r.taxBase) +
 `<AAQ00000>${aaq.join("")}</AAQ00000>` +
 amountAlways("AAS00000", r.outputTax) +
 `<AAT00000>${aat.join("")}</AAT00000>` +
+amount("AAU00000", options?.returnsTax ?? 0) +
+(options?.returnsTax
+? `<AAV00000>${amount("AAV00010", options.returnsTax)}</AAV00000>`
+: "") +
 `<AAW00000>${aaw.join("")}</AAW00000>` +
 `</SHA010-2>`;
 
@@ -570,7 +590,8 @@ dsf.push(
 );
 parts.push(`<DSF00000>${dsf.join("")}</DSF00000>`);
 parts.push(amount("DSG00000", r.refundNational));
-parts.push(amountAlways("DSH00000", r.diffRaw > 0? r.diffRaw: 0));
+// 差引税額は100円未満切捨て後の値で第一表と一致させる
+parts.push(amountAlways("DSH00000", r.diffNational));
 parts.push(
 `<DSI00000>${amount("DSI00010", r.refundNational)}${amountAlways("DSI00020", r.diffNational)}</DSI00000>`,
 );
@@ -961,6 +982,12 @@ parts.join("") +
 * 生成物は署名なしの組み込み用データで、送信は e-Tax 側で本人が行う。
 */
 export function buildSpecial20ConsumptionXtx(data: Special20ConsumptionXtxData): string {
+// 2割特例の適用期間は令和5年10月1日から令和8年9月30日までの課税期間
+if (data.periodTo < "2023-10-01" || data.periodFrom > "2026-09-30") {
+throw new Error(
+"2割特例は課税期間が2023年10月1日から2026年9月30日までの期間と重なる場合に適用できます",
+);
+}
 const taxpayer = normalizeXtxTaxpayer(data.taxpayer, {
 submissionDate: data.submissionDate,
 periodFrom: data.periodFrom,
@@ -1025,6 +1052,9 @@ id: "SHA010",
 xml: buildSha010(shaData, {
 creditMethodKubun: 8,
 creditSubtotal: r.creditSubtotal,
+returnsTax: r.returnsTax,
+badDebtTax: r.badDebtTax,
+badDebtRecoveryTax: r.badDebtRecoveryTax,
 }),
 },
 { id: "SHB070", xml: buildShb070(normalized) },

@@ -254,6 +254,32 @@ function shohiSample(): string {
   });
 }
 
+function shohi8Sample(): string {
+  // 軽減税率8%の売上・仕入がある本則（AAQ/AAT の税率別内訳の順序を検証）
+  const input = {
+    salesIncl10: 15_352_564,
+    salesIncl8: 5_400_000,
+    nontaxableSales: 100_000,
+    exemptSales: 0,
+    purchasesIncl10: 4_496_249,
+    purchasesIncl8: 1_080_000,
+    interimNational: 0,
+    interimLocal: 0,
+  };
+  return buildConsumptionXtx({
+    taxpayer: TAXPAYER,
+    periodFrom: "2025-01-01",
+    periodTo: "2025-12-31",
+    submissionDate: "2026-11-15",
+    filingKind: 1,
+    basePeriodSalesThousands: 11_345,
+    input,
+    result: computeConsumptionReturn(input),
+    originalNational: null,
+    originalLocal: null,
+  });
+}
+
 function kanniSample(): string {
   const input = {
     salesByCategory: { 5: { incl10: 16_885_000, incl8: 0 } },
@@ -283,16 +309,17 @@ function kanniSample(): string {
 }
 
 function special20Sample(): string {
+  // 返還等・貸倒回収・貸倒れあり（AAJ00030/60/70・AAU・AAV の出力と順序を検証）
   const input = {
-    salesIncl10: 15_352_564,
-    salesIncl8: 0,
+    salesIncl10: 11_000_000,
+    salesIncl8: 1_080_000,
     nontaxableSales: 0,
     exemptSales: 0,
-    returnsIncl10: 0,
+    returnsIncl10: 110_000,
     returnsIncl8: 0,
-    badDebtRecoveryTax10: 0,
+    badDebtRecoveryTax10: 7_800,
     badDebtRecoveryTax8: 0,
-    badDebtTax10: 0,
+    badDebtTax10: 3_900,
     badDebtTax8: 0,
     interimNational: 0,
     interimLocal: 0,
@@ -313,6 +340,7 @@ function special20Sample(): string {
 
 describe("公式XMLスキーマ検証", () => {
   maybe("所得税 2023〜2026 と消費税の生成物が公式XSDを通る", () => {
+    // 検証は python3 + lxml でサンプル数に応じて数秒かかるため余裕を持たせる
     const dir = mkdtempSync(join(tmpdir(), "xtx-xsd-"));
     const samples: [string, string, string][] = [
       ["shotoku2023.xtx", incomeSample(2023), "shotoku/RKO0010-231.xsd"],
@@ -322,6 +350,7 @@ describe("公式XMLスキーマ検証", () => {
       ["shotokuSalary2025.xtx", salarySample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuDepBs2025.xtx", depBsSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
+      ["shohi8.xtx", shohi8Sample(), "shohi/RSH0010-260.xsd"],
       ["shohiSpecial20.xtx", special20Sample(), "shohi/RSH0010-260.xsd"],
       ["shohiKanni2027.xtx", kanniSample(), "shohi/RSH0030-260.xsd"],
     ];
@@ -345,5 +374,5 @@ describe("公式XMLスキーマ検証", () => {
     console.log(result.stdout);
     if (result.stderr) console.log(result.stderr);
     expect(result.status).toBe(0);
-  });
+  }, 30_000);
 });
