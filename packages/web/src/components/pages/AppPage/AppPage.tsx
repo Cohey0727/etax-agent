@@ -1,13 +1,11 @@
 import { sampleTransactions, Transaction } from "@etax/shared";
-import { ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, IconName } from "@components/atoms";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@components/atoms";
 import { PageSkeleton, TableSkeleton } from "@components/molecules";
 import { DashboardSkeleton } from "@components/organisms/dashboard";
 import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
 import {
   applyDeductionPatch,
-  BreakdownEntry,
-  DeductionPatch,
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
@@ -15,196 +13,70 @@ import { AppTemplate } from "@components/templates";
 import {
   AgentConnectionConfig,
   AppView,
-  AuthConfig,
-  AuthUser,
   ChatMessage,
   FilingTab,
-  LedgerTransaction,
   SendKeyMode,
   ThemeMode,
-  ViewPageProps,
 } from "@types";
 import {
   archiveChatSession,
-  AuthQuery,
   ChatSession,
   loadAgentConnection,
   loadChatSessions,
-  parseAuthQuery,
   parsePath,
   pathForView,
   saveAgentConnection,
-  setStorageUserId,
 } from "@utils";
-import {
-  fetchAuthConfig,
-  fetchLedgerTransactions,
-  fetchMe,
-  ledgerRowToTransaction,
-  replaceYearLedgerTransactions,
-  transactionToLedgerInput,
-  updateLedgerTransaction,
-} from "@utils/api";
-import { DashboardPage } from "../DashboardPage";
-import { FilingPage } from "../FilingPage";
-import { ImportPage } from "../ImportPage";
-import { LedgerPage } from "../LedgerPage";
 import { LoginPage } from "../LoginPage";
-import { ReceiptPage } from "../ReceiptPage";
-import { SettingsPage } from "../SettingsPage";
-import { TaxpayerPage } from "../TaxpayerPage";
-
-// nav: サイドバーに出す画面。取込・領収書は帳簿の「追加」からの遷移専用
-// （サイドバーには出さない）。設定は下部アクションバー左下のボタン専用。
-// 修正は独立した画面を持たず、確定 → 差し戻し → 再確定の流れの中で
-// 前回確定との差分として確定申告画面に出す。
-const appViews = [
-  { id: AppView.Dashboard, label: "ダッシュボード", icon: "grid", nav: true, Component: DashboardPage },
-  { id: AppView.Import, label: "取引・CSV取込", icon: "import", nav: false, Component: ImportPage },
-  { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", nav: false, Component: ReceiptPage },
-  { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
-  { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },
-  { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
-  { id: AppView.Settings, label: "設定", icon: "settings", nav: false, Component: SettingsPage },
-] as const satisfies readonly {
-  id: AppView;
-  label: string;
-  icon: IconName;
-  nav: boolean;
-  Component: ComponentType<ViewPageProps>;
-}[];
-
-// サイドバーで確定申告にぶら下げる子項目（タブへの直接遷移）。総合は親そのものなので出さない。
-// 納税者情報は独立画面になったため、ここには含めない。
-const FILING_NAV_CHILDREN: readonly { view: AppView; key: string; label: string }[] = [
-  { view: AppView.Filing, key: "balance", label: "収支" },
-  { view: AppView.Filing, key: "deductions", label: "控除" },
-  { view: AppView.Filing, key: "consumption", label: "消費税" },
-];
-
-/** エージェント由来の控除パッチの内訳に、保存用の id を補う。 */
-const withEntryIds = (patch: DeductionPatch): DeductionPatch => {
-  if (!patch.entries) return patch;
-  const entries: DeductionPatch["entries"] = {};
-  for (const [key, list] of Object.entries(patch.entries)) {
-    if (!list) continue;
-    entries[key as keyof typeof entries] = list.map(
-      (e, i): BreakdownEntry => ({
-        id: e.id || `agent-${key}-${i}`,
-        recipient: e.recipient ?? "",
-        amount: typeof e.amount === "number" ? e.amount : 0,
-      }),
-    );
-  }
-  return { ...patch, entries };
-};
-
-const THEME_STORAGE_KEY = "etax-theme";
-
-const readStoredThemeMode = (): ThemeMode => {
-  try {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "light" || saved === "dark" || saved === "system") return saved;
-  } catch {
-    // 保存値が読めない環境では端末設定に合わせる
-  }
-  return "system";
-};
-
-const applyThemeMode = (mode: ThemeMode) => {
-  const dark =
-    mode === "dark" ||
-    (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-};
-
-const SEND_KEY_STORAGE_KEY = "etax-send-key";
-
-const readStoredSendKeyMode = (): SendKeyMode => {
-  try {
-    if (localStorage.getItem(SEND_KEY_STORAGE_KEY) === "modEnter") return "modEnter";
-  } catch {
-    // 保存値が読めない環境では Enter 送信を既定にする
-  }
-  return "enter";
-};
-
-const YEAR_STORAGE_KEY = "etax-selected-year";
-
-const readStoredYear = (): number => {
-  try {
-    const saved = Number(localStorage.getItem(YEAR_STORAGE_KEY));
-    return Number.isInteger(saved) && saved > 0 ? saved : 0;
-  } catch {
-    return 0;
-  }
-};
-
-/** 取引がまだ無いのに追加された年度（年度セレクタの「YYYY年度を追加」）。 */
-const EXTRA_YEARS_STORAGE_KEY = "etax-extra-years";
-
-const readExtraYears = (): number[] => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(EXTRA_YEARS_STORAGE_KEY) ?? "[]") as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (y): y is number => typeof y === "number" && Number.isInteger(y) && y >= 1900 && y <= 2100,
-    );
-  } catch {
-    return [];
-  }
-};
+import { withEntryIds } from "./appPageHelpers";
+import {
+  applyThemeMode,
+  readStoredSendKeyMode,
+  readStoredThemeMode,
+  SEND_KEY_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from "./appPageStorage";
+import { appViews, FILING_NAV_CHILDREN } from "./appViews";
+import { useAuthGate } from "./useAuthGate";
+import { useLedgerSync } from "./useLedgerSync";
+import { useYearSelection } from "./useYearSelection";
 
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);
+  // エージェント会話の履歴。見出し横の履歴ボタンとパネルで状態を共有する。
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
   // 認証ゲート: 設定（必須かどうか）とログイン状態を確認するまで待つ。
-  // 必須でないローカル運用では従来どおりそのまま使う。メールリンク
-  // （?magic=）や外部ログインの戻り（?auth_error=）はログイン画面で受ける。
-  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  // 認証クエリはURL同期（パスだけの書き換え）で消える前に、値ごと
-  // 捕捉しておき、ログイン画面へ渡す（Issue #10-1）。
-  const authQueryRef = useRef<AuthQuery>(
-    typeof window !== "undefined"
-      ? parseAuthQuery(window.location.search)
-      : { magic: null, authError: null, verify: null, totpChallenge: null },
-  );
-  const refreshAuth = useCallback(async () => {
-    const [config, me] = await Promise.all([
-      fetchAuthConfig().catch(() => null),
-      fetchMe().catch(() => null),
-    ]);
-    if (config) setAuthConfig(config);
-    // 端末保存の名前空間をログイン中ユーザーに合わせる（Issue #9）。
-    // 画面の子コンポーネントが読み書きする前に、ここで同期的に設定する。
-    setStorageUserId(me?.id ?? null);
-    // 初期表示で読んだ会話履歴は名前空間が未確定だったため、確定後に読み直す
-    setChatSessions(loadChatSessions());
-    setAuthUser(me);
-    setAuthChecked(true);
-    if (me) {
-      // ログインできたらクエリ（magic 等）を消して通常表示に戻す
-      authQueryRef.current = { magic: null, authError: null, verify: null, totpChallenge: null };
-      window.history.replaceState(null, "", window.location.pathname);
-    }
-  }, []);
-  useEffect(() => {
-    void refreshAuth();
-  }, [refreshAuth]);
+  // 必須でないローカル運用では従来どおりそのまま使う。
+  const { authConfig, authUser, authChecked, authQueryRef, refreshAuth, loginRequired } =
+    useAuthGate(() => setChatSessions(loadChatSessions()));
   // 起動時のURL（/<画面>/<年度>）があれば、保存値より優先して初期状態にする。
   const initialRoute = useMemo(() => parsePath(window.location.pathname), []);
   const initialView =
     initialRoute && appViews.some((view) => view.id === initialRoute.view)
       ? initialRoute.view
       : AppView.Dashboard;
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [dataSource, setDataSource] = useState("帳簿");
-  // 起動時の帳簿読み込みが終わるまではスケルトンを出す（サンプルデータは初期表示に使わない）。
-  const [ledgerLoading, setLedgerLoading] = useState(true);
   const [activeView, setActiveView] = useState<AppView>(initialView);
-  const [selectedYear, setSelectedYear] = useState<number>(
-    () => initialRoute?.year ?? readStoredYear(),
+  // 帳簿（DB）と画面の取引状態の同期。読み込み中はスケルトンを出し、
+  // 帳簿が未接続・空なら空のままにする（サンプルデータは取込画面で
+  // 明示的に読み込む場合だけ使う）。
+  const {
+    transactions,
+    dataSource,
+    ledgerLoading,
+    handleUseImported,
+    handleUseCsvImported,
+    handleSyncTransactions,
+    handleLoadSample,
+    reloadTransactions,
+  } = useLedgerSync({
+    authChecked,
+    authUserId: authUser?.id ?? null,
+    sample,
+    setActiveView,
+  });
+  const { years, year, handleYearChange, handleAddYear } = useYearSelection(
+    transactions,
+    initialRoute?.year ?? undefined,
   );
   // 確定申告画面のタブもURLと連動させる（リロード・戻る/進むで復元される）。
   const [filingTab, setFilingTab] = useState<FilingTab>(
@@ -215,8 +87,6 @@ export const AppPage = () => {
   const [agentConnection, setAgentConnection] = useState<AgentConnectionConfig>(() =>
     loadAgentConnection(),
   );
-  // エージェント会話の履歴。見出し横の履歴ボタンとパネルで状態を共有する。
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
   // エージェントが設定・申告まわりを変更したときに、表示中の画面を読み直させる。
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -229,124 +99,6 @@ export const AppPage = () => {
     setCanClearChat(handler !== null);
   }, []);
 
-  const [extraYears, setExtraYears] = useState<number[]>(() => readExtraYears());
-  const years = useMemo(
-    () => [...new Set([...transactions.map((t) => t.year), ...extraYears])].sort((a, b) => b - a),
-    [transactions, extraYears],
-  );
-  const handleAddYear = useCallback(
-    (nextYear: number) => {
-      if (!extraYears.includes(nextYear)) {
-        const next = [...extraYears, nextYear];
-        setExtraYears(next);
-        try {
-          localStorage.setItem(EXTRA_YEARS_STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          // 保存できなくても追加自体は有効にする
-        }
-      }
-      // handleYearChange と同じ処理（宣言順の都合で直接書く）。
-      setSelectedYear(nextYear);
-      try {
-        localStorage.setItem(YEAR_STORAGE_KEY, String(nextYear));
-      } catch {
-        // 保存できなくても切替自体は有効にする
-      }
-    },
-    [extraYears],
-  );
-  // 選択中の年がデータに無い場合は、描画時点で最新の年に詰める
-  const year = years.includes(selectedYear) ? selectedYear : (years[0] ?? new Date().getFullYear());
-
-  // 起動時に帳簿（DB）を読み、保存済みの取引があればそれを正として表示する。
-  // 読み込み中はスケルトンを出し、帳簿が未接続・空なら空のままにする
-  // （サンプルデータは取込画面で明示的に読み込む場合だけ使う）。
-  // 認証の確認が終わるまでは取得しない。未ログインのまま初回取得すると
-  // 401 で失敗し、ログイン後も読み直されず取引0件表示のままになるため、
-  // ログイン状態（ユーザーID）が変わるたびに読み直す（Issue #10-3）。
-  const authUserId = authUser?.id ?? null;
-  useEffect(() => {
-    if (!authChecked) return;
-    let cancelled = false;
-    void (async () => {
-      const rows = await fetchLedgerTransactions();
-      if (cancelled) return;
-      if (rows && rows.length > 0) {
-        setTransactions(rows.map(ledgerRowToTransaction));
-        setDataSource("帳簿");
-      }
-      setLedgerLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authChecked, authUserId]);
-
-  const handleUseImported = (next: Transaction[]) => {
-    setTransactions(next);
-    setDataSource("取込CSV");
-    setActiveView(AppView.Dashboard);
-    // 確定した内容は帳簿へも保存する（年ごとに置き換え。失敗しても画面は継続）。
-    const yearsToSave = [...new Set(next.map((tx) => tx.year))];
-    for (const saveYear of yearsToSave) {
-      const inputs = next
-        .filter((tx) => tx.year === saveYear)
-        .map(transactionToLedgerInput);
-      void replaceYearLedgerTransactions(saveYear, inputs).catch(() => {
-        // 帳簿が未接続の環境ではメモリ上のみで動く
-      });
-    }
-  };
-  // CSV取込（DB保存済み）の「ダッシュボードで使う」専用経路。
-  // 取込レスポンスの transactions は新規分のみ（最大500件）で年度の完全な
-  // 集合ではないため、それで画面を置き換えると既存行が消え、続く年度置換で
-  // DBからも消える（Issue #10-2）。影響年度はサーバーの帳簿を正として
-  // 読み直し、その年度の分だけ画面へ反映する。年度置換は行わない
-  // （取込分はサーバーが保存済みで、置き換える必要がない）。
-  const handleUseCsvImported = (imported: Transaction[]) => {
-    setActiveView(AppView.Dashboard);
-    const importedYears = [...new Set(imported.map((tx) => tx.year))];
-    if (importedYears.length === 0) return;
-    void (async () => {
-      const fetchedByYear = new Map<number, Transaction[]>();
-      for (const importYear of importedYears) {
-        const rows = await fetchLedgerTransactions(importYear);
-        if (!rows) continue;
-        fetchedByYear.set(
-          importYear,
-          await applyCsvClassificationEdits(
-            rows,
-            imported.filter((tx) => tx.year === importYear),
-          ),
-        );
-      }
-      setTransactions((current) => {
-        const merged = current.filter((tx) => !importedYears.includes(tx.year));
-        for (const importYear of importedYears) {
-          const fetched = fetchedByYear.get(importYear);
-          if (fetched) {
-            merged.push(...fetched);
-          } else {
-            // 読み直せなかった年度はメモリ上の既存分＋取込分で保持する（消さない）
-            merged.push(
-              ...current.filter((tx) => tx.year === importYear),
-              ...imported.filter((tx) => tx.year === importYear),
-            );
-          }
-        }
-        return merged;
-      });
-      if (fetchedByYear.size > 0) setDataSource("帳簿");
-    })();
-  };
-  const handleSyncTransactions = (next: Transaction[]) => {
-    setTransactions(next);
-    setDataSource("帳簿");
-  };
-  const handleLoadSample = () => {
-    setTransactions(sample);
-    setDataSource("サンプルデータ");
-  };
   const handleThemeModeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
     applyThemeMode(mode);
@@ -364,15 +116,6 @@ export const AppPage = () => {
       // 保存できなくても切替自体は有効にする
     }
   };
-  // 年度の切替は端末に保存し、次回も同じ年度から始める。
-  const handleYearChange = useCallback((nextYear: number) => {
-    setSelectedYear(nextYear);
-    try {
-      localStorage.setItem(YEAR_STORAGE_KEY, String(nextYear));
-    } catch {
-      // 保存できなくても切替自体は有効にする
-    }
-  }, []);
 
   // 画面・年度（と確定申告タブ）の状態をURLへ反映する。初回だけ履歴を汚さず置き換える。
   const firstUrlSyncRef = useRef(true);
@@ -429,13 +172,7 @@ export const AppPage = () => {
     } else if (action.type === "reloadView") {
       setViewRefreshKey((v) => v + 1);
     } else if (action.type === "reloadTransactions") {
-      // エージェントが帳簿DBへ書き込んだ後は、帳簿の最新状態を読み直して反映する。
-      void (async () => {
-        const rows = await fetchLedgerTransactions();
-        if (!rows) return;
-        setTransactions(rows.map(ledgerRowToTransaction));
-        setDataSource("帳簿");
-      })();
+      reloadTransactions();
     } else if (action.type === "setTheme") {
       handleThemeModeChange(action.mode);
     } else if (appViews.some((view) => view.id === action.view)) {
@@ -451,12 +188,7 @@ export const AppPage = () => {
   if (!authChecked) {
     return <DashboardSkeleton year={year} />;
   }
-  const authQueryPending =
-    authQueryRef.current.magic !== null ||
-    authQueryRef.current.authError !== null ||
-    authQueryRef.current.verify !== null ||
-    authQueryRef.current.totpChallenge !== null;
-  if (authConfig && ((authConfig.required && !authUser) || (authQueryPending && !authUser))) {
+  if (loginRequired && authConfig) {
     return (
       <LoginPage
         config={authConfig}
@@ -558,46 +290,3 @@ export const AppPage = () => {
     </AppTemplate>
   );
 };
-
-/**
- * 取込プレビューで付け直した科目（科目判定パネルの編集）を、サーバーから
- * 読み直した帳簿の行へ反映する。日付・金額・摘要・口座が一致する行を
- * 対応付け（同一キーは複数行ありうるので消費済みは再利用しない）、
- * 科目・収入区分が変わった行だけ帳簿へも保存する。
- */
-async function applyCsvClassificationEdits(
-  rows: LedgerTransaction[],
-  imported: Transaction[],
-): Promise<Transaction[]> {
-  const used = new Set<number>();
-  const result = rows.map((row) => ({ ...row }));
-  for (const tx of imported) {
-    const index = result.findIndex(
-      (row, i) =>
-        !used.has(i) &&
-        row.date === tx.date &&
-        row.amount === tx.amount &&
-        row.description === tx.description &&
-        row.account === tx.account,
-    );
-    if (index < 0) continue;
-    used.add(index);
-    const row = result[index] as LedgerTransaction;
-    if (row.category === tx.category && row.income_type === tx.income_type) continue;
-    const edited: LedgerTransaction = {
-      ...row,
-      category: tx.category,
-      income_type: tx.income_type,
-    };
-    result[index] = edited;
-    try {
-      result[index] = await updateLedgerTransaction(
-        edited.id,
-        transactionToLedgerInput(ledgerRowToTransaction(edited)),
-      );
-    } catch {
-      // 帳簿への保存に失敗しても、画面表示は編集後の値で続ける
-    }
-  }
-  return result.map(ledgerRowToTransaction);
-}
