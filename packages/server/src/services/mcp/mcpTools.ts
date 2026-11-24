@@ -45,10 +45,13 @@ import {
   taxableSalesFromBreakdown,
   xtxSupportedYears,
 } from "@etax/shared";
+import { billingEnabled } from "../../gateways/stripeGateway";
 import { createSystemOneClient } from "../../gateways/systemOneGateway";
 import { Db, getDb } from "../../lib/db";
 import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
 import { databaseUnavailableMessage } from "../../lib/errors";
+import { authRequired } from "../../lib/tenantContext";
+import { hasActivePlan } from "../../repositories/subscriptionRepository";
 import {
   loadClassificationHistory,
   recordClassification,
@@ -567,12 +570,29 @@ function textResult(value: unknown): McpToolResult {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
 }
 
+/** REST の planGate（/api/etax/*）と対応する、課金対象の MCP ツール。 */
+const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set(["export_xtx", "export_consumption_xtx"]);
+
+/**
+ * プランゲート（REST 側 planGateMiddleware と同じ条件、Issue #8）。
+ * SaaS モード（認証必須＋課金有効）のときだけ、XTX 出力系ツールは
+ * 有効なプランを必須にする。ローカル運用・課金未設定では制限しない。
+ */
+async function assertPlanForGatedTool(name: string): Promise<void> {
+  if (!PLAN_GATED_TOOLS.has(name)) return;
+  if (!authRequired() || !billingEnabled()) return;
+  const db = requireDb();
+  if (await hasActivePlan(db)) return;
+  throw new Error("この機能は有料プラン（月額490円）への加入が必要です");
+}
+
 /** MCP ツールの実行。例外は isError の結果として返す（呼び出し側で判断できるように）。 */
 export async function dispatchMcpTool(
   name: string,
   args: Record<string, unknown>,
 ): Promise<McpToolResult> {
   try {
+    await assertPlanForGatedTool(name);
     switch (name) {
       case "aggregate_year": {
         const db = requireDb();

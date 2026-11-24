@@ -74,8 +74,15 @@ export async function upsertSubscriptionRow(
   return row;
 }
 
-/** 現在の所有者のプランが有効か。 */
+/**
+ * 現在の所有者のプランが有効か。status が有効でも、期間終了
+ * （currentPeriodEnd）が過ぎていれば無効として扱う（Webhook の
+ * 取りこぼしで canceled になっていない行を有効にし続けないため）。
+ * currentPeriodEnd が未記録（null）の場合は status のみで判定する。
+ */
 export async function hasActivePlan(db: Db): Promise<boolean> {
   const row = await getSubscriptionRow(db);
-  return row !== undefined && ACTIVE_PLAN_STATUSES.has(row.status);
+  if (!row || !ACTIVE_PLAN_STATUSES.has(row.status)) return false;
+  if (row.currentPeriodEnd && row.currentPeriodEnd.getTime() <= Date.now()) return false;
+  return true;
 }
