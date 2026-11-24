@@ -24,9 +24,9 @@ import {
   SUMMARY_ROWS,
 } from "./consumptionTaxFields";
 import {
+  buildResultRows,
   deriveBasePeriodSalesThousands,
   downloadTextFile,
-  outputTaxBacking,
   toAmount,
   todayIso,
 } from "./consumptionTaxHelpers";
@@ -93,64 +93,7 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
   );
 
   // 計算結果の各項目と、その裏付け（どう計算したか）を直下に並べる。
-  const resultRows: readonly { label: string; value: string; backing: string }[] = [
-    {
-      label: "課税売上割合",
-      value: `${preview.ratio}%`,
-      backing:
-        `課税売上高（税抜）${formatYen(preview.salesExcl)} ÷ 売上高の合計（税抜）` +
-        `${formatYen(preview.totalSalesExcl)} ・ ${preview.fullDeduction ? "全額控除" : "一括比例配分"}`,
-    },
-    {
-      label: "課税標準額",
-      value: formatYen(preview.taxBase),
-      backing: "課税売上高（税抜）の千円未満を切り捨て",
-    },
-    {
-      label: "消費税額",
-      value: formatYen(preview.outputTax),
-      backing: outputTaxBacking(preview),
-    },
-    {
-      label: "控除対象仕入税額",
-      value: formatYen(preview.inputTax),
-      backing: preview.fullDeduction
-        ? `課税仕入にかかる消費税額 ${formatYen(preview.inputTaxRaw10 + preview.inputTaxRaw8)} の全額`
-        : `課税仕入にかかる消費税額 ${formatYen(preview.inputTaxRaw10 + preview.inputTaxRaw8)} × 課税売上割合 ${preview.ratio}%`,
-    },
-    preview.refundNational > 0
-      ? {
-          label: "還付税額（国税）",
-          value: formatYen(preview.refundNational),
-          backing: `消費税額 ${formatYen(preview.outputTax)} − 控除対象仕入税額 ${formatYen(preview.inputTax)}`,
-        }
-      : {
-          label: "納付税額（国税）",
-          value: formatYen(preview.payableNational),
-          backing:
-            `消費税額 ${formatYen(preview.outputTax)} − 控除対象仕入税額 ${formatYen(preview.inputTax)}` +
-            ` = ${formatYen(preview.diffNational)}` +
-            (form.interimNational > 0 ? ` − 中間納付 ${formatYen(form.interimNational)}` : ""),
-        },
-    preview.refundLocal > 0
-      ? {
-          label: "還付譲渡割額（地方）",
-          value: formatYen(preview.refundLocal),
-          backing: `還付税額（国税）× 22/78`,
-        }
-      : {
-          label: "納付譲渡割額（地方）",
-          value: formatYen(preview.payableLocal),
-          backing:
-            `差引税額（国税）${formatYen(preview.diffNational)} × 22/78 = ${formatYen(preview.localTaxGross)}` +
-            (form.interimLocal > 0 ? ` − 中間納付 ${formatYen(form.interimLocal)}` : ""),
-        },
-    {
-      label: "合計",
-      value: formatYen(preview.totalPayable),
-      backing: `国税 ${formatYen(preview.payableNational)} ＋ 地方 ${formatYen(preview.payableLocal)}`,
-    },
-  ];
+  const resultRows = buildResultRows(preview, form);
 
   const update = (key: EditableKey, value: number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
