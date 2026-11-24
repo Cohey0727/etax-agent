@@ -391,12 +391,26 @@ export const subscriptionsTable = pgTable("subscriptions", {
   stripeSubscriptionId: text("stripe_subscription_id").notNull().default(""),
   status: text("status").notNull().default("none"),
   currentPeriodEnd: timestampColumn("current_period_end"),
+  /** 最後に適用した Webhook イベントの作成時刻（順序逆転の検出用）。 */
+  lastEventCreatedAt: timestampColumn("last_event_created_at"),
   updatedAt: timestampColumn("updated_at")
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
 export type SubscriptionRow = typeof subscriptionsTable.$inferSelect;
+
+/** 処理済み Stripe Webhook イベント（冪等性のためイベントIDを記録する）。 */
+export const stripeWebhookEventsTable = pgTable("stripe_webhook_events", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  eventId: text("event_id").notNull().unique(),
+  type: text("type").notNull().default(""),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type StripeWebhookEventRow = typeof stripeWebhookEventsTable.$inferSelect;
 
 export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
 export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;

@@ -34,6 +34,7 @@ const allTables = [
   "filing_inputs",
   "fixed_assets",
   "subscriptions",
+  "stripe_webhook_events",
   "knowledge_docs",
 ];
 
