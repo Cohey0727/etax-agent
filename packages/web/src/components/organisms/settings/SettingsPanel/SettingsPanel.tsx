@@ -48,7 +48,7 @@ const SEND_KEY_OPTIONS: readonly { mode: SendKeyMode; label: string; caption: st
 
 const INFO_ROWS: readonly { label: string; value: string }[] = [
   { label: "アプリ", value: "eTaxAgent — 確定申告 準備ツール" },
-  { label: "データの保存先", value: "このブラウザとホームサーバー（帳簿・学習履歴）" },
+  { label: "データの保存先", value: "このブラウザとサーバー（帳簿・学習履歴）" },
   { label: "申告の提出", value: "e-Tax での最終提出は納税者本人が行います" },
 ];
 
@@ -151,7 +151,7 @@ export const SettingsPanel = ({
               onChange={(e) =>
                 onAgentConnectionChange({ ...agentConnection, baseUrl: e.target.value })
               }
-              placeholder="https://opencode.ai/zen/go/v1"
+              placeholder="AIサービスのベースURL"
               autoComplete="off"
             />
           </Col>
@@ -162,7 +162,7 @@ export const SettingsPanel = ({
               onChange={(e) =>
                 onAgentConnectionChange({ ...agentConnection, model: e.target.value })
               }
-              placeholder="deepseek-v4.1-flash"
+              placeholder="モデル名"
               autoComplete="off"
             />
           </Col>

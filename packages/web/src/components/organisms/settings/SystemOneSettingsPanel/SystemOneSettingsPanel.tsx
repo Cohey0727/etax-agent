@@ -100,7 +100,7 @@ export const SystemOneSettingsPanel = () => {
     return (
       <Card>
         <Col gap="md">
-          <Text variant="sectionTitle">科目判定（Jev / SystemOne）</Text>
+          <Text variant="sectionTitle">科目判定AIの接続</Text>
           {message ? (
             <Text variant="caption">{message.text}</Text>
           ) : (
@@ -119,7 +119,7 @@ export const SystemOneSettingsPanel = () => {
   return (
     <Card>
       <Col gap="md">
-        <Text variant="sectionTitle">科目判定（Jev / SystemOne）</Text>
+        <Text variant="sectionTitle">科目判定AIの接続</Text>
         <Col gap="sm">
           <Text variant="statLabel">ベースURL</Text>
           <Input
@@ -137,7 +137,7 @@ export const SystemOneSettingsPanel = () => {
           <Input
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder="tev1"
+            placeholder="モデル名"
             autoComplete="off"
           />
           {settings && !model ? (
@@ -184,7 +184,7 @@ export const SystemOneSettingsPanel = () => {
           </Text>
         ) : null}
         <Text variant="caption">
-          OpenRouter の Jev を使う場合は、そのベースURL・APIキー・モデル名を入れてください。設定はサーバーに保存され、科目判定のすべてに効きます。未入力の項目はサーバーの環境変数（SYSTEMONE_*）を使います。
+          科目判定に使う AI サービスのベースURL・APIキー・モデル名を入れてください。設定はサーバーに保存され、科目判定のすべてに効きます。未入力の項目はサーバー側の既定設定を使います。
         </Text>
       </Col>
     </Card>

@@ -14,7 +14,7 @@ export interface AccountClassificationPanelProps {
 
 const sourceLabels = {
   generated: "生成ルール",
-  systemone: "SystemOne判定",
+  systemone: "AI判定",
   rules: "キーワードルール",
   none: "判定なし",
 } as const satisfies Record<ClassificationSource, string>;
@@ -89,7 +89,7 @@ export const AccountClassificationPanel = ({
       <Col gap="sm">
         <Text variant="sectionTitle">勘定科目の判定（未分類 {unclassifiedIndexes.length}件）</Text>
         <Text variant="muted">
-          カード・銀行明細の未分類の行について、自動生成ルール（正規表現）と SystemOne
+          カード・銀行明細の未分類の行について、自動生成ルール（正規表現）と AI
           （プロンプト）で科目を提案します。内容を確認して確定すると、科目が反映され、対応が学習されます。
         </Text>
         {error && <AlertBox variant="error">{error}</AlertBox>}

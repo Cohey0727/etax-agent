@@ -27,7 +27,7 @@ const isValidPattern = (pattern: string): boolean => {
 
 /**
  * AIのメモリー（科目判定の学習）を見る・編集するカード。表示するのは2つだけ:
- * 科目判定の正規表現ルールと、jev用プロンプト。どちらもここで直接編集でき、
+ * 科目判定の正規表現ルールと、判定用プロンプト。どちらもここで直接編集でき、
  * 保存すると自動生成より優先して判定に使われる（ルールは空にして保存、
  * プロンプトは空文字で保存すると自動生成に戻る）。
  */
@@ -236,7 +236,7 @@ export const AiMemoryPanel = () => {
               ) : null}
             </Col>
             <Col gap="sm">
-              <Text variant="statLabel">jev用プロンプト</Text>
+              <Text variant="statLabel">判定用プロンプト</Text>
               <Text variant="caption">
                 {data.prompt.customPrompt
                   ? "カスタムプロンプトを使用中です（自動生成より優先されます）"
@@ -246,7 +246,7 @@ export const AiMemoryPanel = () => {
                 value={draftValue}
                 rows={9}
                 onChange={(e) => setDraft(e.target.value)}
-                aria-label="jev用プロンプト"
+                aria-label="判定用プロンプト"
                 placeholder="（自動生成のプロンプトはまだありません。ここに書いて保存すると、そのまま判定に使われます）"
               />
               <Row gap="sm" align="center" justify="spaceBetween">
@@ -283,7 +283,7 @@ export const AiMemoryPanel = () => {
               </Row>
             </Col>
             <Text variant="caption">
-              科目判定は「正規表現ルール → jev（プロンプト）→
+              科目判定は「正規表現ルール → AI（プロンプト）→
               キーワードルール」の順に効きます。正規表現に引っ掛かれば自動で対応し、
               決められないものはプロンプトで判定します。ルールとプロンプトはサーバーに保存されます。
             </Text>
