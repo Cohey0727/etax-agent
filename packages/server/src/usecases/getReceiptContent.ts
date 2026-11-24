@@ -13,6 +13,7 @@ import {
 import { loadStorageConfig } from "../lib/config";
 import { getDb } from "../lib/db";
 import { currentUserId } from "../lib/tenantContext";
+import { servedContentType } from "../lib/uploadTypes";
 import { getReceiptRowByFileId } from "../repositories/receiptRepository";
 import { ErrorSchema } from "../schemas/common";
 import { ReceiptFileIdParamSchema } from "../schemas/receipt";
@@ -52,7 +53,14 @@ export const getReceiptContentHandler: RouteHandler<typeof getReceiptContentRout
     const storage = createStorageClient(loadStorageConfig());
     const downloaded = await storage.download(receiptObjectKey(fileId));
     const bytes = Buffer.from(downloaded.dataBase64, "base64");
-    return c.body(bytes, 200, { "Content-Type": downloaded.mimeType });
+    // 配信タイプはホワイトリストで検証し、nosniff と CSP sandbox で
+    // ブラウザ側の解釈を封じる（Stored XSS 対策、Issue #7）。
+    return c.body(bytes, 200, {
+      "Content-Type": servedContentType(downloaded.mimeType),
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+      "Content-Disposition": "inline",
+    });
   } catch (e) {
     if (e instanceof StorageObjectNotFoundError) {
       throw new HTTPException(404, { message: e.message });
