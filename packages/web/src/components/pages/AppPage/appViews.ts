@@ -11,7 +11,7 @@ import { SettingsPage } from "../SettingsPage";
 import { TaxpayerPage } from "../TaxpayerPage";
 
 // nav: サイドバーに出す画面。取込・領収書は帳簿の「追加」からの遷移専用
-// （サイドバーには出さない）。設定は下部アクションバー左下のボタン専用。
+// （サイドバーには出さない）。設定も通常のメニュー項目として並べる。
 // 修正は独立した画面を持たず、確定 → 差し戻し → 再確定の流れの中で
 // 前回確定との差分として確定申告画面に出す。
 export const appViews = [
@@ -22,7 +22,7 @@ export const appViews = [
   { id: AppView.FixedAssets, label: "固定資産", icon: "building", nav: true, Component: FixedAssetsPage },
   { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },
   { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
-  { id: AppView.Settings, label: "設定", icon: "settings", nav: false, Component: SettingsPage },
+  { id: AppView.Settings, label: "設定", icon: "settings", nav: true, Component: SettingsPage },
 ] as const satisfies readonly {
   id: AppView;
   label: string;

@@ -268,16 +268,6 @@ export const AppTemplate = ({
             >
               <Icon name="panelLeft" size={17} />
             </Button>
-            <Button
-              variant={activeView === AppView.Settings ? "tabActive" : "ghost"}
-              size="sm"
-              onClick={() => handleViewChange(AppView.Settings)}
-              aria-pressed={activeView === AppView.Settings}
-              aria-label="設定"
-              title="設定"
-            >
-              <Icon name="settings" size={17} />
-            </Button>
           </Row>
           <Button
             variant={agentPanelOpen ? "tabActive" : "ghost"}
