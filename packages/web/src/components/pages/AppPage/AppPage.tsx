@@ -272,7 +272,12 @@ export const AppPage = () => {
   // 起動時に帳簿（DB）を読み、保存済みの取引があればそれを正として表示する。
   // 読み込み中はスケルトンを出し、帳簿が未接続・空なら空のままにする
   // （サンプルデータは取込画面で明示的に読み込む場合だけ使う）。
+  // 認証の確認が終わるまでは取得しない。未ログインのまま初回取得すると
+  // 401 で失敗し、ログイン後も読み直されず取引0件表示のままになるため、
+  // ログイン状態（ユーザーID）が変わるたびに読み直す（Issue #10-3）。
+  const authUserId = authUser?.id ?? null;
   useEffect(() => {
+    if (!authChecked) return;
     let cancelled = false;
     void (async () => {
       const rows = await fetchLedgerTransactions();
@@ -286,7 +291,7 @@ export const AppPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authChecked, authUserId]);
 
   const handleUseImported = (next: Transaction[]) => {
     setTransactions(next);
