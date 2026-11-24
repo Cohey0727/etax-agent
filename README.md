@@ -7,7 +7,7 @@ LLMエージェントで再構成した、個人事業主向けの確定申告**
 新規の計算・修正作業には使いません。
 
 - 銀行・カード明細CSVを取り込み（**列の対応付けはAIが自動判定**）、事業所得 / 不動産所得に振り分けて集計（税込経理）
-- 青色申告特別控除（不動産10万 → 事業65万、合計最大75万）を計算
+- 青色申告特別控除（不動産 → 事業の順に、各区分の限度額の範囲で）を計算
 - 消費税を 本則 / 簡易課税（第5種・みなし仕入率50%）/ 2割特例 で比較
 - 修正申告用に「申告済み vs 修正後」の差分を出力
 - 対話型エージェント（LLM）がツール呼び出しで上記を orchestrate
@@ -28,17 +28,20 @@ LLM は会話・CSVマッピングの判定・ツールの選択だけを担当�
 責任を持つのは、次の4点です。
 
 1. **事業／不動産への所得の切り分け**（税込経理）
-2. **青色申告特別控除**：不動産10万 → 事業65万の順に適用し、
-   各区分の控除額はその区分の所得を上限として、合計最大75万
+2. **青色申告特別控除**：不動産 → 事業の順に適用する。各区分の控除額は
+   その区分の所得金額を上限とし、限度額は事業所得65万円、不動産所得は
+   事業的規模なら55万円／65万円、それ以外は10万円（国税庁 No.2072）
 3. **消費税の比較**：本則／簡易課税／2割特例の3方式について、
    納付税額を並べて算出
 4. **修正申告の差分**：「申告済み vs 修正後」の項目別差分と税額の増減。
    修正後の数値は、取引データから 1→2→3 のパイプラインで計算することも、
    JSONで直接渡すこともできる
 
+5. **所得税額の計算**：所得控除・税額控除を反映し、基準所得税額 →
+   復興特別所得税（基準所得税額 × 2.1%）→ 外国税額控除の順で算出する
+
 範囲外のもの：簡易課税・2割特例の**適用可否の判定**（基準期間の
 課税売上・届出の有無・インボイス登録の経緯など）は計算には含めません。
-所得税額そのものの計算（税率表・所得控除の網羅）も行いません。
 
 ## 技術スタック
 
@@ -101,7 +104,9 @@ packages/
     test/            bun test（Python版テストの移植）
   server/   Hono API（CODING_CONVENTIONS_BACKEND.md のレイヤー構成）
     src/index.ts     エントリーポイント（ルート合成・CORS・エラー形式の統一）
-    src/routes/      ルート登録のみ（health / calc / transactions / imports / agent）
+    src/routes/      ルート登録のみ（health / calc / transactions / imports / agent /
+                     auth / billing / classify / etax / receipts / files / settings /
+                     taxpayer / filing系 / fixed-assets / freee / mcp）
     src/usecases/    ルート定義＋ハンドラ（getHealth / calculateAggregate / importCsv / runAgentChat 等）
     src/schemas/     Zod スキーマ（.openapi 名つき。ErrorSchema は互換のため { error } 形式）
     src/gateways/    llmGateway（OpenAI互換 / Anthropic。raw fetch + Zod検証、UA・セッションヘッダー要件つき）
@@ -109,19 +114,21 @@ packages/
     src/services/    csvImport（自動マッピング・デコード・パース）/ agent（ツール定義・実行ループ）
     src/lib/         DB遅延初期化・AGENT_* 設定・エラ文言・バリデーションフック
     drizzle/         生成済みマイグレーションSQL
-  web/      React アプリ（ダッシュボード / 取引・CSV取込 / 修正申告 / エージェント）
+  web/      React アプリ（ダッシュボード / 帳簿 / 取込 / 領収書 / 納税者情報 /
+            確定申告 / 設定 / ログイン。修正は独立画面を持たず、確定申告画面の
+            前回確定との差分として出す）
     src/components/atoms      Row / Col / Button / Input / Select / Textarea / Card / Badge / Text / Table / LoadingCircle など
     src/components/molecules  Tabs / AlertBox
-    src/components/organisms  dashboard / import / amend / agent のドメイン別パネル
+    src/components/organisms  dashboard / ledger / import / receipt / filing / settings / agent のドメイン別パネル
     src/components/templates  AppTemplate（ヘッダー・タブ・フッターの画面骨格）
-    src/components/pages      AppPage（画面切替の対応表）＋ 4画面
+    src/components/pages      AppPage（画面切替の対応表）＋ 各画面
     src/configs               theme / mediaquery / global スタイル
     src/types                 AppView enum・API型・画面共通 props
     src/utils                 APIラッパー・表示用フォーマッタ
   cli/      スタンドアロン計算CLI（サーバー無しで集計・消費税比較・修正差分）
     src/cli.ts       aggregate / consumption / amend の3コマンド
 examples/   サンプル取引CSVと申告JSON（2024年分の original / corrected）
-docker-compose.yml  Postgres 16（ユーザーの Mac 上で使用）
+docker-compose.yml  PostgreSQL 19（ユーザーの Mac 上で使用）
 ```
 
 ## セットアップ
@@ -164,6 +171,16 @@ DATABASE_URL が未設定、または DB に接続できない場合でもサー
 | `AGENT_BASE_URL` | 任意。エンドポイントの上書き（既定: OpenRouter `https://openrouter.ai/api/v1` ／ claude 時は `https://api.anthropic.com`） |
 | `AGENT_MODEL` | 任意。モデル名の上書き（既定: openai `openai/gpt-4o-mini` ／ claude `claude-sonnet-4-5`） |
 | `MCP_TOKEN` | 任意。設定すると `/mcp`（MCP連携）に Bearer 認証を必須にする。公開時は必須 |
+| `ETAX_AUTH_MODE` | `required` でログイン必須（SaaS運用）。未設定はローカル運用（認証なし） |
+| `ETAX_AUTH_SECRET` | ログイン・チャレンジの署名鍵。未設定時は `ETAX_ENCRYPTION_KEY` を使う |
+| `ETAX_ENCRYPTION_KEY` | 機微項目（マイナンバー・TOTP秘密）の保存時暗号化キー。未設定だと平文保存になるため、公開運用では必ず設定 |
+| `ETAX_PUBLIC_URL` | メールリンクや OAuth 戻り先の生成に使う公開URL（Host/Origin には依存しない） |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google ログインを使う場合に設定 |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub ログインを使う場合に設定 |
+| `RESEND_API_KEY` / `RESEND_FROM` | メール送信（マジックリンク・メール確認）に Resend を使う場合に設定 |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID` | 課金（Stripe）を使う場合に設定。未設定だと課金は「準備中」表示 |
+| `SYSTEMONE_API_KEY` / `SYSTEMONE_BASE_URL` / `SYSTEMONE_MODEL` | 科目判定AI（外部LLM）の接続上書き。未設定時は内蔵の接続設定を使う |
+| `ETAX_CORS_ORIGINS` | 許可する Origin の上書き（カンマ区切り）。未設定時は同一オリジン前提 |
 
 OpenCode Go 等の OpenAI 互換エンドポイントも `AGENT_BASE_URL` 差し替えで使えます。
 （LLM送信時は `User-Agent: etax-agent/0.1` と `x-opencode-session` ヘッダーを送ります。
@@ -208,7 +225,7 @@ bun run cli -- amend --year 2024 --original examples/original_2024.json --correc
 3. **パース・正規化**: 日付（YYYY/MM/DD・YYYYMMDD・和暦など）を ISO 形式へ、
    金額（全角・カンマ・括弧マイナス・▲など）を符号つき整数へ正規化。
    出金/入金が分かれた形式は 入金 − 出金 で合成します。
-   勘定科目はキーワードルールで推定し、所得区分（事業/不動産）も推定します。
+   勘定科目はキーワードルールで推定し、収入区分（事業/不動産）も推定します。
    完全重複行は除外します。
 4. **保存**: DBがあれば `imports`（マッピング結果つき）と `transactions` に保存します。
    無ければパース結果をプレビューとして返します。
@@ -223,10 +240,19 @@ bun run cli -- amend --year 2024 --original examples/original_2024.json --correc
 | POST | `/api/calc/aggregate` | `{transactions, year?}` → 所得集計＋青色控除（DB不要） |
 | POST | `/api/calc/consumption` | `{transactions, year?}` → 消費税3方式の比較（DB不要） |
 | POST | `/api/calc/amend` | `{original, corrected, year?}` → 修正申告の差分（DB不要） |
-| GET/POST/PUT/DELETE | `/api/transactions(/:id)` | 取引CRUD（DB必須） |
+| GET/POST/PUT/DELETE | `/api/transactions(/:id)` | 取引CRUD（DB必須）。年度一括置換 `/api/transactions/replace-year`、帳簿PDF `/api/transactions/pdf`、変更履歴 `/:id/history` |
 | GET | `/api/imports` | 取込履歴（DB必須） |
 | POST | `/api/import/csv` | CSV取込（生バイト or JSON `{filename, content}` / `{filename, contentBase64}`） |
+| POST | `/api/calc/income-tax` | 所得税額の計算（所得控除・税額控除・復興特別所得税・外国税額控除） |
+| POST | `/api/classify/account` ほか | 科目判定・一括判定・学習フィードバック・分類ルール/プロンプトの取得と保存 |
 | POST | `/api/agent/chat` | `{messages, transactions}` → エージェント応答（要 `AGENT_API_KEY`） |
+| `/api/auth/*` | 登録・ログイン（パスワード/TOTP/マジックリンク/Google/GitHub）・メール確認・APIキー管理 |
+| `/api/etax/*` | 所得税・消費税のXTX出力、申告書PDF・納税地異動届PDFの出力 |
+| `/api/taxpayer/{year}`・`/api/filing-inputs/{year}`・`/api/filing-status`・`/api/filing-snapshots/{year}` | 納税者情報・申告入力・申告ステータス・確定スナップショット |
+| `/api/receipts/*`・`/api/files/presign-upload` | 領収書の解析・証憑ファイルのアップロード/取得・取引への紐付け |
+| `/api/fixed-assets` | 固定資産台帳と減価償却の計算 |
+| `/api/settings/*` | 科目判定AIの接続設定と接続テスト、エージェント接続テスト |
+| `/api/billing/*` | 課金（Stripe のチェックアウト・プラン状態・Webhook） |
 | ALL | `/mcp` | MCP（外部エージェント連携。下記） |
 
 ### MCP（外部エージェント連携）
@@ -260,8 +286,8 @@ claude mcp add --transport http etax-agent http://localhost:3001/mcp \
 ## 検証
 
 ```bash
-bun run test       # shared の計算テスト（bun test）
-bun run typecheck  # shared / server / web の tsc --noEmit
+bun run test       # shared / server / cli のテスト（bun test）
+bun run typecheck  # shared / server / web / cli の tsc --noEmit
 bun run build      # web の vite build
 ```
 
@@ -280,20 +306,23 @@ AIマッピングも実キーでの疎通は未検証です（検証ロジック
 
 ## 計算の前提（重要な仮定）
 
-- 消費税は標準税率10%のみ（軽減税率8%は対象外）。税込経理前提。
+- 消費税は標準税率10%と軽減税率8%の両方を扱う。税込経理前提。
 - 住宅の家賃は消費税**非課税**として課税売上から除外します
   （事業用賃貸は課税なので、その場合はデータ側で分けてください）。
-- 本則課税の仕入税額は、経費CSVからの**概算**（税込経費×10/110、
-  租税公課・保険料など課税仕入でない科目を除外）です。
-  正式な申告では請求書・インボイスで確定させてください。
+- 本則課税の仕入税額（国税分）は、税込の課税仕入から 10%分は ×7.8/110、
+  軽減8%分は ×6.24/108 で計算します（地方分は国税分の 22/78）。
+  集計プレビュー側は経費CSVからの概算で、租税公課・保険料など
+  課税仕入でない科目を除外します。正式な申告では請求書・インボイスで
+  確定させてください。
 - 簡易課税のみなし仕入率はサービス業（第5種）50%を既定としています。
 - 2割特例・簡易課税の**適用可否**（基準期間の課税売上、届出の有無、
   インボイス登録の経緯など）は本ツールでは判定しません。計算のみです。
 - 青色申告特別控除の65万円は e-Tax申告または電子帳簿保存が前提の金額です
   （紙申告では55万円）。不動産は事業的規模でない前提で10万円です。
-- 所得税そのものの税額計算（税率表・所得控除の網羅）は行いません。
+- 所得税の税額計算は、給与・公的年金等・事業・不動産・雑所得と
+  主な所得控除・税額控除を対象にします（分離課税の譲渡所得などは対象外）。
   amend の税額差分は、入力JSONに含まれる税額フィールド同士の差です。
-- CSV取込時の所得区分の推定は目安です（家賃まわり→不動産所得、
+- CSV取込時の収入区分の推定は目安です（家賃まわり→不動産所得、
   科目が推定できた取引→事業所得、それ以外→その他）。必要に応じて見直してください。
 
 ## 境界（できること・しないこと）
