@@ -156,7 +156,7 @@ export interface XtxBalanceSheetInput {
   extraLiability2?: { name: string; opening: number; closing: number };
   /** 事業主貸（期末・資産の部） */
   ownerLoan: number;
-  /** 事業主借（期末・負債資本の部の内訳行。期末元入金の計算に使う） */
+  /** 事業主借（期末・負債資本の部の内訳行。期末の負債・資本合計に加える） */
   ownerBorrowing: number;
 }
 
@@ -1066,7 +1066,9 @@ const BS_LIABILITY_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
 
 /**
  * KOA210-4（貸借対照表）を組み立てる。
- * 期末元入金 = 期首元入金 + 事業主借 − 事業主貸 + 青色申告特別控除前の所得金額。
+ * 元入金は期首・期末とも期首元入金の額を書く様式で、期末の合計は
+ * 期末負債合計 + 事業主借 + 期首元入金 + 青色申告特別控除前の所得金額
+ * とし、資産側の期末合計（事業主貸を含む）と一致させる。
  * 貸借が一致しない入力は例外にする（不整合な決算書を出さない）。
  */
 function buildBalanceSheetPage(data: XtxFilingData): string {
@@ -1094,16 +1096,18 @@ function buildBalanceSheetPage(data: XtxFilingData): string {
     (bs.extraLiability2?.closing ?? 0);
   const openingCapital = opening.capital ?? 0;
   const incomeBeforeBlue = data.figures._detail.business_income_before_deduction;
-  const closingCapital = openingCapital + bs.ownerBorrowing - bs.ownerLoan + incomeBeforeBlue;
+  // 期末の負債・資本合計 = 期末負債合計 + 事業主借 + 期首元入金 + 所得
+  const closingTotal =
+    closingLiabilities + bs.ownerBorrowing + openingCapital + incomeBeforeBlue;
 
   if (openingAssets !== openingLiabilities + openingCapital) {
     throw new Error(
       `貸借対照表（期首）が貸借一致しません: 資産 ${openingAssets} ≠ 負債・資本 ${openingLiabilities + openingCapital}`,
     );
   }
-  if (closingAssets !== closingLiabilities + closingCapital) {
+  if (closingAssets !== closingTotal) {
     throw new Error(
-      `貸借対照表（期末）が貸借一致しません: 資産 ${closingAssets} ≠ 負債・資本 ${closingLiabilities + closingCapital}`,
+      `貸借対照表（期末）が貸借一致しません: 資産 ${closingAssets} ≠ 負債・資本 ${closingTotal}`,
     );
   }
 
@@ -1163,9 +1167,10 @@ function buildBalanceSheetPage(data: XtxFilingData): string {
   for (const [key, , closeTag] of BS_LIABILITY_ACCOUNTS) closingL.push(amount(closeTag, closing[key] ?? 0));
   closingL.push(amount("AMG00710", closing.allowance_for_doubtful_accounts ?? 0));
   closingL.push(amount("AMG00730", bs.ownerBorrowing));
-  closingL.push(amountAlways("AMG00740", closingCapital));
+  // 元入金は期末欄にも期首元入金の額を書く（様式の取扱い）
+  closingL.push(amountAlways("AMG00740", openingCapital));
   closingL.push(amountAlways("AMG00750", incomeBeforeBlue));
-  closingL.push(amountAlways("AMG00760", closingLiabilities + closingCapital));
+  closingL.push(amountAlways("AMG00760", closingTotal));
   liabilitySide.push(`<AMG00620>${closingL.join("")}</AMG00620>`);
   parts.push(`<AMG00450>${liabilitySide.join("")}</AMG00450>`);
 

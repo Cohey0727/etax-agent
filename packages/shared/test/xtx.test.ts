@@ -173,7 +173,50 @@ describe("buildXtxFiling の減価償却明細と貸借対照表", () => {
     expect(xtx).toContain("<AMF01730>112500</AMF01730>");
     expect(xtx).toContain("<KOA210-4");
     expect(xtx).toContain("<AMG00230>1000000</AMG00230>");
-    expect(xtx).toContain(`<AMG00740>${1_000_000 + incomeBeforeBlue}</AMG00740>`);
+    // 元入金は期末欄にも期首元入金の額を書き、合計は負債+事業主借+元入金+所得
+    expect(xtx).toContain("<AMG00740>1000000</AMG00740>");
+    expect(xtx).toContain(`<AMG00760>${1_000_000 + incomeBeforeBlue}</AMG00760>`);
+  });
+
+  test("貸借対照表: 事業主貸・事業主借がある場合も様式の合計式で一致する", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2023);
+    const tax = computeIncomeTax({
+      year: 2023,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: { ...EMPTY_DEDUCTION_INPUTS },
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const incomeBeforeBlue = figures._detail.business_income_before_deduction;
+    // 期末資産 = 現金（期首 + 所得 − 20万）+ 事業主貸30万
+    //          = 負債0 + 事業主借10万 + 期首元入金100万 + 所得
+    const xtx = buildXtxFiling({
+      year: 2023,
+      amendment: false,
+      submissionDate: "2024-03-10",
+      taxpayer: {
+        name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+        myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア", shopName: "", jan1Address: "",
+      },
+      figures,
+      deductionInputs: { ...EMPTY_DEDUCTION_INPUTS },
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+      balanceSheet: {
+        opening: { cash: 1_000_000, capital: 1_000_000 },
+        closing: { cash: 800_000 + incomeBeforeBlue },
+        ownerLoan: 300_000,
+        ownerBorrowing: 100_000,
+      },
+    });
+    expect(xtx).toContain("<AMG00730>100000</AMG00730>"); // 事業主借
+    expect(xtx).toContain("<AMG00740>1000000</AMG00740>"); // 元入金は期首額
+    expect(xtx).toContain(`<AMG00760>${1_100_000 + incomeBeforeBlue}</AMG00760>`);
   });
 
   test("貸借が一致しない貸借対照表は例外にする", () => {
