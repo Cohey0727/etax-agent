@@ -11,6 +11,9 @@ import {
   StorageObjectNotFoundError,
 } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
+import { getDb } from "../lib/db";
+import { currentUserId } from "../lib/tenantContext";
+import { getReceiptRowByFileId } from "../repositories/receiptRepository";
 import { ErrorSchema } from "../schemas/common";
 import { ReceiptFileIdParamSchema } from "../schemas/receipt";
 
@@ -36,6 +39,15 @@ export const getReceiptContentRoute = createRoute({
 
 export const getReceiptContentHandler: RouteHandler<typeof getReceiptContentRoute> = async (c) => {
   const fileId = c.req.param("fileId");
+  // テナント文脈がある場合（SaaS）は、証憑台帳で所有者を確認できた
+  // ファイルだけを配信する。他テナントの証憑・台帳に無いファイルは
+  // 存在しないものとして 404 にする（画像の IDOR を塞ぐ）。
+  // 文脈が無いローカル運用では従来どおり配信する。
+  if (currentUserId() !== undefined) {
+    const db = getDb();
+    const row = db ? await getReceiptRowByFileId(db, fileId) : null;
+    if (!row) throw new HTTPException(404, { message: "ファイルが存在しません" });
+  }
   try {
     const storage = createStorageClient(loadStorageConfig());
     const downloaded = await storage.download(receiptObjectKey(fileId));
