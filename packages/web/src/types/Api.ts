@@ -320,6 +320,8 @@ export interface LoginResponse {
   token?: string;
   totp_required?: boolean;
   challenge?: string;
+  /** 登録直後（メール確認待ち）。セッションはまだ発行されていない。 */
+  verification_required?: boolean;
 }
 
 /** 課金の状態（/api/billing/plan）。 */

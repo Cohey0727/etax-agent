@@ -74,6 +74,10 @@ export interface AuthQuery {
   magic: string | null;
   /** 外部ログイン失敗の戻り（?auth_error=）。無ければ null。 */
   authError: string | null;
+  /** 登録時のメール確認トークン（?verify=）。無ければ null。 */
+  verify: string | null;
+  /** OAuth ログイン後に TOTP が必要なときのチャレンジ（?totp_challenge=）。 */
+  totpChallenge: string | null;
 }
 
 /**
@@ -83,7 +87,12 @@ export interface AuthQuery {
  */
 export const parseAuthQuery = (search: string): AuthQuery => {
   const params = new URLSearchParams(search);
-  return { magic: params.get("magic"), authError: params.get("auth_error") };
+  return {
+    magic: params.get("magic"),
+    authError: params.get("auth_error"),
+    verify: params.get("verify"),
+    totpChallenge: params.get("totp_challenge"),
+  };
 };
 
 /** URLパスから画面と年度を読む。未知のパスは null。/accounts/<年度> だけならその年のダッシュボード。 */

@@ -184,7 +184,7 @@ export const AppPage = () => {
   const authQueryRef = useRef<AuthQuery>(
     typeof window !== "undefined"
       ? parseAuthQuery(window.location.search)
-      : { magic: null, authError: null },
+      : { magic: null, authError: null, verify: null, totpChallenge: null },
   );
   const refreshAuth = useCallback(async () => {
     const [config, me] = await Promise.all([
@@ -196,7 +196,7 @@ export const AppPage = () => {
     setAuthChecked(true);
     if (me) {
       // ログインできたらクエリ（magic 等）を消して通常表示に戻す
-      authQueryRef.current = { magic: null, authError: null };
+      authQueryRef.current = { magic: null, authError: null, verify: null, totpChallenge: null };
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, []);
@@ -466,7 +466,10 @@ export const AppPage = () => {
     return <DashboardSkeleton year={year} />;
   }
   const authQueryPending =
-    authQueryRef.current.magic !== null || authQueryRef.current.authError !== null;
+    authQueryRef.current.magic !== null ||
+    authQueryRef.current.authError !== null ||
+    authQueryRef.current.verify !== null ||
+    authQueryRef.current.totpChallenge !== null;
   if (authConfig && ((authConfig.required && !authUser) || (authQueryPending && !authUser))) {
     return (
       <LoginPage
@@ -474,6 +477,8 @@ export const AppPage = () => {
         onAuthenticated={() => void refreshAuth()}
         magic={authQueryRef.current.magic}
         authError={authQueryRef.current.authError}
+        verify={authQueryRef.current.verify}
+        totpChallenge={authQueryRef.current.totpChallenge}
       />
     );
   }

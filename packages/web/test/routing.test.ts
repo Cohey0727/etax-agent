@@ -8,28 +8,39 @@ import { describe, expect, test } from "bun:test";
 import { parseAuthQuery, parsePath, pathForView } from "../src/utils/routing";
 import { AppView } from "../src/types";
 
+const EMPTY_AUTH_QUERY = { magic: null, authError: null, verify: null, totpChallenge: null };
+
 describe("parseAuthQuery（認証クエリの捕捉）", () => {
   test("メールリンクのトークンを取り出す", () => {
-    expect(parseAuthQuery("?magic=tok-123")).toEqual({ magic: "tok-123", authError: null });
+    expect(parseAuthQuery("?magic=tok-123")).toEqual({ ...EMPTY_AUTH_QUERY, magic: "tok-123" });
   });
 
   test("外部ログイン失敗の戻りを取り出す", () => {
     expect(parseAuthQuery("?auth_error=access_denied")).toEqual({
-      magic: null,
+      ...EMPTY_AUTH_QUERY,
       authError: "access_denied",
     });
   });
 
   test("両方ある場合は両方取り出す", () => {
     expect(parseAuthQuery("?magic=tok&auth_error=failed")).toEqual({
+      ...EMPTY_AUTH_QUERY,
       magic: "tok",
       authError: "failed",
     });
   });
 
-  test("クエリが無ければどちらも null", () => {
-    expect(parseAuthQuery("")).toEqual({ magic: null, authError: null });
-    expect(parseAuthQuery("?filters=year")).toEqual({ magic: null, authError: null });
+  test("メール確認トークンと OAuth 後の TOTP チャレンジを取り出す", () => {
+    expect(parseAuthQuery("?verify=vtok")).toEqual({ ...EMPTY_AUTH_QUERY, verify: "vtok" });
+    expect(parseAuthQuery("?totp_challenge=chal")).toEqual({
+      ...EMPTY_AUTH_QUERY,
+      totpChallenge: "chal",
+    });
+  });
+
+  test("クエリが無ければすべて null", () => {
+    expect(parseAuthQuery("")).toEqual(EMPTY_AUTH_QUERY);
+    expect(parseAuthQuery("?filters=year")).toEqual(EMPTY_AUTH_QUERY);
   });
 
   test("URLエンコードされたトークンを復号して取り出す", () => {

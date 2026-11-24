@@ -28,6 +28,7 @@ import {
   magicLinkRequestRoute,
 } from "../usecases/authMagicLink";
 import { oauthCallbackHandler, oauthStartHandler } from "../usecases/authOAuth";
+import { verifyEmailHandler, verifyEmailRoute } from "../usecases/authVerifyEmail";
 import {
   loginTotpHandler,
   loginTotpRoute,
@@ -51,6 +52,7 @@ app.openapi(totpEnableRoute, totpEnableHandler);
 app.openapi(totpDisableRoute, totpDisableHandler);
 app.openapi(magicLinkRequestRoute, magicLinkRequestHandler);
 app.openapi(magicLinkConsumeRoute, magicLinkConsumeHandler);
+app.openapi(verifyEmailRoute, verifyEmailHandler);
 app.get("/api/auth/oauth/:provider/start", oauthStartHandler);
 app.get("/api/auth/oauth/:provider/callback", oauthCallbackHandler);
 app.openapi(createApiKeyRoute, createApiKeyHandler);
