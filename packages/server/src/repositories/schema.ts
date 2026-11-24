@@ -14,7 +14,17 @@
  * fixed_assets      : 固定資産台帳（減価償却の計算と決算書明細の元データ）
  * receipts          : 証憑（領収書画像）と取引の紐付け
  */
-import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 
 /** 日時カラム（timestamptz、Date として読み書きする）。 */
 const timestampColumn = (name: string) =>
@@ -170,21 +180,29 @@ export const filingSnapshotsTable = pgTable("filing_snapshots", {
  * 全文検索は pg_trgm の GIN インデックス（title / content）で高速化し、
  * 部分一致（ILIKE）で引く（knowledgeRepository 参照）。
  */
-export const knowledgeDocsTable = pgTable("knowledge_docs", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  /** 一意キー（例: "nta-2072"） */
-  slug: text("slug").notNull().unique(),
-  /** 出典の番号（タックスアンサー番号。例: "2072"） */
-  number: text("number").notNull().default(""),
-  title: text("title").notNull(),
-  /** 分野（例: 所得控除、消費税） */
-  category: text("category").notNull().default(""),
-  sourceUrl: text("source_url").notNull().default(""),
-  content: text("content").notNull(),
-  updatedAt: timestampColumn("updated_at")
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const knowledgeDocsTable = pgTable(
+  "knowledge_docs",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    /** 一意キー（例: "nta-2072"） */
+    slug: text("slug").notNull().unique(),
+    /** 出典の番号（タックスアンサー番号。例: "2072"） */
+    number: text("number").notNull().default(""),
+    title: text("title").notNull(),
+    /** 分野（例: 所得控除、消費税） */
+    category: text("category").notNull().default(""),
+    sourceUrl: text("source_url").notNull().default(""),
+    content: text("content").notNull(),
+    updatedAt: timestampColumn("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  // 部分一致検索（ILIKE）用の pg_trgm GIN インデックス（DDL 側と一致）。
+  (t) => [
+    index("knowledge_docs_title_trgm_idx").using("gin", t.title.op("gin_trgm_ops")),
+    index("knowledge_docs_content_trgm_idx").using("gin", t.content.op("gin_trgm_ops")),
+  ],
+);
 
 /**
  * 固定資産台帳。減価償却費の計算（shared の depreciation エンジン）と
@@ -310,17 +328,22 @@ export const emailVerificationTokensTable = pgTable("email_verification_tokens",
 });
 
 /** OAuth（Google / GitHub）の外部IDとユーザーの対応。 */
-export const userIdentitiesTable = pgTable("user_identities", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  userId: integer("user_id")
-    .notNull()
-    .references(() => usersTable.id),
-  provider: text("provider").notNull(),
-  providerUserId: text("provider_user_id").notNull(),
-  createdAt: timestampColumn("created_at")
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const userIdentitiesTable = pgTable(
+  "user_identities",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => usersTable.id),
+    provider: text("provider").notNull(),
+    providerUserId: text("provider_user_id").notNull(),
+    createdAt: timestampColumn("created_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  // 同一プロバイダの同一外部IDは1ユーザーにだけ紐付く（DDL 側と一致）。
+  (t) => [unique("user_identities_provider_user_unique").on(t.provider, t.providerUserId)],
+);
 
 /** ログインセッション。トークン自体は保存せず SHA-256 ハッシュで持つ。 */
 export const sessionsTable = pgTable("sessions", {

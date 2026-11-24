@@ -27,6 +27,11 @@ export function getDb(): Db | null {
   if (!url) return null;
   attempted = true;
   const pool = new Pool({ connectionString: url });
+  // アイドル接続の切断等で Pool が出す 'error' を未捕捉のままにすると
+  // プロセスごと落ちるため、必ずログに残して握る（Issue #11）。
+  pool.on("error", (err) => {
+    console.error(`PostgreSQL プールのエラー: ${err.message}`);
+  });
   cached = drizzle(pool, { schema });
   return cached;
 }
@@ -230,10 +235,28 @@ const schemaDdl: string[] = [
      ON knowledge_docs USING gin (title gin_trgm_ops)`,
   `CREATE INDEX IF NOT EXISTS knowledge_docs_content_trgm_idx
      ON knowledge_docs USING gin (content gin_trgm_ops)`,
+  // 運用クエリ（所有者×年度の一覧・履歴・紐付け参照）のインデックス。
+  `CREATE INDEX IF NOT EXISTS transactions_owner_fiscal_idx
+     ON transactions (owner_user_id, deleted_at, fiscal_year, date)`,
+  `CREATE INDEX IF NOT EXISTS transaction_history_transaction_idx
+     ON transaction_history (transaction_id)`,
+  `CREATE INDEX IF NOT EXISTS receipts_owner_transaction_idx
+     ON receipts (owner_user_id, transaction_id)`,
+  `CREATE INDEX IF NOT EXISTS filing_snapshots_owner_year_idx
+     ON filing_snapshots (owner_user_id, year)`,
+  `CREATE INDEX IF NOT EXISTS fixed_assets_owner_idx
+     ON fixed_assets (owner_user_id)`,
+  `CREATE INDEX IF NOT EXISTS imports_owner_idx
+     ON imports (owner_user_id)`,
+  `CREATE INDEX IF NOT EXISTS subscriptions_stripe_customer_idx
+     ON subscriptions (stripe_customer_id)`,
+  `CREATE INDEX IF NOT EXISTS sessions_user_expiry_idx
+     ON sessions (user_id, expires_at)`,
   // 割り当て年度が未設定（0）の行は、日付の年で埋める（冪等）。
+  // 日付が数値年で始まらない行は CAST で初期化全体が落ちるため対象外にする。
   `UPDATE transactions
    SET fiscal_year = CAST(substr(date, 1, 4) AS INTEGER)
-   WHERE fiscal_year = 0`,
+   WHERE fiscal_year = 0 AND date ~ '^[0-9]{4}'`,
 ];
 
 /** 指定した DB にスキーマ DDL を適用する（冪等）。 */
@@ -249,7 +272,39 @@ let tablesEnsured = false;
 export async function ensureTables(): Promise<void> {
   if (tablesEnsured) return;
   const db = getDb();
-  if (!db) return;
+  if (!db) {
+    // DB 未設定なら用意すべきものは無い（完了扱いにして待機側を進める）。
+    tablesEnsured = true;
+    return;
+  }
   await applySchema(db);
   tablesEnsured = true;
+}
+
+let readyPromise: Promise<void> | null = null;
+
+/**
+ * テーブル初期化の完了を待つ共有 Promise（Issue #11: 起動時初期化と
+ * 初回リクエストの競合対策）。初期化はバックグラウンドで進むため、
+ * DB を使う処理はこれを await してから走ると安全になる。
+ * DB が落ちている場合は上限まで待ってから諦める（各リクエスト側で
+ * さらに短いタイムアウトを併用すること）。
+ */
+export function tablesReady(): Promise<void> {
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      const maxAttempts = 60;
+      for (let attempt = 0; attempt < maxAttempts && !tablesEnsured; attempt++) {
+        try {
+          await ensureTables();
+        } catch {
+          // 初期化のリトライは起動側ループも行う。ここでは待機に徹する。
+        }
+        if (!tablesEnsured) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+    })();
+  }
+  return readyPromise;
 }

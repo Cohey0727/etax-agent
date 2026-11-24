@@ -45,7 +45,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
 import { ACCOUNT_CRITERIA } from "@etax/shared";
-import { ensureTables, getDb, isDatabaseConfigured } from "./lib/db";
+import { ensureTables, getDb, isDatabaseConfigured, tablesReady } from "./lib/db";
 import { encryptionEnabled } from "./lib/encryption";
 import { publicBaseUrl } from "./lib/publicUrl";
 import { billingEnabled } from "./gateways/stripeGateway";
@@ -113,6 +113,19 @@ app.use(
 // リクエストボディの上限（巨大ボディでのメモリ枯渇を防ぐ、Issue #7）。
 // CSV 取込・領収書画像の PUT もこの範囲に収まる大きさにしている。
 app.use("/api/*", bodyLimit({ maxSize: 25 * 1024 * 1024 }));
+
+// 起動時初期化（テーブル自己修復）はバックグラウンドで進むため、
+// DB を使う初回リクエストが初期化完了前に走ると失敗する（Issue #11）。
+// 完了を短時間だけ待ってから処理する（DB 未設定・疎通確認は待たない）。
+app.use("/api/*", async (c, next) => {
+  if (c.req.path !== "/api/health" && isDatabaseConfigured()) {
+    await Promise.race([
+      tablesReady(),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+  }
+  await next();
+});
 
 /**
  * 認証ミドルウェア: セッション/APIキーからユーザーを解決し、テナント文脈を
@@ -191,6 +204,8 @@ app.onError((err, c) => {
     const message = err.message === "Malformed JSON in request body" ? "JSONボディが必要です" : err.message;
     return c.json({ error: message }, err.status);
   }
+  // 想定外の 500 は握り潰さず、原因追跡のために必ずログへ残す（Issue #11）。
+  console.error(`未処理のエラー (${c.req.method} ${c.req.path}):`, err);
   return c.json({ error: "Internal Server Error" }, 500);
 });
 
