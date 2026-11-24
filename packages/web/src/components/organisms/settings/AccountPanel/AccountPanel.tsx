@@ -10,6 +10,7 @@ import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AuthUser, BillingPlan } from "@types";
 import {
   clearCurrentUserStorage,
+  clearStoredAgentApiKey,
   createBillingCheckout,
   disableTotp,
   enableTotp,
