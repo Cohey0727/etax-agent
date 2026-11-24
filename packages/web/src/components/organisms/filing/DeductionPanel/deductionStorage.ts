@@ -20,6 +20,7 @@ import {
   TaxCreditInputs,
 } from "@etax/shared";
 import { fetchFilingInputs, saveFilingInputs } from "@utils/api";
+import { userScopedKey } from "@utils/userStorage";
 
 /**
  * 内訳の1件（名称と金額）。寄附金・社会保険料・小規模企業共済等・医療費の
@@ -163,7 +164,8 @@ export function freshDeductionState(): DeductionState {
 }
 
 function storageKey(year: number): string {
-  return `etax-amend-deductions-${year}`;
+  // ユーザーごとに分離する（別アカウントの値をサーバーへ移行しないため）
+  return userScopedKey(`etax-amend-deductions-${year}`);
 }
 
 /** 保存済みの給与所得を取り出す。数値でない項目は 0 にする。 */

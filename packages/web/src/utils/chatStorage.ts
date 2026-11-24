@@ -1,4 +1,5 @@
 import { ChatMessage, ChatRole } from "@types";
+import { userScopedKey } from "./userStorage";
 
 /** 保存された過去の会話（クリア時にアーカイブされる）。 */
 export interface ChatSession {
@@ -35,7 +36,7 @@ const parseMessages = (raw: string | null): ChatMessage[] => {
 /** 進行中の会話（再読み込みしても残るよう随時保存する）。 */
 export const loadCurrentMessages = (): ChatMessage[] => {
   try {
-    return parseMessages(localStorage.getItem(CURRENT_KEY));
+    return parseMessages(localStorage.getItem(userScopedKey(CURRENT_KEY)));
   } catch {
     return [];
   }
@@ -43,7 +44,7 @@ export const loadCurrentMessages = (): ChatMessage[] => {
 
 export const saveCurrentMessages = (messages: ChatMessage[]): void => {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify(messages));
+    localStorage.setItem(userScopedKey(CURRENT_KEY), JSON.stringify(messages));
   } catch {
     // 保存できなくても会話自体は続けられる
   }
@@ -52,7 +53,7 @@ export const saveCurrentMessages = (messages: ChatMessage[]): void => {
 /** アーカイブ済みの過去の会話一覧（新しい順）。 */
 export const loadChatSessions = (): ChatSession[] => {
   try {
-    const raw = localStorage.getItem(SESSIONS_KEY);
+    const raw = localStorage.getItem(userScopedKey(SESSIONS_KEY));
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -72,7 +73,7 @@ export const loadChatSessions = (): ChatSession[] => {
 
 const saveChatSessions = (sessions: ChatSession[]): void => {
   try {
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+    localStorage.setItem(userScopedKey(SESSIONS_KEY), JSON.stringify(sessions));
   } catch {
     // 保存できなくても会話自体は続けられる
   }

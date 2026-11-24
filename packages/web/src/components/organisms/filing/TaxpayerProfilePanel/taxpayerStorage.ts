@@ -11,6 +11,7 @@
  */
 import { XtxTaxpayerInput } from "@types";
 import { fetchTaxpayerProfile, saveTaxpayerProfile } from "@utils/api";
+import { userScopedKey } from "@utils/userStorage";
 
 const LEGACY_KEY = "etax-taxpayer";
 const KEY_PREFIX = "etax-taxpayer-";
@@ -93,13 +94,13 @@ export interface LoadedTaxpayer {
 
 /** 端末保存（移行前）から読み込む。何も保存が無ければ null。 */
 function loadTaxpayerFromLocal(year: number): LoadedTaxpayer | null {
-  const own = readKey(`${KEY_PREFIX}${year}`);
+  const own = readKey(userScopedKey(`${KEY_PREFIX}${year}`));
   if (own) return { taxpayer: own, carriedFrom: null, carriedFromLegacy: false };
   for (let y = year - 1; y >= year - CARRY_SEARCH_YEARS; y--) {
-    const past = readKey(`${KEY_PREFIX}${y}`);
+    const past = readKey(userScopedKey(`${KEY_PREFIX}${y}`));
     if (past) return { taxpayer: past, carriedFrom: y, carriedFromLegacy: false };
   }
-  const legacy = readKey(LEGACY_KEY);
+  const legacy = readKey(userScopedKey(LEGACY_KEY));
   if (legacy) return { taxpayer: legacy, carriedFrom: null, carriedFromLegacy: true };
   return null;
 }
