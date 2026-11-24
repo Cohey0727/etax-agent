@@ -62,6 +62,9 @@ export async function createImportWithTransactions(
       .values(
         input.transactions.map((t) => ({
           date: t.date,
+          // 割り当て年度は日付の年で埋める（起動時バックフィルと同じ意味論。
+          // 既定値 0 のままだと年度置換の削除対象から漏れて二重化する）。
+          fiscalYear: Number(t.date.slice(0, 4)) || 0,
           description: t.description,
           amount: t.amount,
           account: t.account,
