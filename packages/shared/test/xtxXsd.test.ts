@@ -101,6 +101,68 @@ function incomeSample(year: number): string {
   });
 }
 
+/** 令和6年分・定額減税あり（ABB00682/684 の XSD 検証用） */
+function flatReductionSample(): string {
+  const year = 2024;
+  const transactions: Transaction[] = [
+    { date: `${year}-06-15`, year, description: "事業売上", amount: 12_000_000, account: "普通預金", category: "売上高", income_type: "business", tax_category: "" },
+  ];
+  const figures = computeCorrectedFigures(transactions, year);
+  const tax = computeIncomeTax({
+    year,
+    totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+    deductions: EMPTY_DEDUCTION_INPUTS,
+    taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, flatReduction: 30_000 },
+  });
+  return buildXtxFiling({
+    year,
+    amendment: false,
+    submissionDate: "2025-03-10",
+    taxpayer: TAXPAYER,
+    figures,
+    deductionInputs: EMPTY_DEDUCTION_INPUTS,
+    miscIncome: EMPTY_MISC_INCOME,
+    tax,
+    categoryTotals: { business: {}, realEstate: {} },
+    withholdingTax: 0,
+    prepaidTax: 0,
+    originalThirdPeriodTax: null,
+  });
+}
+
+/** 令和7年分・特定親族特別控除あり（ABB00542 の XSD 検証用） */
+function specialRelativeSample(): string {
+  const year = 2025;
+  const transactions: Transaction[] = [
+    { date: `${year}-06-15`, year, description: "事業売上", amount: 12_000_000, account: "普通預金", category: "売上高", income_type: "business", tax_category: "" },
+  ];
+  const figures = computeCorrectedFigures(transactions, year);
+  const deductionInputs = {
+    ...EMPTY_DEDUCTION_INPUTS,
+    specialRelativeTotalIncome: 1_000_000,
+  };
+  const tax = computeIncomeTax({
+    year,
+    totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+    deductions: deductionInputs,
+    taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+  });
+  return buildXtxFiling({
+    year,
+    amendment: false,
+    submissionDate: "2026-03-10",
+    taxpayer: TAXPAYER,
+    figures,
+    deductionInputs,
+    miscIncome: EMPTY_MISC_INCOME,
+    tax,
+    categoryTotals: { business: {}, realEstate: {} },
+    withholdingTax: 0,
+    prepaidTax: 0,
+    originalThirdPeriodTax: null,
+  });
+}
+
 function salarySample(year: number): string {
   const transactions: Transaction[] = [
     {
@@ -345,7 +407,9 @@ describe("公式XMLスキーマ検証", () => {
     const samples: [string, string, string][] = [
       ["shotoku2023.xtx", incomeSample(2023), "shotoku/RKO0010-231.xsd"],
       ["shotoku2024.xtx", incomeSample(2024), "shotoku/RKO0010-240.xsd"],
+      ["shotokuFlat2024.xtx", flatReductionSample(), "shotoku/RKO0010-240.xsd"],
       ["shotoku2025.xtx", incomeSample(2025), "shotoku/RKO0010-250.xsd"],
+      ["shotokuSpecial2025.xtx", specialRelativeSample(), "shotoku/RKO0010-250.xsd"],
       ["shotokuWhite2025.xtx", whiteSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuSalary2025.xtx", salarySample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuDepBs2025.xtx", depBsSample(2025), "shotoku/RKO0010-250.xsd"],

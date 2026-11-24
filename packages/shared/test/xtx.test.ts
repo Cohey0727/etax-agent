@@ -652,3 +652,118 @@ describe("buildXtxFiling の仕様適合（公式XMLスキーマ準拠）", () =
     ).toThrow(/利用者識別番号/);
   });
 });
+
+describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", () => {
+  const TAXPAYER = {
+    name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+    address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+    phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+    myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア",
+    shopName: "", jan1Address: "",
+  };
+
+  function buildCustom(opts: {
+    year: number;
+    deductions?: Partial<typeof EMPTY_DEDUCTION_INPUTS>;
+    taxCredits?: Partial<typeof EMPTY_TAX_CREDIT_INPUTS>;
+    filingType?: "blue65" | "white";
+    withholdingTax?: number;
+    txs?: Transaction[];
+  }) {
+    const figures = computeCorrectedFigures(opts.txs ?? TRANSACTIONS, opts.year, {
+      filingType: opts.filingType,
+    });
+    const deductionInputs = { ...EMPTY_DEDUCTION_INPUTS, ...opts.deductions };
+    const tax = computeIncomeTax({
+      year: opts.year,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: deductionInputs,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, ...opts.taxCredits },
+    });
+    const xtx = buildXtxFiling({
+      year: opts.year,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: TAXPAYER,
+      figures,
+      filingType: opts.filingType,
+      deductionInputs,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: opts.withholdingTax ?? 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    return { xtx, tax };
+  }
+
+  const tagValue = (xml: string, tag: string) =>
+    Number(xml.match(new RegExp(`<${tag}>(-?\\d+)</${tag}>`))?.[1]);
+
+  test("白色申告は申告区分 ABA00240 = 2", () => {
+    const { xtx } = buildCustom({ year: 2025, filingType: "white" });
+    expect(xtx).toContain("<ABA00240><kubun_CD>2</kubun_CD></ABA00240>");
+  });
+
+  test("令和6年分は定額減税のチェーン（ABB00682/684/686/688）を出す", () => {
+    const { xtx, tax } = buildCustom({ year: 2024, taxCredits: { flatReduction: 60_000 } });
+    expect(tagValue(xtx, "ABB00670")).toBe(tax.taxAfterOtherCredits + 60_000);
+    expect(tagValue(xtx, "ABB00682")).toBe(tax.standardIncomeTax + 60_000);
+    expect(xtx).toContain("<ABB00686>2</ABB00686>"); // 60,000 ÷ 30,000 = 2人
+    expect(xtx).toContain("<ABB00688>60000</ABB00688>");
+    expect(tagValue(xtx, "ABB01010")).toBe(tax.standardIncomeTax);
+  });
+
+  test("特定親族特別控除は ABB00542 グループに出し、扶養控除 ABB00540 と分ける", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2025,
+      deductions: {
+        specialRelativeTotalIncome: 1_000_000,
+        dependents: { general: 1, specific: 0, elderly: 0, elderlyCohabiting: 0 },
+      },
+    });
+    expect(tax.deductions.specialRelative).toBe(410_000);
+    expect(xtx).toContain("<ABB00546>1</ABB00546>");
+    expect(xtx).toContain("<ABB00548>410000</ABB00548>");
+    expect(tagValue(xtx, "ABB00540")).toBe(tax.deductions.dependents);
+  });
+
+  test("外国税額控除があっても ABB01020 = floor(ABB01010 × 2.1%) の検算が成立する", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2025,
+      taxCredits: { foreignTaxPaid: 500_000, foreignIncome: 3_000_000 },
+    });
+    expect(tax.taxCredits.foreignTax).toBeGreaterThan(0);
+    const b = tagValue(xtx, "ABB01010");
+    const r = tagValue(xtx, "ABB01020");
+    expect(b).toBe(tax.standardIncomeTax);
+    expect(r).toBe(Math.floor((b * 21) / 1000));
+    expect(tagValue(xtx, "ABB01040")).toBe(tax.taxCredits.foreignTax);
+    expect(tagValue(xtx, "ABB00720")).toBe(
+      Math.floor((b + r - tax.taxCredits.foreignTax) / 100) * 100,
+    );
+  });
+
+  test("還付になる場合は ABB00720 を負のまま出す（0にクランプしない）", () => {
+    const { xtx, tax } = buildCustom({ year: 2025, withholdingTax: 2_000_000 });
+    const raw = tax.standardIncomeTax + tax.reconstructionTaxGross - 2_000_000;
+    expect(raw).toBeLessThan(0);
+    expect(tagValue(xtx, "ABB00720")).toBe(raw);
+    expect(tagValue(xtx, "ABB00760")).toBe(-raw);
+  });
+
+  test("配偶者控除のみ（特別控除なし）では ABB00515 を立てない", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2025,
+      // 配偶者控除は本人の合計所得1,000万円以下が要件なので小さい取引で組む
+      txs: [
+        tx({ date: "2025-06-15", year: 2025, description: "事業売上", amount: 5_000_000, category: "売上高", income_type: "business" }),
+      ],
+      deductions: { spouseCategory: "general", spouseTotalIncome: 400_000 },
+    });
+    expect(tax.deductions.spouse).toBeGreaterThan(0);
+    expect(tax.deductions.spouseSpecial).toBe(0);
+    expect(xtx).not.toContain("ABB00515");
+  });
+});

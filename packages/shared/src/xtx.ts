@@ -381,7 +381,8 @@ function buildKoa020Face1(data: XtxFilingData): string {
   if (t.shopName) taxpayer.push(ref("ABA00170", "NOZEISHA_YAGO"));
   if (toEraDate(t.birthDate)) taxpayer.push(ref("ABA00200", "BIRTHDAY"));
   if (phoneXml(t.phone)) taxpayer.push(ref("ABA00220", "NOZEISHA_TEL"));
-  const kinds: string[] = [kubun("ABA00240", 1)]; // 青色区分: 該当
+  // 申告区分: 青色申告 = 1、白色申告 = 2
+  const kinds: string[] = [kubun("ABA00240", data.filingType === "white" ? 2 : 1)];
   if (data.amendment) kinds.push(kubun("ABA00256", 1)); // 修正区分: 該当
   taxpayer.push(`<ABA00230>${kinds.join("")}</ABA00230>`);
   header.push(`<ABA00050>${taxpayer.join("")}</ABA00050>`);
@@ -432,18 +433,23 @@ function buildKoa020Face1(data: XtxFilingData): string {
   if (f.business_revenue || f.business_expenses) {
     incomes.push(`<ABB00280>${amountAlways("ABB00300", f._detail.business_income)}</ABB00280>`);
   }
-  incomes.push(amountAlways("ABB00340", f._detail.real_estate_income));
+  incomes.push(amount("ABB00340", f._detail.real_estate_income));
   if (data.salaryIncome && data.salaryIncome.revenue > 0) {
     incomes.push(amountAlways("ABB00370", manual.salary));
   }
-  if (manual.miscTotal > 0 || data.miscIncome.pensionRevenue > 0 || data.miscIncome.businessRevenue > 0) {
-    // 雑: ⑦公的年金等 + ⑧業務 + ⑨その他 + ⑩（⑦〜⑨の計）
+  if (
+    manual.miscTotal !== 0 ||
+    data.miscIncome.pensionRevenue > 0 ||
+    data.miscIncome.businessRevenue > 0 ||
+    data.miscIncome.revenue > 0
+  ) {
+    // 雑: ⑦公的年金等 + ⑧業務 + ⑨その他 + ⑩（⑦〜⑨の計）。赤字もそのまま出す
     const miscParts: string[] = [];
     if (manual.pension > 0) miscParts.push(amountAlways("ABB01060", manual.pension));
-    if (manual.miscBusiness > 0) {
+    if (manual.miscBusiness !== 0) {
       miscParts.push(`<ABB01070>${amountAlways("ABB01090", manual.miscBusiness)}</ABB01070>`);
     }
-    if (manual.miscOther > 0) {
+    if (manual.miscOther !== 0) {
       miscParts.push(`<ABB01100>${amountAlways("ABB01120", manual.miscOther)}</ABB01100>`);
     }
     miscParts.push(amountAlways("ABB01130", manual.miscTotal));
@@ -466,44 +472,64 @@ function buildKoa020Face1(data: XtxFilingData): string {
   ded.push(amount("ABB00510", d.workingStudent + d.disability));
   const spouseTotal = d.spouse + d.spouseSpecial;
   if (spouseTotal > 0) {
-    ded.push((d.spouse > 0 ? kubunValue("ABB00515", 1) : "") + amountAlways("ABB00520", spouseTotal));
+    // 区分1は配偶者特別控除がある場合に立てる
+    ded.push((d.spouseSpecial > 0 ? kubunValue("ABB00515", 1) : "") + amountAlways("ABB00520", spouseTotal));
   }
-  ded.push(amount("ABB00540", d.dependents + d.specialRelative));
+  ded.push(amount("ABB00540", d.dependents));
+  if (d.specialRelative > 0) {
+    // 特定親族特別控除（KOA020-023 以降の様式。人数は入力が単一のため 1）
+    ded.push(
+      `<ABB00542>${amountAlways("ABB00546", 1)}${amountAlways("ABB00548", d.specialRelative)}</ABB00542>`,
+    );
+  }
   ded.push(amountAlways("ABB00550", d.basic));
   ded.push(amountAlways("ABB00555", d.total));
   body.push(`<ABB00420>${ded.join("")}</ABB00420>`);
 
   // 税金の計算
   const taxCalc: string[] = [];
-  const nonForeignCredits = c.total - c.foreignTax;
-  const afterCredits = Math.max(data.tax.incomeTaxBase - nonForeignCredits, 0);
-  const taxTotal = afterCredits + data.tax.reconstructionTax;
-  taxCalc.push(amountAlways("ABB00580", data.tax.taxableIncome));
-  taxCalc.push(amountAlways("ABB00590", data.tax.incomeTaxBase));
+  const tax = data.tax;
+  // 差引所得税額は定額減税を引く前の額で示す。令和6年分は
+  // 再差引所得税額・令和6年分特別税額控除の欄を経て、再々差引
+  // 所得税額（基準所得税額）に至るチェーンになる（KOA020-022）。
+  // 復興特別所得税額は基準所得税額 × 2.1%（外国税額控除前）で、
+  // 外国税額控除等は所得税等の額から引く（ABB01040）。
+  const differential = tax.taxAfterOtherCredits + c.flatReduction;
+  const taxTotal = tax.standardIncomeTax + tax.reconstructionTaxGross;
+  taxCalc.push(amountAlways("ABB00580", tax.taxableIncome));
+  taxCalc.push(amountAlways("ABB00590", tax.incomeTaxBase));
   taxCalc.push(amount("ABB00600", c.dividend));
   taxCalc.push(amount("ABB00650", c.housingLoan));
   taxCalc.push(amount("ABB00660", c.politicalDonations + c.certifiedNpoDonations));
   taxCalc.push(amount("ABB00663", c.seismicRetrofit));
-  taxCalc.push(amountAlways("ABB00670", afterCredits));
-  taxCalc.push(amountAlways("ABB01010", afterCredits));
-  taxCalc.push(amountAlways("ABB01020", data.tax.reconstructionTax));
+  taxCalc.push(amountAlways("ABB00670", differential));
+  if (data.year === 2024) {
+    taxCalc.push(amountAlways("ABB00682", tax.standardIncomeTax + c.flatReduction));
+    if (c.flatReduction > 0) {
+      taxCalc.push(
+        `<ABB00684>${amountAlways("ABB00686", Math.trunc(c.flatReduction / 30_000))}${amountAlways("ABB00688", c.flatReduction)}</ABB00684>`,
+      );
+    }
+  }
+  taxCalc.push(amountAlways("ABB01010", tax.standardIncomeTax));
+  taxCalc.push(amountAlways("ABB01020", tax.reconstructionTaxGross));
   taxCalc.push(amountAlways("ABB01030", taxTotal));
   taxCalc.push(amount("ABB01040", c.foreignTax));
   taxCalc.push(amount("ABB00710", data.withholdingTax));
-  // 申告納税額は100円未満切捨て（国税通則法119条）。還付になる場合は切り捨てない。
+  // 申告納税額は100円未満切捨て（国税通則法119条）。還付になる場合は切り捨てず負のまま出す。
   const declaredRaw = taxTotal - c.foreignTax - data.withholdingTax;
-  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : 0;
+  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : declaredRaw;
   taxCalc.push(amountAlways("ABB00720", declaredTax));
   taxCalc.push(amount("ABB00730", data.prepaidTax));
-  // 第3期分: 納付は申告納税額−予定納税額、還付は源泉超過分も含めた過払い全額
-  const thirdPeriod = declaredTax - data.prepaidTax + Math.min(declaredRaw, 0);
+  // 第3期分: 納付は申告納税額−予定納税額、還付は過払い全額
+  const thirdPeriod = declaredTax - data.prepaidTax;
   if (thirdPeriod > 0) taxCalc.push(`<ABB00740>${amountAlways("ABB00750", thirdPeriod)}</ABB00740>`);
   else if (thirdPeriod < 0) taxCalc.push(`<ABB00740>${amountAlways("ABB00760", -thirdPeriod)}</ABB00740>`);
   body.push(`<ABB00570>${taxCalc.join("")}</ABB00570>`);
 
   // 修正申告・その他は「税金の計算」グループの外（申告内容の直下）に置く
   if (data.amendment && data.originalThirdPeriodTax !== null) {
-    const increase = Math.max(thirdPeriod - data.originalThirdPeriodTax, 0);
+    const increase = Math.floor(Math.max(thirdPeriod - data.originalThirdPeriodTax, 0) / 100) * 100;
     body.push(
       `<ABB00763>${amountAlways("ABB00765", data.originalThirdPeriodTax)}${amountAlways("ABB00767", increase)}</ABB00763>`,
     );
