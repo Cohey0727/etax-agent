@@ -49,11 +49,19 @@ describe("基礎控除", () => {
   test("令和6年分: 所得2,600万円 → 0円", () => {
     expect(basicDeduction(2024, 26_000_000)).toBe(0);
   });
-  test("令和8年分: 所得100万円 → 78万円（上乗せ縮小）", () => {
-    expect(basicDeduction(2026, 1_000_000)).toBe(780_000);
+  test("令和8年分: 所得100万円 → 104万円（令和8年度改正、No.1199）", () => {
+    expect(basicDeduction(2026, 1_000_000)).toBe(1_040_000);
   });
-  test("令和9年分: 所得100万円 → 58万円（本則のみ）", () => {
-    expect(basicDeduction(2027, 1_000_000)).toBe(580_000);
+  test("令和9年分: 所得100万円 → 104万円（令和8年分と同額）", () => {
+    expect(basicDeduction(2027, 1_000_000)).toBe(1_040_000);
+  });
+  test("令和8・9年分: 段階（655万円以下 67万円 / 2,350万円以下 62万円 / 2,400万円以下 48万円）", () => {
+    expect(basicDeduction(2026, 6_550_000)).toBe(670_000);
+    expect(basicDeduction(2026, 23_500_000)).toBe(620_000);
+    expect(basicDeduction(2026, 24_000_000)).toBe(480_000);
+    expect(basicDeduction(2027, 6_550_000)).toBe(670_000);
+    expect(basicDeduction(2027, 24_500_000)).toBe(320_000);
+    expect(basicDeduction(2027, 25_000_001)).toBe(0);
   });
 });
 
