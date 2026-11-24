@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
-import { verifyChallenge } from "../lib/loginChallenge";
+import { beginChallengeUse, burnChallenge } from "../lib/loginChallenge";
 import { currentUserId } from "../lib/tenantContext";
 import { generateTotpSecret, totpOtpauthUrl, verifyTotpCode } from "../lib/totp";
 import { usersTable } from "../repositories/schema";
@@ -60,6 +60,17 @@ export const totpSetupRoute = createRoute({
 
 export const totpSetupHandler: RouteHandler<typeof totpSetupRoute> = async (c) => {
   const { db, user } = await requireUser(c);
+  if (user.totpEnabled) {
+    // 有効化済みの秘密の上書きは、現在のコード確認を必須にする。
+    // セッションを奪われただけでは 2FA を差し替えられないようにするため。
+    const currentSecret = readUserTotpSecret(user);
+    const code = await readCode(c);
+    if (!currentSecret || !verifyTotpCode(currentSecret, code)) {
+      throw new HTTPException(400, {
+        message: "TOTP を設定し直すには現在のコードが必要です",
+      });
+    }
+  }
   const secret = generateTotpSecret();
   await setUserTotpSecret(db, user.id, secret);
   return c.json({ otpauth_url: totpOtpauthUrl(secret, user.email), secret });
@@ -139,7 +150,8 @@ export const loginTotpHandler: RouteHandler<typeof loginTotpRoute> = async (c) =
     | null;
   const challenge = typeof body?.challenge === "string" ? body.challenge : "";
   const code = typeof body?.code === "string" ? body.code : "";
-  const userId = verifyChallenge(challenge, "totp-login");
+  // チャレンジは試行回数を数え（上限で失効）、成功時は消費して再利用を防ぐ
+  const userId = beginChallengeUse(challenge, "totp-login");
   if (userId === undefined) {
     throw new HTTPException(401, { message: "チャレンジが無効か期限切れです。ログインし直してください" });
   }
@@ -148,6 +160,7 @@ export const loginTotpHandler: RouteHandler<typeof loginTotpRoute> = async (c) =
   if (!user || !secret || !verifyTotpCode(secret, code)) {
     throw new HTTPException(401, { message: "コードが違います" });
   }
+  burnChallenge(challenge, "totp-login");
   const token = await issueSession(c, db, user.id);
   return c.json({
     user: { id: user.id, email: user.email, totp_enabled: user.totpEnabled },
