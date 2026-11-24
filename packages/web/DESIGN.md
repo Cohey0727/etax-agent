@@ -20,8 +20,9 @@
 
 ## 色の方針
 
-- 地はごく淡いラベンダーグレー（`bg`）、面は白（`surface`）、アクセントはインディゴ（`accent`）1色。
-- グラデーションはブランドマークのみ（`gradientStart` → `accent`）。
+- パレットは LP（`public/lp.html`）と共通。地は淡いラベンダーグレー（`bg`）、面は白（`surface`）、基調は濃紺ネイビー（`navy` / `navyDeep`）、アクセントはインディゴ（`accent`）1色、差し色はラベンダー（`lavender`）。
+- サイドバーは濃紺グラデーション（`navy` → `navyDeep`）を地にし、選択中ナビは `accent` のピルで満たす。濃紺地の上の文字は `onNavy` / `onNavySubtle`、淡い面は `navySoft` を使う。
+- グラデーションはブランドマークとサイドバーの地のみ（ブランドマークは `gradientStart` → `accent`）。
 - 増減は `positive` / `negative`、注意は `warn*`、異常は `error*`。意味のない装飾色を増やさない。
 
 ## アニメーションの方針

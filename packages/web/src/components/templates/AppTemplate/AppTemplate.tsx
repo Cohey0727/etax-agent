@@ -111,8 +111,12 @@ export const AppTemplate = ({
                   <Icon name="bill" size={21} />
                 </div>
                 <Col gap="none">
-                  <Text variant="sectionTitle">eTaxAgent</Text>
-                  <Text variant="caption">確定申告 準備ツール</Text>
+                  <Text variant="sectionTitle" className={styles.brandTitle}>
+                    eTaxAgent
+                  </Text>
+                  <Text variant="caption" className={styles.brandCaption}>
+                    確定申告 準備ツール
+                  </Text>
                 </Col>
               </Row>
               <Col gap="sm">
@@ -124,7 +128,9 @@ export const AppTemplate = ({
                     <Fragment key={view.id}>
                       {view.id === AppView.Filing ? (
                         <Col gap="sm">
-                          <Text variant="statLabel">年度</Text>
+                          <Text variant="statLabel" className={styles.dataLabel}>
+                            年度
+                          </Text>
                           <Select
                             className={styles.yearSelect}
                             value={selectedYear}
@@ -180,8 +186,10 @@ export const AppTemplate = ({
               <div className={styles.spacer} />
               <div className={styles.dataPanel}>
                 <Col gap="sm">
-                  <Text variant="statLabel">表示中のデータ</Text>
-                  <Text variant="body">
+                  <Text variant="statLabel" className={styles.dataLabel}>
+                    表示中のデータ
+                  </Text>
+                  <Text variant="body" className={styles.dataText}>
                     {dataSource}（{transactionCount}件）
                   </Text>
                 </Col>
