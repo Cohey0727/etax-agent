@@ -118,11 +118,24 @@ export async function listTransactionRows(
     .orderBy(asc(transactionsTable.date), asc(transactionsTable.id));
 }
 
-/** 取引の変更履歴を新しい順に取得する。 */
+/**
+ * 取引の変更履歴を新しい順に取得する。
+ * テナント文脈がある場合は親取引の所有者を確認し、他テナントの取引の
+ * 履歴は返さない（履歴自体に所有者列が無いため親で判定する。
+ * 論理削除済みの取引の履歴も正規の参照なので削除済みも対象に含める）。
+ */
 export async function listTransactionHistoryRows(
   db: Db,
   transactionId: number,
 ): Promise<TransactionHistoryRow[]> {
+  const owner = currentUserId();
+  if (owner !== undefined) {
+    const [parent] = await db
+      .select({ ownerUserId: transactionsTable.ownerUserId })
+      .from(transactionsTable)
+      .where(eq(transactionsTable.id, transactionId));
+    if (!parent || parent.ownerUserId !== owner) return [];
+  }
   return db
     .select()
     .from(transactionHistoryTable)
@@ -221,7 +234,10 @@ export async function listTransactionFingerprintRows(db: Db): Promise<
     taxCategory: string;
   }[]
 > {
-  return db
+  // テナント文脈がある場合は自テナントの行だけで判定する
+  // （他テナントの同一取引で自テナントの取込が「重複」扱いになるのを防ぐ）。
+  const owner = currentUserId();
+  const query = db
     .select({
       date: transactionsTable.date,
       amount: transactionsTable.amount,
@@ -230,6 +246,9 @@ export async function listTransactionFingerprintRows(db: Db): Promise<
       taxCategory: transactionsTable.taxCategory,
     })
     .from(transactionsTable);
+  return owner !== undefined
+    ? query.where(eq(transactionsTable.ownerUserId, owner))
+    : query;
 }
 
 /**
