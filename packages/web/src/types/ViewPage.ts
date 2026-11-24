@@ -17,6 +17,12 @@ export interface ViewPageProps {
   transactions: Transaction[];
   year: number;
   onUseTransactions: (transactions: Transaction[]) => void;
+  /**
+   * CSV取込（DB保存済み）の「ダッシュボードで使う」専用。取込レスポンスは
+   * 新規分のみで年度の完全な集合ではないため、汎用の onUseTransactions とは
+   * 別に、サーバーから影響年度を読み直す経路を使う。取込画面だけが使う。
+   */
+  onUseImportedCsv?: (transactions: Transaction[]) => void;
   onLoadSample: () => void;
   /** 帳簿画面の変更を全体へ反映する（メモリのみ・画面遷移なし）。 */
   onSyncTransactions?: (transactions: Transaction[]) => void;

@@ -19,6 +19,7 @@ import {
   AuthUser,
   ChatMessage,
   FilingTab,
+  LedgerTransaction,
   SendKeyMode,
   ThemeMode,
   ViewPageProps,
@@ -37,6 +38,7 @@ import {
   ledgerRowToTransaction,
   replaceYearLedgerTransactions,
   transactionToLedgerInput,
+  updateLedgerTransaction,
 } from "@utils/api";
 import { DashboardPage } from "../DashboardPage";
 import { FilingPage } from "../FilingPage";
@@ -297,6 +299,48 @@ export const AppPage = () => {
       });
     }
   };
+  // CSV取込（DB保存済み）の「ダッシュボードで使う」専用経路。
+  // 取込レスポンスの transactions は新規分のみ（最大500件）で年度の完全な
+  // 集合ではないため、それで画面を置き換えると既存行が消え、続く年度置換で
+  // DBからも消える（Issue #10-2）。影響年度はサーバーの帳簿を正として
+  // 読み直し、その年度の分だけ画面へ反映する。年度置換は行わない
+  // （取込分はサーバーが保存済みで、置き換える必要がない）。
+  const handleUseCsvImported = (imported: Transaction[]) => {
+    setActiveView(AppView.Dashboard);
+    const importedYears = [...new Set(imported.map((tx) => tx.year))];
+    if (importedYears.length === 0) return;
+    void (async () => {
+      const fetchedByYear = new Map<number, Transaction[]>();
+      for (const importYear of importedYears) {
+        const rows = await fetchLedgerTransactions(importYear);
+        if (!rows) continue;
+        fetchedByYear.set(
+          importYear,
+          await applyCsvClassificationEdits(
+            rows,
+            imported.filter((tx) => tx.year === importYear),
+          ),
+        );
+      }
+      setTransactions((current) => {
+        const merged = current.filter((tx) => !importedYears.includes(tx.year));
+        for (const importYear of importedYears) {
+          const fetched = fetchedByYear.get(importYear);
+          if (fetched) {
+            merged.push(...fetched);
+          } else {
+            // 読み直せなかった年度はメモリ上の既存分＋取込分で保持する（消さない）
+            merged.push(
+              ...current.filter((tx) => tx.year === importYear),
+              ...imported.filter((tx) => tx.year === importYear),
+            );
+          }
+        }
+        return merged;
+      });
+      if (fetchedByYear.size > 0) setDataSource("帳簿");
+    })();
+  };
   const handleSyncTransactions = (next: Transaction[]) => {
     setTransactions(next);
     setDataSource("帳簿");
@@ -488,6 +532,7 @@ export const AppPage = () => {
           transactions={transactions}
           year={year}
           onUseTransactions={handleUseImported}
+          onUseImportedCsv={handleUseCsvImported}
           onLoadSample={handleLoadSample}
           onSyncTransactions={handleSyncTransactions}
           onNavigate={setActiveView}
@@ -504,3 +549,46 @@ export const AppPage = () => {
     </AppTemplate>
   );
 };
+
+/**
+ * 取込プレビューで付け直した科目（科目判定パネルの編集）を、サーバーから
+ * 読み直した帳簿の行へ反映する。日付・金額・摘要・口座が一致する行を
+ * 対応付け（同一キーは複数行ありうるので消費済みは再利用しない）、
+ * 科目・収入区分が変わった行だけ帳簿へも保存する。
+ */
+async function applyCsvClassificationEdits(
+  rows: LedgerTransaction[],
+  imported: Transaction[],
+): Promise<Transaction[]> {
+  const used = new Set<number>();
+  const result = rows.map((row) => ({ ...row }));
+  for (const tx of imported) {
+    const index = result.findIndex(
+      (row, i) =>
+        !used.has(i) &&
+        row.date === tx.date &&
+        row.amount === tx.amount &&
+        row.description === tx.description &&
+        row.account === tx.account,
+    );
+    if (index < 0) continue;
+    used.add(index);
+    const row = result[index] as LedgerTransaction;
+    if (row.category === tx.category && row.income_type === tx.income_type) continue;
+    const edited: LedgerTransaction = {
+      ...row,
+      category: tx.category,
+      income_type: tx.income_type,
+    };
+    result[index] = edited;
+    try {
+      result[index] = await updateLedgerTransaction(
+        edited.id,
+        transactionToLedgerInput(ledgerRowToTransaction(edited)),
+      );
+    } catch {
+      // 帳簿への保存に失敗しても、画面表示は編集後の値で続ける
+    }
+  }
+  return result.map(ledgerRowToTransaction);
+}
