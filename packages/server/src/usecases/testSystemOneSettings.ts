@@ -6,7 +6,13 @@
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { createSystemOneClient } from "../gateways/systemOneGateway";
-import { loadSystemOneConfig, SystemOneConfig } from "../lib/config";
+import {
+  getSystemOneOverrides,
+  loadSystemOneConfig,
+  pairApiKeyWithBaseUrl,
+  SystemOneConfig,
+} from "../lib/config";
+import { assertSafeUserBaseUrl } from "../lib/ssrfGuard";
 import {
   TestSystemOneSettingsRequestSchema,
   TestSystemOneSettingsResponseSchema,
@@ -42,10 +48,29 @@ export const testSystemOneSettingsHandler: RouteHandler<
 > = async (c) => {
   const body = c.req.valid("json");
   const effective = loadSystemOneConfig();
-  const typedKey = body.apiKey?.trim() ?? "";
+  const overrides = getSystemOneOverrides();
+  // 宛先とキーの出所を揃える: カスタム宛先（入力値または保存済み）には
+  // ユーザー自身のキーだけを組み合わせ、環境変数のキーは送らない。
+  const customBaseUrl = body.baseUrl?.trim() || overrides.baseUrl || null;
+  if (customBaseUrl) {
+    try {
+      await assertSafeUserBaseUrl(customBaseUrl);
+    } catch (e) {
+      return c.json(
+        { ok: false, top: null, error: e instanceof Error ? e.message : String(e) },
+        200,
+      );
+    }
+  }
+  const paired = pairApiKeyWithBaseUrl({
+    customBaseUrl,
+    serverBaseUrl: process.env.SYSTEMONE_BASE_URL || "http://127.0.0.1:11434",
+    userKey: body.apiKey?.trim() || overrides.apiKey || null,
+    serverKey: process.env.SYSTEMONE_API_KEY || null,
+  });
   const config: SystemOneConfig = {
-    baseUrl: body.baseUrl?.trim() ? body.baseUrl.trim().replace(/\/+$/, "") : effective.baseUrl,
-    apiKey: typedKey ? typedKey : effective.apiKey,
+    baseUrl: paired.baseUrl,
+    apiKey: paired.apiKey,
     model: body.model?.trim() ? body.model.trim() : effective.model,
   };
   try {
