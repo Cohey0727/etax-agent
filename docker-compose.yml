@@ -55,6 +55,26 @@ services:
       # uid 1000 が読み書きできる権限にしておくこと。
       - ./packages/server/data:/app/packages/server/data
 
+  # オブジェクトストレージ（Garage、S3互換）。領収書・固定資産画像の実体置き場。
+  # ブラウザは署名付きURLで Garage と直接やり取りし、アプリは署名と
+  # メタ操作だけを行う（バイト列はアプリを経由しない）。
+  # 設定は garage.toml（秘密を含むため Git 管理外。garage.toml.example 参照）。
+  # 初期化は scripts/provision-garage.sh（レイアウト・バケット・キー・CORS）。
+  garage:
+    image: dxflrs/garage:v2.5.0@sha256:23b16d34e0348d9aca9b960a7429a7e6d494974b5288bfb8f6c3ab856895f71e
+    container_name: etax-agent-garage
+    restart: unless-stopped
+    command: ["/garage", "-c", "/etc/garage.toml", "server"]
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garagedata:/var/lib/garage
+    ports:
+      # Cloudflare Tunnel の mini-files ホスト名がこのポートへ流す
+      # （署名付きURLの公開エンドポイント）。
+      - "127.0.0.1:43108:3900"
+
 volumes:
   pgdata:
     name: etax-pgdata
+  garagedata:
+    name: etax-garagedata
