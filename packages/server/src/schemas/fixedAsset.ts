@@ -75,6 +75,49 @@ export const SingleFixedAssetResponseSchema = z
 
 export type SingleFixedAssetResponse = z.infer<typeof SingleFixedAssetResponseSchema>;
 
+export const FixedAssetImageSchema = z
+  .object({
+    id: z.number(),
+    asset_id: z.number(),
+    file_id: z.string(),
+    mime_type: z.string(),
+    /** 表示用URL。署名付きURL（s3）か、自前配信エンドポイントのパス（local）。 */
+    url: z.string(),
+    created_at: z.string(),
+  })
+  .openapi("FixedAssetImage");
+
+export type FixedAssetImageResponse = z.infer<typeof FixedAssetImageSchema>;
+
+export const AttachFixedAssetImageRequestSchema = z
+  .object({
+    /** アップロード時に発行されたファイルID。実体はストレージに直アップロード済み。 */
+    file_id: z.string().min(1),
+  })
+  .openapi("AttachFixedAssetImageRequest");
+
+export type AttachFixedAssetImageRequest = z.infer<typeof AttachFixedAssetImageRequestSchema>;
+
+export const FixedAssetImageListResponseSchema = z
+  .object({ images: z.array(FixedAssetImageSchema) })
+  .openapi("FixedAssetImageListResponse");
+
+export type FixedAssetImageListResponse = z.infer<typeof FixedAssetImageListResponseSchema>;
+
+export const SingleFixedAssetImageResponseSchema = z
+  .object({ image: FixedAssetImageSchema.nullable() })
+  .openapi("SingleFixedAssetImageResponse");
+
+export type SingleFixedAssetImageResponse = z.infer<typeof SingleFixedAssetImageResponseSchema>;
+
+export const FixedAssetImageFileIdParamSchema = z
+  .object({ fileId: z.string() })
+  .openapi("FixedAssetImageFileIdParam");
+
+export const FixedAssetImageParamsSchema = z
+  .object({ id: z.string(), fileId: z.string() })
+  .openapi("FixedAssetImageParams");
+
 export const DepreciationRowSchema = z
   .object({
     asset_id: z.number(),

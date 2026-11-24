@@ -15,6 +15,8 @@ export const PresignUploadFileRequestSchema = z
   .object({
     /** アップロードするファイルの Content-Type。署名に含まれるため、実際の送信と一致させる。 */
     contentType: UploadableImageMimeTypeSchema,
+    /** 用途。オブジェクトキーの接頭辞が変わる（未指定は領収書）。 */
+    purpose: z.enum(["receipt", "fixed_asset"]).optional(),
   })
   .openapi("PresignUploadFileRequest");
 

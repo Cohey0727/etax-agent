@@ -240,6 +240,27 @@ export const fixedAssetsTable = pgTable("fixed_assets", {
   ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
+/**
+ * 固定資産に添付した画像（購入時の写真・納品書など）。
+ * 画像そのものはストレージ（fixed-assets/<fileId>）にあり、本テーブルは
+ * ファイルIDと紐付け先の資産を持つ。アップロードは署名付きURLで
+ * ブラウザからストレージへ直接行い、完了後に本テーブルへ登録する。
+ */
+export const fixedAssetImagesTable = pgTable("fixed_asset_images", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  /** 紐付け先の固定資産。資産を消すと画像の紐付けも消える。 */
+  assetId: integer("asset_id")
+    .notNull()
+    .references(() => fixedAssetsTable.id, { onDelete: "cascade" }),
+  /** ストレージ上のファイルID（アップロード時に発行される UUID） */
+  fileId: text("file_id").notNull().unique(),
+  mimeType: text("mime_type").notNull().default(""),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
+});
+
 export type ImportRow = typeof importsTable.$inferSelect;
 export type TransactionRow = typeof transactionsTable.$inferSelect;
 export type TransactionHistoryRow = typeof transactionHistoryTable.$inferSelect;
@@ -437,3 +458,5 @@ export type StripeWebhookEventRow = typeof stripeWebhookEventsTable.$inferSelect
 
 export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
 export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;
+export type FixedAssetImageRow = typeof fixedAssetImagesTable.$inferSelect;
+export type NewFixedAssetImageRow = typeof fixedAssetImagesTable.$inferInsert;

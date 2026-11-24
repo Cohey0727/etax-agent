@@ -15,6 +15,13 @@
       "when": 1795508366418,
       "tag": "0001_silky_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795524729884,
+      "tag": "0002_kind_gunslinger",
+      "breakpoints": true
     }
   ]
 }
