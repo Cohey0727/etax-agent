@@ -2,6 +2,7 @@
  * auth.ts — 認証まわりのルート登録（routes）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { rateLimitMiddleware } from "../lib/rateLimit";
 import {
   loginHandler,
   loginRoute,
@@ -41,6 +42,14 @@ import {
 } from "../usecases/authTotp";
 
 const app = new OpenAPIHono();
+// 認証系の総当たり・濫用対策（Issue #6）。IP 単位の固定ウィンドウ制限。
+app.use("/api/auth/login", rateLimitMiddleware("login", 30, 5 * 60 * 1000));
+app.use("/api/auth/login/totp", rateLimitMiddleware("login-totp", 30, 5 * 60 * 1000));
+app.use("/api/auth/register", rateLimitMiddleware("register", 20, 60 * 60 * 1000));
+app.use("/api/auth/magic-link", rateLimitMiddleware("magic-link", 10, 10 * 60 * 1000));
+app.use("/api/auth/magic-link/consume", rateLimitMiddleware("magic-consume", 30, 5 * 60 * 1000));
+app.use("/api/auth/verify-email", rateLimitMiddleware("verify-email", 30, 5 * 60 * 1000));
+app.use("/api/auth/totp/*", rateLimitMiddleware("totp", 30, 5 * 60 * 1000));
 app.openapi(registerRoute, registerHandler);
 app.openapi(loginRoute, loginHandler);
 app.openapi(logoutRoute, logoutHandler);
