@@ -156,8 +156,10 @@ class SystemOneHttpClient implements SystemOneClient {
       );
     }
     if (!resp.ok) {
+      // 上流のエラー本文はクライアントへ反射しない（サーバーログにのみ残す）。
       const body = (await resp.text()).slice(0, 500);
-      throw new SystemOneError(`HTTP ${resp.status} ${url}: ${body}`);
+      console.warn(`SystemOne 上流エラー HTTP ${resp.status} ${url}: ${body}`);
+      throw new SystemOneError(`HTTP ${resp.status} ${url}: 上流サービスがエラーを返しました`);
     }
     const data = (await resp.json()) as Record<string, unknown>;
     const envelope = systemOneResponseSchema.safeParse(data);
@@ -165,7 +167,9 @@ class SystemOneHttpClient implements SystemOneClient {
     const answer = answers?.["account"] ?? (envelope.success ? envelope.data.answer : undefined) ?? data;
     const probabilities = extractProbabilities(answer);
     if (Object.keys(probabilities).length === 0) {
-      throw new SystemOneError(`応答に確率分布が含まれていません: ${JSON.stringify(data).slice(0, 300)}`);
+      // 応答本文はクライアントへ反射しない。
+      console.warn(`SystemOne 応答に確率分布が含まれていません: ${JSON.stringify(data).slice(0, 300)}`);
+      throw new SystemOneError("応答に確率分布が含まれていません");
     }
     return { probabilities, top: extractTop(answer, probabilities) };
   }
