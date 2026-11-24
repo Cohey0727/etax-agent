@@ -3,6 +3,13 @@ import { clsx } from "clsx";
 import { Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
+import {
+  AGENT_OPEN_KEY,
+  SIDEBAR_OPEN_KEY,
+  loadPanelOpen,
+  savePanelOpen,
+  useMediaQuery,
+} from "./appTemplateUtils";
 
 export interface AppTemplateProps {
   /** 全画面の登録。nav が false の画面はサイドバーに出さず、他画面からの遷移専用。 */
@@ -26,42 +33,6 @@ export interface AppTemplateProps {
   onNavChildSelect?: (view: AppView, key: string) => void;
   children?: ReactNode;
 }
-
-const SIDEBAR_OPEN_KEY = "etax-sidebar-open";
-const AGENT_OPEN_KEY = "etax-agent-open";
-
-/** 開閉状態の復元。未保存なら既定値（左は開く、右は閉じる）。 */
-const loadPanelOpen = (key: string, fallback: boolean): boolean => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw === null ? fallback : raw === "1";
-  } catch {
-    return fallback;
-  }
-};
-
-const savePanelOpen = (key: string, open: boolean): void => {
-  try {
-    localStorage.setItem(key, open ? "1" : "0");
-  } catch {
-    // 保存できなくても開閉自体は効く
-  }
-};
-
-/** メディアクエリの一致を購読する（モバイルではナビの向きを切り替えるため）。 */
-const useMediaQuery = (query: string): boolean => {
-  const [matches, setMatches] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const onChange = () => setMatches(media.matches);
-    onChange();
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, [query]);
-  return matches;
-};
 
 export const AppTemplate = ({
   views,
