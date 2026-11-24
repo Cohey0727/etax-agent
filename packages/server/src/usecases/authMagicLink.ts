@@ -3,12 +3,15 @@
  * リクエストでは登録の有無を明かさず常に同じ応答を返す。リンクの有効期限は
  * 15分・1回限り。未登録のメールアドレスなら、消費時にパスワードなしの
  * ユーザーを作る（パスワードレス登録）。送信は Resend（services/email）。
- * リンクの宛先は ETAX_PUBLIC_URL（未設定時はリクエストの Origin）で組み立てる。
+ * リンクの宛先は設定済みの公開オリジン（ETAX_PUBLIC_URL）だけで組み立てる。
+ * Host / Origin ヘッダは汚染され得るため使わない（Issue #6）。未設定なら
+ * 安全なリンクを作れないので送信自体をしない。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
+import { publicBaseUrl } from "../lib/publicUrl";
 import {
   consumeMagicLinkToken,
   createMagicLinkToken,
@@ -47,9 +50,9 @@ export const magicLinkRequestHandler: RouteHandler<typeof magicLinkRequestRoute>
   const db = requireDb(c);
   const body = (await c.req.json().catch(() => null)) as { email?: unknown } | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  if (email.includes("@")) {
+  const base = publicBaseUrl();
+  if (email.includes("@") && base) {
     const token = await createMagicLinkToken(db, email);
-    const base = process.env.ETAX_PUBLIC_URL || c.req.header("Origin") || "";
     const link = `${base}/?magic=${encodeURIComponent(token)}`;
     await sendMail({
       to: email,

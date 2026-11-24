@@ -10,6 +10,7 @@ import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { issueChallenge, verifyChallenge } from "../lib/loginChallenge";
+import { publicBaseUrl } from "../lib/publicUrl";
 import { findOrCreateOAuthUser } from "../repositories/userRepository";
 import { issueSession } from "./authSession";
 
@@ -51,12 +52,14 @@ function providerFromParam(c: Context): OAuthProvider {
   throw new HTTPException(404, { message: "不明なプロバイダです" });
 }
 
-function publicBase(c: Context): string {
-  return process.env.ETAX_PUBLIC_URL || c.req.header("Origin") || new URL(c.req.url).origin;
-}
-
-function redirectUri(c: Context, provider: OAuthProvider): string {
-  return `${publicBase(c)}/api/auth/oauth/${provider}/callback`;
+/**
+ * redirect_uri の組み立てには設定済みの公開オリジンだけを使う。
+ * Host / Origin ヘッダは汚染され得るため使わない（Issue #6）。
+ * 未設定なら安全な redirect_uri を作れないので null を返す。
+ */
+function redirectUri(c: Context, provider: OAuthProvider): string | null {
+  const base = publicBaseUrl();
+  return base ? `${base}/api/auth/oauth/${provider}/callback` : null;
 }
 
 /** GET /api/auth/oauth/:provider/start — プロバイダの認可画面へリダイレクト。 */
@@ -65,10 +68,14 @@ export async function oauthStartHandler(c: Context): Promise<Response> {
   if (!oauthConfigured(provider)) {
     throw new HTTPException(503, { message: "このログイン方法は設定されていません" });
   }
+  const uri = redirectUri(c, provider);
+  if (!uri) {
+    throw new HTTPException(503, { message: "公開オリジン（ETAX_PUBLIC_URL）が設定されていません" });
+  }
   const config = PROVIDERS[provider];
   const params = new URLSearchParams({
     client_id: process.env[config.clientIdEnv] as string,
-    redirect_uri: redirectUri(c, provider),
+    redirect_uri: uri,
     response_type: "code",
     scope: config.scope,
     state: issueChallenge(0, `oauth:${provider}`, 10 * 60 * 1000),
@@ -82,6 +89,8 @@ async function exchangeCode(
   code: string,
 ): Promise<string> {
   const config = PROVIDERS[provider];
+  const uri = redirectUri(c, provider);
+  if (!uri) throw new Error("公開オリジンが設定されていません");
   const res = await fetch(config.tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
@@ -89,7 +98,7 @@ async function exchangeCode(
       client_id: process.env[config.clientIdEnv] as string,
       client_secret: process.env[config.clientSecretEnv] as string,
       code,
-      redirect_uri: redirectUri(c, provider),
+      redirect_uri: uri,
       grant_type: "authorization_code",
     }),
   });
