@@ -9,12 +9,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AuthUser, BillingPlan } from "@types";
 import {
+  clearCurrentUserStorage,
   createBillingCheckout,
   disableTotp,
   enableTotp,
   fetchBillingPlan,
   fetchMe,
   logoutAccount,
+  setStorageUserId,
   setupTotp,
 } from "@utils";
 
@@ -60,6 +62,11 @@ export const AccountPanel = () => {
 
   const handleLogout = async () => {
     await logoutAccount();
+    // このユーザーの端末キャッシュを消してから再読み込みする
+    // （別アカウントが同じブラウザで開いても前の値が残らない、Issue #9）
+    clearCurrentUserStorage();
+    clearStoredAgentApiKey();
+    setStorageUserId(null);
     window.location.reload();
   };
 

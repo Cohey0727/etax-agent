@@ -28,10 +28,13 @@ import {
   archiveChatSession,
   AuthQuery,
   ChatSession,
+  loadAgentConnection,
   loadChatSessions,
   parseAuthQuery,
   parsePath,
   pathForView,
+  saveAgentConnection,
+  setStorageUserId,
 } from "@utils";
 import {
   fetchAuthConfig,
@@ -152,25 +155,6 @@ const readExtraYears = (): number[] => {
   }
 };
 
-const CONNECTION_STORAGE_KEY = "etax-agent-connection";
-
-const readStoredAgentConnection = (): AgentConnectionConfig => {
-  try {
-    const raw = localStorage.getItem(CONNECTION_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AgentConnectionConfig>;
-      return {
-        baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
-        model: typeof parsed.model === "string" ? parsed.model : "",
-        apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
-      };
-    }
-  } catch {
-    // 読めない環境では未設定として扱う
-  }
-  return { baseUrl: "", model: "", apiKey: "" };
-};
-
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);
   // 認証ゲート: 設定（必須かどうか）とログイン状態を確認するまで待つ。
@@ -192,6 +176,11 @@ export const AppPage = () => {
       fetchMe().catch(() => null),
     ]);
     if (config) setAuthConfig(config);
+    // 端末保存の名前空間をログイン中ユーザーに合わせる（Issue #9）。
+    // 画面の子コンポーネントが読み書きする前に、ここで同期的に設定する。
+    setStorageUserId(me?.id ?? null);
+    // 初期表示で読んだ会話履歴は名前空間が未確定だったため、確定後に読み直す
+    setChatSessions(loadChatSessions());
     setAuthUser(me);
     setAuthChecked(true);
     if (me) {
@@ -224,7 +213,7 @@ export const AppPage = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const [sendKeyMode, setSendKeyMode] = useState<SendKeyMode>(() => readStoredSendKeyMode());
   const [agentConnection, setAgentConnection] = useState<AgentConnectionConfig>(() =>
-    readStoredAgentConnection(),
+    loadAgentConnection(),
   );
   // エージェント会話の履歴。見出し横の履歴ボタンとパネルで状態を共有する。
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
@@ -419,11 +408,8 @@ export const AppPage = () => {
   };
   const handleAgentConnectionChange = (config: AgentConnectionConfig) => {
     setAgentConnection(config);
-    try {
-      localStorage.setItem(CONNECTION_STORAGE_KEY, JSON.stringify(config));
-    } catch {
-      // 保存できなくてもこのセッションでは有効にする
-    }
+    // APIキーは localStorage に置かずセッション保存にする（utils/agentConnection）
+    saveAgentConnection(config);
   };
   const handleArchiveChat = (messages: ChatMessage[]) => {
     setChatSessions(archiveChatSession(messages));
