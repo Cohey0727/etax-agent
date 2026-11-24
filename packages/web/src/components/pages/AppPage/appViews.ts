@@ -3,6 +3,7 @@ import { IconName } from "@components/atoms";
 import { AppView, ViewPageProps } from "@types";
 import { DashboardPage } from "../DashboardPage";
 import { FilingPage } from "../FilingPage";
+import { FixedAssetsPage } from "../FixedAssetsPage";
 import { ImportPage } from "../ImportPage";
 import { LedgerPage } from "../LedgerPage";
 import { ReceiptPage } from "../ReceiptPage";
@@ -18,6 +19,7 @@ export const appViews = [
   { id: AppView.Import, label: "取引・CSV取込", icon: "import", nav: false, Component: ImportPage },
   { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", nav: false, Component: ReceiptPage },
   { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
+  { id: AppView.FixedAssets, label: "固定資産", icon: "building", nav: true, Component: FixedAssetsPage },
   { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },
   { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
   { id: AppView.Settings, label: "設定", icon: "settings", nav: false, Component: SettingsPage },

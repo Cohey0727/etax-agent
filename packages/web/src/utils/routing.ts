@@ -8,6 +8,8 @@ import { AppView, FilingTab } from "@types";
  * 設定も年度から独立して /settings。
  * 納税者情報も年度から独立した独立画面 /taxpayer（年度はサイドバーの
  * 年度切替で切り替え、過去年度分が履歴として見られる）。
+ * 固定資産も年度から独立した独立画面 /fixed-assets（集計の対象年度は
+ * サイドバーの年度切替に従う）。
  * 確定申告画面はさらにタブがぶら下がる（総合はスラッグなし）。
  * 例: 収支タブ = /accounts/2024/final-tax/balance。
  */
@@ -18,6 +20,7 @@ const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Import]: "import",
   [AppView.Receipt]: "receipt",
   [AppView.Taxpayer]: "taxpayer",
+  [AppView.FixedAssets]: "fixed-assets",
   [AppView.Settings]: "settings",
   [AppView.Agent]: "agent",
 };
@@ -54,6 +57,7 @@ export const pathForView = (view: AppView, year: number, filingTab?: FilingTab):
   if (view === AppView.Settings) return "/settings";
   if (view === AppView.Ledger) return "/ledger";
   if (view === AppView.Taxpayer) return "/taxpayer";
+  if (view === AppView.FixedAssets) return "/fixed-assets";
   const base = `/accounts/${year}/${VIEW_SLUGS[view]}`;
   if (view === AppView.Filing && filingTab) {
     const slug = FILING_TAB_SLUGS[filingTab];
@@ -107,6 +111,9 @@ export const parsePath = (pathname: string): ParsedRoute | null => {
   }
   if (parts[0] === VIEW_SLUGS[AppView.Taxpayer] && parts.length === 1) {
     return { view: AppView.Taxpayer, year: null, filingTab: null };
+  }
+  if (parts[0] === VIEW_SLUGS[AppView.FixedAssets] && parts.length === 1) {
+    return { view: AppView.FixedAssets, year: null, filingTab: null };
   }
   if (parts[0] !== "accounts" || parts.length < 2) return null;
   const year = asYear(parts[1]);

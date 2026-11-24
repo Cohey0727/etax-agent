@@ -3,6 +3,7 @@ export const AppView = {
   Import: "import",
   Receipt: "receipt",
   Ledger: "ledger",
+  FixedAssets: "fixedAssets",
   Filing: "filing",
   Taxpayer: "taxpayer",
   Settings: "settings",
