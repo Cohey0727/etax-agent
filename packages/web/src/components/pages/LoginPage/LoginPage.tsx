@@ -16,9 +16,13 @@ type Mode = "login" | "register" | "totp" | "magic" | "magicSent";
 export interface LoginPageProps {
   config: AuthConfig;
   onAuthenticated: () => void;
+  /** 起動時に捕捉したメールリンクのトークン（URL同期で消える前に AppPage が保持した値）。 */
+  magic?: string | null;
+  /** 起動時に捕捉した外部ログイン失敗の戻り（?auth_error= の値）。 */
+  authError?: string | null;
 }
 
-export const LoginPage = ({ config, onAuthenticated }: LoginPageProps) => {
+export const LoginPage = ({ config, onAuthenticated, magic, authError }: LoginPageProps) => {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [secret, setSecret] = useState("");
@@ -28,27 +32,29 @@ export const LoginPage = ({ config, onAuthenticated }: LoginPageProps) => {
   const [error, setError] = useState<string | null>(null);
   const consumedRef = useRef(false);
 
-  // メールのリンクから開かれた場合: トークンを消費してログインする
+  // メールのリンクから開かれた場合: トークンを消費してログインする。
+  // AppPage が起動時に捕捉した値を優先する（URLは同期でパスだけに
+  // 書き換え済みのことがある）。捕捉が無い場合は現在地のクエリを読む。
   useEffect(() => {
     if (consumedRef.current) return;
     consumedRef.current = true;
     const params = new URLSearchParams(window.location.search);
-    const magic = params.get("magic");
-    const authError = params.get("auth_error");
-    if (authError) {
+    const magicToken = magic ?? params.get("magic");
+    const authErrorValue = authError ?? params.get("auth_error");
+    if (authErrorValue) {
       setError("外部ログインに失敗しました。もう一度お試しください。");
       return;
     }
-    if (!magic) return;
+    if (!magicToken) return;
     setBusy(true);
-    consumeMagicLink(magic)
+    consumeMagicLink(magicToken)
       .then(() => onAuthenticated())
       .catch(() => {
         setError("ログインリンクが無効か期限切れです。新しいリンクを送ってください。");
         setMode("magic");
       })
       .finally(() => setBusy(false));
-  }, [onAuthenticated]);
+  }, [onAuthenticated, magic, authError]);
 
   const handlePasswordSubmit = async () => {
     setBusy(true);

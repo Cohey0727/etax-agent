@@ -26,8 +26,10 @@ import {
 } from "@types";
 import {
   archiveChatSession,
+  AuthQuery,
   ChatSession,
   loadChatSessions,
+  parseAuthQuery,
   parsePath,
   pathForView,
 } from "@utils";
@@ -177,10 +179,12 @@ export const AppPage = () => {
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const authQueryRef = useRef(
-    typeof window !== "undefined" &&
-      (new URLSearchParams(window.location.search).has("magic") ||
-        new URLSearchParams(window.location.search).has("auth_error")),
+  // 認証クエリはURL同期（パスだけの書き換え）で消える前に、値ごと
+  // 捕捉しておき、ログイン画面へ渡す（Issue #10-1）。
+  const authQueryRef = useRef<AuthQuery>(
+    typeof window !== "undefined"
+      ? parseAuthQuery(window.location.search)
+      : { magic: null, authError: null },
   );
   const refreshAuth = useCallback(async () => {
     const [config, me] = await Promise.all([
@@ -192,7 +196,7 @@ export const AppPage = () => {
     setAuthChecked(true);
     if (me) {
       // ログインできたらクエリ（magic 等）を消して通常表示に戻す
-      authQueryRef.current = false;
+      authQueryRef.current = { magic: null, authError: null };
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, []);
@@ -456,8 +460,17 @@ export const AppPage = () => {
   if (!authChecked) {
     return <DashboardSkeleton year={year} />;
   }
-  if (authConfig && ((authConfig.required && !authUser) || (authQueryRef.current && !authUser))) {
-    return <LoginPage config={authConfig} onAuthenticated={() => void refreshAuth()} />;
+  const authQueryPending =
+    authQueryRef.current.magic !== null || authQueryRef.current.authError !== null;
+  if (authConfig && ((authConfig.required && !authUser) || (authQueryPending && !authUser))) {
+    return (
+      <LoginPage
+        config={authConfig}
+        onAuthenticated={() => void refreshAuth()}
+        magic={authQueryRef.current.magic}
+        authError={authQueryRef.current.authError}
+      />
+    );
   }
 
   return (
