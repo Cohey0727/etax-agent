@@ -162,12 +162,15 @@ function buildJevPrompt(
   return sections.join("\n");
 }
 
+/** 照合対象の最大長。バックトラックのコストは入力長に比例するため切り詰める。 */
+const MAX_MATCH_INPUT_LENGTH = 500;
+
 /** 正規表現ルールに摘要が当たるか（先に並んだルールが優先）。 */
 export function matchGeneratedRule(
   description: string,
   rules: readonly RegexRule[],
 ): RegexRule | null {
-  const normalized = normalizeDescriptionKey(description);
+  const normalized = normalizeDescriptionKey(description).slice(0, MAX_MATCH_INPUT_LENGTH);
   for (const rule of rules) {
     if (new RegExp(rule.pattern).test(normalized)) return rule;
   }
