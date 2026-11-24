@@ -245,9 +245,19 @@ describe("税額控除", () => {
   test("耐震改修: 標準費用200万円・その他100万円 → 25万円", () => {
     expect(seismicRetrofitCredit(2_000_000, 1_000_000)).toBe(250_000);
   });
-  test("外国税額: 限度額 = 所得税額 × 国外所得/所得総額", () => {
-    expect(foreignTaxCredit(100_000, 2_000_000, 10_000_000, 1_500_000)).toBe(100_000);
-    expect(foreignTaxCredit(500_000, 2_000_000, 10_000_000, 1_500_000)).toBe(300_000);
+  test("外国税額: 所得税分は限度額 = 差引所得税額 × 国外所得/所得総額", () => {
+    const small = foreignTaxCredit(100_000, 2_000_000, 10_000_000, 1_500_000);
+    expect(small.incomePart).toBe(100_000);
+    expect(small.reconstructionPart).toBe(0);
+    expect(small.total).toBe(100_000);
+  });
+  test("外国税額: 所得税分を超えた分は復興税分に回る（別添4の按分）", () => {
+    // A=1,500,000・割合20% → 所得税限度額 300,000。基準所得税額 1,200,000、
+    // 復興税（控除前）25,200、その限度額 5,040 が復興税分になる
+    const split = foreignTaxCredit(500_000, 2_000_000, 10_000_000, 1_500_000);
+    expect(split.incomePart).toBe(300_000);
+    expect(split.reconstructionPart).toBe(5_040);
+    expect(split.total).toBe(305_040);
   });
 });
 
@@ -315,5 +325,29 @@ describe("所得税額の計算", () => {
     const breakdown = computeIncomeDeductions(2023, 10_444_000, EMPTY_DEDUCTION_INPUTS);
     expect(breakdown.basic).toBe(480_000);
     expect(breakdown.total).toBe(480_000);
+  });
+
+  test("外国税額控除がある場合: 復興税は基準所得税額 × 2.1% で先に確定する（別添4）", () => {
+    const result = computeIncomeTax({
+      year: 2023,
+      totalIncome: 10_000_000,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, foreignTaxPaid: 500_000, foreignIncome: 2_000_000 },
+    });
+    // 課税所得 952万円 → 所得税額 952万 × 33% − 1,536,000 = 1,605,600（= 差引所得税額 A）
+    expect(result.incomeTaxBase).toBe(1_605_600);
+    expect(result.taxAfterOtherCredits).toBe(1_605_600);
+    // 所得税分: 限度額 1,605,600 × 20% = 321,120
+    expect(result.taxCredits.foreignTaxIncomePart).toBe(321_120);
+    // 基準所得税額 B = 1,605,600 − 321,120 = 1,284,480
+    expect(result.standardIncomeTax).toBe(1_284_480);
+    // 復興税（控除前）R = B × 2.1% = 26,974（恒等式: R = floor(B × 0.021)）
+    expect(result.reconstructionTaxGross).toBe(26_974);
+    expect(result.reconstructionTaxGross).toBe(Math.floor(result.standardIncomeTax * 0.021));
+    // 復興税分: 限度額 26,974 × 20% = 5,394
+    expect(result.taxCredits.foreignTaxReconstructionPart).toBe(5_394);
+    expect(result.reconstructionTax).toBe(21_580);
+    // 確定税額: B + (R − 復興税分) = 1,306,060 → 1,306,000
+    expect(result.finalTax).toBe(1_306_000);
   });
 });

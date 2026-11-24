@@ -561,20 +561,46 @@ export function seismicRetrofitCredit(standardCost: number, otherCost: number): 
   return floor100(a * 0.1) + floor100(b * 0.05);
 }
 
+/** 外国税額控除の内訳（所得税分・復興特別所得税分）。 */
+export interface ForeignTaxCreditSplit {
+  /** 所得税からの控除分 */
+  incomePart: number;
+  /** 復興特別所得税からの控除分 */
+  reconstructionPart: number;
+  /** 合計 */
+  total: number;
+}
+
 /**
- * 外国税額控除。控除限度額 = 所得税額 × （調整国外所得金額 ÷ 所得総額）。
- * 所得総額には合計所得金額（所得控除前）を渡すこと。
+ * 外国税額控除（確定申告書等作成コーナー別添4の按分方法）。
+ * incomeTaxAfterOtherCredits は「外国税額控除以外の税額控除を引いた後の
+ * 所得税額」（差引所得税額 A）。所得総額には合計所得金額（所得控除前）を
+ * 渡すこと。手順:
+ *   所得税控除限度額 = A ×（調整国外所得金額 ÷ 所得総額）（円未満切捨て）
+ *   所得税分 = min(外国所得税額, 所得税控除限度額）
+ *   基準所得税額 B = A − 所得税分
+ *   復興特別所得税（控除前）R = B × 2.1%（円未満切捨て）
+ *   復興税控除限度額 = R ×（調整国外所得金額 ÷ 所得総額）（円未満切捨て）
+ *   復興税分 = min(外国所得税額 − 所得税分， 復興税控除限度額）
  */
 export function foreignTaxCredit(
   paid: number,
   foreignIncome: number,
   totalIncome: number,
-  baseIncomeTax: number,
-): number {
+  incomeTaxAfterOtherCredits: number,
+): ForeignTaxCreditSplit {
+  const p = amount(paid);
   const t = amount(totalIncome);
-  if (t <= 0) return 0;
-  const limit = floorYen((amount(baseIncomeTax) * amount(foreignIncome)) / t);
-  return Math.min(amount(paid), limit);
+  if (p <= 0 || t <= 0) return { incomePart: 0, reconstructionPart: 0, total: 0 };
+  const a = amount(incomeTaxAfterOtherCredits);
+  const foreign = Math.min(amount(foreignIncome), t);
+  const incomeLimit = Math.floor((a * foreign) / t);
+  const incomePart = Math.min(p, incomeLimit);
+  const standardIncomeTax = a - incomePart;
+  const reconstructionGross = Math.floor((standardIncomeTax * 21) / 1000);
+  const reconstructionLimit = Math.floor((reconstructionGross * foreign) / t);
+  const reconstructionPart = Math.min(p - incomePart, reconstructionLimit);
+  return { incomePart, reconstructionPart, total: incomePart + reconstructionPart };
 }
 
 export interface TaxCreditBreakdown {
@@ -585,7 +611,12 @@ export interface TaxCreditBreakdown {
   politicalDonations: number;
   certifiedNpoDonations: number;
   seismicRetrofit: number;
+  /** 外国税額控除の合計（所得税分＋復興特別所得税分） */
   foreignTax: number;
+  /** 外国税額控除のうち所得税分 */
+  foreignTaxIncomePart: number;
+  /** 外国税額控除のうち復興特別所得税分 */
+  foreignTaxReconstructionPart: number;
   /** 税額控除の合計 */
   total: number;
 }
@@ -595,6 +626,8 @@ export interface TaxCreditBreakdown {
  * baseIncomeTax は税額控除前の所得税額（速算表の税額）。
  * taxableIncome は配当控除の判定に使う課税総所得金額等、
  * totalIncome は外国税額控除の限度額計算に使う合計所得金額。
+ * 外国税額控除の限度額は、外国以外の税額控除を引いた後の所得税額
+ * （差引所得税額）を基準に按分する（作成コーナー別添4の順序）。
  */
 export function computeTaxCredits(
   inputs: TaxCreditInputs,
@@ -602,32 +635,40 @@ export function computeTaxCredits(
   taxableIncome: number,
   totalIncome: number,
 ): TaxCreditBreakdown {
-  const breakdown: TaxCreditBreakdown = {
-    housingLoan: housingLoanCredit(
-      inputs.housingLoanBalance,
-      inputs.housingLoanLimit,
-      inputs.housingLoanRate,
-    ),
-    flatReduction: amount(inputs.flatReduction),
-    dividend: dividendCredit(inputs.dividendCorporate, inputs.dividendTrust, taxableIncome),
-    politicalDonations: politicalDonationCredit(inputs.politicalDonations, baseIncomeTax),
-    certifiedNpoDonations: certifiedNpoDonationCredit(inputs.certifiedNpoDonations, baseIncomeTax),
-    seismicRetrofit: seismicRetrofitCredit(
-      inputs.seismicRetrofitStandardCost,
-      inputs.seismicRetrofitOtherCost,
-    ),
-    foreignTax: foreignTaxCredit(inputs.foreignTaxPaid, inputs.foreignIncome, totalIncome, baseIncomeTax),
-    total: 0,
+  const housingLoan = housingLoanCredit(
+    inputs.housingLoanBalance,
+    inputs.housingLoanLimit,
+    inputs.housingLoanRate,
+  );
+  const flatReduction = amount(inputs.flatReduction);
+  const dividend = dividendCredit(inputs.dividendCorporate, inputs.dividendTrust, taxableIncome);
+  const politicalDonations = politicalDonationCredit(inputs.politicalDonations, baseIncomeTax);
+  const certifiedNpoDonations = certifiedNpoDonationCredit(inputs.certifiedNpoDonations, baseIncomeTax);
+  const seismicRetrofit = seismicRetrofitCredit(
+    inputs.seismicRetrofitStandardCost,
+    inputs.seismicRetrofitOtherCost,
+  );
+  const othersTotal =
+    housingLoan + flatReduction + dividend + politicalDonations + certifiedNpoDonations + seismicRetrofit;
+  const incomeTaxAfterOtherCredits = Math.max(amount(baseIncomeTax) - othersTotal, 0);
+  const foreign = foreignTaxCredit(
+    inputs.foreignTaxPaid,
+    inputs.foreignIncome,
+    totalIncome,
+    incomeTaxAfterOtherCredits,
+  );
+  return {
+    housingLoan,
+    flatReduction,
+    dividend,
+    politicalDonations,
+    certifiedNpoDonations,
+    seismicRetrofit,
+    foreignTax: foreign.total,
+    foreignTaxIncomePart: foreign.incomePart,
+    foreignTaxReconstructionPart: foreign.reconstructionPart,
+    total: othersTotal + foreign.total,
   };
-  breakdown.total =
-    breakdown.housingLoan +
-    breakdown.flatReduction +
-    breakdown.dividend +
-    breakdown.politicalDonations +
-    breakdown.certifiedNpoDonations +
-    breakdown.seismicRetrofit +
-    breakdown.foreignTax;
-  return breakdown;
 }
 
 // ---------------------------------------------------------------------------
@@ -942,7 +983,13 @@ export interface IncomeTaxResult {
   taxCredits: TaxCreditBreakdown;
   /** 税額控除の合計 */
   taxCreditsTotal: number;
-  /** 復興特別所得税（税額控除後の所得税額 × 2.1%、円未満切捨て） */
+  /** 差引所得税額（外国税額控除以外の税額控除を引いた後の所得税額） */
+  taxAfterOtherCredits: number;
+  /** 基準所得税額（差引所得税額 − 外国税額控除の所得税分） */
+  standardIncomeTax: number;
+  /** 復興特別所得税（外国税額控除前）= 基準所得税額 × 2.1%（円未満切捨て） */
+  reconstructionTaxGross: number;
+  /** 復興特別所得税（外国税額控除の復興税分を引いた後） */
   reconstructionTax: number;
   /** 確定税額（100円未満切捨て）。修正申告の income_tax に使える金額 */
   finalTax: number;
@@ -951,6 +998,9 @@ export interface IncomeTaxResult {
 /**
  * 所得税額の全計算: 所得控除 → 課税所得 → 速算表 → 税額控除 →
  * 復興特別所得税 → 確定税額（100円未満切捨て）。
+ * 復興特別所得税は基準所得税額（外国税額控除の所得税分を引いた後の
+ * 所得税額）× 2.1% で確定し、外国税額控除は所得税分・復興税分に
+ * 分けて差し引く（作成コーナー別添4の順序）。
  * 源泉徴収税額・予定納税の精算は含まない（申告納税額とは別に扱うこと）。
  */
 export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
@@ -961,9 +1011,14 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
   const taxableIncome = Math.floor(taxableRaw / 1000) * 1000;
   const incomeTaxBase = incomeTaxOnTaxableIncome(taxableIncome);
   const taxCredits = computeTaxCredits(options.taxCredits, incomeTaxBase, taxableIncome, totalIncome);
-  const afterCredits = Math.max(incomeTaxBase - taxCredits.total, 0);
-  const reconstructionTax = floorYen(afterCredits * 0.021);
-  const finalTax = floor100(afterCredits + reconstructionTax);
+  const taxAfterOtherCredits = Math.max(
+    incomeTaxBase - (taxCredits.total - taxCredits.foreignTax),
+    0,
+  );
+  const standardIncomeTax = taxAfterOtherCredits - taxCredits.foreignTaxIncomePart;
+  const reconstructionTaxGross = Math.floor((standardIncomeTax * 21) / 1000);
+  const reconstructionTax = reconstructionTaxGross - taxCredits.foreignTaxReconstructionPart;
+  const finalTax = floor100(standardIncomeTax + reconstructionTax);
   return {
     year,
     totalIncome,
@@ -973,6 +1028,9 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
     incomeTaxBase,
     taxCredits,
     taxCreditsTotal: taxCredits.total,
+    taxAfterOtherCredits,
+    standardIncomeTax,
+    reconstructionTaxGross,
     reconstructionTax,
     finalTax,
   };
