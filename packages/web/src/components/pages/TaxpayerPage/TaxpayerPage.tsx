@@ -1,8 +1,9 @@
 import { FilingType } from "@etax/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import {
   DeductionState,
+  hydrateDeductionStateFromServer,
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
@@ -24,11 +25,27 @@ const TaxpayerWorkspace = ({ year }: { year: number }) => {
   const [deductionState, setDeductionState] = useState<DeductionState>(() =>
     loadDeductionState(year),
   );
+  // 申告入力の正はサーバーDB（確定申告画面と共有）。表示時にサーバー値を
+  // 取り込んでから再読込する。取り込みが終わるまでは保存しない
+  // （端末に値が無い状態で編集すると空状態がサーバーへ全体置換され、
+  // 保存済みの控除等が消えてしまうため。Issue #10-4）。
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void hydrateDeductionStateFromServer(year).then(() => {
+      if (cancelled) return;
+      setDeductionState(loadDeductionState(year));
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [year]);
 
   const updateFilingSettings = (filingType: FilingType, realEstateBusinessScale: boolean) => {
     const state = { ...deductionState, filingType, realEstateBusinessScale };
     setDeductionState(state);
-    saveDeductionState(year, state);
+    if (hydrated) saveDeductionState(year, state);
   };
 
   return (
