@@ -125,30 +125,54 @@ export async function setFilingStatusForAgent(
   return row ? filingStatusToApi(row) : { ok: false, error: "申告ステータスを更新できませんでした" };
 }
 
+/**
+ * エージェント（外部 LLM）へ返す形に納税者プロフィールを整える。
+ * マイナンバーは設計方針どおりアプリの DB 内だけに置き、外部 LLM へは
+ * 値そのものを渡さない（登録有無だけを伝える）。ツール結果は呼び出し
+ * ログにも残るため、ここで落とすことでログへの混入も防ぐ（Issue #7）。
+ */
+export function taxpayerProfileForAgent(profile: TaxpayerProfile) {
+  return {
+    ...profile,
+    my_number: "",
+    my_number_registered: profile.my_number !== "",
+  };
+}
+
 /** 納税者プロフィールを返す（無ければ過去年からの引き継ぎ、無ければ空）。 */
 export async function getTaxpayerProfileForAgent(year: number) {
   const db = requireDb();
   const own = await getTaxpayerProfileRow(db, year);
-  if (own) return { taxpayer: taxpayerProfileToApi(own), carried_from: null };
+  if (own) return { taxpayer: taxpayerProfileForAgent(taxpayerProfileToApi(own)), carried_from: null };
   const carry = await findTaxpayerCarryRow(db, year);
   return carry
-    ? { taxpayer: taxpayerProfileToApi(carry), carried_from: carry.year }
-    : { taxpayer: emptyTaxpayerProfile(), carried_from: null };
+    ? { taxpayer: taxpayerProfileForAgent(taxpayerProfileToApi(carry)), carried_from: carry.year }
+    : { taxpayer: taxpayerProfileForAgent(emptyTaxpayerProfile()), carried_from: null };
 }
 
 /** 納税者プロフィールを更新する（指定した項目だけ。未指定は現在の値を維持）。 */
 export async function updateTaxpayerProfileForAgent(year: number, patch: Partial<TaxpayerProfile>) {
   const db = requireDb();
-  const current = await getTaxpayerProfileForAgent(year);
+  // マージ元はマスクされていない実値で読む（マスク済みを書き戻すと
+  // 保存済みマイナンバーが消えてしまうため、読みは内部用に分ける）。
+  const own = await getTaxpayerProfileRow(db, year);
+  const carry = own ? null : await findTaxpayerCarryRow(db, year);
+  const current: TaxpayerProfile = own
+    ? taxpayerProfileToApi(own)
+    : carry
+      ? taxpayerProfileToApi(carry)
+      : emptyTaxpayerProfile();
   const allowed = new Set(Object.keys(emptyTaxpayerProfile()) as (keyof TaxpayerProfile)[]);
-  const merged: TaxpayerProfile = { ...current.taxpayer };
+  const merged: TaxpayerProfile = { ...current };
   for (const [key, value] of Object.entries(patch)) {
     if (allowed.has(key as keyof TaxpayerProfile) && value !== undefined) {
       (merged as Record<string, unknown>)[key] = value;
     }
   }
   const row = await upsertTaxpayerProfileRow(db, year, merged);
-  return row ? taxpayerProfileToApi(row) : { ok: false, error: "納税者プロフィールを更新できませんでした" };
+  return row
+    ? taxpayerProfileForAgent(taxpayerProfileToApi(row))
+    : { ok: false, error: "納税者プロフィールを更新できませんでした" };
 }
 
 /** 摘要1件の勘定科目を、現在の判定パイプライン（正規表現→jev→キーワード）で判定する。 */
