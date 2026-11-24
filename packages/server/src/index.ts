@@ -40,11 +40,14 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Context, Next } from "hono";
 import { serveStatic } from "hono/bun";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { join } from "node:path";
 import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { ensureTables, getDb, isDatabaseConfigured } from "./lib/db";
+import { encryptionEnabled } from "./lib/encryption";
+import { publicBaseUrl } from "./lib/publicUrl";
 import { billingEnabled } from "./gateways/stripeGateway";
 import { hasActivePlan } from "./repositories/subscriptionRepository";
 import { authRequired, runWithTenant } from "./lib/tenantContext";
@@ -76,7 +79,40 @@ import taxpayerRoutes from "./routes/taxpayer";
 import transactionsRoutes from "./routes/transactions";
 
 const app = new OpenAPIHono();
-app.use("/api/*", cors());
+
+/**
+ * CORS はワイルドカードにせず、許可オリジンを設定ベースにする（Issue #7）。
+ * 画面は同一オリジン配信が前提なので、通常は CORS 自体が不要。許可するのは
+ * 公開オリジン（ETAX_PUBLIC_URL）と ETAX_CORS_ORIGINS（カンマ区切り）だけで、
+ * 認証オフのローカル運用に限って localhost の開発オリジンも許可する。
+ * セッション Cookie を使うため credentials は true（ワイルドカードとは併用不可）。
+ */
+function allowedCorsOrigins(): string[] {
+  const fromEnv = (process.env.ETAX_CORS_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value !== "");
+  const publicUrl = publicBaseUrl();
+  return publicUrl ? [...fromEnv, publicUrl] : fromEnv;
+}
+
+app.use(
+  "/api/*",
+  cors({
+    origin: (origin) => {
+      if (allowedCorsOrigins().includes(origin)) return origin;
+      if (!authRequired() && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return origin;
+      }
+      return undefined;
+    },
+    credentials: true,
+  }),
+);
+
+// リクエストボディの上限（巨大ボディでのメモリ枯渇を防ぐ、Issue #7）。
+// CSV 取込・領収書画像の PUT もこの範囲に収まる大きさにしている。
+app.use("/api/*", bodyLimit({ maxSize: 25 * 1024 * 1024 }));
 
 /**
  * 認証ミドルウェア: セッション/APIキーからユーザーを解決し、テナント文脈を
@@ -174,6 +210,21 @@ app.notFound(async (c) => {
 
 const port = Number(process.env.PORT ?? 3001);
 console.log(`eTaxAgent server listening on http://localhost:${port}`);
+
+// 暗号化ガード（Issue #7）: SaaS 運用（認証必須）では機微項目
+// （マイナンバー・TOTP 秘密）を平文で保存しないため、鍵が無ければ
+// 起動を止める。単一ユーザーのローカル運用では従来互換のため警告に留める。
+if (!encryptionEnabled()) {
+  if (authRequired()) {
+    console.error(
+      "ETAX_AUTH_MODE=required では ETAX_ENCRYPTION_KEY が必須です（機微項目を平文保存しないため）。起動を中止します。",
+    );
+    process.exit(1);
+  }
+  console.warn(
+    "ETAX_ENCRYPTION_KEY が未設定のため、機微項目（マイナンバー・TOTP秘密）は平文で保存されます。公開運用では必ず設定してください。",
+  );
+}
 
 // 起動時に帳簿DB（PostgreSQL）のテーブルを自己修復しておく。
 // コンテナ構成では DB の起動完了がアプリより遅れることがあるため、
