@@ -228,13 +228,6 @@ if (i <= 0) return 0;
 return Math.floor((i * 100) / (100 + ratePercent));
 }
 
-/** 税込の課税仕入 → 消費税額（10%: ×10/110、8%: ×8/108、円未満切捨て）。 */
-function taxFromIncl(incl: number, ratePercent: number): number {
-const i = Math.trunc(incl || 0);
-if (i <= 0) return 0;
-return Math.floor((i * ratePercent) / (100 + ratePercent));
-}
-
 /** 税込金額 → 消費税額のうち国税分（10%: ×7.8/110、8%: ×6.24/108、円未満切捨て）。 */
 export function nationalTaxFromIncl(incl: number, ratePercent: number): number {
 const i = Math.trunc(incl || 0);
@@ -251,19 +244,24 @@ export function computeConsumptionReturn(input: ConsumptionReturnInput): Consump
 const salesExcl10 = exclFromIncl(input.salesIncl10, 10);
 const salesExcl8 = exclFromIncl(input.salesIncl8, 8);
 const salesExcl = salesExcl10 + salesExcl8;
+const exemptSales = Math.trunc(input.exemptSales || 0);
 const totalSalesExcl =
-salesExcl + Math.trunc(input.nontaxableSales || 0) + Math.trunc(input.exemptSales || 0);
+salesExcl + Math.trunc(input.nontaxableSales || 0) + exemptSales;
+// 課税売上割合の分子は課税売上＋免税売上（付表2の計算と同一）
 const ratio =
-totalSalesExcl > 0? Math.floor((salesExcl / totalSalesExcl) * 10000) / 100: 100;
-const fullDeduction = salesExcl <= 500_000_000 && ratio >= 95;
+totalSalesExcl > 0
+? Math.floor(((salesExcl + exemptSales) / totalSalesExcl) * 10000) / 100
+: 100;
+const fullDeduction = salesExcl + exemptSales <= 500_000_000 && ratio >= 95;
 
 const base10 = floor1000(salesExcl10);
 const base8 = floor1000(salesExcl8);
-const outputTax10 = Math.floor(base10 * 0.078);
-const outputTax8 = Math.floor(base8 * 0.0624);
+const outputTax10 = Math.floor((base10 * 78) / 1000);
+const outputTax8 = Math.floor((base8 * 624) / 10000);
 
-const inputTaxRaw10 = taxFromIncl(input.purchasesIncl10, 10);
-const inputTaxRaw8 = taxFromIncl(input.purchasesIncl8, 8);
+// 控除対象仕入税額は国税分（10%: 7.8/110、8%: 6.24/108）で計算する
+const inputTaxRaw10 = nationalTaxFromIncl(input.purchasesIncl10, 10);
+const inputTaxRaw8 = nationalTaxFromIncl(input.purchasesIncl8, 8);
 const applyRatio = (raw: number) =>
 fullDeduction? raw: Math.floor((raw * ratio) / 100);
 const inputTax10 = applyRatio(inputTaxRaw10);
@@ -290,21 +288,23 @@ diffNational = floor100(diffRaw);
 if (diffNational >= interimNational) {
 payableNational = floor100(diffNational - interimNational);
 } else {
-interimRefundNational = floor100(interimNational - diffNational);
+interimRefundNational = interimNational - diffNational;
 }
-// 地方消費税: 譲渡割額は差引税額（国税）× 22/78
-const localRaw = Math.floor(diffNational * (22 / 78));
+// 地方消費税: 譲渡割額は差引税額（国税）× 22/78。中間納付の差引は
+// 100円未満切捨て後の譲渡割額（localTaxGross）を基準にする
+const localRaw = Math.floor((diffNational * 22) / 78);
 localTaxGross = floor100(localRaw);
-if (localRaw >= interimLocal) {
-payableLocal = floor100(localRaw - interimLocal);
+if (localTaxGross >= interimLocal) {
+payableLocal = floor100(localTaxGross - interimLocal);
 } else {
-interimRefundLocal = floor100(interimLocal - localRaw);
+interimRefundLocal = interimLocal - localTaxGross;
 }
 } else {
 refundNational = -diffRaw;
-refundLocal = Math.floor(refundNational * (22 / 78));
-if (interimNational > 0) interimRefundNational = floor100(interimNational);
-if (interimLocal > 0) interimRefundLocal = floor100(interimLocal);
+refundLocal = Math.floor((refundNational * 22) / 78);
+// 還付側の中間納付還付額は差額そのもの（100円未満切捨てはしない）
+if (interimNational > 0) interimRefundNational = interimNational;
+if (interimLocal > 0) interimRefundLocal = interimLocal;
 }
 
 const totalPayable =
@@ -796,8 +796,8 @@ const totalSalesExcl =
 salesExcl + Math.trunc(input.nontaxableSales || 0) + Math.trunc(input.exemptSales || 0);
 const base10 = floor1000(salesExcl10);
 const base8 = floor1000(salesExcl8);
-const outputTax10 = Math.floor(base10 * 0.078);
-const outputTax8 = Math.floor(base8 * 0.0624);
+const outputTax10 = Math.floor((base10 * 78) / 1000);
+const outputTax8 = Math.floor((base8 * 624) / 10000);
 const outputTax = outputTax10 + outputTax8;
 
 const returnsTax10 = nationalTaxFromIncl(input.returnsIncl10, 10);
@@ -835,20 +835,22 @@ diffNational = floor100(diffRaw);
 if (diffNational >= interimNational) {
 payableNational = floor100(diffNational - interimNational);
 } else {
-interimRefundNational = floor100(interimNational - diffNational);
+interimRefundNational = interimNational - diffNational;
 }
-const localRaw = Math.floor(diffNational * (22 / 78));
+// 地方消費税: 中間納付の差引は切捨て後の譲渡割額（localTaxGross）基準
+const localRaw = Math.floor((diffNational * 22) / 78);
 localTaxGross = floor100(localRaw);
-if (localRaw >= interimLocal) {
-payableLocal = floor100(localRaw - interimLocal);
+if (localTaxGross >= interimLocal) {
+payableLocal = floor100(localTaxGross - interimLocal);
 } else {
-interimRefundLocal = floor100(interimLocal - localRaw);
+interimRefundLocal = interimLocal - localTaxGross;
 }
 } else {
 refundNational = -diffRaw;
-refundLocal = Math.floor(refundNational * (22 / 78));
-if (interimNational > 0) interimRefundNational = floor100(interimNational);
-if (interimLocal > 0) interimRefundLocal = floor100(interimLocal);
+refundLocal = Math.floor((refundNational * 22) / 78);
+// 還付側の中間納付還付額は差額そのもの（100円未満切捨てはしない）
+if (interimNational > 0) interimRefundNational = interimNational;
+if (interimLocal > 0) interimRefundLocal = interimLocal;
 }
 
 const totalPayable =
