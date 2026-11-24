@@ -237,21 +237,64 @@ export function serverDataDir(): string {
 }
 
 // ---------------------------------------------------------------------------
-// ファイルストレージ（ローカルフォルダ）の設定
+// ファイルストレージの設定
 // ---------------------------------------------------------------------------
 
+/**
+ * ストレージドライバ。
+ * - local: データフォルダ配下のローカルフォルダ（開発・未設定時の既定）。
+ * - s3: S3互換ストレージ（本番は Garage）。アップロード/表示は署名付きURLで
+ *   ブラウザがストレージと直接やり取りし、APIサーバーはバイト列を経由しない。
+ */
+export type StorageDriver = "local" | "s3";
+
+export interface S3StorageConfig {
+  /** ブラウザから到達できる公開エンドポイント。署名付きURLはこのホストで発行する。 */
+  endpoint: string;
+  /** サーバー自身の操作用エンドポイント（compose 内のサービス名など）。未設定なら endpoint。 */
+  internalEndpoint: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Garage のリージョンは "garage" 固定。 */
+  region: string;
+}
+
 export interface StorageConfig {
-  /** アップロードファイルの保存先フォルダ（データフォルダ配下の files）。 */
+  driver: StorageDriver;
+  /** アップロードファイルの保存先フォルダ（データフォルダ配下の files）。local 用。 */
   filesDir: string;
-  /** ローカル保存のため常時 true（将来の外部ストレージ再導入に備えた形）。 */
+  /** s3 ドライバの設定。driver が s3 で必須項目が欠ける場合は null（未設定）。 */
+  s3: S3StorageConfig | null;
+  /** ストレージが使える状態か（s3 で必須項目が欠けていれば false）。 */
   configured: boolean;
 }
 
-/** ファイルストレージの設定を返す。保存先はデータフォルダ配下に固定する。 */
+/** ファイルストレージの設定を環境変数から返す。 */
 export function loadStorageConfig(): StorageConfig {
+  const filesDir = join(serverDataDir(), "files");
+  if (process.env.ETAX_STORAGE_DRIVER !== "s3") {
+    return { driver: "local", filesDir, s3: null, configured: true };
+  }
+  const endpoint = process.env.ETAX_STORAGE_S3_ENDPOINT ?? "";
+  const bucket = process.env.ETAX_STORAGE_S3_BUCKET ?? "";
+  const accessKeyId = process.env.ETAX_STORAGE_S3_ACCESS_KEY_ID ?? "";
+  const secretAccessKey = process.env.ETAX_STORAGE_S3_SECRET_ACCESS_KEY ?? "";
+  const configured = Boolean(endpoint && bucket && accessKeyId && secretAccessKey);
   return {
-    filesDir: join(serverDataDir(), "files"),
-    configured: true,
+    driver: "s3",
+    filesDir,
+    s3: configured
+      ? {
+          endpoint,
+          internalEndpoint: process.env.ETAX_STORAGE_S3_INTERNAL_ENDPOINT || endpoint,
+          bucket,
+          accessKeyId,
+          secretAccessKey,
+          region: process.env.ETAX_STORAGE_S3_REGION || "garage",
+        }
+      : null,
+    configured,
   };
 }
 
