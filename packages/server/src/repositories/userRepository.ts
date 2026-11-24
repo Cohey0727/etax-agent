@@ -10,6 +10,7 @@ import {
   ApiKeyRow,
   UserRow,
   apiKeysTable,
+  emailVerificationTokensTable,
   magicLinkTokensTable,
   sessionsTable,
   userIdentitiesTable,
@@ -28,12 +29,22 @@ export async function getUserByEmail(db: Db, email: string): Promise<UserRow | u
   return row;
 }
 
-/** ユーザーを作る。パスワードは Bun.password（argon2id）でハッシュ化する。 */
-export async function createUser(db: Db, email: string, password: string): Promise<UserRow> {
+/**
+ * ユーザーを作る。パスワードは Bun.password（argon2id）でハッシュ化する。
+ * emailVerified は呼び出し側が決める: パスワード登録はメール所有を
+ * 証明していないため、SaaS 運用では確認メールを経るまで false を渡す。
+ * それ以外の経路（ローカル運用など）は従来どおり true。
+ */
+export async function createUser(
+  db: Db,
+  email: string,
+  password: string,
+  emailVerified: boolean = true,
+): Promise<UserRow> {
   const passwordHash = await Bun.password.hash(password);
   const [row] = await db
     .insert(usersTable)
-    .values({ email, passwordHash })
+    .values({ email, passwordHash, emailVerified })
     .returning();
   return row;
 }
@@ -44,10 +55,31 @@ export async function verifyUserPassword(user: UserRow, password: string): Promi
   return Bun.password.verify(password, user.passwordHash);
 }
 
-/** パスワードなしのユーザーを作る（マジックリンク・OAuth 用）。 */
+/**
+ * パスワードなしのユーザーを作る（マジックリンク・OAuth 用）。
+ * どちらの経路もメールボックス/プロバイダ側で所有確認が済んでいるため
+ * emailVerified は true で作る。
+ */
 export async function createPasswordlessUser(db: Db, email: string): Promise<UserRow> {
-  const [row] = await db.insert(usersTable).values({ email, passwordHash: "" }).returning();
+  const [row] = await db
+    .insert(usersTable)
+    .values({ email, passwordHash: "", emailVerified: true })
+    .returning();
   return row;
+}
+
+/** メール確認済みに更新する。 */
+export async function markEmailVerified(db: Db, userId: number): Promise<void> {
+  await db.update(usersTable).set({ emailVerified: true }).where(eq(usersTable.id, userId));
+}
+
+/**
+ * パスワード資格情報を消去する（パスワードなしユーザーにする）。
+ * 未確認のパスワード登録アカウントをメールボックス所有者が引き継ぐときに
+ * 使う: 先行登録した第三者のパスワードを残すと乗っ取りになるため。
+ */
+export async function clearUserPassword(db: Db, userId: number): Promise<void> {
+  await db.update(usersTable).set({ passwordHash: "" }).where(eq(usersTable.id, userId));
 }
 
 /** TOTP 秘密を保存する（保存時暗号化）。有効化は別途 setUserTotpEnabled で行う。 */
@@ -92,6 +124,8 @@ export async function createMagicLinkToken(db: Db, email: string): Promise<strin
 /**
  * マジックリンク用トークンを消費し、メールアドレスを返す。
  * 不明・期限切れ・使用済みは undefined。消費は1回限り。
+ * usedAt が NULL の行だけを更新し、実際に更新できた場合だけ成功とする
+ * （並行した二重消費で片方が0行更新になっても成功扱いにしない TOCTOU 対策）。
  */
 export async function consumeMagicLinkToken(
   db: Db,
@@ -102,11 +136,50 @@ export async function consumeMagicLinkToken(
     .from(magicLinkTokensTable)
     .where(eq(magicLinkTokensTable.tokenHash, hashToken(token)));
   if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) return undefined;
-  await db
+  const updated = await db
     .update(magicLinkTokensTable)
     .set({ usedAt: new Date() })
-    .where(and(eq(magicLinkTokensTable.id, row.id), isNull(magicLinkTokensTable.usedAt)));
+    .where(and(eq(magicLinkTokensTable.id, row.id), isNull(magicLinkTokensTable.usedAt)))
+    .returning();
+  if (updated.length !== 1) return undefined;
   return row.email;
+}
+
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** 登録時のメール確認用トークンを発行し、平文を返す（DBにはハッシュだけを保存）。 */
+export async function createEmailVerificationToken(db: Db, userId: number): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  await db.insert(emailVerificationTokensTable).values({
+    userId,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+  });
+  return token;
+}
+
+/**
+ * メール確認用トークンを消費し、ユーザーIDを返す。
+ * 不明・期限切れ・使用済みは undefined。消費は1回限り（原子的に判定）。
+ */
+export async function consumeEmailVerificationToken(
+  db: Db,
+  token: string,
+): Promise<number | undefined> {
+  const [row] = await db
+    .select()
+    .from(emailVerificationTokensTable)
+    .where(eq(emailVerificationTokensTable.tokenHash, hashToken(token)));
+  if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) return undefined;
+  const updated = await db
+    .update(emailVerificationTokensTable)
+    .set({ usedAt: new Date() })
+    .where(
+      and(eq(emailVerificationTokensTable.id, row.id), isNull(emailVerificationTokensTable.usedAt)),
+    )
+    .returning();
+  if (updated.length !== 1) return undefined;
+  return row.userId;
 }
 
 /**
@@ -133,6 +206,16 @@ export async function findOrCreateOAuthUser(
     if (user) return user;
   }
   const existing = await getUserByEmail(db, email);
+  if (existing && !existing.emailVerified && existing.passwordHash) {
+    // Pre-Account Takeover 対策: メール未確認のままパスワード登録された
+    // アカウントに OAuth を統合すると、先行登録者のパスワードが残って
+    // 乗っ取られる。メールボックス所有者（この OAuth ログインの本人）が
+    // 引き継ぐ形にし、未確認の資格情報は引き継がない。
+    await clearUserPassword(db, existing.id);
+    await markEmailVerified(db, existing.id);
+    existing.passwordHash = "";
+    existing.emailVerified = true;
+  }
   const user = existing ?? (await createPasswordlessUser(db, email));
   if (!identity) {
     await db

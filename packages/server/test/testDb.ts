@@ -25,6 +25,7 @@ const allTables = [
   "sessions",
   "api_keys",
   "magic_link_tokens",
+  "email_verification_tokens",
   "user_identities",
   "users",
   "filing_status",

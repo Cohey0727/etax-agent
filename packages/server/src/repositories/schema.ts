@@ -271,6 +271,13 @@ export const usersTable = pgTable("users", {
   totpSecret: text("totp_secret").notNull().default(""),
   /** TOTP 2要素認証が有効か */
   totpEnabled: boolean("totp_enabled").notNull().default(false),
+  /**
+   * メールアドレスの所有確認が済んでいるか。パスワード登録だけでは
+   * 他人のメールでも登録できてしまう（Pre-Account Takeover）ため、
+   * SaaS 運用では確認が済むまでパスワードログインを許可しない。
+   * 既存行は DDL の DEFAULT true で確認済みとして移行する。
+   */
+  emailVerified: boolean("email_verified").notNull().default(true),
   createdAt: timestampColumn("created_at")
     .notNull()
     .$defaultFn(() => new Date()),
@@ -280,6 +287,20 @@ export const usersTable = pgTable("users", {
 export const magicLinkTokensTable = pgTable("magic_link_tokens", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   email: text("email").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestampColumn("expires_at").notNull(),
+  usedAt: timestampColumn("used_at"),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+/** 登録時のメール確認用トークン。平文は保存せず SHA-256 ハッシュで持つ。 */
+export const emailVerificationTokensTable = pgTable("email_verification_tokens", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => usersTable.id),
   tokenHash: text("token_hash").notNull().unique(),
   expiresAt: timestampColumn("expires_at").notNull(),
   usedAt: timestampColumn("used_at"),
@@ -332,6 +353,7 @@ export const apiKeysTable = pgTable("api_keys", {
 
 export type UserRow = typeof usersTable.$inferSelect;
 export type MagicLinkTokenRow = typeof magicLinkTokensTable.$inferSelect;
+export type EmailVerificationTokenRow = typeof emailVerificationTokensTable.$inferSelect;
 export type UserIdentityRow = typeof userIdentitiesTable.$inferSelect;
 export type SessionRow = typeof sessionsTable.$inferSelect;
 export type ApiKeyRow = typeof apiKeysTable.$inferSelect;
