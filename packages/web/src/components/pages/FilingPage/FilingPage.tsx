@@ -99,10 +99,16 @@ const FilingWorkspace = ({
     loadDeductionState(year),
   );
   // 申告入力の正はサーバーDB。表示時にサーバー値を取り込んでから再読込する。
+  // 取り込みが終わるまでは保存しない（端末に値が無い状態で編集すると
+  // 空状態がサーバーへ全体置換され、保存済みの控除等が消えてしまうため。
+  // 納税者画面と同じガード。Issue #10-4 の横展開）。
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     let cancelled = false;
     void hydrateDeductionStateFromServer(year).then(() => {
-      if (!cancelled) setDeductionState(loadDeductionState(year));
+      if (cancelled) return;
+      setDeductionState(loadDeductionState(year));
+      setHydrated(true);
     });
     return () => {
       cancelled = true;
@@ -120,27 +126,27 @@ const FilingWorkspace = ({
   const updateDeductions = (next: DeductionInputs) => {
     const state = { ...deductionState, deductions: next };
     setDeductionState(state);
-    saveDeductionState(year, state);
+    if (hydrated) saveDeductionState(year, state);
   };
   const updateTaxCredits = (next: TaxCreditInputs) => {
     const state = { ...deductionState, taxCredits: next };
     setDeductionState(state);
-    saveDeductionState(year, state);
+    if (hydrated) saveDeductionState(year, state);
   };
   const updateMiscIncome = (next: MiscIncomeInput) => {
     const state = { ...deductionState, miscIncome: next };
     setDeductionState(state);
-    saveDeductionState(year, state);
+    if (hydrated) saveDeductionState(year, state);
   };
   const updateSalaryIncome = (next: SalaryIncomeInput) => {
     const state = { ...deductionState, salaryIncome: next };
     setDeductionState(state);
-    saveDeductionState(year, state);
+    if (hydrated) saveDeductionState(year, state);
   };
   const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => {
     const state = applyBreakdownEntries(deductionState, key, entries);
     setDeductionState(state);
-    saveDeductionState(year, state);
+    if (hydrated) saveDeductionState(year, state);
   };
 
   // 各タブの警告から、帳簿画面をこの年度＋警告種別のフィルターで開く。
