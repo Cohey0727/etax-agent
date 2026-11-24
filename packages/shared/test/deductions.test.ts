@@ -14,6 +14,7 @@ import {
   certifiedNpoDonationCredit,
   computeIncomeDeductions,
   computeIncomeTax,
+  computeTaxCredits,
   dependentDeduction,
   disabilityDeduction,
   dividendCredit,
@@ -201,6 +202,17 @@ describe("医療費控除・寄附金控除・雑損控除", () => {
       ),
     ).toBe(250_000);
   });
+  test("雑損: 算式(2)の補填金は損害金額を超える部分だけ差し引く（No.1110 注記）", () => {
+    // 損害10万円・災害関連30万円・補填25万円・所得100万円
+    // 算式(1): 10万+30万−25万−10万 = 5万円
+    // 算式(2): 30万 −（25万−10万）− 5万 = 10万円 → 大きい方 10万円
+    expect(
+      casualtyLossDeduction(
+        { damageAmount: 100_000, disasterRelatedExpenses: 300_000, otherRelatedExpenses: 0, compensation: 250_000 },
+        1_000_000,
+      ),
+    ).toBe(100_000);
+  });
 });
 
 describe("税額控除", () => {
@@ -235,15 +247,37 @@ describe("税額控除", () => {
   test("配当控除: 証券投資信託の分配10万円 → 5,000円", () => {
     expect(dividendCredit(0, 100_000, 5_000_000)).toBe(5_000);
   });
-  test("政党等寄附金: 10.2万円 → 3万円", () => {
-    expect(politicalDonationCredit(102_000, 1_000_000)).toBe(30_000);
+  test("政党等寄附金: 10.2万円 → 3万円（100円未満切捨て）", () => {
+    expect(politicalDonationCredit(102_000, 10_000_000)).toBe(30_000);
   });
-  test("認定NPO寄附金: 10.2万円 → 4万円、上限は所得税額の25%", () => {
-    expect(certifiedNpoDonationCredit(102_000, 1_000_000)).toBe(40_000);
-    expect(certifiedNpoDonationCredit(1_002_000, 1_000_000)).toBe(250_000);
+  test("政党等寄附金: 対象寄附金は総所得金額等の40%が上限", () => {
+    // 所得100万円 → 対象は40万円まで。（40万 − 2,000）× 30% = 119,400円
+    expect(politicalDonationCredit(1_000_000, 1_000_000)).toBe(119_400);
+  });
+  test("認定NPO寄附金: 10.2万円 → 4万円", () => {
+    expect(certifiedNpoDonationCredit(102_000, 10_000_000)).toBe(40_000);
+    expect(certifiedNpoDonationCredit(1_002_000, 10_000_000)).toBe(400_000);
+  });
+  test("政党等＋認定NPOは合算で所得税額の25%が上限", () => {
+    const credits = computeTaxCredits(
+      { ...EMPTY_TAX_CREDIT_INPUTS, politicalDonations: 1_002_000, certifiedNpoDonations: 1_002_000 },
+      1_000_000,
+      0,
+      10_000_000,
+    );
+    expect(credits.politicalDonations + credits.certifiedNpoDonations).toBe(250_000);
+  });
+  test("配当控除: 1,000万円の枠は剰余金配当等から先に充当する", () => {
+    // 配当以外の所得990万円・株式配当10万円・投信分配10万円、課税総所得1,010万円
+    // 枠10万円は株式配当に充当（10%）、投信は半率（2.5%）→ 10,000 + 2,500
+    expect(dividendCredit(100_000, 100_000, 10_100_000)).toBe(12_500);
   });
   test("耐震改修: 標準費用200万円・その他100万円 → 25万円", () => {
     expect(seismicRetrofitCredit(2_000_000, 1_000_000)).toBe(250_000);
+  });
+  test("耐震改修: A + B の合算は1,000万円が上限", () => {
+    // A 250万円（上限）× 10% + B は 1,000万 − 250万 = 750万円 × 5%
+    expect(seismicRetrofitCredit(2_500_000, 9_000_000)).toBe(625_000);
   });
   test("外国税額: 所得税分は限度額 = 差引所得税額 × 国外所得/所得総額", () => {
     const small = foreignTaxCredit(100_000, 2_000_000, 10_000_000, 1_500_000);
@@ -349,5 +383,50 @@ describe("所得税額の計算", () => {
     expect(result.reconstructionTax).toBe(21_580);
     // 確定税額: B + (R − 復興税分) = 1,306,060 → 1,306,000
     expect(result.finalTax).toBe(1_306_000);
+  });
+});
+
+describe("寡婦・ひとり親・勤労学生の所得要件と排他", () => {
+  test("合計所得500万円以下なら ひとり親 35万円・寡婦 27万円", () => {
+    const single = computeIncomeDeductions(2025, 5_000_000, {
+      ...EMPTY_DEDUCTION_INPUTS,
+      isSingleParent: true,
+    });
+    expect(single.singleParent).toBe(350_000);
+    const widow = computeIncomeDeductions(2025, 5_000_000, {
+      ...EMPTY_DEDUCTION_INPUTS,
+      isWidow: true,
+    });
+    expect(widow.widow).toBe(270_000);
+  });
+  test("合計所得500万円超は ひとり親・寡婦とも 0", () => {
+    const b = computeIncomeDeductions(2025, 5_000_001, {
+      ...EMPTY_DEDUCTION_INPUTS,
+      isSingleParent: true,
+      isWidow: true,
+    });
+    expect(b.singleParent).toBe(0);
+    expect(b.widow).toBe(0);
+  });
+  test("両方該当する場合はひとり親が優先し寡婦は付かない（排他）", () => {
+    const b = computeIncomeDeductions(2025, 3_000_000, {
+      ...EMPTY_DEDUCTION_INPUTS,
+      isSingleParent: true,
+      isWidow: true,
+    });
+    expect(b.singleParent).toBe(350_000);
+    expect(b.widow).toBe(0);
+  });
+  test("勤労学生は年度パラメータの所得上限以下だけ付く（令和7年分 85万円）", () => {
+    const ok = computeIncomeDeductions(2025, 850_000, {
+      ...EMPTY_DEDUCTION_INPUTS,
+      isWorkingStudent: true,
+    });
+    expect(ok.workingStudent).toBe(270_000);
+    const over = computeIncomeDeductions(2025, 850_001, {
+      ...EMPTY_DEDUCTION_INPUTS,
+      isWorkingStudent: true,
+    });
+    expect(over.workingStudent).toBe(0);
   });
 });

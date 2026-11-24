@@ -23,7 +23,9 @@
  *   あることを呼び出し側（入力UI）が確認し、区分・人数だけを渡す。
  *   ただし配偶者特別控除と特定親族特別控除は、対象者の合計所得金額で
  *   控除額が段階的に変わるため、その金額自体を入力として段階表を適用する。
- * - 寡婦控除とひとり親控除は併用できない（入力UI側で排他にする前提）。
+ * - 寡婦控除とひとり親控除は併用できない（計算側でひとり親を優先する）。
+ *   寡婦・ひとり親は合計所得金額500万円以下、勤労学生は年度パラメータの
+ *   上限以下が所得要件で、計算側でも判定する。
  * - 医療費控除とセルフメディケーション税制は選択制。本モジュールは
  *   通常の医療費控除のみを計算する。
  */
@@ -329,7 +331,9 @@ export interface CasualtyLossInput {
 /**
  * 雑損控除。次の2つのうち大きい方:
  *   (1)（損害金額 + 関連支出 − 補填金）− 総所得金額等 × 10%
- *   (2)（災害関連支出 − 補填金）− 50,000円
+ *   (2)（災害関連支出 − 補填金のうち損害金額を超える部分）− 50,000円
+ * 算式(2)で差し引く補填金は、まず損害金額から差し引き、損害金額を
+ * 超える部分だけが対象になる（国税庁 No.1110 の注記）。
  */
 export function casualtyLossDeduction(input: CasualtyLossInput, totalIncome: number): number {
   const damage = amount(input.damageAmount);
@@ -337,7 +341,8 @@ export function casualtyLossDeduction(input: CasualtyLossInput, totalIncome: num
   const other = amount(input.otherRelatedExpenses);
   const comp = amount(input.compensation);
   const a = damage + disaster + other - comp - Math.floor(amount(totalIncome) * 0.1);
-  const b = disaster - comp - 50_000;
+  const excessCompensation = Math.max(comp - damage, 0);
+  const b = disaster - excessCompensation - 50_000;
   return Math.max(a, b, 0);
 }
 
@@ -421,6 +426,14 @@ export function computeIncomeDeductions(
   totalIncome: number,
   inputs: DeductionInputs,
 ): IncomeDeductionBreakdown {
+  const t = amount(totalIncome);
+  // 寡婦・ひとり親は合計所得金額500万円以下が要件。両方に該当する場合は
+  // ひとり親控除が優先し、寡婦控除は適用しない（排他）。
+  const singleParent = inputs.isSingleParent && t <= 5_000_000 ? 350_000 : 0;
+  const widow = inputs.isWidow && !inputs.isSingleParent && t <= 5_000_000 ? 270_000 : 0;
+  // 勤労学生は合計所得金額が年度パラメータの上限以下が要件
+  const workingStudent =
+    inputs.isWorkingStudent && t <= taxParametersFor(year).workingStudentLimit ? 270_000 : 0;
   const breakdown: IncomeDeductionBreakdown = {
     casualtyLoss: inputs.casualtyLoss ? casualtyLossDeduction(inputs.casualtyLoss, totalIncome) : 0,
     medical: medicalDeduction(inputs.medicalExpensesPaid, inputs.medicalReimbursement, totalIncome),
@@ -430,9 +443,9 @@ export function computeIncomeDeductions(
     earthquakeInsurance: earthquakeInsuranceDeduction(inputs.earthquakeInsurance),
     donations: donationDeduction(inputs.donationsTotal, totalIncome),
     disability: disabilityDeduction(inputs.disability),
-    widow: inputs.isWidow ? 270_000 : 0,
-    singleParent: inputs.isSingleParent ? 350_000 : 0,
-    workingStudent: inputs.isWorkingStudent ? 270_000 : 0,
+    widow,
+    singleParent,
+    workingStudent,
     spouse: spouseDeduction(inputs.spouseCategory, totalIncome),
     spouseSpecial: spouseSpecialDeduction(year, inputs.spouseTotalIncome, totalIncome),
     dependents: dependentDeduction(inputs.dependents),
@@ -521,7 +534,8 @@ export function housingLoanCredit(balance: number, limit: number, rate = 0.007):
 /**
  * 配当控除（No.1250）。課税総所得金額等のうち1,000万円以下の部分に
  * 対応する配当等は 剰余金配当等 10%・証券投資信託 5%、超過部分は半率。
- * 配当以外の所得を先に1,000万円の枠へ積む前提で、配当の按分を行う。
+ * 1,000万円の枠への充当順は「配当以外の所得 → 剰余金配当等 →
+ * 証券投資信託の収益の分配」（作成コーナーの計算式）。
  * taxableTotalIncome は配当所得を含む課税総所得金額等。
  */
 export function dividendCredit(
@@ -531,33 +545,46 @@ export function dividendCredit(
 ): number {
   const corp = amount(dividendCorporate);
   const trust = amount(dividendTrust);
-  const total = corp + trust;
-  if (total <= 0) return 0;
-  const baseWithoutDividend = Math.max(amount(taxableTotalIncome) - total, 0);
-  const fullBand = Math.min(Math.max(10_000_000 - baseWithoutDividend, 0), total);
-  const corpFull = (corp * fullBand) / total;
-  const trustFull = (trust * fullBand) / total;
-  return floorYen(
-    corpFull * 0.1 + trustFull * 0.05 + (corp - corpFull) * 0.05 + (trust - trustFull) * 0.025,
-  );
+  if (corp + trust <= 0) return 0;
+  const baseWithoutDividend = Math.max(amount(taxableTotalIncome) - corp - trust, 0);
+  let band = Math.max(10_000_000 - baseWithoutDividend, 0);
+  const corpFull = Math.min(corp, band);
+  band -= corpFull;
+  const trustFull = Math.min(trust, band);
+  // 率は 10% / 5% / 5% / 2.5% — 1,000 分率の整数演算で求める
+  const numerator =
+    corpFull * 100 + trustFull * 50 + (corp - corpFull) * 50 + (trust - trustFull) * 25;
+  return Math.floor(numerator / 1000);
 }
 
-/** 政党等寄附金特別控除:（寄附金 − 2,000円）× 30%、上限は所得税額の25%。 */
-export function politicalDonationCredit(donations: number, baseIncomeTax: number): number {
-  const raw = floorYen(Math.max(amount(donations) - 2_000, 0) * 0.3);
-  return Math.min(raw, floorYen(amount(baseIncomeTax) * 0.25));
+/**
+ * 政党等寄附金特別控除:（対象寄附金 − 2,000円）× 30%（100円未満切捨て）。
+ * 対象寄附金は総所得金額等の40%が上限。所得税額の25%上限は
+ * 認定NPO等との合算で適用するため computeTaxCredits 側で処理する。
+ */
+export function politicalDonationCredit(donations: number, totalIncome: number): number {
+  const eligible = Math.min(amount(donations), Math.floor(amount(totalIncome) * 0.4));
+  return Math.floor((Math.max(eligible - 2_000, 0) * 3) / 1000) * 100;
 }
 
-/** 認定NPO法人等寄附金特別控除:（寄附金 − 2,000円）× 40%、上限は所得税額の25%。 */
-export function certifiedNpoDonationCredit(donations: number, baseIncomeTax: number): number {
-  const raw = floorYen(Math.max(amount(donations) - 2_000, 0) * 0.4);
-  return Math.min(raw, floorYen(amount(baseIncomeTax) * 0.25));
+/**
+ * 認定NPO法人等寄附金特別控除:（対象寄附金 − 2,000円）× 40%
+ * （100円未満切捨て）。対象寄附金は総所得金額等の40%が上限。
+ * 所得税額の25%上限は政党等との合算で computeTaxCredits 側が処理する。
+ */
+export function certifiedNpoDonationCredit(donations: number, totalIncome: number): number {
+  const eligible = Math.min(amount(donations), Math.floor(amount(totalIncome) * 0.4));
+  return Math.floor((Math.max(eligible - 2_000, 0) * 4) / 1000) * 100;
 }
 
-/** 住宅耐震改修特別控除: A × 10% + B × 5%（それぞれ100円未満切捨て）。A は250万円が限度。 */
+/**
+ * 住宅耐震改修特別控除: A × 10% + B × 5%（それぞれ100円未満切捨て）。
+ * A（標準的な費用の額）は250万円が限度、A + B の合計は1,000万円が限度。
+ */
 export function seismicRetrofitCredit(standardCost: number, otherCost: number): number {
-  const a = Math.min(amount(standardCost), 2_500_000);
-  const b = amount(otherCost);
+  const standardRaw = amount(standardCost);
+  const a = Math.min(standardRaw, 2_500_000);
+  const b = Math.min(amount(otherCost), Math.max(10_000_000 - standardRaw, 0));
   return floor100(a * 0.1) + floor100(b * 0.05);
 }
 
@@ -642,8 +669,14 @@ export function computeTaxCredits(
   );
   const flatReduction = amount(inputs.flatReduction);
   const dividend = dividendCredit(inputs.dividendCorporate, inputs.dividendTrust, taxableIncome);
-  const politicalDonations = politicalDonationCredit(inputs.politicalDonations, baseIncomeTax);
-  const certifiedNpoDonations = certifiedNpoDonationCredit(inputs.certifiedNpoDonations, baseIncomeTax);
+  let politicalDonations = politicalDonationCredit(inputs.politicalDonations, totalIncome);
+  let certifiedNpoDonations = certifiedNpoDonationCredit(inputs.certifiedNpoDonations, totalIncome);
+  // 政党等・認定NPO等の寄附金特別控除は、合算で所得税額の25%が上限
+  const donationCreditCap = floor100(amount(baseIncomeTax) * 0.25);
+  if (politicalDonations + certifiedNpoDonations > donationCreditCap) {
+    certifiedNpoDonations = Math.max(donationCreditCap - politicalDonations, 0);
+    politicalDonations = Math.min(politicalDonations, donationCreditCap);
+  }
   const seismicRetrofit = seismicRetrofitCredit(
     inputs.seismicRetrofitStandardCost,
     inputs.seismicRetrofitOtherCost,
@@ -929,24 +962,26 @@ export function computeManualIncomes(
     salaryInput.adjustmentEligible === true,
   );
   const salaryAfterAdj1 = Math.max(salaryBase - adjustment1, 0);
-  const miscBusiness = amount(miscInput.businessIncome);
-  const miscOther = amount(miscInput.income);
+  // 雑所得（業務・その他）は赤字もあり得るため、0で潰さず符号つきで扱う
+  // （赤字は他の所得と通算される）。
+  const signed = (x: number): number => (Number.isFinite(x) ? Math.trunc(x) : 0);
+  const miscBusiness = signed(miscInput.businessIncome);
+  const miscOther = signed(miscInput.income);
   const ledger = amount(ledgerIncomeTotal);
 
   let pension = 0;
   let adjustment2 = 0;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 100; i++) {
     const otherTotal = ledger + salaryAfterAdj1 - adjustment2 + miscBusiness + miscOther;
     const nextPension = publicPensionIncome(miscInput.pensionRevenue, miscInput.pensionOver65, otherTotal);
     const nextAdjustment2 = salaryAdjustmentDeduction2(salaryAfterAdj1, nextPension);
-    if (nextPension === pension && nextAdjustment2 === adjustment2) {
-      pension = nextPension;
-      adjustment2 = nextAdjustment2;
-      break;
-    }
+    if (nextPension === pension && nextAdjustment2 === adjustment2) break;
     pension = nextPension;
     adjustment2 = nextAdjustment2;
   }
+  // 最終整合: 確定した年金所得に対して調整控除②を再計算し、年金所得の
+  // 判定に使った他の所得の合計と矛盾しない形にそろえる
+  adjustment2 = salaryAdjustmentDeduction2(salaryAfterAdj1, pension);
   const salary = Math.max(salaryAfterAdj1 - adjustment2, 0);
   const miscTotal = pension + miscBusiness + miscOther;
   return {

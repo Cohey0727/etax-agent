@@ -131,3 +131,18 @@ describe("手入力所得の統合計算", () => {
     expect(manual.miscTotal).toBe(0);
   });
 });
+
+describe("雑所得の赤字（損益通算）", () => {
+  test("業務の赤字は 0 に潰されず合計に反映される", () => {
+    const manual = computeManualIncomes(
+      2025,
+      EMPTY_SALARY_INCOME,
+      { ...EMPTY_MISC_INCOME, businessRevenue: 100_000, businessIncome: -200_000, income: -50_000 },
+      1_000_000,
+    );
+    expect(manual.miscBusiness).toBe(-200_000);
+    expect(manual.miscOther).toBe(-50_000);
+    expect(manual.miscTotal).toBe(-250_000);
+    expect(manual.total).toBe(-250_000);
+  });
+});
