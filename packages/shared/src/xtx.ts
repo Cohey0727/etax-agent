@@ -243,9 +243,12 @@ export function toEraDate(iso: string): EraDate | null {
   const year = Number(m[1]);
   const mm = Number(m[2]);
   const dd = Number(m[3]);
-  if (year >= 2019) return { era: 5, yy: year - 2018, mm, dd };
-  if (year >= 1989) return { era: 4, yy: year - 1988, mm, dd };
-  if (year >= 1927) return { era: 3, yy: year - 1925, mm, dd };
+  // 元号の開始日（改元の月日境界まで含めて判定する）
+  if (iso >= "2019-05-01") return { era: 5, yy: year - 2018, mm, dd }; // 令和
+  if (iso >= "1989-01-08") return { era: 4, yy: year - 1988, mm, dd }; // 平成
+  if (iso >= "1926-12-25") return { era: 3, yy: year - 1925, mm, dd }; // 昭和
+  if (iso >= "1912-07-30") return { era: 2, yy: year - 1911, mm, dd }; // 大正
+  if (iso >= "1868-10-23") return { era: 1, yy: year - 1867, mm, dd }; // 明治
   return null;
 }
 
@@ -612,7 +615,12 @@ const KOA210_EXPENSE_LINES: [string, string][] = [
 function buildKoa210(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = data.categoryTotals.business;
+  const totals = { ...data.categoryTotals.business };
+  // 分類カテゴリの「外注工賃」は決算書の固定行「外注費」に合算する
+  if (totals["外注工賃"]) {
+    totals["外注費"] = (totals["外注費"] ?? 0) + (totals["外注工賃"] ?? 0);
+    totals["外注工賃"] = 0;
+  }
   const purchases = totals["仕入高"] ?? 0;
 
   const parts: string[] = [];
@@ -649,12 +657,14 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
     ([account, value]) =>
       value > 0 && !fixedAccounts.has(account) && account !== "仕入高" && account !== "売上高",
   );
-  for (const [account, value] of extras) {
+  // 追加科目は様式の上限（AMF00355 の maxOccurs = 6）まで。超過分は雑費に合算する
+  for (const [account, value] of extras.slice(0, 6)) {
     expenseLines.push(
       `<AMF00355><AMF00060>${esc(account)}</AMF00060>${amountAlways("AMF00360", value)}</AMF00355>`,
     );
   }
-  expenseLines.push(amount("AMF00370", totals["雑費"] ?? 0));
+  const extrasOverflow = extras.slice(6).reduce((sum, [, value]) => sum + value, 0);
+  expenseLines.push(amount("AMF00370", (totals["雑費"] ?? 0) + extrasOverflow));
   const expenseTotal = f.business_expenses - purchases;
   expenseLines.push(amountAlways("AMF00380", expenseTotal));
   amounts.push(`<AMF00180>${expenseLines.join("")}</AMF00180>`);
@@ -725,12 +735,14 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
     ([account, value]) =>
       value > 0 && !fixedAccounts.has(account) && account !== "雑費" && account !== "家賃収入",
   );
-  for (const [account, value] of extras) {
+  // 追加科目は様式の上限（ANF00195 の maxOccurs = 5）まで。超過分は雑費に合算する
+  for (const [account, value] of extras.slice(0, 5)) {
     expenseLines.push(
       `<ANF00195><ANF00060>${esc(account)}</ANF00060>${amountAlways("ANF00200", value)}</ANF00195>`,
     );
   }
-  expenseLines.push(amount("ANF00210", totals["雑費"] ?? 0));
+  const extrasOverflow = extras.slice(5).reduce((sum, [, value]) => sum + value, 0);
+  expenseLines.push(amount("ANF00210", (totals["雑費"] ?? 0) + extrasOverflow));
   expenseLines.push(amountAlways("ANF00220", f.real_estate_expenses));
   pl.push(`<ANF00120>${expenseLines.join("")}</ANF00120>`);
 
@@ -771,7 +783,12 @@ const KOA110_OTHER_EXPENSE_LINES: [string, string][] = [
 function buildKoa110(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = data.categoryTotals.business;
+  const totals = { ...data.categoryTotals.business };
+  // 分類カテゴリの「外注工賃」は収支内訳書の固定行「外注費」に合算する
+  if (totals["外注工賃"]) {
+    totals["外注費"] = (totals["外注費"] ?? 0) + (totals["外注工賃"] ?? 0);
+    totals["外注工賃"] = 0;
+  }
   const purchases = totals["仕入高"] ?? 0;
 
   const parts: string[] = [];
@@ -827,13 +844,15 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
     ([account, value]) =>
       value > 0 && !fixedAccounts.has(account) && account !== "仕入高" && account !== "売上高" && account !== "雑費",
   );
-  for (const [account, value] of extras) {
+  // 追加科目は様式の上限（AIG00325 の maxOccurs = 5）まで。超過分は雑費に合算する
+  for (const [account, value] of extras.slice(0, 5)) {
     otherSubtotal += value;
     otherLines.push(
       `<AIG00325><AIG00010>${esc(account)}</AIG00010>${amountAlways("AIG00330", value)}</AIG00325>`,
     );
   }
-  const misc = totals["雑費"] ?? 0;
+  const extrasOverflow = extras.slice(5).reduce((sum, [, value]) => sum + value, 0);
+  const misc = (totals["雑費"] ?? 0) + extrasOverflow;
   otherSubtotal += misc;
   otherLines.push(amount("AIG00340", misc));
   otherLines.push(amountAlways("AIG00350", otherSubtotal));
@@ -946,6 +965,8 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
 
 /** 様式ごとの減価償却明細のタグ対応 */
 interface DepDetailTags {
+  /** 明細行の maxOccurs（同梱 XSD）。超過分は様式に載せられないため例外にする */
+  maxRows: number;
   group: string;
   row: string;
   name: string;
@@ -974,6 +995,7 @@ interface DepDetailTags {
 }
 
 const DEP_TAGS_KOA210: DepDetailTags = {
+  maxRows: 7,
   group: "AMF01590", row: "AMF01600", name: "AMF01610", quantity: "AMF01620",
   acquisition: "AMF01630", cost: "AMF01640", guarantee: "AMF01645", basis: "AMF01650",
   method: "AMF01660", life: "AMF01670", rateWrap: "AMF01680", rate: "AMF01690",
@@ -984,6 +1006,7 @@ const DEP_TAGS_KOA210: DepDetailTags = {
 };
 
 const DEP_TAGS_KOA220: DepDetailTags = {
+  maxRows: 13,
   group: "ANF00880", row: "ANF00890", name: "ANF00900", quantity: "ANF00910",
   acquisition: "ANF00920", cost: "ANF00930", guarantee: "ANF00935", basis: "ANF00940",
   method: "ANF00950", life: "ANF00960", rateWrap: "ANF00970", rate: "ANF00980",
@@ -994,6 +1017,7 @@ const DEP_TAGS_KOA220: DepDetailTags = {
 };
 
 const DEP_TAGS_KOA110: DepDetailTags = {
+  maxRows: 6,
   group: "AIM00000", row: "AIM00010", name: "AIM00020", quantity: "AIM00030",
   acquisition: "AIM00050", cost: "AIM00060", guarantee: "AIM00065", basis: "AIM00070",
   method: "AIM00080", life: "AIM00090", rateWrap: "AIM00100", rate: "AIM00110",
@@ -1004,6 +1028,7 @@ const DEP_TAGS_KOA110: DepDetailTags = {
 };
 
 const DEP_TAGS_KOA130: DepDetailTags = {
+  maxRows: 8,
   group: "AKK00000", row: "AKK00010", name: "AKK00020", quantity: "AKK00030",
   acquisition: "AKK00050", cost: "AKK00060", guarantee: "AKK00065", basis: "AKK00070",
   method: "AKK00080", life: "AKK00090", rateWrap: "AKK00100", rate: "AKK00110",
@@ -1023,6 +1048,11 @@ function eraYearMonthTag(tag: string, yearMonth: string): string {
 /** 減価償却費の計算グループ（明細行＋計）を組み立てる。 */
 function buildDepreciationDetail(rows: DepreciationDetailRow[], tags: DepDetailTags): string {
   if (rows.length === 0) return "";
+  if (rows.length > tags.maxRows) {
+    throw new Error(
+      `減価償却費の計算明細は様式の上限 ${tags.maxRows} 件までです（${rows.length} 件指定）。明細をまとめてから出力してください`,
+    );
+  }
   const body: string[] = [];
   for (const row of rows) {
     const cells: string[] = [];

@@ -8,6 +8,8 @@ import {
   computeCorrectedFigures,
   computeIncomeTax,
   computeManualIncomes,
+  depreciationDetailRow,
+  toEraDate,
   xtxSupportedYears,
 } from "../src";
 
@@ -753,6 +755,102 @@ describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", (
     expect(tagValue(xtx, "ABB00760")).toBe(-raw);
   });
 
+  test("分類カテゴリ「外注工賃」は固定行「外注費」AMF00320 に合算される", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2025);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: TAXPAYER,
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: { 外注費: 100_000, 外注工賃: 550_000 }, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    expect(xtx).toContain("<AMF00320>650000</AMF00320>");
+    expect(xtx).not.toContain("外注工賃");
+  });
+
+  test("追加科目が様式の上限（6件）を超えたら超過分は雑費に合算される", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2025);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const extras: Record<string, number> = {};
+    for (let i = 1; i <= 8; i++) extras[`追加科目${i}`] = i * 10_000;
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: TAXPAYER,
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: { ...extras, 雑費: 5_000 }, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    expect(xtx.match(/<AMF00355>/g)).toHaveLength(6);
+    // 雑費 = 5,000 + 超過2件（70,000 + 80,000）
+    expect(xtx).toContain("<AMF00370>155000</AMF00370>");
+  });
+
+  test("減価償却明細が様式の上限（KOA210 は7件）を超えたら例外", () => {
+    const figures = computeCorrectedFigures(TRANSACTIONS, 2025);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const rows = Array.from({ length: 8 }, (_, i) =>
+      depreciationDetailRow(
+        `資産${i}`,
+        {
+          acquisitionDate: "2025-04-01",
+          cost: 100_000,
+          usefulLifeYears: 4,
+          method: "straight_line",
+          businessRatioPercent: 100,
+        },
+        2025,
+      ),
+    ).filter((r) => r !== null);
+    expect(rows).toHaveLength(8);
+    expect(() =>
+      buildXtxFiling({
+        year: 2025,
+        amendment: false,
+        submissionDate: "2026-03-10",
+        taxpayer: TAXPAYER,
+        figures,
+        deductionInputs: EMPTY_DEDUCTION_INPUTS,
+        miscIncome: EMPTY_MISC_INCOME,
+        tax,
+        categoryTotals: { business: {}, realEstate: {} },
+        withholdingTax: 0,
+        prepaidTax: 0,
+        originalThirdPeriodTax: null,
+        depreciation: { business: rows, realEstate: [] },
+      }),
+    ).toThrow(/上限 7 件/);
+  });
+
   test("配偶者控除のみ（特別控除なし）では ABB00515 を立てない", () => {
     const { xtx, tax } = buildCustom({
       year: 2025,
@@ -765,5 +863,19 @@ describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", (
     expect(tax.deductions.spouse).toBeGreaterThan(0);
     expect(tax.deductions.spouseSpecial).toBe(0);
     expect(xtx).not.toContain("ABB00515");
+  });
+});
+
+describe("toEraDate の元号境界 (#3-4)", () => {
+  test("改元の月日境界で元号が切り替わる", () => {
+    expect(toEraDate("2019-04-30")).toEqual({ era: 4, yy: 31, mm: 4, dd: 30 }); // 平成31年
+    expect(toEraDate("2019-05-01")).toEqual({ era: 5, yy: 1, mm: 5, dd: 1 }); // 令和元年
+    expect(toEraDate("1989-01-07")).toEqual({ era: 3, yy: 64, mm: 1, dd: 7 }); // 昭和64年
+    expect(toEraDate("1989-01-08")).toEqual({ era: 4, yy: 1, mm: 1, dd: 8 }); // 平成元年
+    expect(toEraDate("1926-12-24")).toEqual({ era: 2, yy: 15, mm: 12, dd: 24 }); // 大正15年
+    expect(toEraDate("1926-12-25")).toEqual({ era: 3, yy: 1, mm: 12, dd: 25 }); // 昭和元年
+    expect(toEraDate("1912-07-29")).toEqual({ era: 1, yy: 45, mm: 7, dd: 29 }); // 明治45年
+    expect(toEraDate("1912-07-30")).toEqual({ era: 2, yy: 1, mm: 7, dd: 30 }); // 大正元年
+    expect(toEraDate("1868-10-22")).toBeNull();
   });
 });
