@@ -339,6 +339,11 @@ const MessageBubbles = ({ items }: { items: ChatMessage[] }) => {
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                  components={{
+                    // 外部画像は読み込まない（読み込み自体がビーコンになり、
+                    // 閲覧情報が外部へ漏れるため、Issue #9）。代替テキストだけ出す。
+                    img: ({ alt }) => <span>[画像{alt ? `: ${alt}` : ""}]</span>,
+                  }}
                 >
                   {m.content}
                 </ReactMarkdown>
