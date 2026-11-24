@@ -71,7 +71,7 @@ export const LedgerTable = ({
               <TableHeaderCell>区分</TableHeaderCell>
               <TableHeaderCell>税区分</TableHeaderCell>
               <TableHeaderCell>出所</TableHeaderCell>
-              <TableHeaderCell>操作</TableHeaderCell>
+              <TableHeaderCell className={styles.actionsHeader}>操作</TableHeaderCell>
             </tr>
           </thead>
           <tbody>
@@ -83,7 +83,7 @@ export const LedgerTable = ({
                   <TableCell>
                     <Input
                       type="date"
-                      className={styles.cellInput}
+                      className={`${styles.cellInput} ${styles.cellControl}`}
                       value={edit.date}
                       onChange={(e) => onEdit(row.id, { date: e.target.value })}
                       aria-label="日付"
@@ -91,7 +91,7 @@ export const LedgerTable = ({
                   </TableCell>
                   <TableCell>
                     <Select
-                      className={styles.cellInput}
+                      className={`${styles.cellInput} ${styles.cellSelect}`}
                       value={edit.fiscal_year}
                       onChange={(e) =>
                         onEdit(row.id, { fiscal_year: Number(e.target.value) })
@@ -114,7 +114,7 @@ export const LedgerTable = ({
                   </TableCell>
                   <TableCell>
                     <Input
-                      className={styles.descriptionInput}
+                      className={`${styles.descriptionInput} ${styles.cellControl}`}
                       value={edit.description}
                       onChange={(e) => onEdit(row.id, { description: e.target.value })}
                       aria-label="摘要"
@@ -123,7 +123,7 @@ export const LedgerTable = ({
                   <TableCell>
                     <Input
                       type="number"
-                      className={styles.amountInput}
+                      className={`${styles.amountInput} ${styles.cellControl}`}
                       value={edit.amount}
                       onChange={(e) =>
                         onEdit(row.id, { amount: Number(e.target.value) })
@@ -133,6 +133,7 @@ export const LedgerTable = ({
                   </TableCell>
                   <TableCell>
                     <Select
+                      className={styles.cellSelect}
                       value={edit.category}
                       onChange={(e) => onEdit(row.id, { category: e.target.value })}
                       aria-label="勘定科目"
@@ -146,6 +147,7 @@ export const LedgerTable = ({
                   </TableCell>
                   <TableCell>
                     <Select
+                      className={styles.cellSelect}
                       value={edit.income_type}
                       onChange={(e) => onEdit(row.id, { income_type: e.target.value })}
                       aria-label="区分"
@@ -159,6 +161,7 @@ export const LedgerTable = ({
                   </TableCell>
                   <TableCell>
                     <Select
+                      className={styles.cellSelect}
                       value={edit.tax_category}
                       onChange={(e) => onEdit(row.id, { tax_category: e.target.value })}
                       aria-label="税区分"
@@ -175,7 +178,7 @@ export const LedgerTable = ({
                   </TableCell>
                   <TableCell>
                     <Input
-                      className={styles.cellInput}
+                      className={`${styles.cellInput} ${styles.cellControl}`}
                       value={edit.account}
                       onChange={(e) => onEdit(row.id, { account: e.target.value })}
                       aria-label="出所"
