@@ -11,3 +11,4 @@ export * from "./InvoicesPage";
 export * from "./FilingPage";
 export * from "./TaxpayerPage";
 export * from "./SettingsPage";
+export * from "./McpSettingsPage";
