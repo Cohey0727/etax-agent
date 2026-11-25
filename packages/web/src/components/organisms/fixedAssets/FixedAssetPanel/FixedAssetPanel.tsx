@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Col, Icon, Row, Text } from "@components/atoms";
+import { Badge, Button, Col, Icon, Row, Text } from "@components/atoms";
 import { AlertBox, Drawer } from "@components/molecules";
 import { FixedAssetInput } from "@types";
 import { FixedAssetDetail } from "./FixedAssetDetail";
@@ -17,7 +17,7 @@ export interface FixedAssetPanelProps {
 
 type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
 
-/** 固定資産台帳の画面本体。サマリ帯・資産カード・詳細（償却表と画像）。登録/編集は右 Drawer で行う。 */
+/** 固定資産台帳の画面本体。ページはサマリ帯と資産一覧が主役で、詳細・登録・編集はいずれも右 Drawer で開く。 */
 export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   const {
     status,
@@ -38,6 +38,7 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   } = useFixedAssetsData(year);
   const [formState, setFormState] = useState<FormState>(null);
   const [draft, setDraft] = useState<FixedAssetInput>(() => emptyDraft(year));
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   if (status === "loading") {
     return <FixedAssetSkeleton />;
@@ -52,7 +53,12 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
     );
   }
 
-  const selected = assets.find((asset) => asset.id === selectedId) ?? null;
+  const detailAsset =
+    detailId !== null ? (assets.find((asset) => asset.id === detailId) ?? null) : null;
+  const editingAsset =
+    formState?.kind === "edit"
+      ? (assets.find((asset) => asset.id === formState.id) ?? null)
+      : null;
 
   const openCreate = () => {
     setDraft(emptyDraft(year));
@@ -60,9 +66,9 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   };
 
   const openEdit = () => {
-    if (!selected) return;
-    setDraft(toInput(selected));
-    setFormState({ kind: "edit", id: selected.id });
+    if (!detailAsset) return;
+    setDraft(toInput(detailAsset));
+    setFormState({ kind: "edit", id: detailAsset.id });
   };
 
   const submitForm = async () => {
@@ -75,7 +81,7 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   };
 
   const formTitle =
-    formState?.kind === "edit" ? `「${selected?.name ?? ""}」を編集` : "固定資産を登録";
+    formState?.kind === "edit" ? `「${editingAsset?.name ?? ""}」を編集` : "固定資産を登録";
 
   return (
     <Col gap="lg">
@@ -103,26 +109,47 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
             onSelect={(assetId) => {
               setFormState(null);
               select(assetId);
+              setDetailId(assetId);
             }}
           />
-          {selected ? (
-            <FixedAssetDetail
-              asset={selected}
-              year={year}
-              images={images[selected.id]}
-              imagesBusy={imagesBusy}
-              busy={busy}
-              deleteArmed={deleteArmedId === selected.id}
-              onEdit={openEdit}
-              onDelete={() => void handleDelete(selected)}
-              onUploadImages={(files) => void handleUploadImages(selected.id, files)}
-              onDeleteImage={(fileId) => void handleDeleteImage(selected.id, fileId)}
-            />
-          ) : null}
         </>
       )}
 
-      <Drawer open={formState !== null} title={formTitle} onClose={() => setFormState(null)}>
+      <Drawer
+        open={detailAsset !== null}
+        title={
+          detailAsset ? (
+            <Row gap="sm" align="center">
+              <Text variant="sectionTitle">{detailAsset.name}</Text>
+              {detailAsset.disposed_date ? <Badge>除却済み</Badge> : null}
+            </Row>
+          ) : undefined
+        }
+        width="min(720px, 96vw)"
+        onClose={() => setDetailId(null)}
+      >
+        {detailAsset ? (
+          <FixedAssetDetail
+            asset={detailAsset}
+            year={year}
+            images={images[detailAsset.id]}
+            imagesBusy={imagesBusy}
+            busy={busy}
+            deleteArmed={deleteArmedId === detailAsset.id}
+            onEdit={openEdit}
+            onDelete={() => void handleDelete(detailAsset)}
+            onUploadImages={(files) => void handleUploadImages(detailAsset.id, files)}
+            onDeleteImage={(fileId) => void handleDeleteImage(detailAsset.id, fileId)}
+          />
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        open={formState !== null}
+        title={formTitle}
+        layer={formState?.kind === "edit" ? 1 : 0}
+        onClose={() => setFormState(null)}
+      >
         {formState ? (
           <FixedAssetForm
             submitLabel={formState.kind === "create" ? "登録する" : "保存する"}

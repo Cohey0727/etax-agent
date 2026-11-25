@@ -92,10 +92,6 @@ const styles = {
     background: theme.color.accent,
     transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
   }),
-  // 詳細パネル。
-  detailCard: style({
-    animation: `${popIn} 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)`,
-  }),
   tableWrap: style({
     width: "100%",
     overflowX: "auto",
@@ -193,7 +189,6 @@ const styles = {
   skeletonValue: style({ width: "70%", height: "24px" }),
   skeletonLabel: style({ width: "45%", height: "14px" }),
   skeletonCard: style({ height: "132px" }),
-  skeletonDetail: style({ height: "320px" }),
 };
 
 export default styles;
