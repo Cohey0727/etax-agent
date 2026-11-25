@@ -28,7 +28,6 @@ type LoadState = "loading" | "anonymous" | "ready";
 type ClientId = "claudeCode" | "codex" | "muse";
 
 interface ClientSnippet {
-  label: string;
   /** スニペットを貼る場所の案内。 */
   hint: string;
   build: (endpoint: string) => string;
@@ -37,17 +36,14 @@ interface ClientSnippet {
 /** クライアント別の設定スニペット（列挙分岐はマッピング表で持つ）。 */
 const CLIENT_SNIPPETS: Record<ClientId, ClientSnippet> = {
   claudeCode: {
-    label: "Claude Code",
     hint: "プロジェクト直下の .mcp.json（または ~/.claude.json）の mcpServers に追加します。コマンドなら: claude mcp add --transport http etax-agent <URL> --header \"Authorization: Bearer YOUR_API_KEY\"",
     build: (endpoint) => buildSnippetJson(endpoint),
   },
   codex: {
-    label: "Codex",
     hint: "Codex の MCP 設定の mcpServers に追加します。",
     build: (endpoint) => buildSnippetJson(endpoint),
   },
   muse: {
-    label: "Muse",
     hint: "Muse の MCP 設定の mcpServers に追加します。",
     build: (endpoint) => buildSnippetJson(endpoint),
   },
@@ -66,7 +62,7 @@ export const McpConnectionPanel = () => {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [info, setInfo] = useState<McpInfo | null>(null);
   const [clientId, setClientId] = useState<ClientId>("claudeCode");
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -88,9 +84,12 @@ export const McpConnectionPanel = () => {
   const handleCopy = async (text: string, doneText: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setMessage(doneText);
+      setMessage({ ok: true, text: doneText });
     } catch {
-      setMessage("コピーに失敗しました。表示されている内容を選択してコピーしてください");
+      setMessage({
+        ok: false,
+        text: "コピーに失敗しました。表示されている内容を選択してコピーしてください",
+      });
     }
   };
 
@@ -180,7 +179,12 @@ export const McpConnectionPanel = () => {
             </Col>
           </>
         )}
-        {message ? <Text variant="caption">✓ {message}</Text> : null}
+        {message ? (
+          <Text variant="caption">
+            {message.ok ? "✓ " : "⚠ "}
+            {message.text}
+          </Text>
+        ) : null}
       </Col>
     </Card>
   );
