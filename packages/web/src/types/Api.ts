@@ -441,6 +441,78 @@ export interface ExportDomicilePdfResponse {
   pdf_base64: string;
 }
 
+/** 開業届・青色申告承認申請書の所得の種類。 */
+export type BusinessStartIncomeType = "real_estate" | "forest" | "business";
+
+/** 青色申告承認申請書 6(1) の簿記方式。 */
+export type BookkeepingMethod = "double" | "simple" | "other";
+
+/** 給与等の支払の状況の1行（専従者・使用人・その他）。 */
+export interface SalarySituationRow {
+  /** 従事員数。未入力は null。 */
+  count: number | null;
+  /** 給与の定め方（日給・月給など）。 */
+  terms: string;
+  /** 税額の有無。未選択は null。 */
+  has_tax: boolean | null;
+}
+
+/**
+ * 開業届・青色申告承認申請書の専用入力（プロフィールに無い項目）。
+ * 開業は一度きりの手続きで年度に属さないため、保存は所有者ごとの
+ * 専用保存（サーバーの business_start_inputs）になる。
+ */
+export interface BusinessStartInputs {
+  start_date: string;
+  shop_name_kana: string;
+  business_overview: string;
+  income_types: BusinessStartIncomeType[];
+  submits_blue_application: boolean;
+  submits_consumption_election: boolean;
+  other_zip_code: string;
+  other_address: string;
+  other_phone: string;
+  /** 青色申告を開始する年分。0 は未入力（開業年を使う）。 */
+  blue_start_year: number;
+  offices: { name: string; location: string }[];
+  blue_cancellation_has: boolean | null;
+  blue_cancellation_date: string;
+  inheritance_has: boolean | null;
+  inheritance_date: string;
+  predecessor_name: string;
+  bookkeeping: BookkeepingMethod | null;
+  bookkeeping_other: string;
+  /** 備付帳簿名（BLUE_BOOK_OPTIONS のキー）。 */
+  books: string[];
+  blue_other_notes: string;
+  salary_family: SalarySituationRow;
+  salary_employee: SalarySituationRow;
+  salary_other_label: string;
+  salary_other: SalarySituationRow;
+  withholding_special: boolean | null;
+  salary_start_date: string;
+  other_notes: string;
+}
+
+/** 開業の専用入力の取得レスポンス。未保存なら state は null。 */
+export interface BusinessStartInputsResponse {
+  state: BusinessStartInputs | null;
+  updated_at: string | null;
+}
+
+/** 開業届・青色申告承認申請書 PDF 出力のリクエスト。 */
+export interface ExportBusinessStartPdfRequest {
+  submission_date: string;
+  taxpayer: XtxTaxpayerInput;
+  inputs: BusinessStartInputs;
+}
+
+/** 開業届・青色申告承認申請書 PDF 出力のレスポンス。 */
+export interface ExportBusinessStartPdfResponse {
+  filename: string;
+  pdf_base64: string;
+}
+
 /** 消費税申告書（本則）XTX出力のリクエスト。金額は税込・確定値で渡す。 */
 export interface ExportConsumptionXtxRequest {
   taxpayer: XtxTaxpayerInput;

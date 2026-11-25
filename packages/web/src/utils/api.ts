@@ -10,6 +10,10 @@ import {
   JevPromptInfo,
   RegexRuleItem,
   RegexRulesInfo,
+  BusinessStartInputs,
+  BusinessStartInputsResponse,
+  ExportBusinessStartPdfRequest,
+  ExportBusinessStartPdfResponse,
   ExportConsumptionXtxRequest,
   ExportConsumptionXtxResponse,
   ExportDomicilePdfRequest,
@@ -718,6 +722,57 @@ export async function exportDomicilePdfFile(
     body: JSON.stringify(request),
   });
   return parseJson<ExportDomicilePdfResponse>(resp);
+}
+
+/** 開業の専用入力（開業届・青色申告承認申請書）を取得する。失敗時は null。 */
+export async function fetchBusinessStartInputs(): Promise<BusinessStartInputsResponse | null> {
+  try {
+    const resp = await fetch("/api/business-start-inputs");
+    if (!resp.ok) return null;
+    return (await resp.json()) as BusinessStartInputsResponse;
+  } catch {
+    return null;
+  }
+}
+
+/** 開業の専用入力をDBへ保存する。失敗した場合は false。 */
+export async function saveBusinessStartInputsToServer(
+  state: BusinessStartInputs,
+): Promise<boolean> {
+  try {
+    const resp = await fetch("/api/business-start-inputs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state }),
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** 個人事業の開業・廃業等届出書（印刷用 PDF）を生成する。 */
+export async function exportOpeningNoticePdfFile(
+  request: ExportBusinessStartPdfRequest,
+): Promise<ExportBusinessStartPdfResponse> {
+  const resp = await fetch("/api/etax/export-opening-notice-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJson<ExportBusinessStartPdfResponse>(resp);
+}
+
+/** 所得税の青色申告承認申請書（印刷用 PDF）を生成する。 */
+export async function exportBlueReturnPdfFile(
+  request: ExportBusinessStartPdfRequest,
+): Promise<ExportBusinessStartPdfResponse> {
+  const resp = await fetch("/api/etax/export-blue-return-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJson<ExportBusinessStartPdfResponse>(resp);
 }
 
 /** 消費税申告書（本則）のXTXを生成する。失敗時はサーバーのエラー文言で例外。 */
