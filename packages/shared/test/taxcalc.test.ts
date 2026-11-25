@@ -1,5 +1,5 @@
 /**
- * taxcalc.test.ts — Python 版 tests/run_tests.py の移植（bun test）。
+ * taxcalc.test.ts — 税額計算の検証（bun test）。
  * 検証する主な税務ルール:
  *   (a) 簡易課税: 課税売上（税込） ¥15,000,000 → 納付税額 ¥681,818
  *   (b) 2割特例 : 同上 → ¥272,727
