@@ -7,6 +7,7 @@ import {
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import { BusinessStartPanel } from "@components/organisms/filing/BusinessStartPanel";
 import { FilingTypeFields } from "@components/organisms/filing/FilingTypeFields";
 import { TaxpayerProfilePanel } from "@components/organisms/filing/TaxpayerProfilePanel";
 import { ViewPageProps } from "@types";
@@ -64,6 +65,7 @@ const TaxpayerWorkspace = ({ year }: { year: number }) => {
         </Col>
       </Card>
       <TaxpayerProfilePanel year={year} />
+      <BusinessStartPanel year={year} />
     </Col>
   );
 };
