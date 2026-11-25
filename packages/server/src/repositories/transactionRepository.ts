@@ -56,6 +56,8 @@ export function transactionToApi(row: TransactionRow): TransactionResponse {
     category: row.category,
     income_type: row.incomeType,
     tax_category: row.taxCategory,
+    business_ratio_percent: row.businessRatioPercent,
+    business_ratio_basis: row.businessRatioBasis,
     import_id: row.importId,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
@@ -177,6 +179,8 @@ type TransactionValues = {
   category: string;
   incomeType: string;
   taxCategory: string;
+  businessRatioPercent: number;
+  businessRatioBasis: string;
 };
 
 /** 取引を1件登録する（executor 版）。変更履歴（登録）も同じ実行単位で残す。 */
@@ -324,6 +328,8 @@ export async function replaceYearTransactionRows(
     category: string;
     incomeType: string;
     taxCategory: string;
+    businessRatioPercent: number;
+    businessRatioBasis: string;
   }[],
 ): Promise<TransactionRow[]> {
   // PostgreSQL ドライバのトランザクションは非同期実行する

@@ -62,6 +62,10 @@ export const transactionsTable = pgTable("transactions", {
   incomeType: text("income_type").notNull().default("other"),
   /** 消費税の税区分（freee表記）。"" は未設定 */
   taxCategory: text("tax_category").notNull().default(""),
+  /** 事業専用割合（家事按分、0〜100の整数）。100 は全額事業分 */
+  businessRatioPercent: integer("business_ratio_percent").notNull().default(100),
+  /** 按分根拠のメモ（任意） */
+  businessRatioBasis: text("business_ratio_basis").notNull().default(""),
   importId: integer("import_id").references(() => importsTable.id),
   createdAt: timestampColumn("created_at")
     .notNull()
