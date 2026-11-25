@@ -15,6 +15,19 @@ const skeletonPulse = keyframes({
   "100%": { opacity: 0.5 },
 });
 
+// 削除が確定した行の退場（右へ滑りながら消える）。
+const rowDelete = keyframes({
+  "0%": { opacity: 1, transform: "translateX(0)" },
+  "100%": { opacity: 0, transform: "translateX(40px)" },
+});
+
+// 削除の武装中を知らせる鼓動。
+const armedPulse = keyframes({
+  "0%": { transform: "scale(1)" },
+  "50%": { transform: "scale(1.14)" },
+  "100%": { transform: "scale(1)" },
+});
+
 // 検索・フィルター行の高さ。チップの中身（controlHeight）に
 // チップの上下 padding と枠線を足したもの。行内の全要素で共有する。
 const FILTER_ROW_HEIGHT = `calc(${theme.component.controlHeight} + ${theme.space.xs} * 2 + 2px)`;
@@ -71,6 +84,14 @@ const styles = {
     width: "28px",
     height: "28px",
     padding: 0,
+  }),
+  // 削除の武装中はボタンを鼓動させて、状態に気づけるようにする。
+  armedButton: style({
+    animation: `${armedPulse} 0.9s ease-in-out infinite`,
+  }),
+  // 削除が確定した行の退場アニメーション。
+  rowDeleting: style({
+    animation: `${rowDelete} 380ms ${theme.animation.spring} forwards`,
   }),
   // 事業割合の入力行は、% の単位が下に折り返さないよう折り返し禁止にする。
   ratioRow: style({
