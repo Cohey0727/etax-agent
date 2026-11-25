@@ -2,9 +2,10 @@
  * mcpMetaTools.ts — MCP のメタ/設定系ツール（services/mcp）。
  *
  * ヘルスチェック相当、勘定科目マスタ、月次集計、SystemOne 接続設定と
- * 科目判定の学習設定（jev プロンプト/正規表現ルール）、freee 試算表。
- * REST の /api/health・/api/settings/systemone・/api/classify/*・
- * /api/freee/trial-balance と同じ部品を使う。
+ * 科目判定の学習設定（jev プロンプト/正規表現ルール）、freee 試算表、
+ * 接続テスト（SystemOne / 外部接続）と対話エージェントの実行。
+ * REST の /api/health・/api/settings/systemone・接続テスト系・
+ * /api/agent/chat・/api/classify 系・/api/freee/trial-balance と同じ部品を使う。
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -31,6 +32,9 @@ import { listTransactionRows } from "../../repositories/transactionRepository";
 import { BalanceSheetInputSchema } from "../../schemas/etax";
 import { balanceSheetFromWire } from "../../usecases/exportXtx";
 import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsView";
+import { AgentChatError, executeAgentChat } from "../agent/executeAgentChat";
+import { testAgentConnection } from "../agent/testAgentConnection";
+import { testSystemOneConnection } from "../classification/testSystemOneConnection";
 import { generateRules, RegexRule } from "../classification/generateRules";
 import { buildRegexRulesView } from "../classification/regexRulesView";
 import { validateRegexRules } from "../classification/validateRegexRules";
@@ -91,6 +95,32 @@ export const mcpMetaTools: McpToolModule = {
       },
     },
     {
+      name: "test_systemone_connection",
+      description:
+        "科目判定AI（SystemOne / jev）への接続テストを行う（REST の POST /api/settings/systemone/test 相当）。base_url / model / api_key を渡すと未保存のその値でテストし、省略した項目は現在の有効値を使う。ダミー判定を1回投げ、{ ok, top, error } を返す。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          base_url: { type: "string", description: "接続先 URL（任意）" },
+          model: { type: "string", description: "モデル名（任意）" },
+          api_key: { type: "string", description: "APIキー（任意）" },
+        },
+      },
+    },
+    {
+      name: "test_agent_connection",
+      description:
+        "外部接続（AI）への接続テストを行う（REST の POST /api/settings/agent/test 相当）。base_url / model / api_key を渡すと未保存のその値でテストし、省略した項目はサーバーの現在の設定を使う。最小の生成リクエストを1回投げ、{ ok, model, reply, error } を返す。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          base_url: { type: "string", description: "接続先 URL（任意）" },
+          model: { type: "string", description: "モデル名（任意）" },
+          api_key: { type: "string", description: "APIキー（任意）" },
+        },
+      },
+    },
+    {
       name: "get_classify_settings",
       description:
         "科目判定の学習設定を返す。jev プロンプト（カスタム/自動生成/実効）と正規表現ルール（カスタム/自動生成/実効）。",
@@ -142,6 +172,41 @@ export const mcpMetaTools: McpToolModule = {
       description:
         "課金プランの状態を返す（読み取り専用）: 課金が有効か、契約ステータス、現在の期間の終了日時。契約・支払い自体は本人がブラウザで行うため、ここでは変更できない。",
       inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "agent_chat",
+      description:
+        "アプリ内対話エージェントを1ターン実行する（REST の POST /api/agent/chat 相当）。messages（[{role: 'user'|'assistant', content}]）が必須。エージェントは帳簿の集計・計算・CSV取込などの道具立てを使って応答し、{ reply, toolCalls } を返す。transactions / csv_text / attachments（[{name, mimeType, dataBase64?, text?}]）/ deductions（{year, state}）/ agent_config（{api_key, base_url, model} の接続上書き）も REST と同じ意味で渡せる。サーバーに AGENT_API_KEY が無ければエラーになる。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          messages: {
+            type: "array",
+            description: "会話履歴: [{role: 'user'|'assistant', content: string}]",
+            items: { type: "object" },
+          },
+          transactions: {
+            type: "array",
+            description: "取引（REST の /api/agent/chat と同じ wire 形式、任意）",
+            items: { type: "object" },
+          },
+          csv_text: { type: "string", description: "CSV テキスト（任意）" },
+          attachments: {
+            type: "array",
+            description: "添付ファイル（任意）: [{name, mimeType, dataBase64?, text?}]",
+            items: { type: "object" },
+          },
+          deductions: {
+            type: "object",
+            description: "控除入力のスナップショット（任意）: {year, state}",
+          },
+          agent_config: {
+            type: "object",
+            description: "接続先の上書き（任意）: {api_key, base_url, model}",
+          },
+        },
+        required: ["messages"],
+      },
     },
   ],
   handlers: {
@@ -218,6 +283,24 @@ export const mcpMetaTools: McpToolModule = {
       if (!clearApiKey && !newKey && current.apiKey) next.apiKey = current.apiKey;
       await saveSystemOneSettings(next);
       return textResult(toSystemOneSettingsResponse(next, loadSystemOneConfig()));
+    },
+    test_systemone_connection: async (args) => {
+      return textResult(
+        await testSystemOneConnection({
+          baseUrl: typeof args["base_url"] === "string" ? args["base_url"] : undefined,
+          model: typeof args["model"] === "string" ? args["model"] : undefined,
+          apiKey: typeof args["api_key"] === "string" ? args["api_key"] : undefined,
+        }),
+      );
+    },
+    test_agent_connection: async (args) => {
+      return textResult(
+        await testAgentConnection({
+          baseUrl: typeof args["base_url"] === "string" ? args["base_url"] : undefined,
+          model: typeof args["model"] === "string" ? args["model"] : undefined,
+          apiKey: typeof args["api_key"] === "string" ? args["api_key"] : undefined,
+        }),
+      );
     },
     get_classify_settings: async () => {
       const history = await loadClassificationHistory();
@@ -306,6 +389,31 @@ export const mcpMetaTools: McpToolModule = {
         status: row?.status ?? "none",
         current_period_end: row?.currentPeriodEnd?.toISOString() ?? null,
       });
+    },
+    agent_chat: async (args) => {
+      // 引数名は MCP の流儀（snake_case）から REST のボディ形式へ読み替える。
+      // 検証と実行順序（設定・キーのゲート→検証→実行）は本体が担う。
+      const raw: Record<string, unknown> = {};
+      if (args["messages"] !== undefined) raw.messages = args["messages"];
+      if (args["transactions"] !== undefined) raw.transactions = args["transactions"];
+      if (typeof args["csv_text"] === "string") raw.csvText = args["csv_text"];
+      if (args["attachments"] !== undefined) raw.attachments = args["attachments"];
+      if (args["deductions"] !== undefined) raw.deductions = args["deductions"];
+      const agentConfig = args["agent_config"];
+      if (typeof agentConfig === "object" && agentConfig !== null) {
+        const override = agentConfig as Record<string, unknown>;
+        raw.agentConfig = {
+          apiKey: typeof override["api_key"] === "string" ? override["api_key"] : undefined,
+          baseUrl: typeof override["base_url"] === "string" ? override["base_url"] : undefined,
+          model: typeof override["model"] === "string" ? override["model"] : undefined,
+        };
+      }
+      try {
+        return textResult(await executeAgentChat(raw));
+      } catch (e) {
+        if (e instanceof AgentChatError) throw new Error(e.message);
+        throw e;
+      }
     },
   },
 };
