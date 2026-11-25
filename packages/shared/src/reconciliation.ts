@@ -151,7 +151,12 @@ export function scoreReconciliationCandidate(
   if (unappliedAmount === invoice.remainingAmount) {
     score += 100;
     reasons.push(ReconciliationReason.AmountExact);
-  } else if (unappliedAmount < invoice.remainingAmount) {
+  } else if (
+    unappliedAmount < invoice.remainingAmount &&
+    unappliedAmount * 10 >= invoice.remainingAmount
+  ) {
+    // 部分入金とみなすのは残額の1割以上ある場合だけにする
+    // （少額の無関係な入金まで候補にしないため）。
     score += 40;
     reasons.push(ReconciliationReason.AmountPartial);
   }
