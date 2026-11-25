@@ -10,6 +10,7 @@ export * from "./MiscIncomePanel";
 export * from "./SalaryPanel";
 export * from "./MonthlyBalance";
 export * from "./FilingStatusToggle";
+export * from "./SubmissionHistoryDrawer";
 export * from "./SubmissionRecordPanel";
 export * from "./TaxCreditPanel";
 export * from "./TaxSummary";
