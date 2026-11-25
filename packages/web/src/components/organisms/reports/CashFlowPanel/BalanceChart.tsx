@@ -27,7 +27,7 @@ export const BalanceChart = ({ months }: BalanceChartProps) => {
             const topRatio = row.closing_balance >= 0 ? zeroRatio - heightRatio : zeroRatio;
             return (
               <div key={row.month} className={styles.chartColumn}>
-                <div className={styles.chartSpacer} style={{ height: `${topRatio * 100}%` }} />
+                <div style={{ height: `${topRatio * 100}%` }} />
                 <div
                   className={row.closing_balance >= 0 ? styles.chartBar : styles.chartBarNegative}
                   style={{ height: `${heightRatio * 100}%` }}

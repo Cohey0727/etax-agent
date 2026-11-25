@@ -8,6 +8,12 @@ export interface MonthlyTableProps {
   openingBalance: number;
 }
 
+const PHASE_LABELS: Record<CashFlowMonth["phase"], string> = {
+  past: "実績",
+  current: "当月",
+  future: "予定",
+};
+
 /**
  * 資金繰りの月次表。過去月は実績のみ、当月以降は実績に入金予定
  * （未消込請求書の残額）を積み上げ、月末残高の推移を示す。
@@ -75,12 +81,6 @@ export const MonthlyTable = ({ months, openingBalance }: MonthlyTableProps) => {
       </Col>
     </Card>
   );
-};
-
-const PHASE_LABELS: Record<CashFlowMonth["phase"], string> = {
-  past: "実績",
-  current: "当月",
-  future: "予定",
 };
 
 /** YYYY-MM を「YYYY年M月」にする。 */

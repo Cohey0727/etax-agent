@@ -74,7 +74,6 @@ const styles = {
     height: "100%",
     minWidth: 0,
   }),
-  chartSpacer: style({}),
   chartBar: style({
     background: theme.color.accent,
     borderRadius: "4px 4px 0 0",

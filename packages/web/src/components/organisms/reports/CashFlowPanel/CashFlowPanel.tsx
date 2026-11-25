@@ -18,7 +18,6 @@ export const CashFlowPanel = () => {
   const [report, setReport] = useState<CashFlowReport | null>(null);
   const [failed, setFailed] = useState(false);
   const [openingBalanceDraft, setOpeningBalanceDraft] = useState("0");
-  const [appliedOpeningBalance, setAppliedOpeningBalance] = useState(0);
 
   const load = useCallback(async (openingBalance: number) => {
     setFailed(false);
@@ -31,14 +30,13 @@ export const CashFlowPanel = () => {
   }, []);
 
   useEffect(() => {
-    void load(appliedOpeningBalance);
-  }, [load, appliedOpeningBalance]);
+    void load(0);
+  }, [load]);
 
   const handleApplyOpeningBalance = () => {
     const value = Number(openingBalanceDraft);
     if (Number.isInteger(value)) {
-      setReport(null);
-      setAppliedOpeningBalance(value);
+      void load(value);
     }
   };
 
@@ -63,7 +61,8 @@ export const CashFlowPanel = () => {
           <Text variant="statLabel">資金繰りレポート</Text>
           <Text variant="muted">
             登録済みの取引実績と未入金の請求書に基づく試算です。
-            {report.from_month} から {report.to_month} までを表示しています。
+            {monthLabel(report.from_month)}から{monthLabel(report.to_month)}
+            までを表示しています。
             最終月の月末残高（試算）は {formatYen(report.projected_closing_balance)} です。
           </Text>
           <Row gap="sm">
@@ -101,6 +100,11 @@ export const CashFlowPanel = () => {
     </Col>
   );
 };
+
+/** YYYY-MM を「YYYY年M月」にする。 */
+function monthLabel(month: string): string {
+  return `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`;
+}
 
 /** 読み込み中のスケルトン（月次表の形に似せた形）。 */
 const CashFlowSkeleton = () => (
