@@ -31,9 +31,9 @@ COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
 COPY packages/cli/package.json packages/cli/
 RUN bun install --frozen-lockfile --production
-COPY --from=builder /app/packages/shared ./packages/shared
-COPY --from=builder /app/packages/server ./packages/server
-COPY --from=builder /app/packages/web/dist ./packages/web/dist
+COPY --from=builder --chown=bun:bun /app/packages/shared ./packages/shared
+COPY --from=builder --chown=bun:bun /app/packages/server ./packages/server
+COPY --from=builder --chown=bun:bun /app/packages/web/dist ./packages/web/dist
 
 WORKDIR /app/packages/server
 EXPOSE 43107
