@@ -10,20 +10,16 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import {
-  fetchInvoiceResponse,
-  getInvoiceRow,
-  insertInvoice,
-  InvoiceHeaderDraft,
-  InvoiceLineDraft,
-  listInvoiceLines,
-} from "../repositories/invoiceRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
   InvoiceIdParamSchema,
   SingleInvoiceResponse,
   SingleInvoiceResponseSchema,
 } from "../schemas/invoice";
+import {
+  createInvoiceCorrectionDraft,
+  InvoiceDocumentError,
+} from "../services/invoice/invoiceDocuments";
 
 export const createInvoiceCorrectionRoute = createRoute({
   method: "post",
@@ -52,55 +48,20 @@ export const createInvoiceCorrectionRoute = createRoute({
   },
 });
 
-/** JST の今日（YYYY-MM-DD）。サーバーのタイムゾーンに依存しない。 */
-function todayInTokyo(): string {
-  const parts = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
 export const createInvoiceCorrectionHandler: RouteHandler<
   typeof createInvoiceCorrectionRoute
 > = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
   const id = Number(c.req.valid("param").id);
+  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
   let response: SingleInvoiceResponse;
   try {
-    const source = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
-    if (!source) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    if (source.status !== "issued") {
-      throw new HTTPException(400, {
-        message: "修正用下書きは発行済みの請求書からだけ作れます（下書きはそのまま編集してください）",
-      });
-    }
-    const sourceLines = await listInvoiceLines(db, id);
-    const header: InvoiceHeaderDraft = {
-      issue_date: todayInTokyo(),
-      due_date: source.dueDate,
-      counterparty_name: source.counterpartyName,
-      counterparty_address: source.counterpartyAddress,
-      is_qualified: source.isQualified,
-      tax_rounding: source.taxRounding as InvoiceHeaderDraft["tax_rounding"],
-      memo: source.memo,
-    };
-    const lines: InvoiceLineDraft[] = sourceLines.map((line) => ({
-      item_name: line.itemName,
-      quantity: line.quantity,
-      unit: line.unit,
-      unit_price: line.unitPrice,
-      tax_rate_percent: line.taxRatePercent,
-      is_reduced_rate: line.isReducedRate,
-    }));
-    const row = await insertInvoice(db, header, lines, source.id);
-    response = { invoice: row ? await fetchInvoiceResponse(db, row) : null };
+    response = { invoice: await createInvoiceCorrectionDraft(db, id) };
   } catch (e) {
-    if (e instanceof HTTPException) throw e;
+    if (e instanceof InvoiceDocumentError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
   return c.json(response, 201);

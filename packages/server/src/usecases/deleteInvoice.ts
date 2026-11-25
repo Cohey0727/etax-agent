@@ -8,10 +8,13 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import { deleteInvoice, getInvoiceRow } from "../repositories/invoiceRepository";
 import { ErrorSchema } from "../schemas/common";
 import { MessageResponseSchema } from "../schemas/fixedAsset";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
+import {
+  deleteInvoiceDocument,
+  InvoiceDocumentError,
+} from "../services/invoice/invoiceDocuments";
 
 export const deleteInvoiceRoute = createRoute({
   method: "delete",
@@ -44,18 +47,13 @@ export const deleteInvoiceHandler: RouteHandler<typeof deleteInvoiceRoute> = asy
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
   const id = Number(c.req.valid("param").id);
+  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
   try {
-    const existing = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
-    if (!existing) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    if (existing.status === "issued") {
-      throw new HTTPException(400, {
-        message: "発行済みの請求書は削除できません（写しは7年間の保存が必要です）",
-      });
-    }
-    const deleted = await deleteInvoice(db, id);
-    if (!deleted) throw new HTTPException(404, { message: "請求書が見つかりません" });
+    await deleteInvoiceDocument(db, id);
   } catch (e) {
-    if (e instanceof HTTPException) throw e;
+    if (e instanceof InvoiceDocumentError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
   return c.json({ message: "削除しました" }, 200);

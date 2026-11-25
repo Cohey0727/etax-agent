@@ -10,24 +10,16 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import {
-  fetchInvoiceResponse,
-  getInvoiceRow,
-  listInvoiceLines,
-  markInvoiceIssued,
-  nextDocumentNumber,
-} from "../repositories/invoiceRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
   InvoiceIdParamSchema,
   SingleInvoiceResponse,
   SingleInvoiceResponseSchema,
 } from "../schemas/invoice";
-import { resolveIssuerProfile } from "../services/invoice/resolveIssuerProfile";
 import {
-  buildIssuerSnapshot,
-  validateInvoiceIssue,
-} from "../services/invoice/validateInvoiceIssue";
+  InvoiceDocumentError,
+  issueInvoiceDocument,
+} from "../services/invoice/invoiceDocuments";
 
 export const issueInvoiceRoute = createRoute({
   method: "post",
@@ -60,39 +52,14 @@ export const issueInvoiceHandler: RouteHandler<typeof issueInvoiceRoute> = async
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
   const id = Number(c.req.valid("param").id);
+  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
   let response: SingleInvoiceResponse;
   try {
-    const row = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
-    if (!row) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    if (row.status === "issued") {
-      throw new HTTPException(400, { message: "すでに発行済みです" });
-    }
-    const lines = await listInvoiceLines(db, id);
-    const year = Number(row.issueDate.slice(0, 4));
-    const profile = await resolveIssuerProfile(db, Number.isInteger(year) ? year : new Date().getFullYear());
-    const problems = validateInvoiceIssue(
-      {
-        is_qualified: row.isQualified,
-        counterparty_name: row.counterpartyName,
-        issue_date: row.issueDate,
-        lines: lines.map((line) => ({
-          item_name: line.itemName,
-          tax_rate_percent: line.taxRatePercent,
-          is_reduced_rate: line.isReducedRate,
-        })),
-      },
-      profile,
-    );
-    if (problems.length > 0) {
-      throw new HTTPException(400, { message: problems.join("／") });
-    }
-    const documentNumber = await nextDocumentNumber(db, row.issueDate);
-    const issuer = buildIssuerSnapshot(profile, row.isQualified);
-    const issued = await markInvoiceIssued(db, id, documentNumber, issuer);
-    if (!issued) throw new HTTPException(400, { message: "すでに発行済みです" });
-    response = { invoice: await fetchInvoiceResponse(db, issued) };
+    response = { invoice: await issueInvoiceDocument(db, id) };
   } catch (e) {
-    if (e instanceof HTTPException) throw e;
+    if (e instanceof InvoiceDocumentError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
   return c.json(response, 200);
