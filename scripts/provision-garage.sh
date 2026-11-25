@@ -56,7 +56,7 @@ if $GARAGE key list | grep -q "${KEY_NAME}"; then
 else
   echo "== キー ${KEY_NAME} を作成します"
   KEY_OUTPUT=$($GARAGE key create "${KEY_NAME}")
-  ACCESS_KEY_ID=$(printf '%s' "${KEY_OUTPUT}" | grep -i "access key" | grep -oE 'GK[0-9a-f]+' | head -1)
+  ACCESS_KEY_ID=$(printf '%s' "${KEY_OUTPUT}" | grep -oE 'GK[0-9a-f]+' | head -1)
   SECRET_ACCESS_KEY=$(printf '%s' "${KEY_OUTPUT}" | grep -i "secret key" | awk '{print $NF}')
 fi
 
