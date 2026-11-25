@@ -8,6 +8,7 @@
 import { generateText, stepCountIs } from "ai";
 import { createAgentModel } from "../../gateways/agentModelGateway";
 import { AgentConfig } from "../../lib/config";
+import { AgentChatAttachment, toModelMessages } from "./agentAttachments";
 import { createAgentTools } from "./agentAiTools";
 import { AgentContext, SYSTEM_PROMPT, ToolCallLog } from "./agentTools";
 
@@ -27,12 +28,13 @@ export async function runAgentTurn(
   cfg: AgentConfig,
   history: Array<{ role: "user" | "assistant"; content: string }>,
   ctx: AgentContext,
+  attachments: AgentChatAttachment[] = [],
 ): Promise<AgentTurnResult> {
   const toolCalls: ToolCallLog[] = [];
   const result = await generateText({
     model: createAgentModel(cfg),
     system: SYSTEM_PROMPT,
-    messages: history.map((m) => ({ role: m.role, content: m.content })),
+    messages: toModelMessages(history, attachments),
     tools: createAgentTools(ctx, toolCalls),
     stopWhen: stepCountIs(MAX_TOOL_STEPS),
   });
