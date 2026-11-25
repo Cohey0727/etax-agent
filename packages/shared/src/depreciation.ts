@@ -202,7 +202,27 @@ export function decliningBalanceRates(usefulLifeYears: number): DecliningBalance
 function parseYearMonth(date: string): { year: number; month: number } {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!m) throw new Error(`日付の形式が不正です: ${date}`);
-  return { year: Number(m[1]), month: Number(m[2]) };
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) throw new Error(`日付の形式が不正です: ${date}`);
+  return { year: Number(m[1]), month };
+}
+
+/**
+ * 金額 × 償却率（円未満切り捨て）。率は小数第5位までの表値なので、
+ * 率を10万倍した整数で乗算して float の丸め誤差を避ける
+ * （例: 10,000 × 0.143 は float では 1,429.9999… になり 1,429 に
+ * 切り捨てられてしまうが、正しくは 1,430）。
+ */
+const RATE_SCALE = 100_000;
+function mulRate(amount: number, rate: number): number {
+  return Math.floor((amount * Math.round(rate * RATE_SCALE)) / RATE_SCALE);
+}
+
+/** 金額 × 償却率 × 月数/12（初年度の月割。フロアは1回だけに統一する）。 */
+function mulRateMonths(amount: number, rate: number, months: number): number {
+  return Math.floor(
+    (amount * Math.round(rate * RATE_SCALE) * months) / (RATE_SCALE * 12),
+  );
 }
 
 function serviceStart(asset: FixedAssetInput): { year: number; month: number } {
@@ -245,8 +265,14 @@ export function depreciationSchedule(
   asset: FixedAssetInput,
   targetYear: number,
 ): DepreciationYear[] {
-  if (asset.cost <= 0) throw new Error("取得価額は正の金額で指定してください");
-  if (asset.businessRatioPercent < 0 || asset.businessRatioPercent > 100) {
+  if (!Number.isFinite(asset.cost) || asset.cost <= 0) {
+    throw new Error("取得価額は正の金額で指定してください");
+  }
+  if (
+    !Number.isFinite(asset.businessRatioPercent) ||
+    asset.businessRatioPercent < 0 ||
+    asset.businessRatioPercent > 100
+  ) {
     throw new Error(`事業専用割合は0〜100で指定してください: ${asset.businessRatioPercent}`);
   }
   const start = serviceStart(asset);
@@ -274,14 +300,14 @@ export function depreciationSchedule(
 
   if (asset.method === "straight_line") {
     const rate = straightLineRate(asset.usefulLifeYears);
-    const fullYearAmount = Math.floor(asset.cost * rate);
+    const fullYearAmount = mulRate(asset.cost, rate);
     const years: DepreciationYear[] = [];
     let opening = asset.cost;
     for (let year = start.year; year <= targetYear && opening > 1; year++) {
       const months = year === start.year ? firstYearMonths : 12;
       let ordinary =
         year === start.year
-          ? Math.floor((asset.cost * rate * months) / 12)
+          ? mulRateMonths(asset.cost, rate, months)
           : fullYearAmount;
       if (opening - ordinary < 1) ordinary = opening - 1;
       years.push(makeYear(asset, year, months, opening, asset.cost, rate, null, ordinary));
@@ -293,14 +319,14 @@ export function depreciationSchedule(
   // declining_balance（200%定率法）
   const rates = decliningBalanceRates(asset.usefulLifeYears);
   const guaranteeAmount =
-    rates.guaranteeRate !== null ? Math.floor(asset.cost * rates.guaranteeRate) : null;
+    rates.guaranteeRate !== null ? mulRate(asset.cost, rates.guaranteeRate) : null;
   const years: DepreciationYear[] = [];
   let opening = asset.cost;
   let revisedBase: number | null = null;
   for (let year = start.year; year <= targetYear && opening > 1; year++) {
     const months = year === start.year ? firstYearMonths : 12;
     if (revisedBase === null && guaranteeAmount !== null && rates.revisedRate !== null) {
-      const adjusted = Math.floor(opening * rates.rate);
+      const adjusted = mulRate(opening, rates.rate);
       if (adjusted < guaranteeAmount) revisedBase = opening;
     }
     let ordinary: number;
@@ -309,12 +335,15 @@ export function depreciationSchedule(
     if (revisedBase !== null && rates.revisedRate !== null) {
       basis = revisedBase;
       usedRate = rates.revisedRate;
-      ordinary = Math.floor(revisedBase * rates.revisedRate);
+      ordinary = mulRate(revisedBase, rates.revisedRate);
     } else {
       basis = opening;
       usedRate = rates.rate;
-      const full = Math.floor(opening * rates.rate);
-      ordinary = year === start.year ? Math.floor((full * months) / 12) : full;
+      // 初年度の月割は定額法と同じく「基礎金額 × 率 × 月数/12」を1回で切り捨てる
+      ordinary =
+        year === start.year
+          ? mulRateMonths(opening, rates.rate, months)
+          : mulRate(opening, rates.rate);
     }
     if (opening - ordinary < 1) ordinary = opening - 1;
     years.push(makeYear(asset, year, months, opening, basis, usedRate, guaranteeAmount, ordinary));

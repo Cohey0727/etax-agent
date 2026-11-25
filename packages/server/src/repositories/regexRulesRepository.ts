@@ -9,7 +9,8 @@
  * マルチテナント分離のため、ファイルと上書きは所有者ごとに分ける
  * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { writeFileAtomic } from "../lib/atomicFile";
 import {
   getRegexRulesOverride,
   serverDataDir,
@@ -65,7 +66,7 @@ export async function saveRegexRulesOverride(rules: RegexRule[]): Promise<RegexR
     .map((r) => ({ pattern: r.pattern.trim(), category: r.category }))
     .filter((r) => r.pattern !== "");
   await mkdir(serverDataDir(), { recursive: true });
-  await writeFile(rulesPath(ownerId), JSON.stringify({ rules: cleaned }, null, 2), "utf-8");
+  await writeFileAtomic(rulesPath(ownerId), JSON.stringify({ rules: cleaned }, null, 2));
   setRegexRulesOverride(cleaned.length > 0 ? cleaned : null);
   return getRegexRulesOverride();
 }

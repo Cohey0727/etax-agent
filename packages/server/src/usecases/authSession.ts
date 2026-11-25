@@ -8,6 +8,7 @@
 import { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { Db } from "../lib/db";
+import { isSecureDeployment } from "../lib/publicUrl";
 import { createSession, resolveApiKeyUserId, resolveSessionUserId } from "../repositories/userRepository";
 
 export const SESSION_COOKIE = "etax_session";
@@ -20,6 +21,8 @@ export async function issueSession(c: Context, db: Db, userId: number): Promise<
     sameSite: "Lax",
     path: "/",
     maxAge: 30 * 24 * 60 * 60,
+    // https 配備では Secure を付ける（平文 http へ Cookie を送らない）
+    secure: isSecureDeployment(c),
   });
   return token;
 }

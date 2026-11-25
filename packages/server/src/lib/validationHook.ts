@@ -11,6 +11,10 @@ import { Hook } from "@hono/zod-openapi";
 /**
  * バリデーション失敗時の文言を決めるフックを作る。
  * messageFor には issue のパス（"." 連結文字列）一覧が渡される。
+ *
+ * Hook の型引数はルートごとのスキーマ・応答型で決まるため、複数ルートで
+ * 共有するこのファクトリでは具体型を名指しできない（unknown 等に寄せると
+ * 応答型の位置で代入互換が崩れる）。any はこの1箇所に限定する。
  */
 export function legacyValidationHook(
   messageFor: (issuePaths: string[]) => string,

@@ -29,6 +29,19 @@ export const AuthSessionResponseSchema = z
   })
   .openapi("AuthSessionResponse");
 
+/** 登録直後の応答（SaaS 運用ではメール確認が済むまでセッションを発行しない）。 */
+export const EmailVerificationPendingResponseSchema = z
+  .object({
+    verification_required: z.literal(true),
+  })
+  .openapi("EmailVerificationPendingResponse");
+
+export const VerifyEmailRequestSchema = z
+  .object({
+    token: z.string().openapi({ description: "確認メールで受け取ったトークン" }),
+  })
+  .openapi("VerifyEmailRequest");
+
 /** ログインで TOTP が必要なときの応答（セッションはまだ発行しない）。 */
 export const TotpChallengeResponseSchema = z
   .object({

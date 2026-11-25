@@ -193,6 +193,78 @@ export interface ReceiptListResponse {
   receipts: ReceiptRecord[];
 }
 
+/** 償却方法。サーバーAPI・共有エンジンと共通の値。 */
+export type DepreciationMethod =
+  | "straight_line"
+  | "declining_balance"
+  | "lump_sum"
+  | "small_special";
+
+/** 固定資産レコード。サーバーAPIのワイヤ形式（snake_case）。 */
+export interface FixedAssetRecord {
+  id: number;
+  name: string;
+  quantity: string;
+  income_type: string;
+  acquisition_date: string;
+  service_start_date: string | null;
+  cost: number;
+  useful_life_years: number;
+  method: DepreciationMethod;
+  business_ratio_percent: number;
+  disposed_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 固定資産の登録・更新入力（サーバーの Create/Update スキーマに対応）。 */
+export interface FixedAssetInput {
+  name: string;
+  quantity: string;
+  income_type: string;
+  acquisition_date: string;
+  service_start_date: string | null;
+  cost: number;
+  useful_life_years: number;
+  method: DepreciationMethod;
+  business_ratio_percent: number;
+  disposed_date: string | null;
+}
+
+/** 固定資産に添付した画像。url は表示用（署名付きURLか配信パス）。 */
+export interface FixedAssetImageRecord {
+  id: number;
+  asset_id: number;
+  file_id: string;
+  mime_type: string;
+  url: string;
+  created_at: string;
+}
+
+/** 指定年度の償却明細（資産ごと1行）。 */
+export interface DepreciationRowRecord {
+  asset_id: number;
+  name: string;
+  income_type: string;
+  year: number;
+  months: number;
+  opening_book_value: number;
+  basis_amount: number;
+  rate: number;
+  guarantee_amount: number | null;
+  ordinary: number;
+  deductible: number;
+  closing_book_value: number;
+}
+
+/** 指定年度の償却サマリ（GET /api/fixed-assets/depreciation の応答）。 */
+export interface DepreciationSummary {
+  year: number;
+  rows: DepreciationRowRecord[];
+  deductible_totals: { business: number; real_estate: number };
+  small_special: { total: number; cap: number; exceeded: boolean };
+}
+
 /** e-Tax XTX出力の納税者情報。サーバーAPIのワイヤ形式（snake_case）。 */
 export interface XtxTaxpayerInput {
   name: string;
@@ -320,6 +392,8 @@ export interface LoginResponse {
   token?: string;
   totp_required?: boolean;
   challenge?: string;
+  /** 登録直後（メール確認待ち）。セッションはまだ発行されていない。 */
+  verification_required?: boolean;
 }
 
 /** 課金の状態（/api/billing/plan）。 */

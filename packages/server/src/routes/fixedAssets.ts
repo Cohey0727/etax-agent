@@ -3,9 +3,25 @@
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
+  attachFixedAssetImageHandler,
+  attachFixedAssetImageRoute,
+} from "../usecases/attachFixedAssetImage";
+import {
   createFixedAssetHandler,
   createFixedAssetRoute,
 } from "../usecases/createFixedAsset";
+import {
+  detachFixedAssetImageHandler,
+  detachFixedAssetImageRoute,
+} from "../usecases/detachFixedAssetImage";
+import {
+  getFixedAssetImageContentHandler,
+  getFixedAssetImageContentRoute,
+} from "../usecases/getFixedAssetImageContent";
+import {
+  listFixedAssetImagesHandler,
+  listFixedAssetImagesRoute,
+} from "../usecases/listFixedAssetImages";
 import {
   deleteFixedAssetHandler,
   deleteFixedAssetRoute,
@@ -29,5 +45,9 @@ app.openapi(createFixedAssetRoute, createFixedAssetHandler);
 app.openapi(getDepreciationScheduleRoute, getDepreciationScheduleHandler);
 app.openapi(updateFixedAssetRoute, updateFixedAssetHandler);
 app.openapi(deleteFixedAssetRoute, deleteFixedAssetHandler);
+app.openapi(attachFixedAssetImageRoute, attachFixedAssetImageHandler);
+app.openapi(listFixedAssetImagesRoute, listFixedAssetImagesHandler);
+app.openapi(detachFixedAssetImageRoute, detachFixedAssetImageHandler);
+app.openapi(getFixedAssetImageContentRoute, getFixedAssetImageContentHandler);
 
 export default app;

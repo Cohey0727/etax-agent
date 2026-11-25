@@ -33,11 +33,15 @@ const tables = [
   "receipts",
   "sessions",
   "api_keys",
+  "email_verification_tokens",
+  "magic_link_tokens",
+  "user_identities",
   "filing_status",
   "taxpayer_profiles",
   "filing_snapshots",
   "fixed_assets",
   "subscriptions",
+  "stripe_webhook_events",
   "filing_inputs",
   "knowledge_docs",
 ] as const;
@@ -52,12 +56,21 @@ const timestampColumns: Record<string, string[]> = {
   filing_snapshots: ["confirmed_at"],
   fixed_assets: ["created_at", "updated_at"],
   receipts: ["created_at", "updated_at"],
-  subscriptions: ["current_period_end", "updated_at"],
+  subscriptions: ["current_period_end", "last_event_created_at", "updated_at"],
   filing_inputs: ["updated_at"],
   users: ["created_at"],
   sessions: ["expires_at", "created_at"],
   api_keys: ["last_used_at", "created_at"],
+  email_verification_tokens: ["expires_at", "used_at", "created_at"],
+  magic_link_tokens: ["expires_at", "used_at", "created_at"],
+  user_identities: ["created_at"],
+  stripe_webhook_events: ["created_at"],
   knowledge_docs: ["updated_at"],
+};
+
+/** SQLite の 0/1 整数 → boolean に変換する列（テーブルごと）。 */
+const booleanColumns: Record<string, string[]> = {
+  users: ["totp_enabled", "email_verified"],
 };
 
 /** JSON 文字列 → オブジェクトに変換する列（テーブルごと）。 */
@@ -77,9 +90,13 @@ const identityTables = new Set([
   "receipts",
   "sessions",
   "api_keys",
+  "email_verification_tokens",
+  "magic_link_tokens",
+  "user_identities",
   "filing_snapshots",
   "fixed_assets",
   "subscriptions",
+  "stripe_webhook_events",
   "knowledge_docs",
 ]);
 
@@ -87,6 +104,10 @@ type SqliteRow = Record<string, unknown>;
 
 function convertValue(table: string, column: string, value: unknown): unknown {
   if (value === null || value === undefined) return null;
+  if (booleanColumns[table]?.includes(column)) {
+    // SQLite は真偽値を 0/1 整数で持つ。PostgreSQL の boolean へ変換する。
+    return value === 1 || value === true;
+  }
   if (timestampColumns[table]?.includes(column)) {
     return new Date(Number(value));
   }

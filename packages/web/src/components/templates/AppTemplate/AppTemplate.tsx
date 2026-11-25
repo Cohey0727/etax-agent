@@ -3,6 +3,13 @@ import { clsx } from "clsx";
 import { Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
+import {
+  AGENT_OPEN_KEY,
+  SIDEBAR_OPEN_KEY,
+  loadPanelOpen,
+  savePanelOpen,
+  useMediaQuery,
+} from "./appTemplateUtils";
 
 export interface AppTemplateProps {
   /** 全画面の登録。nav が false の画面はサイドバーに出さず、他画面からの遷移専用。 */
@@ -26,42 +33,6 @@ export interface AppTemplateProps {
   onNavChildSelect?: (view: AppView, key: string) => void;
   children?: ReactNode;
 }
-
-const SIDEBAR_OPEN_KEY = "etax-sidebar-open";
-const AGENT_OPEN_KEY = "etax-agent-open";
-
-/** 開閉状態の復元。未保存なら既定値（左は開く、右は閉じる）。 */
-const loadPanelOpen = (key: string, fallback: boolean): boolean => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw === null ? fallback : raw === "1";
-  } catch {
-    return fallback;
-  }
-};
-
-const savePanelOpen = (key: string, open: boolean): void => {
-  try {
-    localStorage.setItem(key, open ? "1" : "0");
-  } catch {
-    // 保存できなくても開閉自体は効く
-  }
-};
-
-/** メディアクエリの一致を購読する（モバイルではナビの向きを切り替えるため）。 */
-const useMediaQuery = (query: string): boolean => {
-  const [matches, setMatches] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const onChange = () => setMatches(media.matches);
-    onChange();
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, [query]);
-  return matches;
-};
 
 export const AppTemplate = ({
   views,
@@ -140,8 +111,12 @@ export const AppTemplate = ({
                   <Icon name="bill" size={21} />
                 </div>
                 <Col gap="none">
-                  <Text variant="sectionTitle">eTaxAgent</Text>
-                  <Text variant="caption">確定申告 準備ツール</Text>
+                  <Text variant="sectionTitle" className={styles.brandTitle}>
+                    eTaxAgent
+                  </Text>
+                  <Text variant="caption" className={styles.brandCaption}>
+                    確定申告 準備ツール
+                  </Text>
                 </Col>
               </Row>
               <Col gap="sm">
@@ -153,7 +128,9 @@ export const AppTemplate = ({
                     <Fragment key={view.id}>
                       {view.id === AppView.Filing ? (
                         <Col gap="sm">
-                          <Text variant="statLabel">年度</Text>
+                          <Text variant="statLabel" className={styles.dataLabel}>
+                            年度
+                          </Text>
                           <Select
                             className={styles.yearSelect}
                             value={selectedYear}
@@ -209,8 +186,10 @@ export const AppTemplate = ({
               <div className={styles.spacer} />
               <div className={styles.dataPanel}>
                 <Col gap="sm">
-                  <Text variant="statLabel">表示中のデータ</Text>
-                  <Text variant="body">
+                  <Text variant="statLabel" className={styles.dataLabel}>
+                    表示中のデータ
+                  </Text>
+                  <Text variant="body" className={styles.dataText}>
                     {dataSource}（{transactionCount}件）
                   </Text>
                 </Col>
@@ -288,16 +267,6 @@ export const AppTemplate = ({
               aria-label="メニュー（左サイドバー）の開閉"
             >
               <Icon name="panelLeft" size={17} />
-            </Button>
-            <Button
-              variant={activeView === AppView.Settings ? "tabActive" : "ghost"}
-              size="sm"
-              onClick={() => handleViewChange(AppView.Settings)}
-              aria-pressed={activeView === AppView.Settings}
-              aria-label="設定"
-              title="設定"
-            >
-              <Icon name="settings" size={17} />
             </Button>
           </Row>
           <Button

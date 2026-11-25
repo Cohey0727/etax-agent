@@ -8,8 +8,22 @@
  * 論理削除（deleted_at）にし、登録・更新・削除のたびに変更前後の値を
  * transaction_history へ残す。通常の読み取りは削除済みを返さない。
  */
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
-import { Db } from "../lib/db";
+import { and, asc, desc, eq, isNull, like, or } from "drizzle-orm";
+import { Db, DbOrTx } from "../lib/db";
+
+/**
+ * バルク INSERT のチャンク幅。PostgreSQL のパラメータ上限（65,535）に
+ * 達しないよう、1回の INSERT はこの件数までに区切る（Issue #11）。
+ */
+export const BULK_INSERT_CHUNK_SIZE = 1000;
+
+export function chunkArray<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import {
   TransactionHistoryEntryResponse,
@@ -65,7 +79,7 @@ export function transactionHistoryToApi(
 
 /** 変更履歴を1件残す。before / after は API 形式のスナップショット。 */
 async function recordTransactionHistory(
-  db: Db,
+  db: DbOrTx,
   transactionId: number,
   action: "created" | "updated" | "deleted",
   before: TransactionResponse | null,
@@ -81,7 +95,7 @@ async function recordTransactionHistory(
 
 /** 削除されていない取引を1件取得する。無ければ undefined。 */
 async function getActiveTransactionRow(
-  db: Db,
+  db: DbOrTx,
   id: number,
 ): Promise<TransactionRow | undefined> {
   const owner = currentUserId();
@@ -100,16 +114,27 @@ export async function getTransactionRow(db: Db, id: number): Promise<Transaction
 }
 
 /**
- * 取引を日付・id 順に取得する（削除済みは含まない）。incomeType があれば
- * SQL で絞り込む（対象年の絞り込みは従来どおり呼び出し側で行う）。
+ * 取引を日付・id 順に取得する（削除済みは含まない）。incomeType / year が
+ * あれば SQL で絞り込む。year は割り当て年度で判定し、未設定（0）の行は
+ * 日付の年で判定する（effectiveFiscalYear と同じ意味論を SQL で表す）。
+ * 全件ロードして JS で絞る従来方式は、件数が増えると無駄が大きい（Issue #11）。
  */
 export async function listTransactionRows(
   db: Db,
   incomeType?: string,
+  year?: number,
 ): Promise<TransactionRow[]> {
   const owner = currentUserId();
   const conditions = [isNull(transactionsTable.deletedAt)];
   if (incomeType) conditions.push(eq(transactionsTable.incomeType, incomeType));
+  if (year !== undefined) {
+    conditions.push(
+      or(
+        eq(transactionsTable.fiscalYear, year),
+        and(eq(transactionsTable.fiscalYear, 0), like(transactionsTable.date, `${year}-%`)),
+      )!,
+    );
+  }
   if (owner !== undefined) conditions.push(eq(transactionsTable.ownerUserId, owner));
   return db
     .select()
@@ -118,11 +143,24 @@ export async function listTransactionRows(
     .orderBy(asc(transactionsTable.date), asc(transactionsTable.id));
 }
 
-/** 取引の変更履歴を新しい順に取得する。 */
+/**
+ * 取引の変更履歴を新しい順に取得する。
+ * テナント文脈がある場合は親取引の所有者を確認し、他テナントの取引の
+ * 履歴は返さない（履歴自体に所有者列が無いため親で判定する。
+ * 論理削除済みの取引の履歴も正規の参照なので削除済みも対象に含める）。
+ */
 export async function listTransactionHistoryRows(
   db: Db,
   transactionId: number,
 ): Promise<TransactionHistoryRow[]> {
+  const owner = currentUserId();
+  if (owner !== undefined) {
+    const [parent] = await db
+      .select({ ownerUserId: transactionsTable.ownerUserId })
+      .from(transactionsTable)
+      .where(eq(transactionsTable.id, transactionId));
+    if (!parent || parent.ownerUserId !== owner) return [];
+  }
   return db
     .select()
     .from(transactionHistoryTable)
@@ -130,26 +168,64 @@ export async function listTransactionHistoryRows(
     .orderBy(desc(transactionHistoryTable.id));
 }
 
-/** 取引を1件登録し、登録された行を返す。変更履歴（登録）も残す。 */
-export async function insertTransactionRow(
-  db: Db,
-  values: {
-    date: string;
-    fiscalYear: number;
-    description: string;
-    amount: number;
-    account: string;
-    category: string;
-    incomeType: string;
-    taxCategory: string;
-  },
+type TransactionValues = {
+  date: string;
+  fiscalYear: number;
+  description: string;
+  amount: number;
+  account: string;
+  category: string;
+  incomeType: string;
+  taxCategory: string;
+};
+
+/** 取引を1件登録する（executor 版）。変更履歴（登録）も同じ実行単位で残す。 */
+export async function insertTransactionRowWith(
+  executor: DbOrTx,
+  values: TransactionValues,
 ): Promise<TransactionRow | undefined> {
-  const [row] = await db
+  const [row] = await executor
     .insert(transactionsTable)
     .values({ ...values, ownerUserId: ownerIdForWrite() })
     .returning();
   if (row) {
-    await recordTransactionHistory(db, row.id, "created", null, transactionToApi(row));
+    await recordTransactionHistory(executor, row.id, "created", null, transactionToApi(row));
+  }
+  return row;
+}
+
+/**
+ * 取引を1件登録し、登録された行を返す。変更履歴（登録）も残す。
+ * 登録と履歴は1トランザクションで行う（片方だけ残る不整合を防ぐ）。
+ */
+export async function insertTransactionRow(
+  db: Db,
+  values: TransactionValues,
+): Promise<TransactionRow | undefined> {
+  return db.transaction((tx) => insertTransactionRowWith(tx, values));
+}
+
+/** 取引を部分更新する（executor 版）。変更履歴も同じ実行単位で残す。 */
+export async function updateTransactionRowWith(
+  executor: DbOrTx,
+  id: number,
+  patch: Partial<TransactionRow>,
+): Promise<TransactionRow | undefined> {
+  const before = await getActiveTransactionRow(executor, id);
+  if (!before) return undefined;
+  const [row] = await executor
+    .update(transactionsTable)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(transactionsTable.id, id))
+    .returning();
+  if (row) {
+    await recordTransactionHistory(
+      executor,
+      id,
+      "updated",
+      transactionToApi(before),
+      transactionToApi(row),
+    );
   }
   return row;
 }
@@ -160,18 +236,27 @@ export async function updateTransactionRow(
   id: number,
   patch: Partial<TransactionRow>,
 ): Promise<TransactionRow | undefined> {
-  const before = await getActiveTransactionRow(db, id);
+  return db.transaction((tx) => updateTransactionRowWith(tx, id, patch));
+}
+
+/** 取引を論理削除する（executor 版）。変更履歴（削除）も同じ実行単位で残す。 */
+export async function deleteTransactionRowWith(
+  executor: DbOrTx,
+  id: number,
+): Promise<TransactionRow | undefined> {
+  const before = await getActiveTransactionRow(executor, id);
   if (!before) return undefined;
-  const [row] = await db
+  const now = new Date();
+  const [row] = await executor
     .update(transactionsTable)
-    .set({ ...patch, updatedAt: new Date() })
+    .set({ deletedAt: now, updatedAt: now })
     .where(eq(transactionsTable.id, id))
     .returning();
   if (row) {
     await recordTransactionHistory(
-      db,
+      executor,
       id,
-      "updated",
+      "deleted",
       transactionToApi(before),
       transactionToApi(row),
     );
@@ -187,24 +272,7 @@ export async function deleteTransactionRow(
   db: Db,
   id: number,
 ): Promise<TransactionRow | undefined> {
-  const before = await getActiveTransactionRow(db, id);
-  if (!before) return undefined;
-  const now = new Date();
-  const [row] = await db
-    .update(transactionsTable)
-    .set({ deletedAt: now, updatedAt: now })
-    .where(eq(transactionsTable.id, id))
-    .returning();
-  if (row) {
-    await recordTransactionHistory(
-      db,
-      id,
-      "deleted",
-      transactionToApi(before),
-      transactionToApi(row),
-    );
-  }
-  return row;
+  return db.transaction((tx) => deleteTransactionRowWith(tx, id));
 }
 
 /**
@@ -221,7 +289,10 @@ export async function listTransactionFingerprintRows(db: Db): Promise<
     taxCategory: string;
   }[]
 > {
-  return db
+  // テナント文脈がある場合は自テナントの行だけで判定する
+  // （他テナントの同一取引で自テナントの取込が「重複」扱いになるのを防ぐ）。
+  const owner = currentUserId();
+  const query = db
     .select({
       date: transactionsTable.date,
       amount: transactionsTable.amount,
@@ -230,6 +301,9 @@ export async function listTransactionFingerprintRows(db: Db): Promise<
       taxCategory: transactionsTable.taxCategory,
     })
     .from(transactionsTable);
+  return owner !== undefined
+    ? query.where(eq(transactionsTable.ownerUserId, owner))
+    : query;
 }
 
 /**
@@ -270,27 +344,41 @@ export async function replaceYearTransactionRows(
       .update(transactionsTable)
       .set({ deletedAt: now, updatedAt: now })
       .where(and(...yearConditions));
-    for (const beforeRow of beforeRows) {
-      await tx.insert(transactionHistoryTable).values({
-        transactionId: beforeRow.id,
-        action: "deleted",
-        before: transactionToApi(beforeRow),
-        after: { ...transactionToApi(beforeRow), deleted_at: now.toISOString(), updated_at: now.toISOString() },
-      });
+    // 履歴は1行ずつでなくまとめて書く（N+1 解消）。大量件数でも
+    // パラメータ上限に達しないようチャンクに分ける。
+    for (const chunk of chunkArray(beforeRows, BULK_INSERT_CHUNK_SIZE)) {
+      await tx.insert(transactionHistoryTable).values(
+        chunk.map((beforeRow) => ({
+          transactionId: beforeRow.id,
+          action: "deleted",
+          before: transactionToApi(beforeRow) as unknown as Record<string, unknown>,
+          after: {
+            ...transactionToApi(beforeRow),
+            deleted_at: now.toISOString(),
+            updated_at: now.toISOString(),
+          } as unknown as Record<string, unknown>,
+        })),
+      );
     }
     if (values.length === 0) return [];
     const ownerUserId = ownerIdForWrite();
-    const inserted = await tx
-      .insert(transactionsTable)
-      .values(values.map((v) => ({ ...v, ownerUserId })))
-      .returning();
-    for (const row of inserted) {
-      await tx.insert(transactionHistoryTable).values({
-        transactionId: row.id,
-        action: "created",
-        before: null,
-        after: transactionToApi(row),
-      });
+    const inserted: TransactionRow[] = [];
+    for (const chunk of chunkArray(values, BULK_INSERT_CHUNK_SIZE)) {
+      const rows = await tx
+        .insert(transactionsTable)
+        .values(chunk.map((v) => ({ ...v, ownerUserId })))
+        .returning();
+      inserted.push(...rows);
+    }
+    for (const chunk of chunkArray(inserted, BULK_INSERT_CHUNK_SIZE)) {
+      await tx.insert(transactionHistoryTable).values(
+        chunk.map((row) => ({
+          transactionId: row.id,
+          action: "created",
+          before: null,
+          after: transactionToApi(row) as unknown as Record<string, unknown>,
+        })),
+      );
     }
     return inserted.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
   });

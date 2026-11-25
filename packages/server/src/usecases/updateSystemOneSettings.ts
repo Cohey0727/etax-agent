@@ -4,11 +4,13 @@
  * APIキーは「新しい値が来たら差し替え、来なければ維持、clearApiKey で削除」。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
+import { HTTPException } from "hono/http-exception";
 import {
   getSystemOneOverrides,
   loadSystemOneConfig,
   SystemOneOverrides,
 } from "../lib/config";
+import { assertSafeUserBaseUrl, UnsafeUrlError } from "../lib/ssrfGuard";
 import { saveSystemOneSettings } from "../repositories/systemOneSettingsRepository";
 import {
   SystemOneSettingsResponseSchema,
@@ -48,7 +50,16 @@ export const updateSystemOneSettingsHandler: RouteHandler<
   const current = getSystemOneOverrides();
   const next: SystemOneOverrides = {};
   const baseUrl = body.baseUrl.trim();
-  if (baseUrl) next.baseUrl = baseUrl;
+  if (baseUrl) {
+    // ユーザー指定の接続先は保存前に SSRF 検証する。
+    try {
+      await assertSafeUserBaseUrl(baseUrl);
+    } catch (e) {
+      if (e instanceof UnsafeUrlError) throw new HTTPException(400, { message: e.message });
+      throw e;
+    }
+    next.baseUrl = baseUrl;
+  }
   const model = body.model.trim();
   if (model) next.model = model;
   const newKey = body.apiKey?.trim() ?? "";

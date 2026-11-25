@@ -14,12 +14,13 @@
 * - 2割特例: インボイス登録で課税事業者になった免税事業者等が対象。
 * 納付税額 = 売上税額 × 20%。適用可否の判定は申告者側の前提条件とし、
 * 本関数は計算のみを行う。
-* - 青色申告特別控除: 事業所得は最大 65万円（e-Tax申告または
-* 電子帳簿保存が前提の金額。紙申告等では 55万円になる点に注意）、
-* 不動産所得は事業的規模でない場合 最大 10万円。
-* 控除は「不動産所得 → 事業所得」の順に適用され、両方ある場合は
-* 合計で最大 75万円（10万 + 65万）まで認められる、という国税庁の
-* 取扱い（タックスアンサー No.2075 等）を前提に計算する。
+* - 青色申告特別控除: 65万円（e-Tax申告または電子帳簿保存が前提の
+* 金額。紙申告等では 55万円、要件を満たさない青色申告者は 10万円）。
+* 55万円・65万円控除は不動産所得と事業所得の合計額が限度であり、
+* 控除は「不動産所得 → 事業所得」の順に順次行う（事業所得がある場合に
+* 不動産分 10万円が別枠で上乗せされることはない）。不動産所得のみで
+* 事業的規模でない場合は 10万円が限度。国税庁タックスアンサー
+* No.2072「青色申告特別控除」に基づく。
 * なお各所得区分の控除額は、その区分の所得金額（控除前）を上限とする
 * （控除によってその区分が赤字になることはない）。
 */
@@ -29,9 +30,9 @@ import type { Transaction} from "./types";
 /** 消費税 標準税率 */
 export const TAX_RATE = 0.1;
 
-/** 青色申告特別控除（事業所得） */
+/** 青色申告特別控除の上限（65万円控除。不動産・事業の合算限度） */
 export const BLUE_MAX_BUSINESS = 650_000;
-/** 青色申告特別控除（不動産・非事業的規模） */
+/** 不動産所得のみで事業的規模でない場合の青色申告特別控除の上限 */
 export const BLUE_MAX_REAL_ESTATE = 100_000;
 
 /** 申告の種類（青色申告特別控除の区分）。白色申告は控除なし。 */
@@ -64,20 +65,19 @@ export interface BlueDeductionCaps {
 
 /**
  * 申告の種類と不動産の規模から、青色申告特別控除の上限を求める。
- * - 青色65万円・55万円で不動産が事業的規模でない場合、不動産分は
- *   10万円が別枠になり、合計は事業分＋10万円まで。
- * - 不動産が事業的規模の場合と青色10万円の場合は、事業・不動産を
- *   合算した所得に対して上限がかかる（国税庁タックスアンサーNo.2072）。
+ * - 青色65万円・55万円控除は、不動産所得と事業所得の合計額が限度
+ *   （国税庁タックスアンサー No.2072）。不動産が事業的規模かどうかで
+ *   合算限度は変わらない。
+ * - 青色10万円控除も合算した所得に対して 10万円が限度。
  * - 白色申告は控除なし。
+ * 返り値の business / realEstate はいずれも合算限度（プール上限）と同額で、
+ * 区分ごとの別枠上限ではない。
  */
 export function blueDeductionCaps(options: BlueDeductionOptions = {}): BlueDeductionCaps {
   const filingType = options.filingType ?? "blue65";
   const main = BLUE_MAIN_CAPS[filingType];
   if (filingType === "white") return { business: 0, realEstate: 0, total: 0 };
-  if (filingType === "blue10" || options.realEstateBusinessScale) {
-    return { business: main, realEstate: main, total: main };
-  }
-  return { business: main, realEstate: BLUE_MAX_REAL_ESTATE, total: main + BLUE_MAX_REAL_ESTATE };
+  return { business: main, realEstate: main, total: main };
 }
 
 /** 簡易課税のみなし仕入率（事業区分ごと） */
@@ -164,10 +164,11 @@ total: number;
 
 /**
 * 青色申告特別控除を「不動産 → 事業」の順で計算する。
-* 既定（オプションなし）は青色65万円・不動産は事業的規模でない前提で、
-* - 不動産所得: 所得の範囲内で最大 100,000円（別枠）
-* - 事業所得: 所得の範囲内で最大 650,000円
-* - 両方ある場合の合計上限は 750,000円（100,000 + 650,000）
+* 国税庁タックスアンサー No.2072 の取扱い:
+* - 55万円・65万円控除は不動産所得と事業所得の合計額が限度で、
+*   不動産所得から先に控除し、残りを事業所得から控除する。
+* - 不動産所得のみで事業的規模でない場合は 10万円が限度。
+* - 10万円控除も合算した所得に対して 10万円が限度。
 * 申告の種類（青色55万円・10万円・白色）や不動産の事業的規模は
 * BlueDeductionOptions で切り替える（上限の組み立ては blueDeductionCaps）。
 * 所得がマイナスの区分からは控除しない（控除で赤字は作らない）。
@@ -184,16 +185,14 @@ if (filingType === "white") {
 return { realEstate: 0, business: 0, total: 0 };
 }
 const caps = blueDeductionCaps(options);
-// 事業・不動産を合算して上限がかかる場合（不動産が事業的規模、または
-// 青色10万円）は、合算した黒字の範囲内で不動産→事業の順に控除する。
-if (filingType === "blue10" || options.realEstateBusinessScale) {
-const pool = Math.min(caps.total, rePos + bizPos);
+// 不動産所得のみ（事業所得なし）で事業的規模でない場合は 10万円が限度。
+const cap =
+bizPos <= 0 && !options.realEstateBusinessScale
+? Math.min(caps.total, BLUE_MAX_REAL_ESTATE)
+: caps.total;
+const pool = Math.min(cap, rePos + bizPos);
 const realEstate = Math.min(rePos, pool);
 return { realEstate, business: pool - realEstate, total: pool };
-}
-const realEstate = Math.min(rePos, caps.realEstate);
-const business = Math.min(bizPos, caps.business);
-return { realEstate, business, total: realEstate + business };
 }
 
 // ---------------------------------------------------------------------------
@@ -308,11 +307,16 @@ return [taxable, rent];
 * 紛れ込んだ場合に課税仕入として数えないよう除外対象に含めている。
 */
 export const NON_TAXABLE_EXPENSE_CATEGORIES: ReadonlySet<string> = new Set([
-"租税公課",
-"保険料",
-"給与賃金",
-"減価償却費",
-"青色申告特別控除",
+  // 科目名は台帳の分類カテゴリ（ledger.ts の ACCOUNT_CRITERIA）と一致させる。
+  // 旧表記（保険料・給与賃金）は実カテゴリ名とずれており、損害保険料・
+  // 給料賃金が課税仕入として誤判定されていた。
+  "租税公課",
+  "損害保険料",
+  "給料賃金",
+  "利子割引料",
+  "貸倒金",
+  "減価償却費",
+  "青色申告特別控除",
 ]);
 
 /**

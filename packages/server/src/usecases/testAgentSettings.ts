@@ -7,7 +7,8 @@
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { generateText } from "ai";
 import { createAgentModel } from "../gateways/agentModelGateway";
-import { AgentConfig, loadAgentConfig } from "../lib/config";
+import { AgentConfig, loadAgentConfig, pairApiKeyWithBaseUrl } from "../lib/config";
+import { assertSafeUserBaseUrl } from "../lib/ssrfGuard";
 import {
   TestAgentSettingsRequestSchema,
   TestAgentSettingsResponseSchema,
@@ -49,9 +50,27 @@ export const testAgentSettingsHandler: RouteHandler<typeof testAgentSettingsRout
       200,
     );
   }
-  const typedKey = body.apiKey?.trim() ?? "";
-  if (typedKey) cfg.apiKey = typedKey;
-  if (body.baseUrl?.trim()) cfg.baseUrl = body.baseUrl.trim().replace(/\/+$/, "");
+  // baseUrl がカスタム宛先ならサーバー環境変数のキーは組み合わせない
+  // （キー漏洩防止）。カスタム宛先は SSRF 検証も行う。
+  const customBaseUrl = body.baseUrl?.trim() ? body.baseUrl.trim() : null;
+  if (customBaseUrl) {
+    try {
+      await assertSafeUserBaseUrl(customBaseUrl);
+    } catch (e) {
+      return c.json(
+        { ok: false, model: cfg.model, reply: null, error: e instanceof Error ? e.message : String(e) },
+        200,
+      );
+    }
+  }
+  const paired = pairApiKeyWithBaseUrl({
+    customBaseUrl,
+    serverBaseUrl: cfg.baseUrl,
+    userKey: body.apiKey?.trim() || null,
+    serverKey: cfg.apiKey,
+  });
+  cfg.baseUrl = paired.baseUrl;
+  cfg.apiKey = paired.apiKey;
   if (body.model?.trim()) cfg.model = body.model.trim();
   if (!cfg.apiKey) {
     return c.json(

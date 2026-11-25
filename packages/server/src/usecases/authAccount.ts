@@ -9,9 +9,11 @@ import { deleteCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { issueChallenge } from "../lib/loginChallenge";
-import { currentUserId } from "../lib/tenantContext";
+import { publicBaseUrl } from "../lib/publicUrl";
+import { authRequired, currentUserId } from "../lib/tenantContext";
 import { usersTable } from "../repositories/schema";
 import {
+  createEmailVerificationToken,
   createUser,
   deleteSession,
   getUserByEmail,
@@ -19,10 +21,12 @@ import {
 } from "../repositories/userRepository";
 import {
   AuthSessionResponseSchema,
+  EmailVerificationPendingResponseSchema,
   LoginRequestSchema,
   RegisterRequestSchema,
   TotpChallengeResponseSchema,
 } from "../schemas/auth";
+import { sendMail } from "../services/email/mailer";
 import { SESSION_COOKIE, issueSession, requestSessionToken } from "./authSession";
 
 function requireDb(c: Context) {
@@ -39,8 +43,12 @@ export const registerRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: AuthSessionResponseSchema } },
-      description: "登録し、セッションを発行した",
+      content: {
+        "application/json": {
+          schema: AuthSessionResponseSchema.or(EmailVerificationPendingResponseSchema),
+        },
+      },
+      description: "登録した（SaaS 運用ではメール確認待ちを返す）",
     },
   },
 });
@@ -59,6 +67,26 @@ export const registerHandler: RouteHandler<typeof registerRoute> = async (c) => 
   }
   if (await getUserByEmail(db, email)) {
     throw new HTTPException(409, { message: "このメールアドレスは登録済みです" });
+  }
+  if (authRequired()) {
+    // SaaS 運用: パスワード登録だけではメール所有を証明できないため、
+    // 確認メールのリンクを経るまで未確認として作り、セッションは発行しない
+    // （Pre-Account Takeover 対策、Issue #6）。確認は authVerifyEmail が担う。
+    const base = publicBaseUrl();
+    if (!base) {
+      throw new HTTPException(503, {
+        message: "公開オリジン（ETAX_PUBLIC_URL）が設定されていないため登録できません",
+      });
+    }
+    const user = await createUser(db, email, password, false);
+    const token = await createEmailVerificationToken(db, user.id);
+    const link = `${base}/?verify=${encodeURIComponent(token)}`;
+    await sendMail({
+      to: email,
+      subject: "eTaxAgent メールアドレス確認",
+      text: `eTaxAgent への登録ありがとうございます。以下のリンクを開いてメールアドレスを確認してください（24時間有効・1回限り）。\n\n${link}\n\n心当たりがない場合は、このメールを無視してください。`,
+    });
+    return c.json({ verification_required: true as const });
   }
   const user = await createUser(db, email, password);
   const token = await issueSession(c, db, user.id);
@@ -93,6 +121,14 @@ export const loginHandler: RouteHandler<typeof loginRoute> = async (c) => {
   const user = email ? await getUserByEmail(db, email) : undefined;
   if (!user || !(await verifyUserPassword(user, password))) {
     throw new HTTPException(401, { message: "メールアドレスまたはパスワードが違います" });
+  }
+  // SaaS 運用では、メール確認が済んでいないパスワードアカウントに
+  // ログインさせない（未確認の先行登録を有効化させない）。
+  if (authRequired() && user.passwordHash && !user.emailVerified) {
+    throw new HTTPException(403, {
+      message:
+        "メールアドレスの確認が完了していません。登録時に送った確認メールのリンクを開いてください",
+    });
   }
   // TOTP が有効なユーザーは、コード検証が済むまでセッションを発行しない
   if (user.totpEnabled) {

@@ -125,8 +125,11 @@ async function httpPostJson(
     throw new LLMError(`接続失敗 ${url}: ${e instanceof Error ? e.message : String(e)}`);
   }
   if (!resp.ok) {
+    // 上流のエラー本文はクライアントへ反射しない（内部情報の漏洩防止）。
+    // 運用調査用にサーバーログへだけ残す。
     const body = (await resp.text()).slice(0, 500);
-    throw new LLMError(`HTTP ${resp.status} ${url}: ${body}`);
+    console.warn(`LLM 上流エラー HTTP ${resp.status} ${url}: ${body}`);
+    throw new LLMError(`HTTP ${resp.status} ${url}: 上流サービスがエラーを返しました`);
   }
   return (await resp.json()) as Record<string, unknown>;
 }
@@ -181,7 +184,9 @@ class OpenAICompatibleLLM implements LLMClient {
     const envelope = openAiChatCompletionSchema.safeParse(data);
     const msg = envelope.success ? envelope.data.choices[0]?.message : undefined;
     if (!msg) {
-      throw new LLMError(`応答形式が想定外です: ${JSON.stringify(data).slice(0, 500)}`);
+      // 応答本文はクライアントへ反射しない。
+      console.warn(`LLM 応答形式が想定外です: ${JSON.stringify(data).slice(0, 500)}`);
+      throw new LLMError("応答形式が想定外です");
     }
     const toolCalls: ToolCall[] = [];
     const rawCalls = (msg.tool_calls as Array<Record<string, unknown>> | undefined) ?? [];

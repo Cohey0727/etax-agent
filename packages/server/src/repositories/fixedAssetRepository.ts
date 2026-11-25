@@ -6,7 +6,7 @@
  * 除却済み資産の扱い: 除却年の翌年以降は償却対象から外す。除却年の償却は
  * エンジンの通年計算のまま（月割の厳密化はしていない）。
  */
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { DepreciationDetailRow, DepreciationMethod, FixedAssetInput, depreciationDetailRow } from "@etax/shared";
 import { Db } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
@@ -59,8 +59,23 @@ export async function listFixedAssetRows(db: Db): Promise<FixedAssetRow[]> {
   return scoped.orderBy(asc(fixedAssetsTable.acquisitionDate), asc(fixedAssetsTable.id));
 }
 
+/**
+ * id 指定の所有者条件。テナント文脈がある場合は自テナントの行だけに絞る
+ * （他テナントの資産は「存在しない」として扱い、IDOR を塞ぐ）。
+ * 文脈が無い（認証オフ）場合は id のみで従来どおり。
+ */
+function fixedAssetIdCondition(id: number) {
+  const owner = currentUserId();
+  const conditions = [eq(fixedAssetsTable.id, id)];
+  if (owner !== undefined) conditions.push(eq(fixedAssetsTable.ownerUserId, owner));
+  return and(...conditions);
+}
+
 export async function getFixedAssetRow(db: Db, id: number): Promise<FixedAssetRow | null> {
-  const rows = await db.select().from(fixedAssetsTable).where(eq(fixedAssetsTable.id, id));
+  const rows = await db
+    .select()
+    .from(fixedAssetsTable)
+    .where(fixedAssetIdCondition(id));
   return rows[0] ?? null;
 }
 
@@ -83,7 +98,7 @@ export async function updateFixedAssetRow(
   const updated = await db
     .update(fixedAssetsTable)
     .set({ ...values, updatedAt: new Date() })
-    .where(eq(fixedAssetsTable.id, id))
+    .where(fixedAssetIdCondition(id))
     .returning();
   return updated[0] ?? null;
 }
@@ -91,7 +106,7 @@ export async function updateFixedAssetRow(
 export async function deleteFixedAssetRow(db: Db, id: number): Promise<boolean> {
   const deleted = await db
     .delete(fixedAssetsTable)
-    .where(eq(fixedAssetsTable.id, id))
+    .where(fixedAssetIdCondition(id))
     .returning();
   return deleted.length > 0;
 }

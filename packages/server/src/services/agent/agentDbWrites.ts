@@ -23,7 +23,7 @@ import {
   insertTransactionRow,
   listTransactionRows,
   transactionToApi,
-  updateTransactionRow,
+  updateTransactionRowWith,
 } from "../../repositories/transactionRepository";
 import { TransactionRow } from "../../repositories/schema";
 
@@ -99,11 +99,15 @@ export async function updateTransactionsBulk(args: UpdateTransactionsArgs) {
       `対象が ${matched.length} 件と多すぎます（上限 ${MAX_BULK_UPDATE} 件）。キーワードや年度で条件を絞ってください`,
     );
   }
-  let updated = 0;
-  for (const row of matched) {
-    const result = await updateTransactionRow(db, row.id, patch);
-    if (result) updated += 1;
-  }
+  // 一括更新は1トランザクションで行う（途中で失敗したら全件戻す）。
+  const updated = await db.transaction(async (tx) => {
+    let count = 0;
+    for (const row of matched) {
+      const result = await updateTransactionRowWith(tx, row.id, patch);
+      if (result) count += 1;
+    }
+    return count;
+  });
   // 科目の付け替えは分類の学習にも反映する（摘要ごとに1回）。
   if (args.setCategory !== undefined && args.setCategory !== "未分類") {
     const descriptions = [...new Set(matched.map((row) => row.description))].slice(0, 20);

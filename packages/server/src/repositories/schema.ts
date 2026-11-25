@@ -14,7 +14,17 @@
  * fixed_assets      : 固定資産台帳（減価償却の計算と決算書明細の元データ）
  * receipts          : 証憑（領収書画像）と取引の紐付け
  */
-import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 
 /** 日時カラム（timestamptz、Date として読み書きする）。 */
 const timestampColumn = (name: string) =>
@@ -170,21 +180,29 @@ export const filingSnapshotsTable = pgTable("filing_snapshots", {
  * 全文検索は pg_trgm の GIN インデックス（title / content）で高速化し、
  * 部分一致（ILIKE）で引く（knowledgeRepository 参照）。
  */
-export const knowledgeDocsTable = pgTable("knowledge_docs", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  /** 一意キー（例: "nta-2072"） */
-  slug: text("slug").notNull().unique(),
-  /** 出典の番号（タックスアンサー番号。例: "2072"） */
-  number: text("number").notNull().default(""),
-  title: text("title").notNull(),
-  /** 分野（例: 所得控除、消費税） */
-  category: text("category").notNull().default(""),
-  sourceUrl: text("source_url").notNull().default(""),
-  content: text("content").notNull(),
-  updatedAt: timestampColumn("updated_at")
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const knowledgeDocsTable = pgTable(
+  "knowledge_docs",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    /** 一意キー（例: "nta-2072"） */
+    slug: text("slug").notNull().unique(),
+    /** 出典の番号（タックスアンサー番号。例: "2072"） */
+    number: text("number").notNull().default(""),
+    title: text("title").notNull(),
+    /** 分野（例: 所得控除、消費税） */
+    category: text("category").notNull().default(""),
+    sourceUrl: text("source_url").notNull().default(""),
+    content: text("content").notNull(),
+    updatedAt: timestampColumn("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  // 部分一致検索（ILIKE）用の pg_trgm GIN インデックス（DDL 側と一致）。
+  (t) => [
+    index("knowledge_docs_title_trgm_idx").using("gin", t.title.op("gin_trgm_ops")),
+    index("knowledge_docs_content_trgm_idx").using("gin", t.content.op("gin_trgm_ops")),
+  ],
+);
 
 /**
  * 固定資産台帳。減価償却費の計算（shared の depreciation エンジン）と
@@ -217,6 +235,27 @@ export const fixedAssetsTable = pgTable("fixed_assets", {
     .notNull()
     .$defaultFn(() => new Date()),
   updatedAt: timestampColumn("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
+});
+
+/**
+ * 固定資産に添付した画像（購入時の写真・納品書など）。
+ * 画像そのものはストレージ（fixed-assets/<fileId>）にあり、本テーブルは
+ * ファイルIDと紐付け先の資産を持つ。アップロードは署名付きURLで
+ * ブラウザからストレージへ直接行い、完了後に本テーブルへ登録する。
+ */
+export const fixedAssetImagesTable = pgTable("fixed_asset_images", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  /** 紐付け先の固定資産。資産を消すと画像の紐付けも消える。 */
+  assetId: integer("asset_id")
+    .notNull()
+    .references(() => fixedAssetsTable.id, { onDelete: "cascade" }),
+  /** ストレージ上のファイルID（アップロード時に発行される UUID） */
+  fileId: text("file_id").notNull().unique(),
+  mimeType: text("mime_type").notNull().default(""),
+  createdAt: timestampColumn("created_at")
     .notNull()
     .$defaultFn(() => new Date()),
   ownerUserId: integer("owner_user_id").notNull().default(1),
@@ -271,6 +310,13 @@ export const usersTable = pgTable("users", {
   totpSecret: text("totp_secret").notNull().default(""),
   /** TOTP 2要素認証が有効か */
   totpEnabled: boolean("totp_enabled").notNull().default(false),
+  /**
+   * メールアドレスの所有確認が済んでいるか。パスワード登録だけでは
+   * 他人のメールでも登録できてしまう（Pre-Account Takeover）ため、
+   * SaaS 運用では確認が済むまでパスワードログインを許可しない。
+   * 既存行は DDL の DEFAULT true で確認済みとして移行する。
+   */
+  emailVerified: boolean("email_verified").notNull().default(true),
   createdAt: timestampColumn("created_at")
     .notNull()
     .$defaultFn(() => new Date()),
@@ -288,18 +334,37 @@ export const magicLinkTokensTable = pgTable("magic_link_tokens", {
     .$defaultFn(() => new Date()),
 });
 
-/** OAuth（Google / GitHub）の外部IDとユーザーの対応。 */
-export const userIdentitiesTable = pgTable("user_identities", {
+/** 登録時のメール確認用トークン。平文は保存せず SHA-256 ハッシュで持つ。 */
+export const emailVerificationTokensTable = pgTable("email_verification_tokens", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   userId: integer("user_id")
     .notNull()
     .references(() => usersTable.id),
-  provider: text("provider").notNull(),
-  providerUserId: text("provider_user_id").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestampColumn("expires_at").notNull(),
+  usedAt: timestampColumn("used_at"),
   createdAt: timestampColumn("created_at")
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+/** OAuth（Google / GitHub）の外部IDとユーザーの対応。 */
+export const userIdentitiesTable = pgTable(
+  "user_identities",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => usersTable.id),
+    provider: text("provider").notNull(),
+    providerUserId: text("provider_user_id").notNull(),
+    createdAt: timestampColumn("created_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  // 同一プロバイダの同一外部IDは1ユーザーにだけ紐付く（DDL 側と一致）。
+  (t) => [unique("user_identities_provider_user_unique").on(t.provider, t.providerUserId)],
+);
 
 /** ログインセッション。トークン自体は保存せず SHA-256 ハッシュで持つ。 */
 export const sessionsTable = pgTable("sessions", {
@@ -332,6 +397,7 @@ export const apiKeysTable = pgTable("api_keys", {
 
 export type UserRow = typeof usersTable.$inferSelect;
 export type MagicLinkTokenRow = typeof magicLinkTokensTable.$inferSelect;
+export type EmailVerificationTokenRow = typeof emailVerificationTokensTable.$inferSelect;
 export type UserIdentityRow = typeof userIdentitiesTable.$inferSelect;
 export type SessionRow = typeof sessionsTable.$inferSelect;
 export type ApiKeyRow = typeof apiKeysTable.$inferSelect;
@@ -369,6 +435,8 @@ export const subscriptionsTable = pgTable("subscriptions", {
   stripeSubscriptionId: text("stripe_subscription_id").notNull().default(""),
   status: text("status").notNull().default("none"),
   currentPeriodEnd: timestampColumn("current_period_end"),
+  /** 最後に適用した Webhook イベントの作成時刻（順序逆転の検出用）。 */
+  lastEventCreatedAt: timestampColumn("last_event_created_at"),
   updatedAt: timestampColumn("updated_at")
     .notNull()
     .$defaultFn(() => new Date()),
@@ -376,5 +444,19 @@ export const subscriptionsTable = pgTable("subscriptions", {
 
 export type SubscriptionRow = typeof subscriptionsTable.$inferSelect;
 
+/** 処理済み Stripe Webhook イベント（冪等性のためイベントIDを記録する）。 */
+export const stripeWebhookEventsTable = pgTable("stripe_webhook_events", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  eventId: text("event_id").notNull().unique(),
+  type: text("type").notNull().default(""),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type StripeWebhookEventRow = typeof stripeWebhookEventsTable.$inferSelect;
+
 export type FixedAssetRow = typeof fixedAssetsTable.$inferSelect;
 export type NewFixedAssetRow = typeof fixedAssetsTable.$inferInsert;
+export type FixedAssetImageRow = typeof fixedAssetImagesTable.$inferSelect;
+export type NewFixedAssetImageRow = typeof fixedAssetImagesTable.$inferInsert;

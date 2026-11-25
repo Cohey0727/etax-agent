@@ -23,6 +23,7 @@ function secretKey(): string {
 async function stripePost(path: string, params: URLSearchParams): Promise<Record<string, unknown>> {
   const resp = await fetch(`https://api.stripe.com/v1${path}`, {
     method: "POST",
+    signal: AbortSignal.timeout(30_000),
     headers: {
       Authorization: `Bearer ${secretKey()}`,
       "Content-Type": "application/x-www-form-urlencoded",
@@ -88,7 +89,11 @@ export function verifyWebhookSignature(
     if (key === "v1") signatures.push(value);
   }
   if (!timestamp || signatures.length === 0) return false;
-  if (Math.abs(nowSec - Number(timestamp)) > SIGNATURE_TOLERANCE_SEC) return false;
+  // 数値でないタイムスタンプは NaN になって許容範囲チェックをすり抜ける
+  // ため、明示的に検証する（署名自体は秘密鍵が無ければ一致しないが多層防御）。
+  const timestampSec = Number(timestamp);
+  if (!Number.isFinite(timestampSec)) return false;
+  if (Math.abs(nowSec - timestampSec) > SIGNATURE_TOLERANCE_SEC) return false;
   const expected = createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
   return signatures.some((sig) => {
     const a = Buffer.from(sig);

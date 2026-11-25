@@ -13,7 +13,7 @@ export interface ReceiptPanelProps {
 
 const sourceLabels = {
   generated: "生成ルール",
-  systemone: "SystemOne判定",
+  systemone: "AI判定",
   rules: "キーワードルール",
   none: "判定なし",
 } as const satisfies Record<ClassificationSource, string>;
@@ -88,7 +88,7 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
           <Text variant="sectionTitle">領収書・レシート画像から帳簿付け</Text>
           <Text variant="muted">
             画像を選ぶと、AIが日付・金額・支払先を読み取り、勘定科目は自動生成ルールと
-            SystemOne判定で提案します。内容を確認して「帳簿に追加」を押すと取引に加わり、
+            AI判定で提案します。内容を確認して「帳簿に追加」を押すと取引に加わり、
             確定した科目は学習されて、生成ルールとプロンプトに反映されます。
           </Text>
           <Row gap="sm" align="center" wrap>

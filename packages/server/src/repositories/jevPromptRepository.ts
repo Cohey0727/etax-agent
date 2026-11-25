@@ -8,7 +8,8 @@
  * マルチテナント分離のため、ファイルと上書きは所有者ごとに分ける
  * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { writeFileAtomic } from "../lib/atomicFile";
 import {
   getJevPromptOverride,
   serverDataDir,
@@ -51,7 +52,7 @@ export async function saveJevPromptOverride(prompt: string): Promise<string> {
   const ownerId = ownerIdForWrite();
   const trimmed = prompt.trim();
   await mkdir(serverDataDir(), { recursive: true });
-  await writeFile(promptPath(ownerId), JSON.stringify({ prompt: trimmed }, null, 2), "utf-8");
+  await writeFileAtomic(promptPath(ownerId), JSON.stringify({ prompt: trimmed }, null, 2));
   setJevPromptOverride(trimmed);
   return getJevPromptOverride();
 }

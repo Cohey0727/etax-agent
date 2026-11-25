@@ -4,11 +4,14 @@
  * サブコマンドの移植。本ツールが数字の計算の正本）。
  *
  * サブコマンド:
- *   aggregate   --year YYYY --csv FILE
+ *   aggregate   --year YYYY --csv FILE [--filing-type blue65|blue55|blue10|white]
  *       事業所得/不動産所得の集計と青色申告特別控除を表示する。
- *   consumption --year YYYY --csv FILE
+ *   consumption --year YYYY --csv FILE [--business-kind KIND]
  *       消費税を 本則 / 簡易課税 / 2割特例 の3方式で比較表示する。
+ *       KIND は簡易課税の事業区分（wholesale/retail/manufacturing/other/
+ *       services/real_estate、既定は services=第5種）。
  *   amend       --year YYYY --original ORIG.json [--corrected CORR.json] [--csv FILE]
+ *               [--filing-type ...]
  *       申告済みと修正後の差分（項目別＋税額の増減）を表示する。
  *       --csv を渡すと修正後の数値を取引データから計算する
  *       （所得の切り分け→青色申告特別控除→消費税3方式の比較）。
@@ -21,6 +24,7 @@
  * 対話型エージェントは Web 版（packages/server の /api/agent/chat）が担う。
  */
 import {
+  SIMPLIFIED_RATES,
   aggregateIncome,
   amendmentDelta,
   blueDeduction,
@@ -31,15 +35,18 @@ import {
   importCsvText,
   residentialRentTotal,
   taxableSalesFromBreakdown,
+  type BusinessKind,
   type ConsumptionMethod,
   type CorrectedFiguresDetail,
+  type FilingType,
   type Transaction,
 } from "@etax/shared";
 
 const USAGE = `使い方: cli <aggregate|consumption|amend> [オプション]
-  aggregate   --year YYYY --csv FILE
-  consumption --year YYYY --csv FILE
-  amend       --year YYYY --original ORIG.json [--corrected CORR.json] [--csv FILE]`;
+  aggregate   --year YYYY --csv FILE [--filing-type blue65|blue55|blue10|white]
+  consumption --year YYYY --csv FILE [--business-kind wholesale|retail|manufacturing|other|services|real_estate]
+  amend       --year YYYY --original ORIG.json [--corrected CORR.json] [--csv FILE] [--filing-type ...]
+  （--key=value 形式も可。--help / -h でこの使い方を表示）`;
 
 class UsageError extends Error {}
 
@@ -59,31 +66,62 @@ interface CliOptions {
   csv?: string;
   original?: string;
   corrected?: string;
+  filingType?: FilingType;
+  businessKind?: BusinessKind;
 }
+
+const FILING_TYPE_VALUES: readonly string[] = ["blue65", "blue55", "blue10", "white"];
+const BUSINESS_KIND_VALUES: readonly string[] = Object.keys(SIMPLIFIED_RATES);
 
 function parseOptions(argv: string[]): CliOptions {
   const raw: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
     if (!a.startsWith("--")) throw new UsageError(`不明な引数です: ${a}`);
-    const key = a.slice(2);
-    if (!["year", "csv", "original", "corrected"].includes(key)) {
-      throw new UsageError(`不明なオプションです: ${a}`);
+    // --key=value 形式と --key value 形式の両方を受ける。
+    const eq = a.indexOf("=");
+    const key = eq >= 0 ? a.slice(2, eq) : a.slice(2);
+    if (!["year", "csv", "original", "corrected", "filing-type", "business-kind"].includes(key)) {
+      throw new UsageError(`不明なオプションです: --${key}`);
+    }
+    if (eq >= 0) {
+      raw[key] = a.slice(eq + 1);
+      continue;
     }
     const val = argv[i + 1];
-    if (val === undefined) throw new UsageError(`オプション ${a} に値がありません`);
+    // 値が無い、または次のオプションが値の位置に来たらエラーにする
+    // （フラグ文字列を値として飲み込まない）。
+    if (val === undefined || val.startsWith("--")) {
+      throw new UsageError(`オプション --${key} に値がありません`);
+    }
     raw[key] = val;
     i++;
   }
   const opts: CliOptions = {};
   if (raw["year"] !== undefined) {
+    // Number("") === 0 や負数を素通ししないよう、4桁の西暦として厳密に見る。
+    if (!/^\d{4}$/.test(raw["year"])) {
+      throw new UsageError(`--year は4桁の西暦で指定してください: ${raw["year"]}`);
+    }
     const y = Number(raw["year"]);
-    if (!Number.isInteger(y)) throw new UsageError(`--year が整数ではありません: ${raw["year"]}`);
+    if (y < 1900 || y > 2100) throw new UsageError(`--year が範囲外です: ${raw["year"]}`);
     opts.year = y;
   }
   if (raw["csv"] !== undefined) opts.csv = raw["csv"];
   if (raw["original"] !== undefined) opts.original = raw["original"];
   if (raw["corrected"] !== undefined) opts.corrected = raw["corrected"];
+  if (raw["filing-type"] !== undefined) {
+    if (!FILING_TYPE_VALUES.includes(raw["filing-type"])) {
+      throw new UsageError(`--filing-type が不正です: ${raw["filing-type"]}（${FILING_TYPE_VALUES.join(" / ")}）`);
+    }
+    opts.filingType = raw["filing-type"] as FilingType;
+  }
+  if (raw["business-kind"] !== undefined) {
+    if (!BUSINESS_KIND_VALUES.includes(raw["business-kind"])) {
+      throw new UsageError(`--business-kind が不正です: ${raw["business-kind"]}（${BUSINESS_KIND_VALUES.join(" / ")}）`);
+    }
+    opts.businessKind = raw["business-kind"] as BusinessKind;
+  }
   return opts;
 }
 
@@ -93,7 +131,15 @@ function requireOpt<T>(v: T | undefined, flag: string): T {
 }
 
 async function loadYearTransactions(csvPath: string, year: number): Promise<Transaction[]> {
-  const text = await Bun.file(csvPath).text();
+  // 銀行CSVに多い Shift_JIS も読めるようにする（サーバー側 csvDecoding と
+  // 同じ方針: UTF-8 で厳密に試し、壊れるなら Shift_JIS）。
+  const bytes = new Uint8Array(await Bun.file(csvPath).arrayBuffer());
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    text = new TextDecoder("shift_jis").decode(bytes);
+  }
   return filterYear(importCsvText(text), year);
 }
 
@@ -111,11 +157,13 @@ async function cmdAggregate(opts: CliOptions): Promise<number> {
   const csv = requireOpt(opts.csv, "--csv");
   const tx = await loadYearTransactions(csv, year);
   if (tx.length === 0) {
-    console.log(`${year}年の取引がありませんでした。`);
+    console.error(`${year}年の取引がありませんでした。`);
     return 1;
   }
   const b = aggregateIncome(tx);
-  const blue = blueDeduction(b.realEstateIncome, b.businessIncome);
+  const blue = blueDeduction(b.realEstateIncome, b.businessIncome, {
+    filingType: opts.filingType,
+  });
   console.log(`== ${year}年 所得集計（税込経理） ==`);
   console.log(`事業収入        : ${yen(b.businessRevenue)}`);
   console.log(`事業経費        : ${yen(b.businessExpenses)}`);
@@ -137,20 +185,24 @@ async function cmdConsumption(opts: CliOptions): Promise<number> {
   const csv = requireOpt(opts.csv, "--csv");
   const tx = await loadYearTransactions(csv, year);
   if (tx.length === 0) {
-    console.log(`${year}年の取引がありませんでした。`);
+    console.error(`${year}年の取引がありませんでした。`);
     return 1;
   }
   const b = aggregateIncome(tx);
   const rent = residentialRentTotal(tx);
   const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
   const inputTax = estimateInputTax(tx);
+  const businessKind = opts.businessKind ?? "services";
   console.log(`== ${year}年 消費税（税込経理・税率10%） ==`);
   console.log(`課税売上（税込）  : ${yen(taxable)}`);
   console.log(`非課税売上（住宅家賃）: ${yen(nontaxable)}`);
   console.log(`仕入税額（経費からの概算）: ${yen(inputTax)}`);
   const methods: [ConsumptionMethod, string][] = [
     ["standard", "本則課税"],
-    ["simplified", "簡易課税（第5種・みなし仕入率50%）"],
+    [
+      "simplified",
+      `簡易課税（みなし仕入率${Math.round(SIMPLIFIED_RATES[businessKind] * 100)}%・事業区分 ${businessKind}）`,
+    ],
     ["special20", "2割特例"],
   ];
   for (const [method, label] of methods) {
@@ -159,6 +211,7 @@ async function cmdConsumption(opts: CliOptions): Promise<number> {
       nontaxableSalesIncl: nontaxable,
       inputTax,
       method,
+      businessKind,
     });
     console.log(`${label}: 売上税額 ${yen(r.outputTax)} → 納付税額 ${yen(r.payable)}`);
   }
@@ -178,10 +231,10 @@ async function cmdAmend(opts: CliOptions): Promise<number> {
   if (opts.csv !== undefined) {
     const tx = await loadYearTransactions(opts.csv, year);
     if (tx.length === 0) {
-      console.log(`${year}年の取引がありませんでした。`);
+      console.error(`${year}年の取引がありませんでした。`);
       return 1;
     }
-    const figs = computeCorrectedFigures(tx, year);
+    const figs = computeCorrectedFigures(tx, year, { filingType: opts.filingType });
     corrected = figs;
     detail = figs._detail;
   }
@@ -213,18 +266,30 @@ async function cmdAmend(opts: CliOptions): Promise<number> {
   const d = amendmentDelta(original, corrected, year);
   console.log(`== ${year}年 修正申告 差分 ==`);
   if (opts.csv !== undefined && detail !== null) {
+    // 表示は差分表と同じ「マージ後の corrected」を正とする。
+    // --corrected 併用時は Object.assign で上書きされた値が差分表に出るため、
+    // 計算直後の _detail をそのまま出すと表示と差分が矛盾する。
+    // 数値でない項目は NaN円 と出さず「（数値なし）」にする。
+    const mergedNum = (key: string, fallback: number): string => {
+      const v = corrected[key];
+      return typeof v === "number" && Number.isFinite(v) ? yen(v) : yen(fallback);
+    };
+    const mergedOnly = (key: string): string => {
+      const v = corrected[key];
+      return typeof v === "number" && Number.isFinite(v) ? yen(v) : "（数値なし）";
+    };
     console.log("-- 修正後（取引データから計算）--");
     console.log(
-      `事業所得（控除後）  : ${yen(detail.business_income)}（控除前 ${yen(detail.business_income_before_deduction)}）`,
+      `事業所得（控除後）  : ${mergedNum("business_income", detail.business_income)}（控除前 ${yen(detail.business_income_before_deduction)}）`,
     );
     console.log(
-      `不動産所得（控除後）: ${yen(detail.real_estate_income)}（控除前 ${yen(detail.real_estate_income_before_deduction)}）`,
+      `不動産所得（控除後）: ${mergedNum("real_estate_income", detail.real_estate_income)}（控除前 ${yen(detail.real_estate_income_before_deduction)}）`,
     );
     console.log(
       `青色申告特別控除    : 不動産 ${yen(detail.blue_deduction_real_estate)} + 事業 ${yen(detail.blue_deduction_business)}`,
     );
     console.log(
-      `消費税（修正後）    : 本則 ${yen(corrected["consumption_tax_standard"] as number)} / 簡易 ${yen(corrected["consumption_tax_simplified"] as number)} / 2割特例 ${yen(corrected["consumption_tax_special20"] as number)}`,
+      `消費税（修正後）    : 本則 ${mergedOnly("consumption_tax_standard")} / 簡易 ${mergedOnly("consumption_tax_simplified")} / 2割特例 ${mergedOnly("consumption_tax_special20")}`,
     );
   }
   const diffEntries = Object.entries(d.fieldDiffs);
@@ -258,6 +323,11 @@ async function cmdAmend(opts: CliOptions): Promise<number> {
 }
 
 async function main(argv: string[]): Promise<number> {
+  // --help / -h はどこにあっても使い方を表示して正常終了する。
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(USAGE);
+    return 0;
+  }
   const [command, ...rest] = argv;
   if (command === undefined || !["aggregate", "consumption", "amend"].includes(command)) {
     console.error(USAGE);

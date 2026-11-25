@@ -8,17 +8,39 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Card, Col, Input, Text } from "@components/atoms";
 import { AuthConfig } from "@types";
-import { consumeMagicLink, loginAccount, loginWithTotp, registerAccount, requestMagicLink } from "@utils";
+import {
+  consumeMagicLink,
+  loginAccount,
+  loginWithTotp,
+  registerAccount,
+  requestMagicLink,
+  verifyEmailAccount,
+} from "@utils";
 import styles from "./LoginPage.css";
 
-type Mode = "login" | "register" | "totp" | "magic" | "magicSent";
+type Mode = "login" | "register" | "totp" | "magic" | "magicSent" | "verifySent";
 
 export interface LoginPageProps {
   config: AuthConfig;
   onAuthenticated: () => void;
+  /** 起動時に捕捉したメールリンクのトークン（URL同期で消える前に AppPage が保持した値）。 */
+  magic?: string | null;
+  /** 起動時に捕捉した外部ログイン失敗の戻り（?auth_error= の値）。 */
+  authError?: string | null;
+  /** 起動時に捕捉したメール確認トークン（?verify= の値）。 */
+  verify?: string | null;
+  /** 起動時に捕捉した OAuth 後の TOTP チャレンジ（?totp_challenge= の値）。 */
+  totpChallenge?: string | null;
 }
 
-export const LoginPage = ({ config, onAuthenticated }: LoginPageProps) => {
+export const LoginPage = ({
+  config,
+  onAuthenticated,
+  magic,
+  authError,
+  verify,
+  totpChallenge,
+}: LoginPageProps) => {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [secret, setSecret] = useState("");
@@ -28,27 +50,56 @@ export const LoginPage = ({ config, onAuthenticated }: LoginPageProps) => {
   const [error, setError] = useState<string | null>(null);
   const consumedRef = useRef(false);
 
-  // メールのリンクから開かれた場合: トークンを消費してログインする
+  // メールのリンクから開かれた場合: トークンを消費してログインする。
+  // AppPage が起動時に捕捉した値を優先する（URLは同期でパスだけに
+  // 書き換え済みのことがある）。捕捉が無い場合は現在地のクエリを読む。
   useEffect(() => {
     if (consumedRef.current) return;
     consumedRef.current = true;
     const params = new URLSearchParams(window.location.search);
-    const magic = params.get("magic");
-    const authError = params.get("auth_error");
-    if (authError) {
+    const magicToken = magic ?? params.get("magic");
+    const authErrorValue = authError ?? params.get("auth_error");
+    const verifyToken = verify ?? params.get("verify");
+    const challengeValue = totpChallenge ?? params.get("totp_challenge");
+    if (authErrorValue) {
       setError("外部ログインに失敗しました。もう一度お試しください。");
       return;
     }
-    if (!magic) return;
+    // OAuth ログイン後に TOTP が必要な場合はコード入力へ進む
+    if (challengeValue) {
+      setChallenge(challengeValue);
+      setMode("totp");
+      return;
+    }
+    // ログイン結果を受ける共通処理（TOTP 有効ならコード入力へ）
+    const acceptLogin = (result: { totp_required?: boolean; challenge?: string }) => {
+      if (result.totp_required && result.challenge) {
+        setChallenge(result.challenge);
+        setMode("totp");
+        return;
+      }
+      onAuthenticated();
+    };
+    if (verifyToken) {
+      setBusy(true);
+      verifyEmailAccount(verifyToken)
+        .then(acceptLogin)
+        .catch(() => {
+          setError("確認リンクが無効か期限切れです。お手数ですが、もう一度登録してください。");
+        })
+        .finally(() => setBusy(false));
+      return;
+    }
+    if (!magicToken) return;
     setBusy(true);
-    consumeMagicLink(magic)
-      .then(() => onAuthenticated())
+    consumeMagicLink(magicToken)
+      .then(acceptLogin)
       .catch(() => {
         setError("ログインリンクが無効か期限切れです。新しいリンクを送ってください。");
         setMode("magic");
       })
       .finally(() => setBusy(false));
-  }, [onAuthenticated]);
+  }, [onAuthenticated, magic, authError, verify, totpChallenge]);
 
   const handlePasswordSubmit = async () => {
     setBusy(true);
@@ -58,6 +109,10 @@ export const LoginPage = ({ config, onAuthenticated }: LoginPageProps) => {
         mode === "register"
           ? await registerAccount(email, secret)
           : await loginAccount(email, secret);
+      if (result.verification_required) {
+        setMode("verifySent");
+        return;
+      }
       if (result.totp_required && result.challenge) {
         setChallenge(result.challenge);
         setMode("totp");
@@ -210,6 +265,17 @@ export const LoginPage = ({ config, onAuthenticated }: LoginPageProps) => {
             <Col gap="sm">
               <Text variant="caption">
                 ログインリンクをメールで送りました。メール内のリンクを開いてください（15分間有効）。
+              </Text>
+              <Button variant="ghost" size="sm" onClick={() => setMode("login")}>
+                ログイン画面に戻る
+              </Button>
+            </Col>
+          ) : null}
+
+          {mode === "verifySent" ? (
+            <Col gap="sm">
+              <Text variant="caption">
+                確認メールを送りました。メール内のリンクを開くと登録が完了します（24時間有効）。
               </Text>
               <Button variant="ghost" size="sm" onClick={() => setMode("login")}>
                 ログイン画面に戻る

@@ -19,7 +19,7 @@ export interface BalanceRecordsProps {
 }
 
 /**
- * 収支タブの「対象の取引」。集計の元になっている帳簿レコードそのものを
+ * 収支タブの「対象の取引」。集計の元になっている帳簿の取引そのものを
  * 日付順に並べる。数字だけでは裏付けにならないため、収支の末尾に置く。
  * 編集は帳簿側で行う前提の読み取り専用一覧。
  */
@@ -38,7 +38,7 @@ export const BalanceRecords = ({ transactions }: BalanceRecordsProps) => {
   return (
     <Card>
     <Col gap="sm">
-      <Text variant="statLabel">対象の取引（帳簿レコード {sorted.length}件）</Text>
+      <Text variant="statLabel">対象の取引（{sorted.length}件）</Text>
       <div>
         <div className={`${styles.recordRow} ${styles.recordHead}`}>
           <span>日付</span>

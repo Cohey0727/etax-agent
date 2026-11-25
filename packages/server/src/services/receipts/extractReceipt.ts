@@ -63,11 +63,16 @@ export async function extractReceipt(
   }
   const dateRaw = typeof parsed["date"] === "string" ? parsed["date"] : "";
   const amountRaw = parsed["amount"];
+  // 文字列の金額は数字と符号だけを取り出して解釈する。空文字や数字を
+  // 含まない文字列は Number("") === 0 で「0円」になってしまうため、
+  // 数字が1つも無い場合は「読めなかった（null）」として扱う。
+  const amountText =
+    typeof amountRaw === "string" ? amountRaw.replace(/[^\d.-]/g, "") : "";
   const amount =
     typeof amountRaw === "number" && Number.isFinite(amountRaw)
       ? Math.trunc(Math.abs(amountRaw))
-      : typeof amountRaw === "string" && Number.isFinite(Number(amountRaw.replace(/[^\d.-]/g, "")))
-        ? Math.trunc(Math.abs(Number(amountRaw.replace(/[^\d.-]/g, ""))))
+      : amountText !== "" && /\d/.test(amountText) && Number.isFinite(Number(amountText))
+        ? Math.trunc(Math.abs(Number(amountText)))
         : null;
   return {
     date: DATE_RE.test(dateRaw) ? dateRaw : null,

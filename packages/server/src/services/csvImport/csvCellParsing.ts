@@ -17,12 +17,16 @@ function iso(y: number, m: number, d: number): string | null {
 
 /** 日付セル文字列を YYYY-MM-DD に正規化する。解釈できなければ null。 */
 export function parseDateCell(raw: string): string | null {
-  const s = raw.trim();
+  // 全角数字は半角へ寄せてから解釈する（例: ２０２４年１月５日）。
+  const s = raw
+    .trim()
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
   if (!s) return null;
-  let m = s.match(/(令和|平成)(\d{1,2})年(\d{1,2})月(\d{1,2})日/);
+  let m = s.match(/(令和|平成)(元|\d{1,2})年(\d{1,2})月(\d{1,2})日/);
   if (m) {
     const base = m[1] === "令和" ? 2018 : 1988;
-    return iso(base + Number(m[2]), Number(m[3]), Number(m[4]));
+    const eraYear = m[2] === "元" ? 1 : Number(m[2]);
+    return iso(base + eraYear, Number(m[3]), Number(m[4]));
   }
   m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
   if (m) return iso(Number(m[1]), Number(m[2]), Number(m[3]));
@@ -57,6 +61,8 @@ export function parseAmountCell(raw: string): number | null {
   let s = String(raw).trim();
   if (!s) return null;
   s = s.replace(/[\uFF10-\uFF19]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+  // 全角括弧（マイナス表記）と全角マイナス・負号を半角へ寄せる。
+  s = s.replace(/（/g, "(").replace(/）/g, ")").replace(/[－−]/g, "-");
   s = s.replace(/[￥¥,、\s円]/g, "");
   let neg = false;
   if (/^\(.*\)$/.test(s)) {

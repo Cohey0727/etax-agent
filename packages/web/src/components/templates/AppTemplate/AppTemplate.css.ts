@@ -82,6 +82,7 @@ const styles = {
     zIndex: 40,
   }),
   // レール内側。ブランドマークとナビのアイコンボタンだけを縦に並べる。
+  // サイドバーは LP のヒーローと同じ濃紺グラデーションを地にする。
   railInner: style({
     display: "flex",
     flexDirection: "column",
@@ -91,8 +92,7 @@ const styles = {
     height: "100%",
     overflowY: "auto",
     padding: `${theme.space.lg} 0`,
-    background: theme.color.surface,
-    borderRight: `1px solid ${theme.color.border}`,
+    background: `linear-gradient(180deg, ${theme.color.navy} 0%, ${theme.color.navyDeep} 100%)`,
     boxSizing: "border-box",
   }),
   railNav: style({
@@ -109,8 +109,7 @@ const styles = {
     height: "100%",
     overflowY: "auto",
     padding: `${theme.space.lg} ${theme.space.md}`,
-    background: theme.color.surface,
-    borderRight: `1px solid ${theme.color.border}`,
+    background: `linear-gradient(180deg, ${theme.color.navy} 0%, ${theme.color.navyDeep} 100%)`,
     boxSizing: "border-box",
     "@media": {
       // ドロワーの中身はデスクトップと同じ縦レイアウトのまま全高で出す。
@@ -140,18 +139,23 @@ const styles = {
   yearSelect: style({
     width: "100%",
   }),
+  // 濃紺地の上に置くテキストの色（ブランド・データパネル用）。
+  brandTitle: style({ color: theme.color.onNavy }),
+  brandCaption: style({ color: theme.color.onNavySubtle }),
   spacer: style({ flex: 1 }),
   // 画面にぶら下がる子項目（ネスト）の受け皿。左の罫線と字下げで階層を出す。
   navChildren: style({
     marginLeft: theme.space.md,
     paddingLeft: theme.space.sm,
-    borderLeft: `1px solid ${theme.color.lineSoft}`,
+    borderLeft: `1px solid ${theme.color.navySoft}`,
   }),
   dataPanel: style({
-    background: theme.color.bg,
+    background: theme.color.navySoft,
     borderRadius: theme.borderRadius.md,
     padding: `${theme.space.sm} ${theme.space.md}`,
   }),
+  dataLabel: style({ color: theme.color.lavender }),
+  dataText: style({ color: theme.color.onNavy }),
   // 本体はここだけがスクロールする。
   main: style({
     flex: 1,

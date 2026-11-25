@@ -46,6 +46,8 @@ export interface YearTaxParameters {
   specialRelativeTiers: readonly IncomeTier[] | null;
   /** 特定親族特別控除の下限（この額以下は扶養控除の側）。 */
   specialRelativeLowerBound: number;
+  /** 勤労学生控除の所得要件（本人の合計所得金額の上限。給与のみなら収入金額に換算可）。 */
+  workingStudentLimit: number;
   /** 給与所得控除の段階表（国税庁 No.1410 の速算表）。 */
   salaryDeductionTiers: readonly SalaryDeductionTier[];
 }
@@ -101,6 +103,29 @@ const SPECIAL_RELATIVE_TIERS_2025: readonly IncomeTier[] = [
   { upTo: 1_230_000, amount: 30_000 },
 ];
 
+/**
+ * 令和8・9年分の基礎控除（国税庁 No.1199、令和8年度税制改正）。
+ * 令和8年分・9年分とも同額: 合計所得金額 489万円以下は 104万円、
+ * 655万円以下は 67万円、2,350万円以下は 62万円、2,400万円以下は
+ * 48万円、2,450万円以下は 32万円、2,500万円以下は 16万円。
+ */
+const BASIC_TIERS_2026_2027: readonly IncomeTier[] = [
+  { upTo: 4_890_000, amount: 1_040_000 },
+  { upTo: 6_550_000, amount: 670_000 },
+  { upTo: 23_500_000, amount: 620_000 },
+  { upTo: 24_000_000, amount: 480_000 },
+  { upTo: 24_500_000, amount: 320_000 },
+  { upTo: 25_000_000, amount: 160_000 },
+  { upTo: INF, amount: 0 },
+];
+
+/**
+ * 特定親族特別控除の段階表（令和8・9年分）。
+ * 控除額の段階は令和7年分と同額で、適用下限のみ 62万円に移行する
+ * （下限は specialRelativeLowerBound 側で持つ）。
+ */
+const SPECIAL_RELATIVE_TIERS_2026_2027: readonly IncomeTier[] = SPECIAL_RELATIVE_TIERS_2025;
+
 /** 年度ごとの税務パラメータ。新しい年分は行を追加して対応する。 */
 export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
   2023: {
@@ -108,6 +133,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     spouseIncomeLimit: 480_000,
     specialRelativeTiers: null,
     specialRelativeLowerBound: 480_000,
+    workingStudentLimit: 750_000,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
   },
   2024: {
@@ -115,6 +141,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     spouseIncomeLimit: 480_000,
     specialRelativeTiers: null,
     specialRelativeLowerBound: 480_000,
+    workingStudentLimit: 750_000,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
   },
   2025: {
@@ -133,37 +160,26 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     spouseIncomeLimit: 580_000,
     specialRelativeTiers: SPECIAL_RELATIVE_TIERS_2025,
     specialRelativeLowerBound: 580_000,
+    workingStudentLimit: 850_000,
     salaryDeductionTiers: SALARY_TIERS_2025,
   },
   2026: {
-    // 上乗せ特例が縮小（132万円以下は78万円）
-    basicDeductionTiers: [
-      { upTo: 1_320_000, amount: 780_000 },
-      { upTo: 3_360_000, amount: 710_000 },
-      { upTo: 4_890_000, amount: 630_000 },
-      { upTo: 23_500_000, amount: 580_000 },
-      { upTo: 24_000_000, amount: 480_000 },
-      { upTo: 24_500_000, amount: 320_000 },
-      { upTo: 25_000_000, amount: 160_000 },
-      { upTo: INF, amount: 0 },
-    ],
-    spouseIncomeLimit: 580_000,
-    // 令和8年分の段階表は所得基準が異なるため未収録（従来どおり控除 0）
-    specialRelativeTiers: null,
-    specialRelativeLowerBound: 580_000,
+    // 令和8年度税制改正後の本則（No.1199）。令和9年分と同額
+    basicDeductionTiers: BASIC_TIERS_2026_2027,
+    // 配偶者控除の所得要件は令和8年分から 62万円以下
+    spouseIncomeLimit: 620_000,
+    specialRelativeTiers: SPECIAL_RELATIVE_TIERS_2026_2027,
+    specialRelativeLowerBound: 620_000,
+    workingStudentLimit: 890_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
   },
   2027: {
-    // 上乗せ特例なし（本則のみ）
-    basicDeductionTiers: [
-      { upTo: 24_000_000, amount: 580_000 },
-      { upTo: 24_500_000, amount: 320_000 },
-      { upTo: 25_000_000, amount: 160_000 },
-      { upTo: INF, amount: 0 },
-    ],
-    spouseIncomeLimit: 580_000,
-    specialRelativeTiers: null,
-    specialRelativeLowerBound: 580_000,
+    // 令和9年分も令和8年分と同額（No.1199）
+    basicDeductionTiers: BASIC_TIERS_2026_2027,
+    spouseIncomeLimit: 620_000,
+    specialRelativeTiers: SPECIAL_RELATIVE_TIERS_2026_2027,
+    specialRelativeLowerBound: 620_000,
+    workingStudentLimit: 890_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
   },
 };

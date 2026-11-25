@@ -26,7 +26,7 @@ export const ImportedTransactionsTable = ({ transactions }: ImportedTransactions
                 <TableHeaderCell>摘要</TableHeaderCell>
                 <TableHeaderCell align="right">金額</TableHeaderCell>
                 <TableHeaderCell>勘定科目</TableHeaderCell>
-                <TableHeaderCell>所得区分</TableHeaderCell>
+                <TableHeaderCell>収入区分</TableHeaderCell>
                 <TableHeaderCell>口座</TableHeaderCell>
               </tr>
             </thead>

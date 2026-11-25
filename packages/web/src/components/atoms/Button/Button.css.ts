@@ -132,7 +132,8 @@ const styles = {
         "&:hover": { background: theme.color.accentHover },
       },
     },
-    // サイドバーのナビ。アイコン+ラベルを左寄せで並べ、選択中は淡いアクセント地に色字。
+    // サイドバーのナビ（濃紺地の上）。アイコン+ラベルを左寄せで並べ、
+    // 選択中はアクセントで満たしたピルにする（LP のヒーローの白ピルと同じ考え方）。
     // base の justifyContent: center が残ると中央寄せになるため、明示的に上書きする。
     nav: {
       display: "flex",
@@ -143,13 +144,13 @@ const styles = {
       background: "transparent",
       borderColor: "transparent",
       borderRadius: theme.borderRadius.sm,
-      color: theme.color.textSubtle,
+      color: theme.color.onNavySubtle,
       fontWeight: theme.fontWeight.medium,
       textAlign: "left",
       selectors: {
         "&:hover": {
-          background: theme.color.hover,
-          color: theme.color.text,
+          background: theme.color.navySoft,
+          color: theme.color.onNavy,
           transform: "translateX(3px)",
         },
         "&:active": { transform: "translateX(3px) scale(0.97)" },
@@ -161,14 +162,16 @@ const styles = {
       justifyContent: "flex-start",
       gap: "10px",
       width: "100%",
-      background: theme.color.accentSoft,
+      background: theme.color.accent,
       borderColor: "transparent",
       borderRadius: theme.borderRadius.sm,
-      color: theme.color.accent,
+      color: theme.color.onAccent,
       fontWeight: theme.fontWeight.semibold,
       textAlign: "left",
+      boxShadow: theme.shadow.button,
       animation: `${popIn} 0.35s ${theme.animation.spring} both`,
       selectors: {
+        "&:hover": { background: theme.color.accentHover },
         "&:active": { transform: "scale(0.97)" },
       },
     },

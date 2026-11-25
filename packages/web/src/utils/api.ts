@@ -19,6 +19,10 @@ import {
   FilingSnapshot,
   FilingSnapshotFigures,
   FilingStatus,
+  DepreciationSummary,
+  FixedAssetImageRecord,
+  FixedAssetInput,
+  FixedAssetRecord,
   FreeeTrialBalance,
   ImportCsvResponse,
   LedgerTransaction,
@@ -288,6 +292,118 @@ export async function unlinkReceipt(fileId: string): Promise<void> {
 /** 証憑画像の表示URL。 */
 export function receiptContentUrl(fileId: string): string {
   return `/api/receipts/${fileId}/content`;
+}
+
+/* ---------- 固定資産台帳 ---------- */
+
+/** 固定資産の一覧を取得する。帳簿DBが未接続（503）の場合は null。 */
+export async function fetchFixedAssets(): Promise<FixedAssetRecord[] | null> {
+  try {
+    const resp = await fetch("/api/fixed-assets");
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { assets: FixedAssetRecord[] };
+    return data.assets;
+  } catch {
+    return null;
+  }
+}
+
+/** 指定年度の償却サマリを取得する。DB未接続の場合は null。 */
+export async function fetchDepreciationSummary(
+  year: number,
+): Promise<DepreciationSummary | null> {
+  try {
+    const resp = await fetch(`/api/fixed-assets/depreciation?year=${year}`);
+    if (!resp.ok) return null;
+    return (await resp.json()) as DepreciationSummary;
+  } catch {
+    return null;
+  }
+}
+
+/** 固定資産を1件登録する。 */
+export async function createFixedAsset(input: FixedAssetInput): Promise<FixedAssetRecord> {
+  const resp = await fetch("/api/fixed-assets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson<{ asset: FixedAssetRecord | null }>(resp);
+  if (!data.asset) throw new Error("固定資産の登録に失敗しました");
+  return data.asset;
+}
+
+/** 固定資産を1件更新する。 */
+export async function updateFixedAsset(
+  id: number,
+  input: FixedAssetInput,
+): Promise<FixedAssetRecord> {
+  const resp = await fetch(`/api/fixed-assets/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson<{ asset: FixedAssetRecord | null }>(resp);
+  if (!data.asset) throw new Error("固定資産の更新に失敗しました");
+  return data.asset;
+}
+
+/** 固定資産を1件削除する（添付画像も一緒に消える）。 */
+export async function deleteFixedAsset(id: number): Promise<void> {
+  const resp = await fetch(`/api/fixed-assets/${id}`, { method: "DELETE" });
+  await parseJson(resp);
+}
+
+/** 固定資産の画像一覧を取得する（表示用URLつき）。 */
+export async function fetchFixedAssetImages(
+  assetId: number,
+): Promise<FixedAssetImageRecord[]> {
+  const resp = await fetch(`/api/fixed-assets/${assetId}/images`);
+  const data = await parseJson<{ images: FixedAssetImageRecord[] }>(resp);
+  return data.images;
+}
+
+/**
+ * 画像を固定資産へ添付する。署名付きURLでストレージへ直接アップロードし
+ * （APIサーバーはバイト列を経由しない）、完了後に台帳へ登録する。
+ */
+export async function uploadFixedAssetImage(
+  assetId: number,
+  file: File,
+): Promise<FixedAssetImageRecord> {
+  if (!UPLOADABLE_IMAGE_TYPES.includes(file.type)) {
+    throw new Error("対応していないファイル形式です（JPEG / PNG / WebP / GIF のみ）");
+  }
+  const presignResp = await fetch("/api/files/presign-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType: file.type, purpose: "fixed_asset" }),
+  });
+  const presign = await parseJson<PresignUploadFileResponse>(presignResp);
+  const uploadResp = await fetch(presign.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!uploadResp.ok) {
+    throw new Error(`ファイルのアップロードに失敗しました (HTTP ${uploadResp.status})`);
+  }
+  const resp = await fetch(`/api/fixed-assets/${assetId}/images`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: presign.fileId }),
+  });
+  const data = await parseJson<{ image: FixedAssetImageRecord | null }>(resp);
+  if (!data.image) throw new Error("画像の添付に失敗しました");
+  return data.image;
+}
+
+/** 固定資産の画像を1件取り外す（実体も削除される）。 */
+export async function deleteFixedAssetImage(assetId: number, fileId: string): Promise<void> {
+  const resp = await fetch(`/api/fixed-assets/${assetId}/images/${fileId}`, {
+    method: "DELETE",
+  });
+  await parseJson(resp);
 }
 
 /** freee試算表（取り込み済みの実績データ）。未取り込みなら null。 */
@@ -657,6 +773,13 @@ export async function requestMagicLink(email: string): Promise<void> {
 /** メールで受け取ったマジックリンクのトークンを消費してログインする。 */
 export async function consumeMagicLink(token: string): Promise<import("@types").LoginResponse> {
   return postJson<import("@types").LoginResponse>("/api/auth/magic-link/consume", { token });
+}
+
+/** 登録時の確認メールのトークンを消費してメール確認とログインを行う。 */
+export async function verifyEmailAccount(
+  token: string,
+): Promise<import("@types").LoginResponse> {
+  return postJson<import("@types").LoginResponse>("/api/auth/verify-email", { token });
 }
 
 /** TOTP 設定の開始（秘密と otpauth URL を受け取る）。 */

@@ -1,13 +1,19 @@
 /**
  * presignUploadFile.ts — アップロード受け口URLの発行ユースケース（usecases）。
  *
- * フロー: 画面が返されたURL（このサーバーの PUT /api/files/content/<key>）へ
- * 直接ファイルを送る → 画面はファイルIDを解析依頼（/api/receipts/analyze）に
- * 渡す → サーバーがローカルフォルダから取得する。
+ * フロー: 画面が返された署名付きURLへ直接ファイルを送る（s3 ドライバでは
+ * ストレージへ直行し、このサーバーは経由しない。local ドライバではこの
+ * サーバーの PUT /api/files/content/<key> が受け口になる）→ 画面は
+ * ファイルIDを解析依頼（/api/receipts/analyze）や固定資産への添付に渡す。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { createStorageClient, receiptObjectKey, StorageError } from "../gateways/storageGateway";
+import {
+  createStorageClient,
+  fixedAssetObjectKey,
+  receiptObjectKey,
+  StorageError,
+} from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -48,13 +54,11 @@ export const presignUploadFileRoute = createRoute({
 export const presignUploadFileHandler: RouteHandler<typeof presignUploadFileRoute> = async (c) => {
   const body = c.req.valid("json");
   const fileId = crypto.randomUUID();
+  const key =
+    body.purpose === "fixed_asset" ? fixedAssetObjectKey(fileId) : receiptObjectKey(fileId);
   try {
     const storage = createStorageClient(loadStorageConfig());
-    const uploadUrl = await storage.presignUpload(
-      receiptObjectKey(fileId),
-      body.contentType,
-      UPLOAD_URL_EXPIRES_IN_SECONDS,
-    );
+    const uploadUrl = await storage.presignUpload(key, body.contentType, UPLOAD_URL_EXPIRES_IN_SECONDS);
     return c.json({ fileId, uploadUrl, expiresInSeconds: UPLOAD_URL_EXPIRES_IN_SECONDS }, 200);
   } catch (e) {
     if (e instanceof StorageError) {

@@ -15,37 +15,22 @@ import {
 import { ExportConsumptionXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportConsumptionXtxFile } from "@utils/api";
 import { formatNumber, formatYen } from "@utils";
+import { AmountField } from "./AmountField";
+import {
+  AMENDMENT_FIELDS,
+  EDITABLE_FIELDS,
+  EditableForm,
+  EditableKey,
+  SUMMARY_ROWS,
+} from "./consumptionTaxFields";
+import {
+  buildResultRows,
+  deriveBasePeriodSalesThousands,
+  downloadTextFile,
+  toAmount,
+  todayIso,
+} from "./consumptionTaxHelpers";
 import styles from "./ConsumptionTaxPanel.css";
-
-interface EditableForm {
-  basePeriodSalesThousands: number;
-  interimNational: number;
-  interimLocal: number;
-  originalNational: number;
-  originalLocal: number;
-}
-
-type EditableKey = keyof EditableForm;
-
-const EDITABLE_FIELDS: readonly { key: EditableKey; label: string }[] = [
-  { key: "basePeriodSalesThousands", label: "基準期間の課税売上高（千円）" },
-  { key: "interimNational", label: "中間納付税額（国税）" },
-  { key: "interimLocal", label: "中間納付譲渡割額（地方）" },
-];
-
-const AMENDMENT_FIELDS: readonly { key: EditableKey; label: string }[] = [
-  { key: "originalNational", label: "既確定税額（国税）" },
-  { key: "originalLocal", label: "既確定譲渡割額（地方）" },
-];
-
-const SUMMARY_ROWS: readonly { key: keyof ConsumptionTaxSummary; label: string }[] = [
-  { key: "salesIncl10", label: "課税売上（税込）・10%" },
-  { key: "salesIncl8", label: "課税売上（税込）・軽減8%" },
-  { key: "nontaxableSales", label: "非課税売上（対価の額）" },
-  { key: "exemptSales", label: "免税売上（対価の額）" },
-  { key: "purchasesIncl10", label: "課税仕入（税込）・10%" },
-  { key: "purchasesIncl8", label: "課税仕入（税込）・軽減8%" },
-];
 
 export interface ConsumptionTaxPanelProps {
   transactions: Transaction[];
@@ -108,64 +93,7 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
   );
 
   // 計算結果の各項目と、その裏付け（どう計算したか）を直下に並べる。
-  const resultRows: readonly { label: string; value: string; backing: string }[] = [
-    {
-      label: "課税売上割合",
-      value: `${preview.ratio}%`,
-      backing:
-        `課税売上高（税抜）${formatYen(preview.salesExcl)} ÷ 売上高の合計（税抜）` +
-        `${formatYen(preview.totalSalesExcl)} ・ ${preview.fullDeduction ? "全額控除" : "一括比例配分"}`,
-    },
-    {
-      label: "課税標準額",
-      value: formatYen(preview.taxBase),
-      backing: "課税売上高（税抜）の千円未満を切り捨て",
-    },
-    {
-      label: "消費税額",
-      value: formatYen(preview.outputTax),
-      backing: outputTaxBacking(preview),
-    },
-    {
-      label: "控除対象仕入税額",
-      value: formatYen(preview.inputTax),
-      backing: preview.fullDeduction
-        ? `課税仕入にかかる消費税額 ${formatYen(preview.inputTaxRaw10 + preview.inputTaxRaw8)} の全額`
-        : `課税仕入にかかる消費税額 ${formatYen(preview.inputTaxRaw10 + preview.inputTaxRaw8)} × 課税売上割合 ${preview.ratio}%`,
-    },
-    preview.refundNational > 0
-      ? {
-          label: "還付税額（国税）",
-          value: formatYen(preview.refundNational),
-          backing: `消費税額 ${formatYen(preview.outputTax)} − 控除対象仕入税額 ${formatYen(preview.inputTax)}`,
-        }
-      : {
-          label: "納付税額（国税）",
-          value: formatYen(preview.payableNational),
-          backing:
-            `消費税額 ${formatYen(preview.outputTax)} − 控除対象仕入税額 ${formatYen(preview.inputTax)}` +
-            ` = ${formatYen(preview.diffNational)}` +
-            (form.interimNational > 0 ? ` − 中間納付 ${formatYen(form.interimNational)}` : ""),
-        },
-    preview.refundLocal > 0
-      ? {
-          label: "還付譲渡割額（地方）",
-          value: formatYen(preview.refundLocal),
-          backing: `還付税額（国税）× 22/78`,
-        }
-      : {
-          label: "納付譲渡割額（地方）",
-          value: formatYen(preview.payableLocal),
-          backing:
-            `差引税額（国税）${formatYen(preview.diffNational)} × 22/78 = ${formatYen(preview.localTaxGross)}` +
-            (form.interimLocal > 0 ? ` − 中間納付 ${formatYen(form.interimLocal)}` : ""),
-        },
-    {
-      label: "合計",
-      value: formatYen(preview.totalPayable),
-      backing: `国税 ${formatYen(preview.payableNational)} ＋ 地方 ${formatYen(preview.payableLocal)}`,
-    },
-  ];
+  const resultRows = buildResultRows(preview, form);
 
   const update = (key: EditableKey, value: number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -345,65 +273,3 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
     </Card>
   );
 };
-
-interface AmountFieldProps {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}
-
-const AmountField = ({ label, value, onChange }: AmountFieldProps) => (
-  <Row gap="sm">
-    <div className={styles.fieldLabel}>
-      <Text variant="muted">{label}</Text>
-    </div>
-    <Input
-      className={styles.fieldNumber}
-      type="number"
-      value={value}
-      onChange={(e) => onChange(toAmount(e.target.value))}
-      aria-label={label}
-    />
-  </Row>
-);
-
-/** 消費税額の裏付け表記（課税標準額 × 税率の内訳）。 */
-function outputTaxBacking(preview: ConsumptionReturn): string {
-  const parts: string[] = [];
-  if (preview.base10 > 0) parts.push(`10%分 ${formatYen(preview.base10)} × 7.8%`);
-  if (preview.base8 > 0) parts.push(`軽減8%分 ${formatYen(preview.base8)} × 6.24%`);
-  return parts.length > 0 ? `課税標準額 ${parts.join(" ＋ ")}` : "課税標準額なし";
-}
-
-/**
- * 基準期間（2年前）の課税売上高（千円・税抜）を帳簿から出す。
- * 2年前の帳簿が無ければ 0（手入力で直す前提）。
- */
-function deriveBasePeriodSalesThousands(transactions: Transaction[], year: number): number {
-  const base = summarizeConsumptionTax(transactions, year - 2);
-  const excl10 = Math.floor((base.salesIncl10 * 100) / 110);
-  const excl8 = Math.floor((base.salesIncl8 * 100) / 108);
-  return Math.floor((excl10 + excl8) / 1000);
-}
-
-function todayIso(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${mm}-${dd}`;
-}
-
-function toAmount(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
-}
-
-function downloadTextFile(filename: string, content: string): void {
-  const blob = new Blob([content], { type: "application/xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}

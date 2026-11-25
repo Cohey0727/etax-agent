@@ -10,6 +10,7 @@
 import { Context } from "hono";
 import { createStorageClient, StorageError } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
+import { isAllowedUploadContentType, normalizeContentType } from "../lib/uploadTypes";
 
 const CONTENT_PATH_PREFIX = "/api/files/content/";
 
@@ -18,10 +19,15 @@ export const uploadFileContentHandler = async (c: Context) => {
   if (!key) {
     return c.json({ error: "ファイルキーが指定されていません" }, 400);
   }
+  // 実際に送られた Content-Type を検証する。presign の申告だけを信じると、
+  // 画像と偽って HTML を置き、自オリジン配信で Stored XSS になる（Issue #7）。
+  const contentType = normalizeContentType(c.req.header("content-type"));
+  if (!isAllowedUploadContentType(contentType)) {
+    return c.json({ error: "対応していないファイル形式です（画像のみアップロードできます）" }, 400);
+  }
   try {
     const storage = createStorageClient(loadStorageConfig());
     const data = new Uint8Array(await c.req.arrayBuffer());
-    const contentType = c.req.header("content-type") || "application/octet-stream";
     await storage.save(key, data, contentType);
     return c.json({ ok: true }, 200);
   } catch (e) {

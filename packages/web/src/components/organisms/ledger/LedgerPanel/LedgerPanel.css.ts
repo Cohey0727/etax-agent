@@ -22,12 +22,39 @@ const FILTER_ROW_HEIGHT = `calc(${theme.component.controlHeight} + ${theme.space
 const styles = {
   cellInput: style({
     width: "100%",
-    minWidth: "92px",
+    minWidth: "76px",
+  }),
+  // 表の中の入力は詰めて出す（丸み・余白を落として全カラムが収まるように）。
+  cellControl: style({
+    height: "28px",
+    padding: "0 6px",
+    borderRadius: "4px",
+    fontSize: theme.fontSizes.xs,
+  }),
+  cellSelect: style({
+    height: "28px",
+    padding: "0 20px 0 6px",
+    borderRadius: "4px",
+    fontSize: theme.fontSizes.xs,
+    backgroundPosition: "right 6px center",
   }),
   // 操作列は保存・削除を必ず横並びにする。表の列幅計算で潰れてボタンが
   // 縦に積まれるのを防ぐため、セルは折り返し禁止、行は内容幅に固定する。
+  // あわせて右端に固定し、横スクロールしても操作列が隠れないようにする。
   actionsCell: style({
     whiteSpace: "nowrap",
+    position: "sticky",
+    right: 0,
+    background: theme.color.surface,
+    boxShadow: "-10px 0 14px -10px rgba(34, 26, 99, 0.35)",
+    zIndex: 1,
+  }),
+  actionsHeader: style({
+    position: "sticky",
+    right: 0,
+    background: theme.color.surface,
+    boxShadow: "-10px 0 14px -10px rgba(34, 26, 99, 0.35)",
+    zIndex: 1,
   }),
   actionsRow: style({
     width: "max-content",
@@ -80,11 +107,11 @@ const styles = {
   }),
   descriptionInput: style({
     width: "100%",
-    minWidth: "180px",
+    minWidth: "140px",
   }),
   amountInput: style({
     width: "100%",
-    minWidth: "104px",
+    minWidth: "88px",
     textAlign: "right",
   }),
   addGrid: style({
@@ -218,6 +245,13 @@ const styles = {
     height: "20px",
   }),
 };
+
+// 帳簿テーブルはセルの余白も詰める（全カラムが収まるように）。
+// Table atom 側の指定（クラス+要素）より詳細度を上げて確実に効かせる。
+globalStyle(`${styles.tableWrap} table th, ${styles.tableWrap} table td`, {
+  padding: "4px 6px",
+  verticalAlign: "middle",
+});
 
 // 統計カードは左から順に少しずつ遅れて弾んで現れる（Card の登場アニメーションへの遅延）。
 globalStyle(`${styles.statGrid} > *:nth-child(2)`, { animationDelay: "0.05s" });

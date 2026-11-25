@@ -101,4 +101,49 @@ describe("buildSpecial20ConsumptionXtx", () => {
     expect(xtx).toContain("<AYB00080>10000000</AYB00080>"); // 付表6 課税標準額
     expect(xtx).toContain("<AYC00040>624000</AYC00040>"); // 付表6 特別控除税額
   });
+
+  test("返還等・貸倒回収・貸倒れは第一表・第二表の内訳タグに出る", () => {
+    const input: Special20ConsumptionInput = {
+      ...EMPTY_INPUT,
+      salesIncl10: 11_000_000,
+      returnsIncl10: 110_000,
+      badDebtRecoveryTax10: 7_800,
+      badDebtTax10: 3_900,
+    };
+    const xtx = buildSpecial20ConsumptionXtx({
+      taxpayer: TAXPAYER,
+      periodFrom: "2025-01-01",
+      periodTo: "2025-12-31",
+      submissionDate: "2026-02-15",
+      filingKind: 1,
+      basePeriodSalesThousands: 0,
+      input,
+      result: computeSpecial20ConsumptionReturn(input),
+      originalNational: null,
+      originalLocal: null,
+    });
+    expect(xtx).toContain("<AAJ00030>7800</AAJ00030>"); // 控除過大調整税額（貸倒回収）
+    expect(xtx).toContain("<AAJ00060>7800</AAJ00060>"); // 返還等対価に係る税額
+    expect(xtx).toContain("<AAJ00070>3900</AAJ00070>"); // 貸倒れに係る税額
+    expect(xtx).toContain("<AAU00000>7800</AAU00000>"); // 第二表 返還等対価に係る税額
+    expect(xtx).toContain("<AAV00010>7800</AAV00010>"); // 第二表 売上げの返還等の内訳
+  });
+
+  test("適用期間（2023-10-01〜2026-09-30）と重ならない課税期間は例外", () => {
+    const input: Special20ConsumptionInput = { ...EMPTY_INPUT, salesIncl10: 11_000_000 };
+    expect(() =>
+      buildSpecial20ConsumptionXtx({
+        taxpayer: TAXPAYER,
+        periodFrom: "2027-01-01",
+        periodTo: "2027-12-31",
+        submissionDate: "2028-02-15",
+        filingKind: 1,
+        basePeriodSalesThousands: 0,
+        input,
+        result: computeSpecial20ConsumptionReturn(input),
+        originalNational: null,
+        originalLocal: null,
+      }),
+    ).toThrow(/2割特例/);
+  });
 });

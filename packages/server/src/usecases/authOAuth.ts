@@ -7,11 +7,20 @@
  * リダイレクト応答のため、この2つは通常の Hono ハンドラとして登録する。
  */
 import { Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
-import { issueChallenge, verifyChallenge } from "../lib/loginChallenge";
+import { beginChallengeUse, burnChallenge, issueChallenge } from "../lib/loginChallenge";
+import { isSecureDeployment, publicBaseUrl } from "../lib/publicUrl";
 import { findOrCreateOAuthUser } from "../repositories/userRepository";
 import { issueSession } from "./authSession";
+
+/**
+ * OAuth state を発行したブラウザに紐付ける Cookie。state は署名つきだが
+ * それだけでは他人のブラウザで開始したフローを踏ませるログイン CSRF が
+ * 成立するため、開始時に Cookie へ同じ値を置き、callback で一致を必須にする。
+ */
+const OAUTH_STATE_COOKIE = "etax_oauth_state";
 
 export type OAuthProvider = "google" | "github";
 
@@ -51,12 +60,14 @@ function providerFromParam(c: Context): OAuthProvider {
   throw new HTTPException(404, { message: "不明なプロバイダです" });
 }
 
-function publicBase(c: Context): string {
-  return process.env.ETAX_PUBLIC_URL || c.req.header("Origin") || new URL(c.req.url).origin;
-}
-
-function redirectUri(c: Context, provider: OAuthProvider): string {
-  return `${publicBase(c)}/api/auth/oauth/${provider}/callback`;
+/**
+ * redirect_uri の組み立てには設定済みの公開オリジンだけを使う。
+ * Host / Origin ヘッダは汚染され得るため使わない（Issue #6）。
+ * 未設定なら安全な redirect_uri を作れないので null を返す。
+ */
+function redirectUri(c: Context, provider: OAuthProvider): string | null {
+  const base = publicBaseUrl();
+  return base ? `${base}/api/auth/oauth/${provider}/callback` : null;
 }
 
 /** GET /api/auth/oauth/:provider/start — プロバイダの認可画面へリダイレクト。 */
@@ -65,13 +76,25 @@ export async function oauthStartHandler(c: Context): Promise<Response> {
   if (!oauthConfigured(provider)) {
     throw new HTTPException(503, { message: "このログイン方法は設定されていません" });
   }
+  const uri = redirectUri(c, provider);
+  if (!uri) {
+    throw new HTTPException(503, { message: "公開オリジン（ETAX_PUBLIC_URL）が設定されていません" });
+  }
   const config = PROVIDERS[provider];
+  const state = issueChallenge(0, `oauth:${provider}`, 10 * 60 * 1000);
+  setCookie(c, OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "Lax",
+    path: "/api/auth/oauth",
+    maxAge: 10 * 60,
+    secure: isSecureDeployment(c),
+  });
   const params = new URLSearchParams({
     client_id: process.env[config.clientIdEnv] as string,
-    redirect_uri: redirectUri(c, provider),
+    redirect_uri: uri,
     response_type: "code",
     scope: config.scope,
-    state: issueChallenge(0, `oauth:${provider}`, 10 * 60 * 1000),
+    state,
   });
   return c.redirect(`${config.authorizeUrl}?${params.toString()}`);
 }
@@ -82,14 +105,17 @@ async function exchangeCode(
   code: string,
 ): Promise<string> {
   const config = PROVIDERS[provider];
+  const uri = redirectUri(c, provider);
+  if (!uri) throw new Error("公開オリジンが設定されていません");
   const res = await fetch(config.tokenUrl, {
     method: "POST",
+    signal: AbortSignal.timeout(15_000),
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({
       client_id: process.env[config.clientIdEnv] as string,
       client_secret: process.env[config.clientSecretEnv] as string,
       code,
-      redirect_uri: redirectUri(c, provider),
+      redirect_uri: uri,
       grant_type: "authorization_code",
     }),
   });
@@ -105,7 +131,7 @@ async function fetchProfile(
 ): Promise<{ providerUserId: string; email: string }> {
   const headers = { Authorization: `Bearer ${accessToken}`, Accept: "application/json" };
   if (provider === "google") {
-    const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers });
+    const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) throw new Error(`userinfo failed: ${res.status}`);
     const data = (await res.json()) as { sub?: string; email?: string; email_verified?: boolean };
     if (!data.sub || !data.email || data.email_verified !== true) {
@@ -113,11 +139,11 @@ async function fetchProfile(
     }
     return { providerUserId: data.sub, email: data.email.toLowerCase() };
   }
-  const userRes = await fetch("https://api.github.com/user", { headers });
+  const userRes = await fetch("https://api.github.com/user", { headers, signal: AbortSignal.timeout(15_000) });
   if (!userRes.ok) throw new Error(`github user failed: ${userRes.status}`);
   const user = (await userRes.json()) as { id?: number };
   if (!user.id) throw new Error("GitHub のユーザーIDが取得できませんでした");
-  const emailsRes = await fetch("https://api.github.com/user/emails", { headers });
+  const emailsRes = await fetch("https://api.github.com/user/emails", { headers, signal: AbortSignal.timeout(15_000) });
   if (!emailsRes.ok) throw new Error(`github emails failed: ${emailsRes.status}`);
   const emails = (await emailsRes.json()) as {
     email: string;
@@ -136,13 +162,29 @@ export async function oauthCallbackHandler(c: Context): Promise<Response> {
   if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
   const code = c.req.query("code") ?? "";
   const state = c.req.query("state") ?? "";
-  if (!code || verifyChallenge(state, `oauth:${provider}`) === undefined) {
+  // state は開始したブラウザの Cookie と一致し、かつ単回使用であること
+  // （ログイン CSRF と state 再利用の防止）。
+  const stateCookie = getCookie(c, OAUTH_STATE_COOKIE);
+  deleteCookie(c, OAUTH_STATE_COOKIE, { path: "/api/auth/oauth" });
+  if (
+    !code ||
+    !state ||
+    stateCookie !== state ||
+    beginChallengeUse(state, `oauth:${provider}`) === undefined
+  ) {
     return c.redirect("/?auth_error=oauth_state");
   }
+  burnChallenge(state, `oauth:${provider}`);
   try {
     const accessToken = await exchangeCode(c, provider, code);
     const profile = await fetchProfile(provider, accessToken);
     const user = await findOrCreateOAuthUser(db, provider, profile.providerUserId, profile.email);
+    // TOTP 有効なユーザーは OAuth でも2段階目を必須にする（2FA 迂回防止）。
+    // セッションは発行せず、チャレンジを画面へ渡してコード入力を求める。
+    if (user.totpEnabled) {
+      const challenge = issueChallenge(user.id, "totp-login");
+      return c.redirect(`/?totp_challenge=${encodeURIComponent(challenge)}`);
+    }
     await issueSession(c, db, user.id);
     return c.redirect("/");
   } catch {

@@ -68,6 +68,15 @@ export interface KnowledgeSearchHit extends KnowledgeDocRow {
 const docColumns = sql`id, slug, number, title, category, source_url AS "sourceUrl", content, updated_at AS "updatedAt"`;
 
 /**
+ * ILIKE のパターン用に検索語をエスケープする。検索語に含まれる
+ * % / _ / \ がワイルドカードとして効いてしまうのを防ぐ
+ * （PostgreSQL の ILIKE の既定エスケープはバックスラッシュ）。
+ */
+function escapeLikeTerm(term: string): string {
+  return term.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
  * trigram インデックスを使った部分一致検索（3文字以上の語向け）。
  * タイトル一致を優先し、本文中の出現位置が早いものを上位にする。
  */
@@ -76,7 +85,7 @@ export async function searchKnowledgeTrgm(
   term: string,
   limit: number,
 ): Promise<KnowledgeSearchHit[]> {
-  const pattern = `%${term}%`;
+  const pattern = `%${escapeLikeTerm(term)}%`;
   const result = await db.execute(sql`
     SELECT ${docColumns}, (CASE WHEN title ILIKE ${pattern} THEN 0 ELSE 1 END) AS rank
     FROM knowledge_docs
@@ -93,7 +102,7 @@ export async function searchKnowledgeLike(
   term: string,
   limit: number,
 ): Promise<KnowledgeDocRow[]> {
-  const pattern = `%${term}%`;
+  const pattern = `%${escapeLikeTerm(term)}%`;
   const result = await db.execute(sql`
     SELECT ${docColumns}
     FROM knowledge_docs

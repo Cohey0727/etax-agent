@@ -2,22 +2,34 @@
  * getFreeeTrialBalance.ts — freee試算表データの取得ユースケース（usecases）。
  *
  * freee から取り込んだ試算表（損益計算書ベース）はサーバーのデータ
- * ディレクトリに freee-trial-balance.json として置かれる（実績の金額を
- * 含むため Git 管理しない）。ファイルが無い環境では 404 を返し、
- * 画面側はパネル自体を表示しない。
+ * ディレクトリに置かれる（実績の金額を含むため Git 管理しない）。
+ * ローカル運用では freee-trial-balance.json、SaaS（テナント文脈あり）
+ * では freee-trial-balance-<所有者ID>.json と所有者別に分ける。
+ * ファイルが無い環境では 404 を返し、画面側はパネル自体を表示しない。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serverDataDir } from "../lib/config";
+import { currentUserId } from "../lib/tenantContext";
 import { ErrorSchema } from "../schemas/common";
 import {
   FreeeTrialBalanceResponse,
   FreeeTrialBalanceResponseSchema,
 } from "../schemas/freee";
 
-const TRIAL_BALANCE_FILENAME = "freee-trial-balance.json";
+/**
+ * 試算表ファイル名。テナント文脈がある場合（SaaS）は所有者別のファイル
+ * だけを読む（共有ファイルへはフォールバックしない＝他テナントの実績を
+ * 見せない）。文脈が無いローカル運用では従来の共有ファイル名。
+ */
+function trialBalanceFilename(): string {
+  const owner = currentUserId();
+  return owner === undefined
+    ? "freee-trial-balance.json"
+    : `freee-trial-balance-${owner}.json`;
+}
 
 export const getFreeeTrialBalanceRoute = createRoute({
   method: "get",
@@ -42,7 +54,7 @@ export const getFreeeTrialBalanceHandler: RouteHandler<
 > = async (c) => {
   let text: string;
   try {
-    text = await readFile(join(serverDataDir(), TRIAL_BALANCE_FILENAME), "utf-8");
+    text = await readFile(join(serverDataDir(), trialBalanceFilename()), "utf-8");
   } catch {
     throw new HTTPException(404, { message: "freee試算表データがまだ取り込まれていません" });
   }

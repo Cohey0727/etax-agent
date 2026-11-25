@@ -11,10 +11,12 @@ import styles from "./CsvImportPanel.css";
 
 export interface CsvImportPanelProps {
   onUseTransactions: (transactions: Transaction[]) => void;
+  /** DB保存済みの取込で使う専用経路（サーバーから影響年度を読み直す）。 */
+  onUseImportedCsv?: (transactions: Transaction[]) => void;
   onLoadSample: () => void;
 }
 
-export const CsvImportPanel = ({ onUseTransactions, onLoadSample }: CsvImportPanelProps) => {
+export const CsvImportPanel = ({ onUseTransactions, onUseImportedCsv, onLoadSample }: CsvImportPanelProps) => {
   const [result, setResult] = useState<ImportCsvResponse | null>(null);
   // 科目判定で書き換わるため、取込結果の取引は編集可能なコピーで保持する
   const [txs, setTxs] = useState<Transaction[]>([]);
@@ -73,7 +75,13 @@ export const CsvImportPanel = ({ onUseTransactions, onLoadSample }: CsvImportPan
 
       {result && (
         <>
-          <MappingSummary result={{ ...result, transactions: txs }} onUseTransactions={onUseTransactions} />
+          <MappingSummary
+            result={{ ...result, transactions: txs }}
+            onUseTransactions={
+              // DB保存済みなら、取込分だけで画面を置き換えずサーバー読み直し経路を使う
+              result.persisted && onUseImportedCsv ? onUseImportedCsv : onUseTransactions
+            }
+          />
           <AccountClassificationPanel transactions={txs} onApply={setTxs} />
           <ImportedTransactionsTable transactions={txs} />
         </>

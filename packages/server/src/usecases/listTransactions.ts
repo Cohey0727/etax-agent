@@ -6,7 +6,6 @@ import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
 import {
-  effectiveFiscalYear,
   listTransactionRows,
   transactionToApi,
 } from "../repositories/transactionRepository";
@@ -42,12 +41,11 @@ export const listTransactionsHandler: RouteHandler<typeof listTransactionsRoute>
   const { year, income_type: incomeType } = c.req.valid("query");
   let rows;
   try {
-    rows = await listTransactionRows(db, incomeType);
+    // 対象年の絞り込みは割り当て年度で、SQL 側で行う（日付の年とは限らない）
+    rows = await listTransactionRows(db, incomeType, year ? Number(year) : undefined);
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
-  // 対象年の絞り込みは割り当て年度で行う（日付の年とは限らない）
-  if (year) rows = rows.filter((r) => effectiveFiscalYear(r) === Number(year));
   const response: ListTransactionsResponse = {
     count: rows.length,
     transactions: rows.map(transactionToApi),
