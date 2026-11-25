@@ -395,6 +395,10 @@ export const apiKeysTable = pgTable("api_keys", {
   /** 表示用の接頭辞（例: etax_ Ab3dEf5） */
   keyPrefix: text("key_prefix").notNull().default(""),
   lastUsedAt: timestampColumn("last_used_at"),
+  /** 有効期限。null は無期限（期限より前に作られた既存キーも無期限として扱う）。 */
+  expiresAt: timestampColumn("expires_at"),
+  /** 失効日時。null でなければ失効済み（行は履歴として残し、認証では拒否する）。 */
+  revokedAt: timestampColumn("revoked_at"),
   createdAt: timestampColumn("created_at")
     .notNull()
     .$defaultFn(() => new Date()),
