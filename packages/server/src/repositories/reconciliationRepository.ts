@@ -20,6 +20,7 @@ import { Db } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import {
   InvoicePaymentResponse,
+  InvoicePaymentsResponse,
   InvoiceSettlementResponse,
 } from "../schemas/reconciliation";
 import {
@@ -71,6 +72,20 @@ export async function paymentToApi(
     transaction: transaction ? transactionToApi(transaction) : null,
     created_at: row.createdAt.toISOString(),
   };
+}
+
+/** 請求書の消込一覧＋サマリの API レスポンスを組み立てる。 */
+export async function fetchPaymentsResponse(
+  db: Db,
+  document: DocumentRow,
+): Promise<InvoicePaymentsResponse> {
+  const rows = await listInvoicePaymentRows(db, document.id);
+  const payments = await Promise.all(rows.map((row) => paymentToApi(db, row)));
+  const settlement = computeInvoiceSettlement(
+    document.totalAmount,
+    rows.map((row) => ({ kind: row.kind as InvoicePaymentKind, amount: row.amount })),
+  );
+  return { payments, settlement: settlementToApi(document.totalAmount, settlement) };
 }
 
 export function settlementToApi(
