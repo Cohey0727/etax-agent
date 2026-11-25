@@ -38,6 +38,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
     draft,
     setDraft,
     deleteArmedId,
+    deletingId,
     error,
     setError,
     busy,
@@ -222,6 +223,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
           yearOptions={yearOptions}
           busy={busy}
           deleteArmedId={deleteArmedId}
+          deletingId={deletingId}
           visibleCount={visibleRows.length}
           currentPage={currentPage}
           totalPages={totalPages}

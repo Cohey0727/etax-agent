@@ -35,6 +35,7 @@ export const LedgerTable = ({
   yearOptions,
   busy,
   deleteArmedId,
+  deletingId,
   visibleCount,
   currentPage,
   totalPages,
@@ -50,6 +51,7 @@ export const LedgerTable = ({
   yearOptions: readonly number[];
   busy: boolean;
   deleteArmedId: number | null;
+  deletingId: number | null;
   visibleCount: number;
   currentPage: number;
   totalPages: number;
@@ -98,7 +100,10 @@ export const LedgerTable = ({
               const edit = edits[row.id] ?? toInput(row);
               const dirty = isDirty(row);
               return (
-                <tr key={row.id}>
+                <tr
+                  key={row.id}
+                  className={deletingId === row.id ? styles.rowDeleting : undefined}
+                >
                   <TableCell>
                     <Input
                       type="date"
@@ -252,17 +257,22 @@ export const LedgerTable = ({
                         aria-label="保存"
                         title="保存"
                       >
-                        <Icon name="check" size={16} />
+                        <Icon name="save" size={16} />
                       </Button>
                       <Button
                         variant={deleteArmedId === row.id ? "danger" : "ghost"}
                         size="sm"
-                        className={styles.iconButton}
+                        className={
+                          deleteArmedId === row.id
+                            ? `${styles.iconButton} ${styles.armedButton}`
+                            : styles.iconButton
+                        }
                         disabled={busy}
                         disabledReason="処理中です"
                         onClick={() => onDelete(row)}
                         aria-label={deleteArmedId === row.id ? "本当に削除" : "削除"}
                         title={deleteArmedId === row.id ? "本当に削除" : "削除"}
+                        data-delete-arm={row.id}
                       >
                         <Icon name="trash" size={16} />
                       </Button>

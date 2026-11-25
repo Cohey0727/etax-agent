@@ -1,5 +1,5 @@
 import { Transaction } from "@etax/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LedgerTransaction, LedgerTransactionInput } from "@types";
 import {
   createLedgerTransaction,
@@ -30,6 +30,10 @@ export function useLedgerData(
     emptyDraft(new Date().getFullYear()),
   );
   const [deleteArmedId, setDeleteArmedId] = useState<number | null>(null);
+  // 削除アニメーション中の行。アニメーションが終わるまで行を残す。
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  // 武装した時刻。直後の連打を確定と誤認しないためのガードに使う。
+  const deleteArmedAtRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -46,6 +50,23 @@ export function useLedgerData(
     setEdits(Object.fromEntries(freshRows.map((row) => [row.id, toInput(row)])));
     setDeleteArmedId(null);
   };
+
+  // 削除の武装は誤操作のもとになるので、4秒で自動解除する。武装した
+  // 削除ボタン以外の場所を押した場合も解除する（ボタン側は data 属性で識別）。
+  useEffect(() => {
+    if (deleteArmedId === null) return;
+    const timer = setTimeout(() => setDeleteArmedId(null), 4000);
+    const disarmOnOutsidePress = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest("[data-delete-arm]")) {
+        setDeleteArmedId(null);
+      }
+    };
+    document.addEventListener("pointerdown", disarmOnOutsidePress);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("pointerdown", disarmOnOutsidePress);
+    };
+  }, [deleteArmedId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,16 +137,25 @@ export function useLedgerData(
   const handleDelete = async (row: LedgerTransaction) => {
     if (deleteArmedId !== row.id) {
       setDeleteArmedId(row.id);
+      deleteArmedAtRef.current = Date.now();
       return;
     }
+    // 武装直後（700ms以内）の再押下は、誤った連打として無視する。
+    if (Date.now() - deleteArmedAtRef.current < 700) return;
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
       await deleteLedgerTransaction(row.id);
       const fresh = rows.filter((r) => r.id !== row.id);
-      applyRows(fresh);
-      syncParent(fresh);
+      setDeleteArmedId(null);
+      // 行はアニメーションで消してから状態へ反映する。
+      setDeletingId(row.id);
+      setTimeout(() => {
+        applyRows(fresh);
+        syncParent(fresh);
+        setDeletingId(null);
+      }, 380);
     } catch (e) {
       setError(e instanceof Error ? e.message : "削除に失敗しました");
     } finally {
@@ -173,6 +203,7 @@ export function useLedgerData(
     draft,
     setDraft,
     deleteArmedId,
+    deletingId,
     error,
     setError,
     busy,
