@@ -478,6 +478,9 @@ describe("拡張所得ありのXTX構造（Issue #27）", () => {
     // 計算明細書: 一般株式等の所得金額・特定口座の明細行
     expect(xml).toContain("<EHD00160>400000</EHD00160>");
     expect(xml).toContain("<EHQ00040>テスト証券</EHQ00040>");
+    // 計算明細書1面の上場株式等は特定口座分を含む総額（二重計上しない）
+    expect(xml).toContain("<EHD00210>2500000</EHD00210>");
+    expect(xml).toContain("<EHD00250>2800000</EHD00250>");
   });
 
   test("拡張所得がなければ第三表も計算明細書も出ない", () => {

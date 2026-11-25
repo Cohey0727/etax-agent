@@ -791,10 +791,11 @@ function buildKoc080(data: XtxFilingData, vr: string): string {
       subtotalCost: "EHD00290", diff: "EHD00300", income: "EHD00320",
     },
     // 1面の上場株式等欄は特定口座分を含む総額を書き、2面がその内訳になる
+    // （内訳の合算は shared の computeStockTransfer が済ませている）
     {
-      revenue: stocks.listed.revenue + stocks.specialAccountsTotal.revenue,
+      revenue: stocks.listed.revenue,
       otherRevenue: stocks.listed.otherRevenue,
-      acquisitionCost: stocks.listed.acquisitionCost + stocks.specialAccountsTotal.cost,
+      acquisitionCost: stocks.listed.acquisitionCost,
       transferFees: stocks.listed.transferFees,
       otherExpenses: stocks.listed.otherExpenses,
       income: stocks.listed.income,
