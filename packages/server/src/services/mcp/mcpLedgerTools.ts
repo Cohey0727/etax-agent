@@ -18,19 +18,25 @@ import {
   unlinkReceiptRow,
 } from "../../repositories/receiptRepository";
 import {
+  effectiveFiscalYear,
   getTransactionRow,
+  listRecentTransactionHistoryRows,
   listTransactionHistoryRows,
+  listTransactionRows,
   replaceYearTransactionRows,
   transactionHistoryToApi,
   transactionToApi,
 } from "../../repositories/transactionRepository";
 import { ReplaceYearTransactionsRequestSchema } from "../../schemas/transaction";
 import { classifyAccount } from "../classification/classifyAccount";
+import { buildLedgerPdf } from "../pdf/buildLedgerPdf";
+import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import {
   McpToolModule,
   idArg,
   requireDb,
   textResult,
+  yearArg,
   yearProperty,
 } from "./mcpToolKit";
 
@@ -84,6 +90,27 @@ export const mcpLedgerTools: McpToolModule = {
         type: "object",
         properties: { transaction_id: { type: "integer", description: "取引ID" } },
         required: ["transaction_id"],
+      },
+    },
+    {
+      name: "list_transaction_history",
+      description:
+        "全取引の変更履歴（作成・更新・削除の前後スナップショット）を新しい順に返す。電帳法の訂正・削除履歴の確認用。limit は既定100・上限500。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          limit: { type: "integer", description: "取得件数（任意、既定100・上限500）" },
+        },
+      },
+    },
+    {
+      name: "export_ledger_pdf",
+      description:
+        "指定年の帳簿 PDF を生成し、{filename, pdf_base64} を返す（帳簿画面の PDF ダウンロードと同じ内容）。",
+      inputSchema: {
+        type: "object",
+        properties: { year: yearProperty },
+        required: ["year"],
       },
     },
     {
@@ -158,6 +185,35 @@ export const mcpLedgerTools: McpToolModule = {
       const id = idArg(args, "id");
       const rows = await listTransactionHistoryRows(db, id);
       return textResult({ history: rows.map(transactionHistoryToApi) });
+    },
+    list_transaction_history: async (args) => {
+      const db = requireDb();
+      const rawLimit = args["limit"];
+      const limit =
+        typeof rawLimit === "number" && Number.isInteger(rawLimit) && rawLimit > 0
+          ? Math.min(rawLimit, 500)
+          : 100;
+      const rows = await listRecentTransactionHistoryRows(db, limit);
+      return textResult({ count: rows.length, history: rows.map(transactionHistoryToApi) });
+    },
+    export_ledger_pdf: async (args) => {
+      const db = requireDb();
+      const year = yearArg(args);
+      const rows = await listTransactionRows(db);
+      const yearRows = rows
+        .filter((r) => effectiveFiscalYear(r) === year)
+        .map(transactionToApi);
+      const fontBytes = await loadJapaneseFont();
+      if (!fontBytes) {
+        throw new Error(
+          "PDF用の日本語フォントがサーバーに配置されていません。データフォルダの fonts/ に日本語フォント（ipaexg.ttf 等）を置いてください。",
+        );
+      }
+      const pdf = await buildLedgerPdf(yearRows, year, new Date(), fontBytes);
+      return textResult({
+        filename: `ledger-${year}.pdf`,
+        pdf_base64: Buffer.from(pdf).toString("base64"),
+      });
     },
     list_transaction_receipts: async (args) => {
       const db = requireDb();
