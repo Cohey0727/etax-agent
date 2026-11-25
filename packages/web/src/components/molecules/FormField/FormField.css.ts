@@ -26,7 +26,14 @@ const styles = {
   size: styleVariants({
     md: {},
     // 単独フォーム用にひと回り大きく（高さ・文字）。
-    lg: { height: "46px", fontSize: theme.fontSizes.base },
+    // 狭い画面では Input atom と同じく 16px にして iOS の自動ズームを避ける。
+    lg: {
+      height: "46px",
+      fontSize: theme.fontSizes.base,
+      "@media": {
+        "(max-width: 640px)": { fontSize: "16px" },
+      },
+    },
   }),
   inputWithIcon: style({
     paddingLeft: "38px",
