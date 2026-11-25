@@ -114,6 +114,16 @@ export function deductibleAt(asset: FixedAssetRecord, year: number): number {
   return row?.deductible ?? 0;
 }
 
+/**
+ * 指定年度の台帳の対象か。その年度の償却スケジュールに現れる資産を対象とし、
+ * 除却年がその年度より前の資産は対象外（除却した年度までは対象）。
+ */
+export function isAssetInYear(asset: FixedAssetRecord, year: number): boolean {
+  const disposedYear = disposedYearOf(asset);
+  if (disposedYear !== null && disposedYear < year) return false;
+  return fullSchedule(asset).some((row) => row.year === year);
+}
+
 /** 償却の進み具合（0〜1）。少額特例は取得年に全額償却される。 */
 export function depreciationProgress(asset: FixedAssetRecord, year: number): number {
   if (asset.cost <= 0) return 0;

@@ -7,7 +7,7 @@ import { FixedAssetForm } from "./FixedAssetForm";
 import { FixedAssetList } from "./FixedAssetList";
 import { FixedAssetSkeleton } from "./FixedAssetSkeleton";
 import { FixedAssetSummary } from "./FixedAssetSummary";
-import { emptyDraft, toInput } from "./fixedAssetOptions";
+import { emptyDraft, isAssetInYear, toInput } from "./fixedAssetOptions";
 import { useFixedAssetsData } from "./useFixedAssetsData";
 
 export interface FixedAssetPanelProps {
@@ -17,7 +17,11 @@ export interface FixedAssetPanelProps {
 
 type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
 
-/** 固定資産台帳の画面本体。ページはサマリ帯と資産一覧が主役で、詳細・登録・編集はいずれも右 Drawer で開く。 */
+/**
+ * 固定資産台帳の画面本体。ページはサマリ帯と資産一覧が主役で、詳細・登録・編集はいずれも右 Drawer で開く。
+ * 一覧は選択年度の対象資産が既定で、対象外の資産は「過去の資産も表示」トグルで広げる。
+ * サマリはフィルタと連動せず、全資産を対象に年度ベースで集計する（従来どおり）。
+ */
 export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   const {
     status,
@@ -39,6 +43,7 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   const [formState, setFormState] = useState<FormState>(null);
   const [draft, setDraft] = useState<FixedAssetInput>(() => emptyDraft(year));
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [showPastAssets, setShowPastAssets] = useState(false);
 
   if (status === "loading") {
     return <FixedAssetSkeleton />;
@@ -59,6 +64,9 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
     formState?.kind === "edit"
       ? (assets.find((asset) => asset.id === formState.id) ?? null)
       : null;
+  const inYearAssets = assets.filter((asset) => isAssetInYear(asset, year));
+  const pastCount = assets.length - inYearAssets.length;
+  const visibleAssets = showPastAssets ? assets : inYearAssets;
 
   const openCreate = () => {
     setDraft(emptyDraft(year));
@@ -101,17 +109,35 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
       ) : (
         <>
           <FixedAssetSummary assets={assets} summary={summary} year={year} />
-          <FixedAssetList
-            assets={assets}
-            year={year}
-            selectedId={selectedId}
-            images={images}
-            onSelect={(assetId) => {
-              setFormState(null);
-              select(assetId);
-              setDetailId(assetId);
-            }}
-          />
+          {pastCount > 0 ? (
+            <Row justify="end">
+              <Button
+                variant={showPastAssets ? "tabActive" : "tab"}
+                size="sm"
+                onClick={() => setShowPastAssets((prev) => !prev)}
+              >
+                過去の資産も表示（{pastCount}件）
+              </Button>
+            </Row>
+          ) : null}
+          {visibleAssets.length === 0 ? (
+            <Text variant="body">
+              {year}年に対象の資産はありません。「過去の資産も表示」をオンにすると、
+              すべての資産を確認できます。
+            </Text>
+          ) : (
+            <FixedAssetList
+              assets={visibleAssets}
+              year={year}
+              selectedId={selectedId}
+              images={images}
+              onSelect={(assetId) => {
+                setFormState(null);
+                select(assetId);
+                setDetailId(assetId);
+              }}
+            />
+          )}
         </>
       )}
 
