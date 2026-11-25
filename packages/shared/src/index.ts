@@ -12,3 +12,4 @@ export * from "./xtxShohiKanni";
 export * from "./depreciation";
 export * from "./trialBalance";
 export * from "./balanceSheet";
+export * from "./businessStart";
