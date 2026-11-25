@@ -72,6 +72,7 @@ import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { mcpAssetTools } from "./mcpAssetTools";
 import { mcpImportTools } from "./mcpImportTools";
 import { mcpLedgerTools } from "./mcpLedgerTools";
+import { mcpMetaTools } from "./mcpMetaTools";
 import { mcpProfileTools } from "./mcpProfileTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
@@ -425,6 +426,7 @@ const DOMAIN_TOOL_MODULES: McpToolModule[] = [
   mcpImportTools,
   mcpLedgerTools,
   mcpAssetTools,
+  mcpMetaTools,
 ];
 
 /** 公開ツール一覧（コア＋ドメイン別モジュール）。 */
