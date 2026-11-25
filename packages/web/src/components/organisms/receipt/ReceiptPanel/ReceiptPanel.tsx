@@ -1,6 +1,6 @@
 import { ACCOUNT_NAMES, guessIncomeType, Transaction } from "@etax/shared";
-import { useRef, useState } from "react";
-import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
+import { ChangeEvent, useRef, useState } from "react";
+import { Button, Card, Col, Icon, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { AccountClassification, ClassificationSource } from "@types";
 import { analyzeReceiptImage, recordClassificationFeedback } from "@utils";
@@ -33,6 +33,15 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 撮影専用の受け口。capture を付けるとスマホではカメラが直接開く
+  // （PCでは通常のファイル選択として振る舞う）。
+  const cameraRef = useRef<HTMLInputElement>(null);
+
+  const handleFileInput = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) void handleFile(f);
+    e.target.value = "";
+  };
 
   const handleFile = async (file: File) => {
     setLoading(true);
@@ -88,23 +97,44 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
           <Text variant="sectionTitle">領収書・レシート画像から帳簿付け</Text>
           <Text variant="muted">
             画像を選ぶと、AIが日付・金額・支払先を読み取り、勘定科目は自動生成ルールと
-            AI判定で提案します。内容を確認して「帳簿に追加」を押すと取引に加わり、
+            AI判定で提案します。スマホでは「撮影する」からその場で撮影できます。
+            内容を確認して「帳簿に追加」を押すと取引に加わり、
             確定した科目は学習されて、生成ルールとプロンプトに反映されます。
           </Text>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className={styles.hiddenInput}
+            onChange={handleFileInput}
+          />
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className={styles.hiddenInput}
+            onChange={handleFileInput}
+          />
           <Row gap="sm" align="center" wrap>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className={styles.hiddenInput}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleFile(f);
-                e.target.value = "";
-              }}
-            />
-            <Button disabled={loading} disabledReason="読み取り中です" onClick={() => fileRef.current?.click()}>
-              {loading ? "読み取り中…" : "画像を選ぶ"}
+            <Button
+              size="md"
+              disabled={loading}
+              disabledReason="読み取り中です"
+              onClick={() => cameraRef.current?.click()}
+            >
+              <Icon name="camera" />
+              {loading ? "読み取り中…" : "撮影する"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              disabled={loading}
+              disabledReason="読み取り中です"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Icon name="image" />
+              画像を選ぶ
             </Button>
           </Row>
           {previewUrl && <img src={previewUrl} alt="領収書のプレビュー" className={styles.preview} />}
@@ -113,9 +143,17 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
 
       {error && <AlertBox variant="error">{error}</AlertBox>}
       {added && (
-        <AlertBox variant="notice">
-          帳簿に追加しました。ダッシュボードで集計に反映されています。科目は学習履歴に記録しました。
-        </AlertBox>
+        <Col gap="sm">
+          <AlertBox variant="notice">
+            帳簿に追加しました。ダッシュボードで集計に反映されています。科目は学習履歴に記録しました。
+          </AlertBox>
+          <Row gap="sm" align="center">
+            <Button size="md" onClick={() => cameraRef.current?.click()}>
+              <Icon name="camera" />
+              続けて撮影する
+            </Button>
+          </Row>
+        </Col>
       )}
 
       {draft && (
@@ -168,8 +206,10 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
                   .map((c) => `${c.account} ${Math.round(c.probability * 100)}%`)
                   .join("、")}`}
             </Text>
-            <Row gap="sm" align="center">
-              <Button onClick={handleAdd}>帳簿に追加</Button>
+            <Row gap="sm" align="center" wrap>
+              <Button size="md" className={styles.addButton} onClick={handleAdd}>
+                帳簿に追加
+              </Button>
               <Text variant="caption">支出として登録します（金額はマイナスで計上）。</Text>
             </Row>
           </Col>
