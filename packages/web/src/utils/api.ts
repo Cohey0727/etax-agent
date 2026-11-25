@@ -27,6 +27,8 @@ import {
   FixedAssetInput,
   FixedAssetRecord,
   FreeeTrialBalance,
+  FetchTrialBalanceRequest,
+  TrialBalanceResponse,
   ImportCsvResponse,
   LedgerTransaction,
   LedgerTransactionInput,
@@ -434,6 +436,13 @@ export async function deleteFixedAssetImage(assetId: number, fileId: string): Pr
 }
 
 /** freee試算表（取り込み済みの実績データ）。未取り込みなら null。 */
+/** 試算表レポート（当年＋前年）を計算系APIから取得する。 */
+export async function fetchTrialBalance(
+  request: FetchTrialBalanceRequest,
+): Promise<TrialBalanceResponse> {
+  return postJson<TrialBalanceResponse>("/api/calc/trial-balance", request);
+}
+
 export async function fetchFreeeTrialBalance(): Promise<FreeeTrialBalance | null> {
   try {
     const resp = await fetch("/api/freee/trial-balance");

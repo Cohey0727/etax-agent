@@ -16,6 +16,7 @@ import { AppView, FilingTab } from "@types";
 const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Dashboard]: "dashboard",
   [AppView.Ledger]: "ledger",
+  [AppView.Reports]: "trial-balance",
   [AppView.Filing]: "final-tax",
   [AppView.Import]: "import",
   [AppView.Receipt]: "receipt",

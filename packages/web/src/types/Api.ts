@@ -129,6 +129,83 @@ export interface FreeeTrialBalance {
   years: Array<{ year: number; accounts: FreeeTrialBalanceAccount[] }>;
 }
 
+/* ---------- 試算表レポート（POST /api/calc/trial-balance） ---------- */
+
+export interface TrialBalanceLine {
+  category: string;
+  /** ドリルダウン用：この行に含まれる実際の勘定科目名 */
+  categories: string[];
+  amount: number;
+}
+
+export interface TrialBalancePl {
+  revenue_lines: TrialBalanceLine[];
+  revenue: number;
+  purchases: number;
+  expense_lines: TrialBalanceLine[];
+  expenses: number;
+  income_before_blue: number;
+  blue_deduction: number;
+  income: number;
+}
+
+export interface TrialBalanceOther {
+  revenue_lines: TrialBalanceLine[];
+  revenue: number;
+  expense_lines: TrialBalanceLine[];
+  expenses: number;
+}
+
+export interface TrialBalanceMonth {
+  month: number;
+  revenue: number;
+  expenses: number;
+  balance: number;
+  cumulative: number;
+}
+
+export interface TrialBalanceBsRow {
+  key: string;
+  label: string;
+  opening: number;
+  closing: number;
+}
+
+export interface TrialBalanceBs {
+  asset_rows: TrialBalanceBsRow[];
+  liability_rows: TrialBalanceBsRow[];
+  owner_loan: number;
+  owner_borrowing: number;
+  capital: number;
+  income_before_blue: number;
+  opening_assets: number;
+  opening_liabilities_capital: number;
+  closing_assets: number;
+  closing_liabilities_capital: number;
+  opening_balanced: boolean;
+  closing_balanced: boolean;
+}
+
+export interface TrialBalanceReport {
+  year: number;
+  business: TrialBalancePl;
+  real_estate: TrialBalancePl;
+  other: TrialBalanceOther;
+  monthly: TrialBalanceMonth[];
+  balance_sheet: TrialBalanceBs | null;
+}
+
+export interface TrialBalanceResponse extends TrialBalanceReport {
+  previous: TrialBalanceReport;
+}
+
+export interface FetchTrialBalanceRequest {
+  transactions: Transaction[];
+  year: number;
+  filing_type?: FilingType;
+  real_estate_business_scale?: boolean;
+}
+
 /** 年度ごとの申告ステータス。サーバーAPIのワイヤ形式（snake_case）。 */
 export interface FilingStatus {
   year: number;
