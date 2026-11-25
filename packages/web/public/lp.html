@@ -118,11 +118,11 @@
         width: 34px;
         height: 34px;
         border-radius: 9px;
-        background: #fff;
-        color: var(--navy);
-        display: grid;
-        place-items: center;
-        font-size: 1rem;
+        display: block;
+      }
+      /* ワードマークは「e」だけラベンダーを差す（banner-reversed と同じ配色）。 */
+      .brand-e {
+        color: #a79dff;
       }
       .nav-links {
         display: flex;
@@ -744,8 +744,8 @@
       <div class="wrap">
         <div class="hero-top">
           <a class="brand" href="/lp.html">
-            <span class="brand-mark">e</span>
-            eTaxAgent
+            <img class="brand-mark" src="/favicon.svg" alt="" width="34" height="34" />
+            <span><span class="brand-e">e</span>TaxAgent</span>
           </a>
           <nav class="nav-links">
             <a href="#concept">コンセプト</a>
@@ -1005,8 +1005,8 @@
         <div class="footer-inner">
           <div>
             <a class="brand" href="/lp.html">
-              <span class="brand-mark">e</span>
-              eTaxAgent
+              <img class="brand-mark" src="/favicon.svg" alt="" width="34" height="34" />
+              <span><span class="brand-e">e</span>TaxAgent</span>
             </a>
             <p>運営：合同会社オッカム</p>
             <p>
