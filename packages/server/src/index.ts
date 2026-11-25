@@ -30,7 +30,10 @@
  *   POST   /api/files/presign-upload アップロード受け口URLの発行（ローカル保存）
  *   GET    /api/freee/trial-balance freee試算表（データディレクトリの取り込み済み実績）
  *   POST   /api/etax/export-xtx     e-Tax 申告等データ（XTX）の出力（DB不要・ステートレス）
- *   ALL    /mcp                     MCP（外部エージェント連携。MCP_TOKEN 設定時は Bearer 認証）
+ *   ALL    /mcp                     MCP（外部エージェント連携。認証はユーザーごとの
+ *                                   APIトークン（設定画面で発行、Bearer）。認証フロー
+ *                                   自体は対象外でトークンが代替する。MCP_TOKEN は
+ *                                   従来互換のマスタートークン）
  *
  * DB は PostgreSQL（DATABASE_URL）で、起動時にテーブルを自己修復する。
  * 起動時は packages/web のビルド成果物（dist）も同一ポートで配信する

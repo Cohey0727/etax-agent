@@ -170,7 +170,7 @@ DATABASE_URL が未設定、または DB に接続できない場合でもサー
 | `AGENT_API_KEY` | APIキー。CSVのAIマッピングと対話エージェントでのみ使用 |
 | `AGENT_BASE_URL` | 任意。エンドポイントの上書き（既定: OpenRouter `https://openrouter.ai/api/v1` ／ claude 時は `https://api.anthropic.com`） |
 | `AGENT_MODEL` | 任意。モデル名の上書き（既定: openai `openai/gpt-4o-mini` ／ claude `claude-sonnet-4-5`） |
-| `MCP_TOKEN` | 任意。設定すると `/mcp`（MCP連携）に Bearer 認証を必須にする。公開時は必須 |
+| `MCP_TOKEN` | 任意。`/mcp`（MCP連携）の従来互換マスタートークン。通常は設定画面で発行するユーザーごとの API キーを使う |
 | `ETAX_AUTH_MODE` | `required` でログイン必須（SaaS運用）。未設定はローカル運用（認証なし） |
 | `ETAX_AUTH_SECRET` | ログイン・チャレンジの署名鍵。未設定時は `ETAX_ENCRYPTION_KEY` を使う |
 | `ETAX_ENCRYPTION_KEY` | 機微項目（マイナンバー・TOTP秘密）の保存時暗号化キー。未設定だと平文保存になるため、公開運用では必ず設定 |
@@ -258,13 +258,34 @@ bun run cli -- amend --year 2024 --original examples/original_2024.json --correc
 ### MCP（外部エージェント連携）
 
 `/mcp` は MCP（Model Context Protocol）の Streamable HTTP エンドポイント（ステートレス）。
-Muse・Grok 等の MCP クライアントから、サーバーの帳簿DBに対して
-集計（aggregate_year）・消費税3方式比較（consumption_tax）・所得税計算（income_tax）・
-修正申告の差分（amendment_delta）・取引CRUD（list/add/update/delete_transaction）・
-勘定科目の判定と学習（classify_account / classify_feedback）・
-XTX出力（export_xtx）・申告ステータス（get/set_filing_status）・
-税務知識ベース検索（search_tax_knowledge）が使える。
+Muse・Codex 等の MCP クライアントから、REST API のほぼ全機能をツールとして使える。
+主なツール: 集計（aggregate_year / monthly_breakdown）・消費税3方式比較（consumption_tax）・
+所得税計算（income_tax）・修正申告の差分（amendment_delta）・
+取引CRUDと履歴・年度置換（list/get/add/update/delete_transaction、get_transaction_history、
+replace_year_transactions）・CSV取込（import_csv / list_imports）・
+勘定科目マスタと判定・学習（list_account_master、classify_account / classify_batch /
+classify_feedback）・XTX出力（export_xtx / export_consumption_xtx）・
+納税者プロフィールと申告入力（get/save_taxpayer_profile、get/save_filing_inputs）・
+申告ステータス（get/set_filing_status）・確定スナップショット（create/list_filing_snapshots）・
+固定資産CRUD・償却・画像（register/list/update/delete_fixed_asset、get_depreciation、
+attach/list/detach_fixed_asset_image）・証憑（list/get/list_transaction_receipts、
+link/unlink_receipt、get_receipt_content）・設定（get/update_systemone_settings、
+get/update_classify_settings）・freee試算表（get_freee_trial_balance）・
+ヘルスチェック（health）・税務知識ベース検索（search_tax_knowledge）。
 数字の計算は REST API と同じ決定的な関数のみで行う。e-Tax への提出は行わない。
+
+認証はユーザーごとの API トークン（Bearer）。トークンはログイン後の設定画面
+「外部エージェント連携（MCP）」で発行し、DB にはハッシュのみを保存する。
+トークンはそのユーザーの全機能アクセスを持ち、ツールは発行ユーザーの
+テナント文脈で実行される（他ユーザーのデータは見えない）。
+サインアップ/ログイン等の認証フロー自体は MCP の対象外で、トークンがそれを
+代替する。API キーの発行・取消もトークンからは行えず、設定画面でのみ行う。
+対象外: アプリ内エージェントの対話（/api/agent/chat）、領収書の AI 解析
+（/api/receipts/analyze）、課金のチェックアウト/Webhook、申告書 PDF 等の
+様式 PDF 出力（申告データは XTX を正とする）、ファイルの署名付きアップロード
+（MCP では CSV 取込・画像添付が Base64 で代替する）。
+環境変数 MCP_TOKEN は従来互換のマスタートークンとして残る（単一テナントの
+ローカル運用向け）。
 
 ## 税務知識ベース
 
@@ -278,10 +299,11 @@ XTX出力（export_xtx）・申告ステータス（get/set_filing_status）・
 
 ```bash
 claude mcp add --transport http etax-agent http://localhost:3001/mcp \
-  --header "Authorization: Bearer <MCP_TOKEN>"
+  --header "Authorization: Bearer <設定画面で発行したAPIキー>"
 ```
 
-`MCP_TOKEN` 未設定の場合は `--header` は不要（ローカル前提）。
+認証が無効なローカル運用（ETAX_AUTH_MODE 未設定かつ MCP_TOKEN 未設定）の
+場合は `--header` は不要。
 
 ## 検証
 
