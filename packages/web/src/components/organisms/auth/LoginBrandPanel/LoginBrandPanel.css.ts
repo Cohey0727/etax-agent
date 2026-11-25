@@ -33,11 +33,12 @@ const styles = {
     position: "relative",
     overflow: "hidden",
     display: "flex",
+    flex: "46 1 0%",
     background: `linear-gradient(165deg, ${theme.color.navy} 0%, ${theme.color.navyDeep} 80%)`,
     color: theme.color.onNavy,
     padding: theme.space.xxl,
     "@media": {
-      "(max-width: 900px)": { padding: theme.space.lg },
+      "(max-width: 900px)": { flex: "none", width: "100%", padding: theme.space.lg },
     },
   }),
   // 罫線グリッドの装飾。下に向けて消える。
