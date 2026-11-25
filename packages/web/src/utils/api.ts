@@ -34,6 +34,9 @@ import {
   FixedAssetImageRecord,
   FixedAssetInput,
   FixedAssetRecord,
+  InvoiceInput,
+  InvoiceRecord,
+  InvoiceSearchFilters,
   FreeeTrialBalance,
   FetchTrialBalanceRequest,
   TrialBalanceResponse,
@@ -1042,4 +1045,88 @@ export async function createBillingCheckout(): Promise<{ url: string }> {
     success_url: `${window.location.origin}/settings?billing=success`,
     cancel_url: `${window.location.origin}/settings?billing=cancel`,
   });
+}
+
+/** 請求書の一覧を取得する（検索条件つき）。DB未接続の場合は null。 */
+export async function fetchInvoices(
+  filters: InvoiceSearchFilters = {},
+): Promise<InvoiceRecord[] | null> {
+  try {
+    const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.min_total !== undefined) params.set("min_total", String(filters.min_total));
+    if (filters.max_total !== undefined) params.set("max_total", String(filters.max_total));
+    if (filters.status) params.set("status", filters.status);
+    const query = params.toString();
+    const resp = await fetch(query ? `/api/invoices?${query}` : "/api/invoices");
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { invoices: InvoiceRecord[] };
+    return data.invoices;
+  } catch {
+    return null;
+  }
+}
+
+/** 請求書（下書き）を作成する。 */
+export async function createInvoice(input: InvoiceInput): Promise<InvoiceRecord> {
+  const resp = await fetch("/api/invoices", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson<{ invoice: InvoiceRecord | null }>(resp);
+  if (!data.invoice) throw new Error("請求書の作成に失敗しました");
+  return data.invoice;
+}
+
+/** 請求書（下書き）を更新する。発行済みはサーバー側で拒まれる。 */
+export async function updateInvoice(id: number, input: InvoiceInput): Promise<InvoiceRecord> {
+  const resp = await fetch(`/api/invoices/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson<{ invoice: InvoiceRecord | null }>(resp);
+  if (!data.invoice) throw new Error("請求書の更新に失敗しました");
+  return data.invoice;
+}
+
+/** 請求書（下書き）を削除する。 */
+export async function deleteInvoice(id: number): Promise<void> {
+  const resp = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
+  await parseJson(resp);
+}
+
+/** 請求書を発行する（採番され、以後は変更できない）。 */
+export async function issueInvoice(id: number): Promise<InvoiceRecord> {
+  const resp = await fetch(`/api/invoices/${id}/issue`, { method: "POST" });
+  const data = await parseJson<{ invoice: InvoiceRecord | null }>(resp);
+  if (!data.invoice) throw new Error("請求書の発行に失敗しました");
+  return data.invoice;
+}
+
+/** 発行済み請求書の修正用下書きを作成する（修正した適格請求書の元）。 */
+export async function createInvoiceCorrection(id: number): Promise<InvoiceRecord> {
+  const resp = await fetch(`/api/invoices/${id}/correct`, { method: "POST" });
+  const data = await parseJson<{ invoice: InvoiceRecord | null }>(resp);
+  if (!data.invoice) throw new Error("修正用下書きの作成に失敗しました");
+  return data.invoice;
+}
+
+/** 発行済み請求書のPDFをダウンロードする。 */
+export async function downloadInvoicePdf(invoice: InvoiceRecord): Promise<void> {
+  const resp = await fetch(`/api/invoices/${invoice.id}/pdf`);
+  if (!resp.ok) {
+    const data = (await resp.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error ?? `HTTP ${resp.status}`);
+  }
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `請求書_${invoice.document_number ?? invoice.id}.pdf`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

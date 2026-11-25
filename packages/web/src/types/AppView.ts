@@ -5,6 +5,7 @@ export const AppView = {
   Ledger: "ledger",
   Reports: "reports",
   FixedAssets: "fixedAssets",
+  Invoices: "invoices",
   Filing: "filing",
   Taxpayer: "taxpayer",
   Settings: "settings",

@@ -6,6 +6,7 @@ export * from "./ReceiptPage";
 export * from "./LedgerPage";
 export * from "./ReportsPage";
 export * from "./FixedAssetsPage";
+export * from "./InvoicesPage";
 export * from "./FilingPage";
 export * from "./TaxpayerPage";
 export * from "./SettingsPage";

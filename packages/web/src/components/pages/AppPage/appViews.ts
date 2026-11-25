@@ -4,6 +4,7 @@ import { AppView, ViewPageProps } from "@types";
 import { DashboardPage } from "../DashboardPage";
 import { FilingPage } from "../FilingPage";
 import { FixedAssetsPage } from "../FixedAssetsPage";
+import { InvoicesPage } from "../InvoicesPage";
 import { ImportPage } from "../ImportPage";
 import { LedgerPage } from "../LedgerPage";
 import { ReceiptPage } from "../ReceiptPage";
@@ -22,6 +23,7 @@ export const appViews = [
   { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
   { id: AppView.Reports, label: "試算表", icon: "bill", nav: true, Component: ReportsPage },
   { id: AppView.FixedAssets, label: "固定資産", icon: "building", nav: true, Component: FixedAssetsPage },
+  { id: AppView.Invoices, label: "請求書", icon: "receipt", nav: true, Component: InvoicesPage },
   { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },
   { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
   { id: AppView.Settings, label: "設定", icon: "settings", nav: true, Component: SettingsPage },
