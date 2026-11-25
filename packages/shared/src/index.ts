@@ -3,6 +3,7 @@ export * from "./text";
 export * from "./taxcalc";
 export * from "./taxParameters";
 export * from "./deductions";
+export * from "./expandedIncome";
 export * from "./ledger";
 export * from "./sample";
 export * from "./xtx";
