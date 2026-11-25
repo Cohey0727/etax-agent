@@ -7,7 +7,15 @@ export interface TextProps extends HTMLAttributes<HTMLSpanElement> {
    * 文字の種類
    * @default "body"
    */
-  variant?: "body" | "muted" | "caption" | "statLabel" | "statValue" | "sectionTitle" | "title";
+  variant?:
+    | "body"
+    | "muted"
+    | "caption"
+    | "statLabel"
+    | "statValue"
+    | "sectionTitle"
+    | "title"
+    | "hero";
   children?: ReactNode;
 }
 

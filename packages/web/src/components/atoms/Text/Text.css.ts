@@ -33,6 +33,13 @@ const styles = {
       letterSpacing: theme.letterSpacing.tight,
       lineHeight: theme.lineHeight.tight,
     },
+    // ログイン画面のブランド見出し専用。通常画面の見出しには使わない。
+    hero: {
+      fontSize: theme.fontSizes.hero,
+      fontWeight: theme.fontWeight.bold,
+      letterSpacing: theme.letterSpacing.tight,
+      lineHeight: theme.lineHeight.tight,
+    },
   }),
 };
 
