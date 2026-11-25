@@ -69,6 +69,7 @@ import {
 } from "../../repositories/receiptRepository";
 import { classifyAccount } from "../classification/classifyAccount";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
+import { mcpAssetTools } from "./mcpAssetTools";
 import { mcpImportTools } from "./mcpImportTools";
 import { mcpLedgerTools } from "./mcpLedgerTools";
 import { mcpProfileTools } from "./mcpProfileTools";
@@ -419,7 +420,12 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
 ];
 
 /** ドメイン別ツールモジュール（定義と実行関数は各モジュールが持つ）。 */
-const DOMAIN_TOOL_MODULES: McpToolModule[] = [mcpProfileTools, mcpImportTools, mcpLedgerTools];
+const DOMAIN_TOOL_MODULES: McpToolModule[] = [
+  mcpProfileTools,
+  mcpImportTools,
+  mcpLedgerTools,
+  mcpAssetTools,
+];
 
 /** 公開ツール一覧（コア＋ドメイン別モジュール）。 */
 export const MCP_TOOLS: McpToolDef[] = [
