@@ -69,11 +69,12 @@ import {
 } from "../../repositories/receiptRepository";
 import { classifyAccount } from "../classification/classifyAccount";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
+import { mcpProfileTools } from "./mcpProfileTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
 
 export type { McpToolDef, McpToolResult } from "./mcpToolKit";
-import type { McpToolDef, McpToolResult } from "./mcpToolKit";
+import type { McpToolDef, McpToolHandler, McpToolModule, McpToolResult } from "./mcpToolKit";
 import {
   filingOptionsArg,
   filingTypeProperty,
@@ -92,7 +93,7 @@ import {
   yearProperty,
 } from "./mcpToolKit";
 
-export const MCP_TOOLS: McpToolDef[] = [
+const CORE_MCP_TOOLS: McpToolDef[] = [
   {
     name: "aggregate_year",
     description:
@@ -414,6 +415,20 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
 ];
+
+/** ドメイン別ツールモジュール（定義と実行関数は各モジュールが持つ）。 */
+const DOMAIN_TOOL_MODULES: McpToolModule[] = [mcpProfileTools];
+
+/** 公開ツール一覧（コア＋ドメイン別モジュール）。 */
+export const MCP_TOOLS: McpToolDef[] = [
+  ...CORE_MCP_TOOLS,
+  ...DOMAIN_TOOL_MODULES.flatMap((module) => module.tools),
+];
+
+const DOMAIN_HANDLERS: Record<string, McpToolHandler> = Object.assign(
+  {},
+  ...DOMAIN_TOOL_MODULES.map((module) => module.handlers),
+);
 
 /** REST の planGate（/api/etax/*）と対応する、課金対象の MCP ツール。 */
 const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set(["export_xtx", "export_consumption_xtx"]);
@@ -927,11 +942,14 @@ export async function dispatchMcpTool(
         if (!row) throw new Error("申告ステータスの更新に失敗しました");
         return textResult({ status: filingStatusToApi(row) });
       }
-      default:
+      default: {
+        const domainHandler = DOMAIN_HANDLERS[name];
+        if (domainHandler) return await domainHandler(args);
         return {
           content: [{ type: "text", text: `未知のツールです: ${name}` }],
           isError: true,
         };
+      }
     }
   } catch (e) {
     return {
