@@ -1,5 +1,5 @@
 /**
- * deductionStorage.ts — 控除・税額控除・雑所得・申告種別の入力（年度別）。
+ * deductionStorage.ts — 控除・税額控除・雑所得・申告種別・貸借対照表の入力（年度別）。
  *
  * 保存先はサーバーのDB（filing_inputs）。端末の localStorage は同期読み出し
  * 用のキャッシュとして併用する: 保存は両方へ書き、画面表示時は
@@ -18,6 +18,8 @@ import {
   MiscIncomeInput,
   SalaryIncomeInput,
   TaxCreditInputs,
+  XtxBalanceSheetInput,
+  normalizeBalanceSheetInput,
 } from "@etax/shared";
 import { fetchFilingInputs, saveFilingInputs } from "@utils/api";
 import { userScopedKey } from "@utils/userStorage";
@@ -59,6 +61,12 @@ export interface DeductionState {
   mutualAidEntries: BreakdownEntry[];
   /** 医療費の内訳 */
   medicalEntries: BreakdownEntry[];
+  /**
+   * 貸借対照表（青色申告決算書4面）の入力。ドメイン形式
+   * （XtxBalanceSheetInput）で保持し、APIへ渡すときだけワイヤ形式へ
+   * 変換する。未入力は null。
+   */
+  balanceSheet: XtxBalanceSheetInput | null;
 }
 
 const BREAKDOWN_STATE_FIELDS: Record<
@@ -160,6 +168,7 @@ export function freshDeductionState(): DeductionState {
     socialInsuranceEntries: [],
     mutualAidEntries: [],
     medicalEntries: [],
+    balanceSheet: null,
   };
 }
 
@@ -246,6 +255,7 @@ export function parseDeductionState(parsed: Partial<DeductionState>): DeductionS
     socialInsuranceEntries: parseBreakdownEntries(parsed.socialInsuranceEntries),
     mutualAidEntries: parseBreakdownEntries(parsed.mutualAidEntries),
     medicalEntries: parseBreakdownEntries(parsed.medicalEntries),
+    balanceSheet: normalizeBalanceSheetInput(parsed.balanceSheet),
   };
 }
 
