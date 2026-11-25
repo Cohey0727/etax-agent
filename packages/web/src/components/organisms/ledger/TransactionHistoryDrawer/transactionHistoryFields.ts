@@ -4,7 +4,7 @@ import {
   historyActionLabel,
   HistoryFieldValue,
   HistoryTimelineEntry,
-} from "@components/molecules";
+} from "@components/molecules/HistoryTimeline/historyChanges";
 import { LedgerTransactionSnapshot, TransactionHistoryEntry } from "@types";
 import { formatYen } from "@utils/format";
 import { INCOME_TYPE_OPTIONS } from "../LedgerPanel/ledgerOptions";

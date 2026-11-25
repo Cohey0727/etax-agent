@@ -4,7 +4,7 @@ import {
   historyActionLabel,
   HistoryFieldValue,
   HistoryTimelineEntry,
-} from "@components/molecules";
+} from "@components/molecules/HistoryTimeline/historyChanges";
 import { FilingSubmission, FilingSubmissionHistoryEntry } from "@types";
 
 /**
