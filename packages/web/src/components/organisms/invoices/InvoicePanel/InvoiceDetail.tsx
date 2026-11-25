@@ -2,6 +2,7 @@ import { Badge, Button, Col, Row, Table, TableCell, TableHeaderCell, Text } from
 import { InvoiceRecord } from "@types";
 import { formatYen } from "@utils/format";
 import styles from "./InvoicePanel.css";
+import { InvoiceReconciliation } from "./InvoiceReconciliation";
 import { ROUNDING_LABELS, STATUS_LABELS, formatQuantity } from "./invoiceOptions";
 
 export interface InvoiceDetailProps {
@@ -13,6 +14,8 @@ export interface InvoiceDetailProps {
   onIssue: () => void;
   onCorrect: () => void;
   onDownloadPdf: () => void;
+  /** 消込・解除の後に一覧側の消込状態を更新するための通知。 */
+  onReconciliationChanged?: () => void;
 }
 
 /**
@@ -28,6 +31,7 @@ export const InvoiceDetail = ({
   onIssue,
   onCorrect,
   onDownloadPdf,
+  onReconciliationChanged,
 }: InvoiceDetailProps) => {
   const isIssued = invoice.status === "issued";
   return (
@@ -113,6 +117,10 @@ export const InvoiceDetail = ({
           <Text variant="sectionTitle">備考</Text>
           <Text variant="body">{invoice.memo}</Text>
         </Col>
+      ) : null}
+
+      {isIssued ? (
+        <InvoiceReconciliation invoice={invoice} onChanged={onReconciliationChanged ?? (() => {})} />
       ) : null}
 
       <Row gap="sm" justify="end" wrap>

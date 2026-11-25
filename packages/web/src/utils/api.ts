@@ -34,9 +34,12 @@ import {
   FixedAssetImageRecord,
   FixedAssetInput,
   FixedAssetRecord,
+  CreateInvoicePaymentInput,
   InvoiceInput,
+  InvoicePaymentsResult,
   InvoiceRecord,
   InvoiceSearchFilters,
+  ReconciliationCandidateRecord,
   FreeeTrialBalance,
   FetchTrialBalanceRequest,
   TrialBalanceResponse,
@@ -1113,6 +1116,57 @@ export async function createInvoiceCorrection(id: number): Promise<InvoiceRecord
   const data = await parseJson<{ invoice: InvoiceRecord | null }>(resp);
   if (!data.invoice) throw new Error("修正用下書きの作成に失敗しました");
   return data.invoice;
+}
+
+/** 請求書の消込一覧とサマリを取得する。DB未接続の場合は null。 */
+export async function fetchInvoicePayments(
+  invoiceId: number,
+): Promise<InvoicePaymentsResult | null> {
+  try {
+    const resp = await fetch(`/api/invoices/${invoiceId}/payments`);
+    if (!resp.ok) return null;
+    return (await resp.json()) as InvoicePaymentsResult;
+  } catch {
+    return null;
+  }
+}
+
+/** 請求書へ入金を消し込む（候補の承認もこの呼び出しで確定する）。 */
+export async function createInvoicePayment(
+  invoiceId: number,
+  input: CreateInvoicePaymentInput,
+): Promise<InvoicePaymentsResult> {
+  const resp = await fetch(`/api/invoices/${invoiceId}/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson<InvoicePaymentsResult>(resp);
+}
+
+/** 請求書の消込を解除する（自動生成した調整取引も一緒に取り消される）。 */
+export async function deleteInvoicePayment(
+  invoiceId: number,
+  paymentId: number,
+): Promise<InvoicePaymentsResult> {
+  const resp = await fetch(`/api/invoices/${invoiceId}/payments/${paymentId}`, {
+    method: "DELETE",
+  });
+  return parseJson<InvoicePaymentsResult>(resp);
+}
+
+/** 消込候補の自動推測を取得する。DB未接続の場合は null。 */
+export async function fetchPaymentSuggestions(
+  invoiceId: number,
+): Promise<ReconciliationCandidateRecord[] | null> {
+  try {
+    const resp = await fetch(`/api/invoices/${invoiceId}/payment-suggestions`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { candidates: ReconciliationCandidateRecord[] };
+    return data.candidates;
+  } catch {
+    return null;
+  }
 }
 
 /** 発行済み請求書のPDFをダウンロードする。 */

@@ -384,8 +384,67 @@ export interface InvoiceRecord {
   issuer: InvoiceIssuerRecord | null;
   lines: InvoiceLineRecord[];
   totals: InvoiceTotalsRecord;
+  /** 入金消込の状態。下書きは null */
+  payment_status: InvoicePaymentStatus | null;
+  /** 消込済み額（差額調整を含む）。 */
+  settled_amount: number;
+  /** 未消込の残額。 */
+  remaining_amount: number;
   created_at: string;
   updated_at: string;
+}
+
+/** 消込レコードの種別。fee / discount は差額調整、overpayment は過入金の預り金。 */
+export type InvoicePaymentKind = "payment" | "fee" | "discount" | "overpayment";
+
+/** 請求書の消込状態。 */
+export type InvoicePaymentStatus = "unpaid" | "partial" | "paid";
+
+/** 消込サマリ（サーバーが消込レコードから計算する）。 */
+export interface InvoiceSettlementRecord {
+  total_amount: number;
+  settled_amount: number;
+  remaining_amount: number;
+  overpaid_amount: number;
+  status: InvoicePaymentStatus;
+}
+
+/** 消込レコード。transaction は紐付く取引（入金または自動生成の調整取引）。 */
+export interface InvoicePaymentRecord {
+  id: number;
+  document_id: number;
+  transaction_id: number;
+  adjustment_transaction_id: number | null;
+  kind: InvoicePaymentKind;
+  amount: number;
+  transaction: LedgerTransaction | null;
+  created_at: string;
+}
+
+export interface InvoicePaymentsResult {
+  payments: InvoicePaymentRecord[];
+  settlement: InvoiceSettlementRecord;
+}
+
+/** 消込の作成入力。amount 省略時は未消込額と請求残額の小さい方を充当する。 */
+export interface CreateInvoicePaymentInput {
+  transaction_id: number;
+  amount?: number;
+  fee_amount?: number;
+  discount_amount?: number;
+  treat_excess_as_deposit?: boolean;
+}
+
+/** 消込候補の推測理由。 */
+export type ReconciliationReason = "amount_exact" | "amount_partial" | "name_match" | "date_close";
+
+/** 自動推測の消込候補。承認するまで消込は確定しない。 */
+export interface ReconciliationCandidateRecord {
+  transaction: LedgerTransaction;
+  unapplied_amount: number;
+  suggested_amount: number;
+  score: number;
+  reasons: ReconciliationReason[];
 }
 
 /** 消費税額の端数処理方法。 */

@@ -2,7 +2,7 @@ import { Badge, Card, Col, Row, Text } from "@components/atoms";
 import { InvoiceRecord } from "@types";
 import { formatYen } from "@utils/format";
 import styles from "./InvoicePanel.css";
-import { STATUS_LABELS } from "./invoiceOptions";
+import { PAYMENT_STATUS_LABELS, STATUS_LABELS } from "./invoiceOptions";
 
 export interface InvoiceListProps {
   invoices: InvoiceRecord[];
@@ -27,12 +27,18 @@ export const InvoiceList = ({ invoices, onSelect }: InvoiceListProps) => {
                 <Badge>修正（{invoice.corrects_document_number}）</Badge>
               ) : null}
               {invoice.is_qualified ? <Badge>適格請求書</Badge> : null}
+              {invoice.payment_status ? (
+                <Badge>{PAYMENT_STATUS_LABELS[invoice.payment_status]}</Badge>
+              ) : null}
             </Row>
             <Text variant="sectionTitle">{invoice.counterparty_name || "（交付先未入力）"}</Text>
             <Row justify="spaceBetween" align="center">
               <Text variant="caption">発行日 {invoice.issue_date}</Text>
               <Text variant="body">{formatYen(invoice.totals.total)}</Text>
             </Row>
+            {invoice.payment_status && invoice.payment_status !== "paid" ? (
+              <Text variant="caption">残額 {formatYen(invoice.remaining_amount)}</Text>
+            ) : null}
           </Col>
         </Card>
       ))}

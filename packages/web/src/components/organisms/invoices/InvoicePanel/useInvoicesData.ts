@@ -50,6 +50,11 @@ export function useInvoicesData() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** 現在の検索条件のまま一覧を再取得する（消込後の状態反映用）。 */
+  const refreshList = useCallback(async () => {
+    await reload(filters);
+  }, [reload, filters]);
+
   const applyFilters = async (next: InvoiceSearchFilters) => {
     setFilters(next);
     setBusy(true);
@@ -174,6 +179,7 @@ export function useInvoicesData() {
     filters,
     deleteArmedId,
     setDeleteArmedId,
+    refreshList,
     applyFilters,
     handleCreate,
     handleUpdate,

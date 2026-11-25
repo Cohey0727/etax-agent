@@ -36,6 +36,13 @@
       "when": 1795597934294,
       "tag": "0004_business_start_inputs",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795601247907,
+      "tag": "0005_invoice_payments",
+      "breakpoints": true
     }
   ]
 }
