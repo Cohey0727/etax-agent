@@ -12,8 +12,10 @@ import {
   computeInvoiceTotals,
   invoiceLineAmount,
   InvoiceLineInput,
+  InvoiceSettlement,
   InvoiceTaxRounding,
 } from "@etax/shared";
+import { settlementSummaries } from "./reconciliationRepository";
 import { Db } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import {
@@ -91,11 +93,12 @@ function lineToApi(row: DocumentLineRow): InvoiceLineResponse {
   };
 }
 
-/** DB行＋明細を API レスポンス形式へ変換する。 */
+/** DB行＋明細を API レスポンス形式へ変換する。settlement は消込サマリ（発行済みのみ）。 */
 export function invoiceToApi(
   row: DocumentRow,
   lines: DocumentLineRow[],
   correctsDocumentNumber: string | null,
+  settlement?: InvoiceSettlement,
 ): InvoiceResponse {
   const drafts: InvoiceLineDraft[] = lines.map((line) => ({
     item_name: line.itemName,
@@ -106,6 +109,8 @@ export function invoiceToApi(
     is_reduced_rate: line.isReducedRate,
   }));
   const rounding = row.taxRounding as InvoiceTaxRounding;
+  const totals =
+    (row.totalsSnapshot as InvoiceTotalsResponse | null) ?? totalsToApi(drafts, rounding);
   return {
     id: row.id,
     kind: row.kind,
@@ -122,7 +127,11 @@ export function invoiceToApi(
     corrects_document_number: correctsDocumentNumber,
     issuer: (row.issuerSnapshot as InvoiceIssuer | null) ?? null,
     lines: lines.map(lineToApi),
-    totals: (row.totalsSnapshot as InvoiceTotalsResponse | null) ?? totalsToApi(drafts, rounding),
+    totals,
+    payment_status:
+      row.status === "issued" && settlement ? settlement.status : null,
+    settled_amount: settlement?.settledAmount ?? 0,
+    remaining_amount: settlement?.remainingAmount ?? totals.total,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
   };
@@ -288,7 +297,12 @@ export async function fetchInvoiceResponse(db: Db, row: DocumentRow): Promise<In
     const source = await getInvoiceRow(db, row.correctsDocumentId);
     correctsDocumentNumber = source?.documentNumber ?? null;
   }
-  return invoiceToApi(row, lines, correctsDocumentNumber);
+  let settlement: InvoiceSettlement | undefined;
+  if (row.status === "issued") {
+    const summaries = await settlementSummaries(db, new Map([[row.id, row.totalAmount]]));
+    settlement = summaries.get(row.id);
+  }
+  return invoiceToApi(row, lines, correctsDocumentNumber, settlement);
 }
 
 /** 下書きを発行済みにする（採番と発行者スナップショットを凍結する）。 */
