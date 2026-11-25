@@ -51,18 +51,33 @@ export interface SystemOneTestResult {
   error: string | null;
 }
 
+/** API キーの状態: active（有効）/ revoked（失効）/ expired（期限切れ）。 */
+export type ApiKeyStatus = "active" | "revoked" | "expired";
+
 /** 外部エージェント連携（MCP）用 API キー。平文キーは発行時のみ返る。 */
 export interface ApiKeyItem {
   id: number;
   name: string;
   key_prefix: string;
   last_used_at: string | null;
+  /** 有効期限。null は無期限。 */
+  expires_at: string | null;
+  /** 失効日時。null は失効していない。 */
+  revoked_at: string | null;
+  status: ApiKeyStatus;
   created_at: string;
 }
 
 /** API キー発行の結果（平文キーを含む、この応答でしか見られない）。 */
 export interface CreatedApiKey extends ApiKeyItem {
   key: string;
+}
+
+/** MCP 接続情報（設定画面の接続セクション用）。 */
+export interface McpInfo {
+  endpoint_path: string;
+  tool_count: number;
+  tools: { name: string; description: string }[];
 }
 
 /** 外部接続（AI）の接続テスト結果。 */
