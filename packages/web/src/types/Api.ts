@@ -248,6 +248,10 @@ export interface LedgerTransaction {
   category: string;
   income_type: string;
   tax_category: string;
+  /** 事業専用割合（家事按分、0〜100の整数）。100 は全額事業分 */
+  business_ratio_percent: number;
+  /** 按分根拠のメモ（任意） */
+  business_ratio_basis: string;
   import_id: number | null;
   created_at: string;
 }
@@ -267,6 +271,10 @@ export interface LedgerTransactionInput {
   category: string;
   income_type: string;
   tax_category: string;
+  /** 事業専用割合（家事按分、0〜100の整数） */
+  business_ratio_percent: number;
+  /** 按分根拠のメモ（任意） */
+  business_ratio_basis: string;
 }
 
 /** 証憑（領収書画像）レコード。サーバーAPIのワイヤ形式（snake_case）。 */

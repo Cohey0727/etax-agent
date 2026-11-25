@@ -644,6 +644,10 @@ export function ledgerRowToTransaction(row: LedgerTransaction): Transaction {
     category: row.category,
     income_type: incomeType,
     tax_category: row.tax_category ?? "",
+    // 旧サーバーの応答など割合が無い場合は未指定（100）として扱う
+    business_ratio_percent:
+      typeof row.business_ratio_percent === "number" ? row.business_ratio_percent : undefined,
+    business_ratio_basis: row.business_ratio_basis ?? undefined,
   };
 }
 
@@ -658,6 +662,8 @@ export function transactionToLedgerInput(tx: Transaction): LedgerTransactionInpu
     category: tx.category,
     income_type: tx.income_type,
     tax_category: tx.tax_category,
+    business_ratio_percent: tx.business_ratio_percent ?? 100,
+    business_ratio_basis: tx.business_ratio_basis ?? "",
   };
 }
 

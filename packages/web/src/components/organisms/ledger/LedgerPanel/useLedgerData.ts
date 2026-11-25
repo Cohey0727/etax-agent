@@ -86,7 +86,9 @@ export function useLedgerData(
       edit.account !== original.account ||
       edit.category !== original.category ||
       edit.income_type !== original.income_type ||
-      edit.tax_category !== original.tax_category
+      edit.tax_category !== original.tax_category ||
+      edit.business_ratio_percent !== original.business_ratio_percent ||
+      edit.business_ratio_basis !== original.business_ratio_basis
     );
   };
 
