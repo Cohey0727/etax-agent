@@ -6,14 +6,16 @@
  * ともに記録する（電子帳簿保存法の訂正・削除履歴に相当する仕組みで、
  * 取引の transaction_history と同じ方式）。行 → API 形式への変換もここ。
  */
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Db, DbOrTx } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import {
+  FilingSubmissionHistoryEntryResponse,
   FilingSubmissionKind,
   FilingSubmissionResponse,
 } from "../schemas/filingSubmission";
 import {
+  FilingSubmissionHistoryRow,
   FilingSubmissionRow,
   filingSubmissionHistoryTable,
   filingSubmissionsTable,
@@ -31,6 +33,38 @@ export function filingSubmissionToApi(row: FilingSubmissionRow): FilingSubmissio
       : null,
     updated_at: row.updatedAt.toISOString(),
   };
+}
+
+/** 変更履歴の DB 行を API レスポンス形式に変換する。 */
+export function filingSubmissionHistoryToApi(
+  row: FilingSubmissionHistoryRow,
+): FilingSubmissionHistoryEntryResponse {
+  return {
+    id: row.id,
+    year: row.year,
+    kind: row.kind as FilingSubmissionKind,
+    action: row.action,
+    before: (row.before as FilingSubmissionResponse | null) ?? null,
+    after: (row.after as FilingSubmissionResponse | null) ?? null,
+    created_at: row.createdAt.toISOString(),
+  };
+}
+
+/** 対象年の提出の記録の変更履歴を新しい順に取得する。 */
+export async function listFilingSubmissionHistoryRows(
+  db: DbOrTx,
+  year: number,
+): Promise<FilingSubmissionHistoryRow[]> {
+  const owner = currentUserId();
+  const conditions = [eq(filingSubmissionHistoryTable.year, year)];
+  if (owner !== undefined) {
+    conditions.push(eq(filingSubmissionHistoryTable.ownerUserId, owner));
+  }
+  return db
+    .select()
+    .from(filingSubmissionHistoryTable)
+    .where(and(...conditions))
+    .orderBy(desc(filingSubmissionHistoryTable.id));
 }
 
 /** 現在のテナントで対象（年度×税目）の行を引く条件。 */

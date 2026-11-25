@@ -20,6 +20,10 @@ import {
 } from "../usecases/getTransactionHistory";
 import { listTransactionsHandler, listTransactionsRoute } from "../usecases/listTransactions";
 import {
+  listTransactionHistoryHandler,
+  listTransactionHistoryRoute,
+} from "../usecases/listTransactionHistory";
+import {
   replaceYearTransactionsHandler,
   replaceYearTransactionsRoute,
 } from "../usecases/replaceYearTransactions";
@@ -36,5 +40,6 @@ app.openapi(replaceYearTransactionsRoute, replaceYearTransactionsHandler);
 app.openapi(updateTransactionRoute, updateTransactionHandler);
 app.openapi(deleteTransactionRoute, deleteTransactionHandler);
 app.openapi(getTransactionHistoryRoute, getTransactionHistoryHandler);
+app.openapi(listTransactionHistoryRoute, listTransactionHistoryHandler);
 
 export default app;

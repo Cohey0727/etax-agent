@@ -170,6 +170,36 @@ export async function listTransactionHistoryRows(
     .orderBy(desc(transactionHistoryTable.id));
 }
 
+/**
+ * 全取引の変更履歴を新しい順に取得する（帳簿の履歴ビューア用）。
+ * 履歴自体に所有者列が無いため、テナント文脈がある場合は親取引と
+ * 結合して所有者で絞る。論理削除済みの取引の履歴も対象に含める。
+ */
+export async function listRecentTransactionHistoryRows(
+  db: Db,
+  limit: number,
+): Promise<TransactionHistoryRow[]> {
+  const owner = currentUserId();
+  if (owner === undefined) {
+    return db
+      .select()
+      .from(transactionHistoryTable)
+      .orderBy(desc(transactionHistoryTable.id))
+      .limit(limit);
+  }
+  const rows = await db
+    .select({ history: transactionHistoryTable })
+    .from(transactionHistoryTable)
+    .innerJoin(
+      transactionsTable,
+      eq(transactionHistoryTable.transactionId, transactionsTable.id),
+    )
+    .where(eq(transactionsTable.ownerUserId, owner))
+    .orderBy(desc(transactionHistoryTable.id))
+    .limit(limit);
+  return rows.map((row) => row.history);
+}
+
 type TransactionValues = {
   date: string;
   fiscalYear: number;
