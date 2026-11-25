@@ -53,7 +53,7 @@ export const MonthlyBalance = ({ transactions }: MonthlyBalanceProps) => {
     <Card>
       <Col gap="sm">
         <Text variant="statLabel">月別の収支</Text>
-        <div>
+        <div className={styles.tableScroll}>
           <div className={`${styles.monthRow} ${styles.monthHead}`}>
             <span>月</span>
             <span className={styles.monthCell}>収入</span>
