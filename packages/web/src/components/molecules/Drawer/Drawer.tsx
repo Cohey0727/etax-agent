@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button, Icon, Text } from "@components/atoms";
 import styles from "./Drawer.css";
 
@@ -60,7 +61,9 @@ export const Drawer = ({ open, title, onClose, layer = 0, width, children }: Dra
 
   if (!open) return null;
 
-  return (
+  // 祖先の transform（画面遷移のバウンスアニメーション等）があると position: fixed が
+  // その祖先基準になって位置がずれるため、body 直下へポータルで描く。
+  return createPortal(
     <div className={styles.root} style={{ zIndex: BASE_Z_INDEX + layer * LAYER_Z_INDEX_STEP }}>
       <div className={styles.overlay} onClick={onClose} aria-hidden="true" />
       <aside
@@ -83,7 +86,8 @@ export const Drawer = ({ open, title, onClose, layer = 0, width, children }: Dra
         </div>
         <div className={styles.body}>{children}</div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
