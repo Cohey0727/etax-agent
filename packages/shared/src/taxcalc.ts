@@ -1,6 +1,5 @@
 /**
-* taxcalc.ts — 税額計算の純粋関数群（本モジュールが数字の計算の正本。
-* 旧 Python 版 ~/workspace/kakutei-agent/taxcalc.py は参照用レガシー）。
+* taxcalc.ts — 税額計算の純粋関数群（本モジュールが数字の計算の正本）。
 *
 * 金額の計算は LLM に一切依存しない。ここにある関数は
 * 決定的（同じ入力→同じ出力）で、テストで検証できる。
@@ -578,7 +577,7 @@ return typeof v === "number" && Number.isFinite(v);
 *
 * 数値でないフィールドは差分対象外（ただし両者にあり値が違う場合は
 * そのまま記録する）。片方にしか無い数値フィールドは 0 との差分にする。
-* "_" で始まるキー（注記）は差分対象外（Python 版と同一）。
+* "_" で始まるキー（注記）は差分対象外。
 */
 export function amendmentDelta(
 original: Record<string, unknown>,

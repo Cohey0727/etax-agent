@@ -260,7 +260,7 @@ export const AppTemplate = ({
         <Row gap="sm" align="center" justify="spaceBetween" className={styles.barInner}>
           <Row gap="sm" align="center">
             <Button
-              variant={sidebarOpen ? "tabActive" : "ghost"}
+              variant={sidebarOpen ? "tabActive" : "tab"}
               size="sm"
               onClick={toggleSidebar}
               aria-pressed={sidebarOpen}
@@ -270,7 +270,7 @@ export const AppTemplate = ({
             </Button>
           </Row>
           <Button
-            variant={agentPanelOpen ? "tabActive" : "ghost"}
+            variant={agentPanelOpen ? "tabActive" : "tab"}
             size="sm"
             onClick={toggleAgentPanel}
             aria-pressed={agentPanelOpen}

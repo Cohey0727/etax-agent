@@ -78,7 +78,7 @@ function yearTransactions(ctx: AgentContext, year: number): Transaction[] {
   return filterYear(ctx.transactions, year);
 }
 
-/** ツール実行（Python 版 AgentSession の各ツールに対応）。 */
+/** ツール実行のディスパッチ。 */
 export function dispatchTool(
   name: string,
   args: Record<string, unknown>,
@@ -284,7 +284,7 @@ export function dispatchTool(
         return { error: `未知のツールです: ${name}` };
     }
   } catch (e) {
-    // ツール側の例外はLLMへ返して判断させる（Python 版と同一方針）
+    // ツール側の例外はLLMへ返して判断させる
     return { error: `${e instanceof Error ? e.name : "Error"}: ${e instanceof Error ? e.message : String(e)}` };
   }
 }

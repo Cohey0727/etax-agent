@@ -4,6 +4,10 @@ import { theme } from "@configs";
 const styles = {
   root: style({
     appearance: "none",
+    // 選択肢の文言で決まる固有幅に引きずられない（flex 子要素では min-width:auto が
+    // 固有幅を下限にしてしまい、狭い画面で親をはみ出すため）。
+    minWidth: 0,
+    maxWidth: "100%",
     // 高さは Input・Button と共通の controlHeight に固定する。
     height: theme.component.controlHeight,
     padding: `0 calc(${theme.component.controlPaddingX} + 14px) 0 ${theme.component.controlPaddingX}`,

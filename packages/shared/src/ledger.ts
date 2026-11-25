@@ -1,5 +1,5 @@
 /**
- * ledger.ts — 取引CSVの取込と、税込経理ベースの集計（Python 版 ledger.py の移植）。
+ * ledger.ts — 取引CSVの取込と、税込経理ベースの集計。
  *
  * 内部CSV形式（ヘッダー必須）:
  *   date, description, amount, account, category, income_type
@@ -21,7 +21,7 @@ import { normalizeBusinessRatio, transactionBusinessAmount } from "./taxcalc";
 import { VALID_INCOME_TYPES, type IncomeType, type Transaction } from "./types";
 
 // ---------------------------------------------------------------------------
-// 勘定科目の推定ルール（Python 版 rules/categories.json の移植）
+// 勘定科目の推定ルール
 // ---------------------------------------------------------------------------
 
 export interface CategoryRule {
@@ -248,7 +248,7 @@ export function parseCsv(text: string): string[][] {
 }
 
 // ---------------------------------------------------------------------------
-// 内部形式CSVの取込（Python 版 import_csv の移植）
+// 内部形式CSVの取込
 // ---------------------------------------------------------------------------
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

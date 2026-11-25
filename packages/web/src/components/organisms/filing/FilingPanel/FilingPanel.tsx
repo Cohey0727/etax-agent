@@ -1,6 +1,6 @@
 import { BlueDeductionOptions, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, Transaction } from "@etax/shared";
 import { Fragment, useMemo } from "react";
-import { Button, Card, Col, Row, Text } from "@components/atoms";
+import { Badge, Button, Card, Col, Row, Text } from "@components/atoms";
 import {
   ConfirmComparePanel,
   buildSnapshotFigures,
@@ -127,9 +127,9 @@ export const FilingPanel = ({
                   <Col gap="sm" className={styles.itemMain}>
                     <Text className={styles.itemLabel}>
                       {item.label}
-                      <span className={done ? styles.stateDone : styles.stateTodo}>
+                      <Badge tone={done ? "accent" : "muted"}>
                         {done ? `確定${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未確定"}
-                      </span>
+                      </Badge>
                     </Text>
                     <Text variant="muted">{item.description}</Text>
                   </Col>

@@ -26,28 +26,6 @@ const styles = {
     flexShrink: 0,
     whiteSpace: "nowrap",
   }),
-  // 状態（済み）。
-  stateDone: style({
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.color.accentText,
-    backgroundColor: theme.color.accentSoft,
-    borderRadius: theme.borderRadius.pill,
-    padding: "2px 8px",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  }),
-  // 状態（未）。
-  stateTodo: style({
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.color.muted,
-    backgroundColor: theme.color.lineSoft,
-    borderRadius: theme.borderRadius.pill,
-    padding: "2px 8px",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  }),
   // 読み込み中の状態欄のバー。
   skeletonBar: style({
     display: "block",

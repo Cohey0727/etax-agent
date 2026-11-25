@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 /**
- * cli.ts — スタンドアロン計算 CLI（旧 Python 版 main.py の計算系
- * サブコマンドの移植。本ツールが数字の計算の正本）。
+ * cli.ts — スタンドアロン計算 CLI（計算は packages/shared の実装を使う）。
  *
  * サブコマンド:
  *   aggregate   --year YYYY --csv FILE [--filing-type blue65|blue55|blue10|white]

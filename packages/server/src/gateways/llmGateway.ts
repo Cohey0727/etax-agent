@@ -20,9 +20,9 @@
  *   - claude スキーマ: POST {base_url}/v1/messages（Anthropic Messages API）
  *                      tool_use / tool_result 形式へ相互変換する。
  *
- * 送信ヘッダーの注意（Python 版で実地に判明した互換性要件）:
- *   - User-Agent は既定のランタイム値だと Cloudflare に弾かれる
- *     （Python-urllib の既定UAで error 1010）ため 'etax-agent/0.1' を明示する。
+ * 送信ヘッダーの注意（互換性要件）:
+ *   - User-Agent はランタイム既定値だと Cloudflare に弾かれる
+ *     （error 1010）ため 'etax-agent/0.1' を明示する。
  *   - OpenCode Go は x-opencode-session ヘッダーが無いリクエストを拒否する
  *     （MissingSessionID）ため、OpenAI互換では常に送る。他のエンドポイントでは無視される。
  */
@@ -221,7 +221,7 @@ class ClaudeLLM implements LLMClient {
   private static ANTHROPIC_VERSION = "2023-06-01";
   constructor(private config: AgentConfig) {}
 
-  /** 内部形式 → Anthropic 形式への変換（Python 版 _convert の移植） */
+  /** 内部形式 → Anthropic 形式への変換 */
   private convert(messages: ChatMessage[], tools?: ToolDef[]) {
     const systemParts: string[] = [];
     const conv: Array<Record<string, unknown>> = [];
