@@ -13,14 +13,18 @@ import {
   XtxBalanceSheetInput,
   XtxTaxpayer,
   buildXtxFiling,
-  categoryTotals,
   computeCorrectedFigures,
   computeIncomeTax,
   computeManualIncomes,
   depreciationDetailRow,
   filterYear,
   normalizeTransactions,
+  statementCategoryTotals,
 } from "@etax/shared";
+
+// 決算書の科目別合計は @etax/shared の単一実装を使う。MCP の export_xtx
+// ツールがこのモジュールから import しているため、名前は引き続き export する。
+export { statementCategoryTotals };
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import {
@@ -54,27 +58,6 @@ export const exportXtxRoute = createRoute({
     },
   },
 });
-
-/**
- * 決算書の経費欄に渡す科目別合計を作る。支出は正の金額（絶対値）に揃え、
- * 不動産の家賃収入だけは収入として正のまま残す。
- * MCP の export_xtx ツールからも使うため export する。
- */
-export function statementCategoryTotals(
-  transactions: Transaction[],
-  incomeType: Transaction["income_type"],
-): Record<string, number> {
-  const totals = categoryTotals(transactions.filter((t) => t.income_type === incomeType));
-  const result: Record<string, number> = {};
-  for (const [category, value] of Object.entries(totals)) {
-    if (category === "家賃収入") {
-      if (value > 0) result[category] = value;
-    } else if (value < 0) {
-      result[category] = -value;
-    }
-  }
-  return result;
-}
 
 /** リクエストの固定資産入力から減価償却明細行（事業・不動産別）を組み立てる。 */
 function depreciationFromWire(

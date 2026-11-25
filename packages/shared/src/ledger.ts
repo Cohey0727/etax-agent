@@ -355,6 +355,27 @@ export function categoryTotals(transactions: Transaction[]): Record<string, numb
   return totals;
 }
 
+/**
+ * 決算書の経費欄に渡す科目別合計を作る。支出は正の金額（絶対値）に揃え、
+ * 不動産の家賃収入だけは収入として正のまま残す。XTX生成（exportXtx）と
+ * 試算表（trialBalance）が同じ振り分けを使うための単一実装。
+ */
+export function statementCategoryTotals(
+  transactions: Transaction[],
+  incomeType: IncomeType,
+): Record<string, number> {
+  const totals = categoryTotals(transactions.filter((t) => t.income_type === incomeType));
+  const result: Record<string, number> = {};
+  for (const [category, value] of Object.entries(totals)) {
+    if (category === "家賃収入") {
+      if (value > 0) result[category] = value;
+    } else if (value < 0) {
+      result[category] = -value;
+    }
+  }
+  return result;
+}
+
 /** 住宅家賃（消費税非課税）の収入合計。category=家賃収入 のものを拾う。 */
 export function residentialRentTotal(transactions: Transaction[]): number {
   return transactions
