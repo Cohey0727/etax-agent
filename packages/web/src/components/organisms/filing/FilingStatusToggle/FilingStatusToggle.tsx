@@ -1,4 +1,4 @@
-import { Button, Card, Col, Row, Text } from "@components/atoms";
+import { Badge, Button, Card, Col, Row, Text } from "@components/atoms";
 import { FilingStatusKey, useFilingStatus } from "./useFilingStatus";
 import styles from "./FilingStatusToggle.css";
 
@@ -42,9 +42,9 @@ export const FilingStatusToggle = ({
         <Col gap="sm" className={styles.itemMain}>
           <Text className={styles.itemLabel}>
             {label}
-            <span className={done ? styles.stateDone : styles.stateTodo}>
+            <Badge tone={done ? "accent" : "muted"}>
               {done ? `確定${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未確定"}
-            </span>
+            </Badge>
           </Text>
           <Text variant="muted">{description}</Text>
           {loaded && !available ? (
