@@ -40,7 +40,9 @@ import {
   AGRICULTURE_BLUE_EXPENSE_CATEGORIES,
   AGRICULTURE_WHITE_OTHER_EXPENSE_CATEGORIES,
   AgricultureStatement,
+  EMPTY_AGRICULTURE_INPUT,
   agricultureIncomeBeforeBlueDeduction,
+  computeAgricultureStatement,
 } from "./agriculture";
 import { DepreciationDetailRow } from "./depreciation";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
@@ -1797,17 +1799,31 @@ export function buildXtxFiling(data: XtxFilingData): string {
   }
   // 農業所得がある場合は農業所得用の様式を添付する（Issue #24）。
   // 農業分は一般用の決算書には混ぜず、専用様式でのみ申告する。
-  const agricultureStatement = data.agriculture?.statement;
+  // 農業区分の固定資産だけがある場合も、減価償却明細を落とさないよう
+  // 空の決算書で様式を添付する（事業所得側の明細添付と同じ扱い）。
+  const agricultureDepRows = data.depreciation?.agriculture ?? [];
+  let agricultureData = normalized;
+  if (!agricultureData.agriculture && agricultureDepRows.length > 0) {
+    agricultureData = {
+      ...normalized,
+      agriculture: {
+        statement: computeAgricultureStatement(EMPTY_AGRICULTURE_INPUT),
+        blueDeduction: 0,
+      },
+    };
+  }
+  const agricultureStatement = agricultureData.agriculture?.statement;
   if (
     agricultureStatement &&
     (agricultureStatement.revenueTotal !== 0 ||
       agricultureStatement.expensesTotal !== 0 ||
-      agricultureStatement.beefCattleExemptionAmount !== 0)
+      agricultureStatement.beefCattleExemptionAmount !== 0 ||
+      agricultureDepRows.length > 0)
   ) {
     forms.push(
       white
-        ? { id: "KOA120", xml: buildKoa120(normalized, versions.koa120) }
-        : { id: "KOA240", xml: buildKoa240(normalized, versions.koa240) },
+        ? { id: "KOA120", xml: buildKoa120(agricultureData, versions.koa120) }
+        : { id: "KOA240", xml: buildKoa240(agricultureData, versions.koa240) },
     );
   }
   if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0) {

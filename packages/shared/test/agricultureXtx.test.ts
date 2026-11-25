@@ -240,4 +240,14 @@ describe("農業所得のXTX生成", () => {
     expect(xtx).toContain('<KOA120-2 page="2">');
     expect(xtx).toContain("<AJL00020>トラクター</AJL00020>");
   });
+
+  test("農業入力が無くても農業区分の固定資産があれば明細つきで様式が出る", () => {
+    const xtx = buildFiling({ withAgriculture: false, withDepreciation: true });
+    expect(xtx).toContain('<KOA240 VR="8.0"');
+    expect(xtx).toContain('<KOA240-3 page="3">');
+    expect(xtx).toContain("<APF02050>トラクター</APF02050>");
+    // 農業の収支が無いので申告書の農業欄は出ない
+    expect(xtx).not.toContain("ABB00040");
+    expect(xtx).not.toContain("ABB00320");
+  });
 });
