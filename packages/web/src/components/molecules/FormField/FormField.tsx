@@ -3,7 +3,8 @@ import { InputHTMLAttributes, ReactNode } from "react";
 import { Col, Icon, IconName, Input } from "@components/atoms";
 import styles from "./FormField.css";
 
-export interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface FormFieldProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   /** 項目ラベル。クリックで入力欄にフォーカスする。 */
   label: string;
   /** 入力欄の左端に重ねるアイコン。 */

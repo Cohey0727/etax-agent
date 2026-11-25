@@ -4,7 +4,7 @@ import { FormField } from "@components/molecules/FormField";
 import styles from "./PasswordField.css";
 
 export interface PasswordFieldProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size"> {
   /** 項目ラベル。 */
   label: string;
   /** 入力欄の大きさ。 @default "md" */
