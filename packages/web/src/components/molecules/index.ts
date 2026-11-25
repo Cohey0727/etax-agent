@@ -6,3 +6,5 @@ export * from "./Drawer";
 export * from "./Modal";
 export * from "./HistoryTimeline";
 export * from "./MultiSelectFilter";
+export * from "./FormField";
+export * from "./PasswordField";

@@ -45,7 +45,7 @@ export const theme = createThemeContract({
   // 余白の段階。コンポーネント間の間隔はこの段階から選ぶ。
   space: { xs: null, sm: null, md: null, lg: null, xl: null, xxl: null },
   borderRadius: { sm: null, md: null, lg: null, pill: null },
-  fontSizes: { xs: null, sm: null, base: null, lg: null, xl: null, xxl: null },
+  fontSizes: { xs: null, sm: null, base: null, lg: null, xl: null, xxl: null, hero: null },
   fontWeight: { regular: null, medium: null, semibold: null, bold: null },
   lineHeight: { tight: null, snug: null, normal: null },
   letterSpacing: { tight: null, snug: null, wide: null },
@@ -84,7 +84,16 @@ export const theme = createThemeContract({
 const baseTokens = {
   space: { xs: "4px", sm: "8px", md: "16px", lg: "24px", xl: "32px", xxl: "48px" },
   borderRadius: { sm: "10px", md: "14px", lg: "20px", pill: "999px" },
-  fontSizes: { xs: "12px", sm: "13px", base: "14px", lg: "15px", xl: "20px", xxl: "26px" },
+  fontSizes: {
+    xs: "12px",
+    sm: "13px",
+    base: "14px",
+    lg: "15px",
+    xl: "20px",
+    xxl: "26px",
+    // ログイン画面のブランド見出し専用の特大サイズ（通常画面では使わない）。
+    hero: "40px",
+  },
   fontWeight: { regular: "400", medium: "500", semibold: "600", bold: "700" },
   lineHeight: { tight: "1.3", snug: "1.6", normal: "1.7" },
   letterSpacing: { tight: "-0.01em", snug: "0.01em", wide: "0.04em" },
