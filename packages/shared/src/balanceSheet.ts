@@ -180,14 +180,21 @@ export function carryOverBalanceSheet(
 // ワイヤ形式への変換
 // ---------------------------------------------------------------------------
 
+/** 名称も金額も無い追加行は「行なし」として送る（様式に空行を出さない）。 */
+function wireExtra(extra: BalanceSheetWireExtra | undefined): BalanceSheetWireExtra | undefined {
+  if (!extra) return undefined;
+  if (extra.name.trim() === "" && !extra.opening && !extra.closing) return undefined;
+  return extra;
+}
+
 /** ドメイン形式をAPIのワイヤ形式（snake_case）へ変換する。 */
 export function balanceSheetToWire(input: XtxBalanceSheetInput): BalanceSheetWireInput {
   return {
     opening: input.opening,
     closing: input.closing,
-    extra_asset: input.extraAsset,
-    extra_liability1: input.extraLiability1,
-    extra_liability2: input.extraLiability2,
+    extra_asset: wireExtra(input.extraAsset),
+    extra_liability1: wireExtra(input.extraLiability1),
+    extra_liability2: wireExtra(input.extraLiability2),
     owner_loan: input.ownerLoan,
     owner_borrowing: input.ownerBorrowing,
   };

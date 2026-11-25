@@ -163,4 +163,17 @@ describe("balanceSheetToWire", () => {
       owner_borrowing: 6,
     });
   });
+
+  test("名称も金額も無い追加行は送らない", () => {
+    const wire = balanceSheetToWire({
+      opening: {},
+      closing: {},
+      extraAsset: { name: "", opening: 0, closing: 0 },
+      extraLiability1: { name: "  ", opening: 0, closing: 0 },
+      ownerLoan: 0,
+      ownerBorrowing: 0,
+    });
+    expect(wire.extra_asset).toBeUndefined();
+    expect(wire.extra_liability1).toBeUndefined();
+  });
 });
