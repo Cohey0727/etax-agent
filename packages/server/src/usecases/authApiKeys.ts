@@ -1,6 +1,7 @@
 /**
- * authApiKeys.ts — 外部エージェント（MCP）接続用 API キーの発行・一覧・削除（usecases）。
+ * authApiKeys.ts — 外部エージェント（MCP）接続用 API キーの発行・一覧・失効（usecases）。
  * 平文キーは発行時のレスポンスでだけ返す（DBにはハッシュのみ）。
+ * 発行・失効は権限昇格にあたるため MCP ツール化せず、この画面（人間の操作）だけが正規経路。
  */
 import { createRoute, RouteHandler, z } from "@hono/zod-openapi";
 import { Context } from "hono";
@@ -8,10 +9,12 @@ import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { currentUserId } from "../lib/tenantContext";
 import {
+  apiKeyStatus,
   createApiKey,
-  deleteApiKeyRow,
   listApiKeyRows,
+  revokeApiKeyRow,
 } from "../repositories/userRepository";
+import { ApiKeyRow } from "../repositories/schema";
 import { ApiKeyResponseSchema, CreateApiKeyRequestSchema } from "../schemas/auth";
 
 function requireUser(c: Context): { db: NonNullable<ReturnType<typeof getDb>>; userId: number } {
@@ -22,20 +25,30 @@ function requireUser(c: Context): { db: NonNullable<ReturnType<typeof getDb>>; u
   return { db, userId };
 }
 
-function keyToApi(row: {
-  id: number;
-  name: string;
-  keyPrefix: string;
-  lastUsedAt: Date | null;
-  createdAt: Date;
-}): z.infer<typeof ApiKeyResponseSchema> {
+function keyToApi(row: ApiKeyRow): z.infer<typeof ApiKeyResponseSchema> {
   return {
     id: row.id,
     name: row.name,
     key_prefix: row.keyPrefix,
     last_used_at: row.lastUsedAt?.toISOString() ?? null,
+    expires_at: row.expiresAt?.toISOString() ?? null,
+    revoked_at: row.revokedAt?.toISOString() ?? null,
+    status: apiKeyStatus(row),
     created_at: row.createdAt.toISOString(),
   };
+}
+
+/** 有効期限の入力を検証する。null・未指定は無期限（null を返す）。過去・解釈不能は 400。 */
+function parseExpiresAt(input: string | null | undefined): Date | null {
+  if (input === null || input === undefined) return null;
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    throw new HTTPException(400, { message: "有効期限の形式が不正です" });
+  }
+  if (date.getTime() <= Date.now()) {
+    throw new HTTPException(400, { message: "有効期限には未来の日時を指定してください" });
+  }
+  return date;
 }
 
 export const createApiKeyRoute = createRoute({
@@ -54,9 +67,9 @@ export const createApiKeyRoute = createRoute({
 
 export const createApiKeyHandler: RouteHandler<typeof createApiKeyRoute> = async (c) => {
   const { db, userId } = requireUser(c);
-  const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
-  const name = typeof body?.name === "string" ? body.name.slice(0, 100) : "";
-  const { row, key } = await createApiKey(db, userId, name);
+  const body = c.req.valid("json");
+  const expiresAt = parseExpiresAt(body.expires_at);
+  const { row, key } = await createApiKey(db, userId, body.name, expiresAt);
   return c.json({ ...keyToApi(row), key });
 };
 
@@ -77,23 +90,23 @@ export const listApiKeysHandler: RouteHandler<typeof listApiKeysRoute> = async (
   return c.json(rows.map(keyToApi));
 };
 
-export const deleteApiKeyRoute = createRoute({
+export const revokeApiKeyRoute = createRoute({
   method: "delete",
   path: "/api/auth/api-keys/{id}",
   request: { params: z.object({ id: z.string() }) },
   responses: {
     200: {
-      content: { "application/json": { schema: z.object({ deleted: z.boolean() }) } },
-      description: "APIキーを削除した",
+      content: { "application/json": { schema: z.object({ revoked: z.boolean() }) } },
+      description: "APIキーを失効させた（行は履歴として残る）",
     },
   },
 });
 
-export const deleteApiKeyHandler: RouteHandler<typeof deleteApiKeyRoute> = async (c) => {
+export const revokeApiKeyHandler: RouteHandler<typeof revokeApiKeyRoute> = async (c) => {
   const { db, userId } = requireUser(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id)) throw new HTTPException(400, { message: "id が不正です" });
-  const deleted = await deleteApiKeyRow(db, userId, id);
-  if (!deleted) throw new HTTPException(404, { message: "APIキーが見つかりません" });
-  return c.json({ deleted: true });
+  const revoked = await revokeApiKeyRow(db, userId, id);
+  if (!revoked) throw new HTTPException(404, { message: "APIキーが見つかりません" });
+  return c.json({ revoked: true });
 };

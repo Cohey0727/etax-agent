@@ -104,6 +104,12 @@ export const AuthConfigResponseSchema = z
 export const CreateApiKeyRequestSchema = z
   .object({
     name: z.string().max(100).default("").openapi({ description: "キーの名前（用途メモ）" }),
+    /** 有効期限（ISO 8601）。null・未指定は無期限。過去日時は受け付けない。 */
+    expires_at: z
+      .string()
+      .nullable()
+      .optional()
+      .openapi({ description: "有効期限（ISO 8601文字列）。null は無期限" }),
   })
   .openapi("CreateApiKeyRequest");
 
@@ -115,6 +121,29 @@ export const ApiKeyResponseSchema = z
     /** 発行時のみ平文キーを返す */
     key: z.string().optional(),
     last_used_at: z.string().nullable(),
+    /** 有効期限。null は無期限 */
+    expires_at: z.string().nullable(),
+    /** 失効日時。null は失効していない */
+    revoked_at: z.string().nullable(),
+    /** 状態: active（有効）/ revoked（失効）/ expired（期限切れ） */
+    status: z.enum(["active", "revoked", "expired"]),
     created_at: z.string(),
   })
   .openapi("ApiKeyResponse");
+
+export const McpToolInfoSchema = z
+  .object({
+    name: z.string(),
+    description: z.string(),
+  })
+  .openapi("McpToolInfo");
+
+export const McpInfoResponseSchema = z
+  .object({
+    /** MCP エンドポイントのパス（オリジンはクライアント側で補う） */
+    endpoint_path: z.string(),
+    /** 公開している MCP ツールの件数 */
+    tool_count: z.number(),
+    tools: z.array(McpToolInfoSchema),
+  })
+  .openapi("McpInfoResponse");
