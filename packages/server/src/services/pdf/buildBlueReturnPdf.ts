@@ -105,19 +105,19 @@ function drawForm(ctx: DrawContext, values: BlueReturnFormValues): void {
     drawTextFitted(ctx, office.location, 0.464, center, 10, 0.49);
   });
   // 2 所得の種類（○で囲む）
-  if (values.incomeTypes.includes("business")) drawCircle(ctx, 0.11, 0.4975, 0.042, 0.0115);
-  if (values.incomeTypes.includes("real_estate")) drawCircle(ctx, 0.2475, 0.4975, 0.045, 0.0115);
-  if (values.incomeTypes.includes("forest")) drawCircle(ctx, 0.355, 0.4975, 0.037, 0.0115);
+  if (values.incomeTypes.includes("business")) drawCircle(ctx, 0.1055, 0.5067, 0.04, 0.0115);
+  if (values.incomeTypes.includes("real_estate")) drawCircle(ctx, 0.2475, 0.5067, 0.045, 0.0115);
+  if (values.incomeTypes.includes("forest")) drawCircle(ctx, 0.355, 0.5067, 0.037, 0.0115);
   // 3 青色申告承認の取消し・取りやめの有無
   if (values.cancellationHas === true) {
-    drawCircle(ctx, 0.077, 0.5405, 0.016, 0.01);
+    drawCircle(ctx, 0.089, 0.55, 0.016, 0.01);
     if (values.cancellationDate) {
       drawTextRight(ctx, String(values.cancellationDate.eraYear), 0.374, 0.5483, 10);
       drawTextRight(ctx, String(values.cancellationDate.month), 0.456, 0.5487, 10);
       drawTextRight(ctx, String(values.cancellationDate.day), 0.542, 0.5469, 10);
     }
   }
-  if (values.cancellationHas === false) drawCircle(ctx, 0.663, 0.5405, 0.016, 0.01);
+  if (values.cancellationHas === false) drawCircle(ctx, 0.676, 0.55, 0.016, 0.01);
   // 4 本年1月16日以後新たに業務を開始した場合、その開始した年月日
   if (values.businessStartDate) {
     drawTextRight(ctx, String(values.businessStartDate.eraYear), 0.63, 0.569, 10);
@@ -126,7 +126,7 @@ function drawForm(ctx: DrawContext, values: BlueReturnFormValues): void {
   }
   // 5 相続による事業承継の有無
   if (values.inheritanceHas === true) {
-    drawCircle(ctx, 0.077, 0.601, 0.016, 0.01);
+    drawCircle(ctx, 0.089, 0.6173, 0.016, 0.01);
     if (values.inheritanceDate) {
       drawTextRight(ctx, String(values.inheritanceDate.eraYear), 0.329, 0.6185, 10);
       drawTextRight(ctx, String(values.inheritanceDate.month), 0.415, 0.6182, 10);
@@ -134,7 +134,7 @@ function drawForm(ctx: DrawContext, values: BlueReturnFormValues): void {
     }
     drawTextFitted(ctx, values.predecessorName, 0.686, 0.6173, 10, 0.248);
   }
-  if (values.inheritanceHas === false) drawCircle(ctx, 0.077, 0.646, 0.016, 0.01);
+  if (values.inheritanceHas === false) drawCircle(ctx, 0.089, 0.646, 0.016, 0.01);
   // 6(1) 簿記方式（○で囲む）と「その他」の内容
   if (values.bookkeeping === "double") drawCircle(ctx, 0.115, 0.7135, 0.037, 0.0115);
   if (values.bookkeeping === "simple") drawCircle(ctx, 0.1955, 0.7135, 0.037, 0.0115);
