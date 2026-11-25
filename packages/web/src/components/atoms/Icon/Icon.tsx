@@ -21,6 +21,7 @@ export type IconName =
   | "building"
   | "image"
   | "trash"
+  | "paperclip"
   | "user";
 
 // 線画アイコンのパス集。色は currentColor で呼び出し側に委ねる。
@@ -162,6 +163,9 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </>
+  ),
+  paperclip: (
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
   ),
 };
 
