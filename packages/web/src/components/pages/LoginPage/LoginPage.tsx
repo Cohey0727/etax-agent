@@ -4,10 +4,22 @@
  * OAuth に対応する。利用できる方法は /api/auth/config の応答で出し分ける。
  * メール内のリンク（?magic=<token>）で開かれた場合はトークンを消費して
  * そのままログインする。ログインできたら onAuthenticated を呼ぶ。
+ * 見た目は organisms/auth の部品に委ね、このファイルは状態と認証の配線だけを持つ。
  */
 import { useEffect, useRef, useState } from "react";
-import { Button, Card, Col, Input, Text } from "@components/atoms";
-import { AuthConfig } from "@types";
+import { Button, Col, Icon } from "@components/atoms";
+import {
+  AuthModeTabs,
+  AuthSentNotice,
+  LoginBrandPanel,
+  LoginFormPanel,
+  MagicLinkForm,
+  OAuthButtons,
+  OAuthProviderKey,
+  PasswordAuthForm,
+  TotpAuthForm,
+} from "@components/organisms/auth";
+import { AuthConfig, LoginMode } from "@types";
 import {
   consumeMagicLink,
   loginAccount,
@@ -17,8 +29,6 @@ import {
   verifyEmailAccount,
 } from "@utils";
 import styles from "./LoginPage.css";
-
-type Mode = "login" | "register" | "totp" | "magic" | "magicSent" | "verifySent";
 
 export interface LoginPageProps {
   config: AuthConfig;
@@ -41,7 +51,7 @@ export const LoginPage = ({
   verify,
   totpChallenge,
 }: LoginPageProps) => {
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<LoginMode>("login");
   const [email, setEmail] = useState("");
   const [secret, setSecret] = useState("");
   const [code, setCode] = useState("");
@@ -152,6 +162,15 @@ export const LoginPage = ({
     }
   };
 
+  const handleSwitchMode = (next: "login" | "register") => {
+    setMode(next);
+    setError(null);
+  };
+
+  const handleOAuthSelect = (key: OAuthProviderKey) => {
+    window.location.href = `/api/auth/oauth/${key}/start`;
+  };
+
   const oauthProviders: readonly { key: "google" | "github"; label: string }[] = [
     ...(config.methods.google ? [{ key: "google" as const, label: "Google でログイン" }] : []),
     ...(config.methods.github ? [{ key: "github" as const, label: "GitHub でログイン" }] : []),
@@ -159,131 +178,58 @@ export const LoginPage = ({
 
   return (
     <div className={styles.root}>
-      <Card>
-        <Col gap="md">
-          <Col gap="sm">
-            <Text variant="title">eTaxAgent</Text>
-            <Text variant="caption">
-              {mode === "register" ? "アカウントを作成してください" : "ログインしてください"}
-            </Text>
+      <LoginBrandPanel />
+      <LoginFormPanel mode={mode} error={error}>
+        {mode === "login" || mode === "register" ? (
+          <Col gap="md">
+            <AuthModeTabs mode={mode} onChange={handleSwitchMode} />
+            <PasswordAuthForm
+              mode={mode}
+              email={email}
+              secret={secret}
+              busy={busy}
+              onEmailChange={setEmail}
+              onSecretChange={setSecret}
+              onSubmit={handlePasswordSubmit}
+            />
+            <OAuthButtons providers={oauthProviders} onSelect={handleOAuthSelect} />
+            {config.methods.magic_link ? (
+              <Button variant="ghost" size="sm" onClick={() => setMode("magic")}>
+                <Icon name="mail" size={15} />
+                メールリンクでログイン
+              </Button>
+            ) : null}
           </Col>
+        ) : null}
 
-          {error ? (
-            <Text variant="caption" className={styles.error}>
-              {error}
-            </Text>
-          ) : null}
+        {mode === "totp" ? (
+          <TotpAuthForm
+            code={code}
+            busy={busy}
+            onCodeChange={setCode}
+            onSubmit={handleTotpSubmit}
+            onRestart={() => setMode("login")}
+          />
+        ) : null}
 
-          {mode === "login" || mode === "register" ? (
-            <Col gap="sm">
-              <Input
-                type="email"
-                placeholder="メールアドレス"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
-              <Input
-                type="password"
-                placeholder={mode === "register" ? "パスワード（8文字以上）" : "パスワード"}
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                autoComplete={mode === "register" ? "new-password" : "current-password"}
-              />
-              <Button variant="primary" onClick={handlePasswordSubmit} disabled={busy || !email || !secret}>
-                {busy ? "処理中…" : mode === "register" ? "登録する" : "ログイン"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setMode(mode === "register" ? "login" : "register");
-                  setError(null);
-                }}
-              >
-                {mode === "register" ? "ログインはこちら" : "新規登録はこちら"}
-              </Button>
-              {config.methods.magic_link ? (
-                <Button variant="ghost" size="sm" onClick={() => setMode("magic")}>
-                  メールリンクでログイン
-                </Button>
-              ) : null}
-              {oauthProviders.map((provider) => (
-                <Button
-                  key={provider.key}
-                  variant="ghost"
-                  onClick={() => {
-                    window.location.href = `/api/auth/oauth/${provider.key}/start`;
-                  }}
-                >
-                  {provider.label}
-                </Button>
-              ))}
-            </Col>
-          ) : null}
+        {mode === "magic" ? (
+          <MagicLinkForm
+            email={email}
+            busy={busy}
+            onEmailChange={setEmail}
+            onSubmit={handleMagicSubmit}
+            onBack={() => setMode("login")}
+          />
+        ) : null}
 
-          {mode === "totp" ? (
-            <Col gap="sm">
-              <Text variant="caption">
-                Authenticator アプリに表示される6桁のコードを入力してください。
-              </Text>
-              <Input
-                inputMode="numeric"
-                placeholder="6桁コード"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                autoComplete="one-time-code"
-              />
-              <Button variant="primary" onClick={handleTotpSubmit} disabled={busy || code.length < 6}>
-                {busy ? "確認中…" : "確認してログイン"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setMode("login")}>
-                最初からやり直す
-              </Button>
-            </Col>
-          ) : null}
+        {mode === "magicSent" ? (
+          <AuthSentNotice variant="magicSent" onBack={() => setMode("login")} />
+        ) : null}
 
-          {mode === "magic" ? (
-            <Col gap="sm">
-              <Input
-                type="email"
-                placeholder="メールアドレス"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
-              <Button variant="primary" onClick={handleMagicSubmit} disabled={busy || !email}>
-                {busy ? "送信中…" : "ログインリンクを送る"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setMode("login")}>
-                パスワードでログイン
-              </Button>
-            </Col>
-          ) : null}
-
-          {mode === "magicSent" ? (
-            <Col gap="sm">
-              <Text variant="caption">
-                ログインリンクをメールで送りました。メール内のリンクを開いてください（15分間有効）。
-              </Text>
-              <Button variant="ghost" size="sm" onClick={() => setMode("login")}>
-                ログイン画面に戻る
-              </Button>
-            </Col>
-          ) : null}
-
-          {mode === "verifySent" ? (
-            <Col gap="sm">
-              <Text variant="caption">
-                確認メールを送りました。メール内のリンクを開くと登録が完了します（24時間有効）。
-              </Text>
-              <Button variant="ghost" size="sm" onClick={() => setMode("login")}>
-                ログイン画面に戻る
-              </Button>
-            </Col>
-          ) : null}
-        </Col>
-      </Card>
+        {mode === "verifySent" ? (
+          <AuthSentNotice variant="verifySent" onBack={() => setMode("login")} />
+        ) : null}
+      </LoginFormPanel>
     </div>
   );
 };
