@@ -5,8 +5,11 @@ import {
 import {
   InvoiceInput,
   InvoiceLineInput,
+  InvoicePaymentKind,
+  InvoicePaymentStatus,
   InvoiceRecord,
   InvoiceTaxRounding,
+  ReconciliationReason,
 } from "@types";
 
 /**
@@ -35,6 +38,26 @@ export const ROUNDING_LABELS: Record<InvoiceTaxRounding, string> = {
 export const STATUS_LABELS: Record<InvoiceRecord["status"], string> = {
   draft: "下書き",
   issued: "発行済み",
+};
+
+export const PAYMENT_STATUS_LABELS: Record<InvoicePaymentStatus, string> = {
+  unpaid: "未消込",
+  partial: "一部消込",
+  paid: "消込済み",
+};
+
+export const PAYMENT_KIND_LABELS: Record<InvoicePaymentKind, string> = {
+  payment: "入金充当",
+  fee: "振込手数料",
+  discount: "売上値引",
+  overpayment: "預り金（過入金）",
+};
+
+export const REASON_LABELS: Record<ReconciliationReason, string> = {
+  amount_exact: "金額一致",
+  amount_partial: "金額近似",
+  name_match: "取引先名の一致",
+  date_close: "期日が近い",
 };
 
 /** JST の今日（YYYY-MM-DD）。 */
