@@ -24,6 +24,7 @@ export const LedgerToolbar = ({
   yearOptions,
   onDownloadPdf,
   onDownloadCsv,
+  onOpenHistory,
   onIntakeNavigate,
   onManualAdd,
   onQueryChange,
@@ -41,6 +42,7 @@ export const LedgerToolbar = ({
   yearOptions: readonly number[];
   onDownloadPdf: () => void;
   onDownloadCsv: () => void;
+  onOpenHistory: () => void;
   onIntakeNavigate: (view: AppView) => void;
   onManualAdd: () => void;
   onQueryChange: (query: string) => void;
@@ -58,6 +60,9 @@ export const LedgerToolbar = ({
       <Row gap="md" align="center" justify="spaceBetween">
         <Text variant="sectionTitle">帳簿</Text>
         <Row gap="md" align="center">
+          <Button variant="ghost" size="sm" onClick={onOpenHistory}>
+            訂正・削除履歴
+          </Button>
           <div className={styles.addMenuWrap}>
             <Button
               variant="ghost"
@@ -181,7 +186,7 @@ export const LedgerToolbar = ({
               className={styles.searchInput}
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
-              placeholder="摘要・科目・出所で検索"
+              placeholder="取引先・摘要・科目・出所で検索"
               aria-label="取引を検索"
             />
           </div>

@@ -5,6 +5,7 @@ import { AlertBox } from "@components/molecules";
 import { AppView } from "@types";
 import { downloadLedgerPdf } from "@utils/api";
 import { formatYen } from "@utils/format";
+import { TransactionHistoryDrawer } from "../TransactionHistoryDrawer";
 import { LedgerAddForm } from "./LedgerAddForm";
 import { LedgerSkeleton } from "./LedgerSkeleton";
 import { LedgerTable } from "./LedgerTable";
@@ -48,6 +49,10 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   } = useLedgerData(onSyncTransactions);
   const [downloading, setDownloading] = useState(false);
   const [addFormOpen, setAddFormOpen] = useState(false);
+  // 履歴ビューアの対象。all = 全取引分、transaction = その取引分だけ。
+  const [historyTarget, setHistoryTarget] = useState<
+    { mode: "all" } | { mode: "transaction"; id: number } | null
+  >(null);
   // 検索とフィルターはURLクエリが初期値。共有・リロードで同じ絞り込みを再現する。
   const [initialUrlState] = useState(() =>
     parseFiltersFromSearch(typeof window === "undefined" ? "" : window.location.search),
@@ -143,6 +148,8 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
   }
 
   // 検索は摘要・勘定科目・出所・税区分の部分一致（大文字小文字は区別しない）。
+  // 取引先は独立した項目を持たず摘要に記録されるため、取引先名での絞り込みも
+  // この摘要検索で行う（検索欄の文言でもその旨を明示している）。
   // フィルターは追加した項目すべてに一致するものだけを残す。
   const visibleRows = filterRows(rows, query, filters);
   // 描画は現在のページの分だけ。集計・CSVは visibleRows 全件が対象で変わらない。
@@ -192,6 +199,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
         yearOptions={yearOptions}
         onDownloadPdf={() => void handleDownloadPdf()}
         onDownloadCsv={handleDownloadCsv}
+        onOpenHistory={() => setHistoryTarget({ mode: "all" })}
         onIntakeNavigate={(view) => onNavigate?.(view)}
         onManualAdd={handleManualAdd}
         onQueryChange={setQuery}
@@ -221,9 +229,17 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
           onEdit={handleEdit}
           onSave={(row) => void handleSave(row)}
           onDelete={(row) => void handleDelete(row)}
+          onHistory={(row) => setHistoryTarget({ mode: "transaction", id: row.id })}
           onPageChange={goToPage}
         />
       )}
+      <TransactionHistoryDrawer
+        open={historyTarget !== null}
+        transactionId={
+          historyTarget?.mode === "transaction" ? historyTarget.id : undefined
+        }
+        onClose={() => setHistoryTarget(null)}
+      />
       {addFormOpen ? (
         <LedgerAddForm
           draft={draft}
