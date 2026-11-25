@@ -258,6 +258,27 @@ export const ExpandedIncomeInputSchema = z
   })
   .openapi("ExpandedIncomeInput");
 
+/** 農業所得の入力（内部形式・camelCase、Issue #24） */
+export const AgricultureInputSchema = z
+  .object({
+    farmName: z.string(),
+    salesAmount: z.number(),
+    householdConsumption: z.number(),
+    miscRevenue: z.number(),
+    produceOpeningInventory: z.number(),
+    produceClosingInventory: z.number(),
+    otherOpeningInventory: z.number(),
+    otherClosingInventory: z.number(),
+    expenseTotals: z.record(z.string(), z.number()),
+    familyWorkerSalary: z.number(),
+    familyWorkerDeduction: z.number(),
+    badDebtProvisionIn: z.number(),
+    badDebtProvisionBack: z.number(),
+    cultivationCostDeduction: z.number(),
+    beefCattleExemptionAmount: z.number(),
+  })
+  .openapi("AgricultureInput");
+
 export const CalculateIncomeTaxRequestSchema = z
   .object({
     year: z.number(),
@@ -266,6 +287,12 @@ export const CalculateIncomeTaxRequestSchema = z
     taxCredits: TaxCreditInputsSchema,
     /** 配当・一時・株式等譲渡の入力（任意）。totalIncome は拡張分を含まない総合課税分の所得として渡す */
     expandedIncome: ExpandedIncomeInputSchema.optional(),
+    /**
+     * 農業所得の入力（任意）。決算書の計算内訳を応答に含めるために使う。
+     * 農業所得（青色申告特別控除後）は事業所得の一部として totalIncome に
+     * 含めて渡すこと（配分計算は申告数値の計算＝computeCorrectedFigures 側）。
+     */
+    agriculture: AgricultureInputSchema.optional(),
   })
   .openapi("CalculateIncomeTaxRequest");
 
@@ -376,6 +403,50 @@ export const ExpandedIncomeBreakdownSchema = z
   })
   .openapi("ExpandedIncomeBreakdown");
 
+/** 農業所得の科目別金額行 */
+export const AgricultureExpenseRowSchema = z
+  .object({
+    category: z.string(),
+    amount: z.number(),
+  })
+  .openapi("AgricultureExpenseRow");
+
+/** 農業所得の決算書計算内訳（Issue #24） */
+export const AgricultureStatementSchema = z
+  .object({
+    farmName: z.string(),
+    salesAmount: z.number(),
+    householdConsumption: z.number(),
+    miscRevenue: z.number(),
+    revenueSubtotal: z.number(),
+    produceOpeningInventory: z.number(),
+    produceClosingInventory: z.number(),
+    revenueTotal: z.number(),
+    expenseTotals: z.record(z.string(), z.number()),
+    blueExpenseRows: z.array(AgricultureExpenseRowSchema),
+    blueExtraExpenses: z.array(AgricultureExpenseRowSchema),
+    blueMiscExpense: z.number(),
+    expensesSubtotal: z.number(),
+    whiteTopExpenseRows: z.array(AgricultureExpenseRowSchema),
+    whiteOtherExpenseRows: z.array(AgricultureExpenseRowSchema),
+    whiteExtraExpenses: z.array(AgricultureExpenseRowSchema),
+    whiteMiscExpense: z.number(),
+    whiteOtherExpensesSubtotal: z.number(),
+    otherOpeningInventory: z.number(),
+    otherClosingInventory: z.number(),
+    cultivationCostDeduction: z.number(),
+    expensesTotal: z.number(),
+    balanceAmount: z.number(),
+    badDebtProvisionBack: z.number(),
+    provisionBackTotal: z.number(),
+    familyWorkerSalary: z.number(),
+    badDebtProvisionIn: z.number(),
+    provisionInTotal: z.number(),
+    familyWorkerDeduction: z.number(),
+    beefCattleExemptionAmount: z.number(),
+  })
+  .openapi("AgricultureStatement");
+
 export const CalculateIncomeTaxResponseSchema = z
   .object({
     year: z.number(),
@@ -400,6 +471,8 @@ export const CalculateIncomeTaxResponseSchema = z
     income_tax_separate_total: z.number(),
     /** 拡張所得の計算内訳（入力がない場合は null） */
     expanded_income: ExpandedIncomeBreakdownSchema.nullable(),
+    /** 農業所得の決算書計算内訳（入力がない場合は null） */
+    agriculture: AgricultureStatementSchema.nullable(),
     tax_credits: TaxCreditBreakdownSchema,
     tax_credits_total: z.number(),
     reconstruction_tax: z.number(),
