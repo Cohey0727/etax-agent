@@ -11,15 +11,18 @@
 import {
   DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
+  EMPTY_EXPANDED_INCOME,
   EMPTY_MISC_INCOME,
   EMPTY_SALARY_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
+  ExpandedIncomeInput,
   FilingType,
   MiscIncomeInput,
   SalaryIncomeInput,
   TaxCreditInputs,
   XtxBalanceSheetInput,
   normalizeBalanceSheetInput,
+  normalizeExpandedIncomeInput,
 } from "@etax/shared";
 import { fetchFilingInputs, saveFilingInputs } from "@utils/api";
 import { userScopedKey } from "@utils/userStorage";
@@ -49,6 +52,8 @@ export interface DeductionState {
   miscIncome: MiscIncomeInput;
   /** 給与所得。帳簿に載らない給与の手入力（収入金額のみ） */
   salaryIncome: SalaryIncomeInput;
+  /** 配当・一時・株式等譲渡の入力（Issue #27） */
+  expandedIncome: ExpandedIncomeInput;
   /** 申告の種類（青色申告特別控除の区分） */
   filingType: FilingType;
   /** 不動産貸付けが事業的規模か */
@@ -97,6 +102,8 @@ export interface DeductionPatch {
   filingType?: FilingType;
   /** 雑所得（その他）の部分上書き。 */
   miscIncome?: Partial<MiscIncomeInput>;
+  /** 配当・一時・株式等譲渡の部分上書き（区分ごとに浅くマージ、特定口座の明細は差し替え）。 */
+  expandedIncome?: Partial<ExpandedIncomeInput>;
   /** 内訳の差し替え（キーごとに全件差し替え、合計は自動同期）。 */
   entries?: Partial<Record<BreakdownEntriesKey, BreakdownEntry[]>>;
 }
@@ -123,6 +130,23 @@ export function applyDeductionPatch(state: DeductionState, patch: DeductionPatch
   }
   if (patch.filingType) next = { ...next, filingType: patch.filingType };
   if (patch.miscIncome) next = { ...next, miscIncome: { ...next.miscIncome, ...patch.miscIncome } };
+  if (patch.expandedIncome) {
+    const p = patch.expandedIncome;
+    const cur = next.expandedIncome;
+    next = {
+      ...next,
+      expandedIncome: normalizeExpandedIncomeInput({
+        temp: { ...cur.temp, ...(p.temp ?? {}) },
+        dividend: { ...cur.dividend, ...(p.dividend ?? {}) },
+        stocks: {
+          ...cur.stocks,
+          ...(p.stocks ?? {}),
+          general: { ...cur.stocks.general, ...(p.stocks?.general ?? {}) },
+          listed: { ...cur.stocks.listed, ...(p.stocks?.listed ?? {}) },
+        },
+      }),
+    };
+  }
   if (patch.entries) {
     for (const key of Object.keys(patch.entries) as BreakdownEntriesKey[]) {
       const entries = patch.entries[key];
@@ -162,6 +186,7 @@ export function freshDeductionState(): DeductionState {
     taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
     miscIncome: { ...EMPTY_MISC_INCOME },
     salaryIncome: { ...EMPTY_SALARY_INCOME },
+    expandedIncome: normalizeExpandedIncomeInput(EMPTY_EXPANDED_INCOME),
     filingType: "blue65",
     realEstateBusinessScale: false,
     donationEntries: [],
@@ -247,6 +272,7 @@ export function parseDeductionState(parsed: Partial<DeductionState>): DeductionS
     taxCredits: { ...base.taxCredits, ...(parsed.taxCredits ?? {}) },
     miscIncome: parseMiscIncome(parsed.miscIncome),
     salaryIncome: parseSalaryIncome(parsed.salaryIncome),
+    expandedIncome: normalizeExpandedIncomeInput(parsed.expandedIncome),
     filingType: FILING_TYPES.includes(parsed.filingType as FilingType)
       ? (parsed.filingType as FilingType)
       : "blue65",
