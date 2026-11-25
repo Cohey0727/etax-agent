@@ -18,6 +18,8 @@ import {
   normalizeAgricultureInput,
 } from "../src/agriculture";
 import type { AgricultureInput } from "../src/agriculture";
+import { blueDeduction, computeCorrectedFigures } from "../src/taxcalc";
+import type { Transaction } from "../src/types";
 
 const BASE: AgricultureInput = {
   farmName: "テスト農園",
@@ -183,5 +185,102 @@ describe("normalizeAgricultureInput / isAgricultureEmpty / wire変換", () => {
     expect(wire.farm_name).toBe("テスト農園");
     expect(wire.sales_amount).toBe(3_000_000);
     expect(agricultureFromWire(wire)).toEqual(normalizeAgricultureInput(BASE));
+  });
+});
+
+describe("blueDeduction への農業の配分", () => {
+  test("農業なしの場合は従来どおり（不動産→事業）", () => {
+    const blue = blueDeduction(300_000, 5_000_000, { filingType: "blue65" });
+    expect(blue.realEstate).toBe(300_000);
+    expect(blue.business).toBe(350_000);
+    expect(blue.agriculture).toBe(0);
+    expect(blue.total).toBe(650_000);
+  });
+
+  test("プールは不動産→営業等→農業の順に配分される", () => {
+    const blue = blueDeduction(100_000, 200_000, { filingType: "blue65" }, 500_000);
+    expect(blue.realEstate).toBe(100_000);
+    expect(blue.business).toBe(200_000);
+    expect(blue.agriculture).toBe(350_000);
+    expect(blue.total).toBe(650_000);
+  });
+
+  test("農業所得があれば不動産のみの10万円限度は適用されない", () => {
+    const blue = blueDeduction(300_000, 0, { filingType: "blue65" }, 500_000);
+    expect(blue.total).toBe(650_000);
+    expect(blue.agriculture).toBe(350_000);
+  });
+
+  test("農業が赤字なら配分は0で、総額は従来と変わらない", () => {
+    const blue = blueDeduction(300_000, 5_000_000, { filingType: "blue65" }, -100_000);
+    expect(blue.agriculture).toBe(0);
+    expect(blue.total).toBe(650_000);
+  });
+
+  test("白色は常に0", () => {
+    const blue = blueDeduction(300_000, 5_000_000, { filingType: "white" }, 500_000);
+    expect(blue.total).toBe(0);
+    expect(blue.agriculture).toBe(0);
+  });
+});
+
+describe("computeCorrectedFigures への農業の統合", () => {
+  const businessTx: Transaction[] = [
+    {
+      date: "2025-04-01",
+      description: "売上",
+      amount: 1_000_000,
+      category: "売上高",
+      income_type: "business",
+    },
+  ];
+
+  test("農業入力があると figures と _detail に農業分が入る", () => {
+    const figures = computeCorrectedFigures(businessTx, 2025, {
+      filingType: "blue65",
+      agriculture: BASE,
+    });
+    expect(figures.agriculture_revenue).toBe(3_100_000);
+    expect(figures.agriculture_expenses).toBe(1_620_000);
+    // 農業の控除前所得 870,000、事業の控除前所得 1,000,000。
+    // プール65万円は事業→農業の順で事業に全額配分される。
+    expect(figures._detail.agriculture_income_before_deduction).toBe(870_000);
+    expect(figures._detail.blue_deduction_business).toBe(650_000);
+    expect(figures._detail.blue_deduction_agriculture).toBe(0);
+    expect(figures._detail.agriculture_income).toBe(870_000);
+    expect(figures._detail.business_income).toBe(350_000);
+  });
+
+  test("農業入力が無い場合は農業分は全て0で従来と一致する", () => {
+    const withNone = computeCorrectedFigures(businessTx, 2025, {
+      filingType: "blue65",
+    });
+    const withEmpty = computeCorrectedFigures(businessTx, 2025, {
+      filingType: "blue65",
+      agriculture: normalizeAgricultureInput(null),
+    });
+    expect(withEmpty).toEqual(withNone);
+    expect(withNone.agriculture_revenue).toBe(0);
+    expect(withNone._detail.agriculture_income).toBe(0);
+  });
+
+  test("白色では専従者控除後の金額が農業所得になる", () => {
+    const figures = computeCorrectedFigures([], 2025, {
+      filingType: "white",
+      agriculture: BASE,
+    });
+    expect(figures._detail.agriculture_income).toBe(620_000);
+    expect(figures._detail.blue_deduction_agriculture).toBe(0);
+    expect(figures.blue_deduction).toBe(0);
+  });
+
+  test("農業と一般事業は混ざらない（事業の収支は農業で変わらない）", () => {
+    const figures = computeCorrectedFigures(businessTx, 2025, {
+      filingType: "blue65",
+      agriculture: BASE,
+    });
+    expect(figures.business_revenue).toBe(1_000_000);
+    expect(figures.business_expenses).toBe(0);
+    expect(figures._detail.business_income_before_deduction).toBe(1_000_000);
   });
 });

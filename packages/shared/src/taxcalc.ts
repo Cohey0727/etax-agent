@@ -26,6 +26,12 @@
 */
 
 import type { Transaction} from "./types";
+import {
+  agricultureIncomeBeforeBlueDeduction,
+  computeAgricultureStatement,
+  isAgricultureEmpty,
+} from "./agriculture";
+import type { AgricultureInput } from "./agriculture";
 
 /** 消費税 標準税率 */
 export const TAX_RATE = 0.1;
@@ -204,11 +210,15 @@ realEstateIncome: b.realEstateRevenue - b.realEstateExpenses,
 export interface BlueDeduction {
 realEstate: number;
 business: number;
+/** 農業所得（事業所得の一部）への配分額 */
+agriculture: number;
 total: number;
 }
 
 /**
-* 青色申告特別控除を「不動産 → 事業」の順で計算する。
+* 青色申告特別控除を「不動産 → 事業」の順で計算する。農業所得は
+* 事業所得の一部であり、事業（営業等）の残りから配分する（配分順は
+* 控除の総額に影響しない。各様式の所得金額行のための決定的な規約）。
 * 国税庁タックスアンサー No.2072 の取扱い:
 * - 55万円・65万円控除は不動産所得と事業所得の合計額が限度で、
 *   不動産所得から先に控除し、残りを事業所得から控除する。
@@ -222,22 +232,27 @@ export function blueDeduction(
 realEstateIncome: number,
 businessIncome: number,
 options: BlueDeductionOptions = {},
+agricultureIncome: number = 0,
 ): BlueDeduction {
 const filingType = options.filingType ?? "blue65";
 const rePos = Math.max(realEstateIncome, 0);
 const bizPos = Math.max(businessIncome, 0);
+const agrPos = Math.max(agricultureIncome, 0);
 if (filingType === "white") {
-return { realEstate: 0, business: 0, total: 0 };
+return { realEstate: 0, business: 0, agriculture: 0, total: 0 };
 }
 const caps = blueDeductionCaps(options);
 // 不動産所得のみ（事業所得なし）で事業的規模でない場合は 10万円が限度。
+// 農業所得は事業所得の一部なので、農業所得があれば「事業所得なし」にはならない。
 const cap =
-bizPos <= 0 && !options.realEstateBusinessScale
+bizPos + agrPos <= 0 && !options.realEstateBusinessScale
 ? Math.min(caps.total, BLUE_MAX_REAL_ESTATE)
 : caps.total;
-const pool = Math.min(cap, rePos + bizPos);
+const pool = Math.min(cap, rePos + bizPos + agrPos);
 const realEstate = Math.min(rePos, pool);
-return { realEstate, business: pool - realEstate, total: pool };
+const business = Math.min(bizPos, pool - realEstate);
+const agriculture = pool - realEstate - business;
+return { realEstate, business, agriculture, total: pool };
 }
 
 // ---------------------------------------------------------------------------
@@ -394,6 +409,12 @@ export interface CorrectedFiguresDetail {
   business_income: number;
   /** 不動産所得（控除後） */
   real_estate_income: number;
+  /** 農業所得（青色申告特別控除前。白色は専従者控除後） */
+  agriculture_income_before_deduction: number;
+  /** 青色申告特別控除の農業所得への配分額 */
+  blue_deduction_agriculture: number;
+  /** 農業所得（控除後） */
+  agriculture_income: number;
 }
 
 /**
@@ -409,6 +430,10 @@ export interface CorrectedFigures {
   business_expenses: number;
   real_estate_revenue: number;
   real_estate_expenses: number;
+  /** 農業の収入金額の計（決算書の棚卸調整込み。農業入力が無い場合は0） */
+  agriculture_revenue: number;
+  /** 農業の経費計（育成費用の調整込み。専従者給与・控除は含まない） */
+  agriculture_expenses: number;
   /** 青色申告特別控除の合計 */
   blue_deduction: number;
   /** 課税売上（税込）。家賃は非課税側 */
@@ -434,13 +459,38 @@ export interface CorrectedFigures {
  * 計算できないため含めない（呼び出し側で申告済み値を引き継ぐ等で扱う）。
  * transactions は対象年の分だけを渡すこと（filterYear 済み前提）。
  */
+/** computeCorrectedFigures の計算条件（青色控除の条件＋農業所得の入力）。 */
+export interface ComputeCorrectedFiguresOptions extends BlueDeductionOptions {
+  /**
+   * 農業所得の入力（申告入力として別に保持するもの。帳簿の取引とは
+   * 混ぜない）。未指定または全て空の場合は農業なしとして計算する。
+   */
+  agriculture?: AgricultureInput;
+}
+
 export function computeCorrectedFigures(
   transactions: Transaction[],
   year = 0,
-  options: BlueDeductionOptions = {},
+  options: ComputeCorrectedFiguresOptions = {},
 ): CorrectedFigures {
   const b = aggregateIncome(transactions);
-  const blue = blueDeduction(b.realEstateIncome, b.businessIncome, options);
+  // 農業所得は帳簿の集計とは独立に、申告入力から決算書計算する。
+  const agricultureStatement =
+    options.agriculture && !isAgricultureEmpty(options.agriculture)
+      ? computeAgricultureStatement(options.agriculture)
+      : undefined;
+  const agricultureBeforeDeduction = agricultureStatement
+    ? agricultureIncomeBeforeBlueDeduction(
+        agricultureStatement,
+        (options.filingType ?? "blue65") === "white",
+      )
+    : 0;
+  const blue = blueDeduction(
+    b.realEstateIncome,
+    b.businessIncome,
+    options,
+    agricultureBeforeDeduction,
+  );
 
   // 住宅家賃（非課税）の合計。ledger.residentialRentTotal と同条件だが、
   // taxcalc の独立性（ledger に依存しない）を保つためここで数える。
@@ -474,6 +524,8 @@ export function computeCorrectedFigures(
     business_expenses: b.businessExpenses,
     real_estate_revenue: b.realEstateRevenue,
     real_estate_expenses: b.realEstateExpenses,
+    agriculture_revenue: agricultureStatement?.revenueTotal ?? 0,
+    agriculture_expenses: agricultureStatement?.expensesTotal ?? 0,
     blue_deduction: blue.total,
     taxable_sales: taxable,
     nontaxable_sales: nontaxable,
@@ -488,6 +540,9 @@ export function computeCorrectedFigures(
       blue_deduction_business: blue.business,
       business_income: b.businessIncome - blue.business,
       real_estate_income: b.realEstateIncome - blue.realEstate,
+      agriculture_income_before_deduction: agricultureBeforeDeduction,
+      blue_deduction_agriculture: blue.agriculture,
+      agriculture_income: agricultureBeforeDeduction - blue.agriculture,
     },
   };
 }
