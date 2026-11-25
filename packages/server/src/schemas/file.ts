@@ -13,10 +13,15 @@ export const UploadableImageMimeTypeSchema = z.enum([
 
 export const PresignUploadFileRequestSchema = z
   .object({
-    /** アップロードするファイルの Content-Type。署名に含まれるため、実際の送信と一致させる。 */
-    contentType: UploadableImageMimeTypeSchema,
+    /**
+     * アップロードするファイルの Content-Type。署名に含まれるため、
+     * 実際の送信と一致させる。画像は領収書・固定資産用、
+     * application/pdf は受信通知（purpose=filing_receipt）専用で、
+     * 組み合わせの検証はハンドラ側で行う。
+     */
+    contentType: z.enum([...UploadableImageMimeTypeSchema.options, "application/pdf"]),
     /** 用途。オブジェクトキーの接頭辞が変わる（未指定は領収書）。 */
-    purpose: z.enum(["receipt", "fixed_asset"]).optional(),
+    purpose: z.enum(["receipt", "fixed_asset", "filing_receipt"]).optional(),
   })
   .openapi("PresignUploadFileRequest");
 

@@ -428,6 +428,64 @@ export const filingInputsTable = pgTable(
 export type FilingInputRow = typeof filingInputsTable.$inferSelect;
 
 /**
+ * 提出の記録（年度×税目ごと）。e-Tax で提出した後に受信通知の受付番号を
+ * 手入力で残し、受信通知 PDF を紐づけて保管する（Issue #28 Phase 1）。
+ * 受付番号が入ると申告ステータス（filing_status.submitted）と連動する。
+ * 受信通知 PDF の実体はストレージ（filing-receipts/<fileId>）にあり、
+ * 本テーブルはファイルIDだけを持つ。
+ */
+export const filingSubmissionsTable = pgTable(
+  "filing_submissions",
+  {
+    /** 対象年（西暦） */
+    year: integer("year").notNull(),
+    /** 税目: income（所得税）/ consumption（消費税） */
+    kind: text("kind").notNull(),
+    /** 受信通知の受付番号。未記録なら空文字 */
+    acceptanceNumber: text("acceptance_number").notNull().default(""),
+    /** 提出日 YYYY-MM-DD。未記録なら null */
+    submittedDate: text("submitted_date"),
+    /** 受信通知 PDF のファイルID。未添付なら null */
+    receiptFileId: text("receipt_file_id").unique(),
+    receiptMimeType: text("receipt_mime_type").notNull().default(""),
+    createdAt: timestampColumn("created_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestampColumn("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+    ownerUserId: integer("owner_user_id").notNull().default(1),
+  },
+  (table) => [primaryKey({ columns: [table.ownerUserId, table.year, table.kind] })],
+);
+
+export type FilingSubmissionRow = typeof filingSubmissionsTable.$inferSelect;
+
+/**
+ * 提出の記録の変更履歴（電子帳簿保存法の訂正・削除履歴に相当）。
+ * 取引の transaction_history と同じ方式で、登録・更新・削除のたびに
+ * 変更前後の値を API 形式の JSON スナップショットで1行残す。
+ * 登録は before が null、削除は after が null。
+ */
+export const filingSubmissionHistoryTable = pgTable("filing_submission_history", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  /** 対象年（西暦） */
+  year: integer("year").notNull(),
+  /** 税目: income / consumption */
+  kind: text("kind").notNull(),
+  /** created / updated / deleted */
+  action: text("action").notNull(),
+  /** 変更前の値（FilingSubmission の JSON）。登録時は null */
+  before: jsonb("before"),
+  /** 変更後の値（FilingSubmission の JSON）。削除時は null */
+  after: jsonb("after"),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
+});
+
+/**
  * 課金（Stripe サブスクリプション）の状態。所有者ごとに1件。
  * status は Stripe の subscription.status をそのまま持つ
  * （active / trialing / past_due / canceled / incomplete 等）。

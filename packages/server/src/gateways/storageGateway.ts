@@ -73,6 +73,11 @@ export function fixedAssetObjectKey(fileId: string): string {
   return `fixed-assets/${fileId}`;
 }
 
+/** 受信通知PDFのオブジェクトキー。ファイルIDから決定的に決まる。 */
+export function filingReceiptObjectKey(fileId: string): string {
+  return `filing-receipts/${fileId}`;
+}
+
 /** キーが保存先フォルダの外を指していないか検証し、実パスを返す。 */
 function resolveKeyPath(filesDir: string, key: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(key) || key.includes("..")) {

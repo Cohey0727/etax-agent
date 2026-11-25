@@ -29,6 +29,8 @@ const allTables = [
   "user_identities",
   "users",
   "filing_status",
+  "filing_submission_history",
+  "filing_submissions",
   "taxpayer_profiles",
   "filing_snapshots",
   "filing_inputs",
