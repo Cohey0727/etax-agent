@@ -23,7 +23,9 @@ import {
   FilingSnapshotFigures,
   FilingStatus,
   FilingSubmission,
+  FilingSubmissionHistoryEntry,
   FilingSubmissionKind,
+  TransactionHistoryEntry,
   DepreciationSummary,
   FixedAssetImageRecord,
   FixedAssetInput,
@@ -576,6 +578,20 @@ export function filingReceiptContentPath(year: number, kind: FilingSubmissionKin
   return `/api/filing-submissions/${year}/${kind}/receipt/content`;
 }
 
+/** 対象年の提出の記録の変更履歴（新しい順）。取得できない場合は null。 */
+export async function fetchFilingSubmissionHistory(
+  year: number,
+): Promise<FilingSubmissionHistoryEntry[] | null> {
+  try {
+    const resp = await fetch(`/api/filing-submissions/${year}/history`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { history: FilingSubmissionHistoryEntry[] };
+    return data.history;
+  } catch {
+    return null;
+  }
+}
+
 /** 対象年の確定スナップショット一覧（確定日時の昇順）。失敗した場合は null。 */
 export async function fetchFilingSnapshots(year: number): Promise<FilingSnapshot[] | null> {
   try {
@@ -826,6 +842,34 @@ export async function updateLedgerTransaction(
 export async function deleteLedgerTransaction(id: number): Promise<void> {
   const resp = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
   await parseJson(resp);
+}
+
+/** 取引1件の変更履歴（新しい順）。取得できない場合は null。 */
+export async function fetchTransactionHistory(
+  transactionId: number,
+): Promise<TransactionHistoryEntry[] | null> {
+  try {
+    const resp = await fetch(`/api/transactions/${transactionId}/history`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { history: TransactionHistoryEntry[] };
+    return data.history;
+  } catch {
+    return null;
+  }
+}
+
+/** 全取引の変更履歴（新しい順、削除済み取引の履歴を含む）。取得できない場合は null。 */
+export async function fetchRecentTransactionHistory(
+  limit = 100,
+): Promise<TransactionHistoryEntry[] | null> {
+  try {
+    const resp = await fetch(`/api/transactions/history?limit=${limit}`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { history: TransactionHistoryEntry[] };
+    return data.history;
+  } catch {
+    return null;
+  }
 }
 
 /** 1年分の取引を丸ごと帳簿へ保存する（画面の確定状態で置き換える）。 */

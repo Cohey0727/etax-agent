@@ -486,6 +486,36 @@ export interface FilingSubmission {
   updated_at: string;
 }
 
+/** 履歴スナップショットとしての取引（削除日時・更新日時を含む完全な形）。 */
+export interface LedgerTransactionSnapshot extends LedgerTransaction {
+  updated_at: string;
+  /** 論理削除の日時。削除済みのときだけ値が入る */
+  deleted_at: string | null;
+}
+
+/** 取引の変更履歴1件（登録・訂正・削除の記録、電帳法の訂正・削除履歴）。 */
+export interface TransactionHistoryEntry {
+  id: number;
+  transaction_id: number;
+  /** created / updated / deleted */
+  action: string;
+  before: LedgerTransactionSnapshot | null;
+  after: LedgerTransactionSnapshot | null;
+  created_at: string;
+}
+
+/** 提出の記録の変更履歴1件（登録・更新・削除の記録）。 */
+export interface FilingSubmissionHistoryEntry {
+  id: number;
+  year: number;
+  kind: FilingSubmissionKind;
+  /** created / updated / deleted */
+  action: string;
+  before: FilingSubmission | null;
+  after: FilingSubmission | null;
+  created_at: string;
+}
+
 /** ログインユーザー（/api/auth/me・ログイン応答）。 */
 export interface AuthUser {
   id: number;
