@@ -10,6 +10,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serverDataDir } from "../../lib/config";
+import { normalizeFormTemplate } from "./decryptPdfTemplate";
 
 const TEMPLATE_FILE = "kaigyo-todokede.pdf";
 const TEMPLATE_URL =
@@ -26,7 +27,9 @@ export async function loadOpeningNoticeFormTemplate(): Promise<Uint8Array | null
   for (const path of candidates) {
     try {
       const bytes = await readFile(path);
-      cached = new Uint8Array(bytes);
+      const normalized = normalizeFormTemplate(new Uint8Array(bytes));
+      if (!normalized) continue;
+      cached = normalized;
       return cached;
     } catch {
       // 次の候補へ
@@ -37,10 +40,12 @@ export async function loadOpeningNoticeFormTemplate(): Promise<Uint8Array | null
     if (!res.ok) return null;
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.length < 100_000) return null;
-    cached = bytes;
+    const normalized = normalizeFormTemplate(bytes);
+    if (!normalized) return null;
+    cached = normalized;
     try {
       await mkdir(join(serverDataDir(), "forms"), { recursive: true });
-      await writeFile(cachePath, bytes);
+      await writeFile(cachePath, normalized);
     } catch {
       // キャッシュ保存に失敗しても生成は続ける
     }
