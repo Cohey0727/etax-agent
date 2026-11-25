@@ -485,6 +485,8 @@ export const filingSubmissionHistoryTable = pgTable("filing_submission_history",
   ownerUserId: integer("owner_user_id").notNull().default(1),
 });
 
+export type FilingSubmissionHistoryRow = typeof filingSubmissionHistoryTable.$inferSelect;
+
 /**
  * 課金（Stripe サブスクリプション）の状態。所有者ごとに1件。
  * status は Stripe の subscription.status をそのまま持つ

@@ -9,6 +9,7 @@ import {
   saveFilingSubmission,
   uploadFilingReceiptPdf,
 } from "@utils/api";
+import { SubmissionHistoryDrawer } from "../SubmissionHistoryDrawer";
 import styles from "./SubmissionRecordPanel.css";
 
 export interface SubmissionRecordPanelProps {
@@ -39,6 +40,7 @@ export const SubmissionRecordPanel = ({ year, kind }: SubmissionRecordPanelProps
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -196,6 +198,9 @@ export const SubmissionRecordPanel = ({ year, kind }: SubmissionRecordPanelProps
                   {deleteArmed ? "もう一度押すと削除します" : "記録を削除"}
                 </Button>
               ) : null}
+              <Button variant="ghost" onClick={() => setHistoryOpen(true)}>
+                変更履歴
+              </Button>
             </Row>
 
             <Row gap="sm" align="center">
@@ -247,6 +252,12 @@ export const SubmissionRecordPanel = ({ year, kind }: SubmissionRecordPanelProps
         {error ? <AlertBox variant="error">{error}</AlertBox> : null}
         {message ? <AlertBox>{message}</AlertBox> : null}
       </Col>
+      <SubmissionHistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        year={year}
+        kind={kind}
+      />
     </Card>
   );
 };

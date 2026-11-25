@@ -16,6 +16,10 @@ import {
   getFilingReceiptContentRoute,
 } from "../usecases/getFilingReceiptContent";
 import {
+  getFilingSubmissionHistoryHandler,
+  getFilingSubmissionHistoryRoute,
+} from "../usecases/getFilingSubmissionHistory";
+import {
   getFilingSubmissionsHandler,
   getFilingSubmissionsRoute,
 } from "../usecases/getFilingSubmissions";
@@ -26,6 +30,7 @@ import {
 
 const app = new OpenAPIHono();
 app.openapi(getFilingSubmissionsRoute, getFilingSubmissionsHandler);
+app.openapi(getFilingSubmissionHistoryRoute, getFilingSubmissionHistoryHandler);
 app.openapi(saveFilingSubmissionRoute, saveFilingSubmissionHandler);
 app.openapi(deleteFilingSubmissionRoute, deleteFilingSubmissionHandler);
 app.openapi(attachFilingReceiptRoute, attachFilingReceiptHandler);

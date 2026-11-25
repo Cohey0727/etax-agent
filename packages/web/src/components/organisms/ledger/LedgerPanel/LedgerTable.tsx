@@ -41,6 +41,7 @@ export const LedgerTable = ({
   onEdit,
   onSave,
   onDelete,
+  onHistory,
   onPageChange,
 }: {
   displayedRows: readonly LedgerTransaction[];
@@ -55,6 +56,7 @@ export const LedgerTable = ({
   onEdit: (id: number, patch: Partial<LedgerTransactionInput>) => void;
   onSave: (row: LedgerTransaction) => void;
   onDelete: (row: LedgerTransaction) => void;
+  onHistory: (row: LedgerTransaction) => void;
   onPageChange: (page: number) => void;
 }) => {
   // 按分候補科目で割合が未設定（100%）の行があれば、軽いガイドを出す。
@@ -254,6 +256,9 @@ export const LedgerTable = ({
                         onClick={() => onDelete(row)}
                       >
                         {deleteArmedId === row.id ? "本当に削除" : "削除"}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => onHistory(row)}>
+                        履歴
                       </Button>
                     </Row>
                   </TableCell>

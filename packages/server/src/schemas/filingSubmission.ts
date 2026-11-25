@@ -92,3 +92,32 @@ export const DeleteFilingSubmissionResponseSchema = z
   .openapi("DeleteFilingSubmissionResponse");
 
 export type AttachFilingReceiptRequest = z.infer<typeof AttachFilingReceiptRequestSchema>;
+
+/** 提出の記録の変更履歴1件（登録・更新・削除の記録）。 */
+export const FilingSubmissionHistoryEntrySchema = z
+  .object({
+    id: z.number(),
+    year: z.number(),
+    kind: FilingSubmissionKindSchema,
+    /** created / updated / deleted */
+    action: z.string(),
+    before: FilingSubmissionSchema.nullable(),
+    after: FilingSubmissionSchema.nullable(),
+    created_at: z.string(),
+  })
+  .openapi("FilingSubmissionHistoryEntry");
+
+export type FilingSubmissionHistoryEntryResponse = z.infer<
+  typeof FilingSubmissionHistoryEntrySchema
+>;
+
+export const ListFilingSubmissionHistoryResponseSchema = z
+  .object({
+    count: z.number(),
+    history: z.array(FilingSubmissionHistoryEntrySchema),
+  })
+  .openapi("FilingSubmissionHistoryList");
+
+export type ListFilingSubmissionHistoryResponse = z.infer<
+  typeof ListFilingSubmissionHistoryResponseSchema
+>;

@@ -51,6 +51,17 @@ export const ListTransactionsQuerySchema = z
 
 export type ListTransactionsQuery = z.infer<typeof ListTransactionsQuerySchema>;
 
+/** 全取引の変更履歴一覧のクエリ（件数の上限だけを受ける）。 */
+export const ListRecentTransactionHistoryQuerySchema = z
+  .object({
+    limit: z.string().optional(),
+  })
+  .openapi("ListRecentTransactionHistoryQuery");
+
+export type ListRecentTransactionHistoryQuery = z.infer<
+  typeof ListRecentTransactionHistoryQuerySchema
+>;
+
 export const LedgerPdfQuerySchema = z
   .object({
     year: z.string().optional(),
