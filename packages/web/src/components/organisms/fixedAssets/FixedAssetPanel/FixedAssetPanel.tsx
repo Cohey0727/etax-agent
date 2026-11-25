@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Col, Icon, Row, Text } from "@components/atoms";
-import { AlertBox } from "@components/molecules";
+import { AlertBox, Drawer } from "@components/molecules";
 import { FixedAssetInput } from "@types";
 import { FixedAssetDetail } from "./FixedAssetDetail";
 import { FixedAssetForm } from "./FixedAssetForm";
@@ -17,7 +17,7 @@ export interface FixedAssetPanelProps {
 
 type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
 
-/** 固定資産台帳の画面本体。サマリ帯・資産カード・詳細（償却表と画像）・登録/編集フォーム。 */
+/** 固定資産台帳の画面本体。サマリ帯・資産カード・詳細（償却表と画像）。登録/編集は右 Drawer で行う。 */
 export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   const {
     status,
@@ -74,6 +74,9 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
     if (ok) setFormState(null);
   };
 
+  const formTitle =
+    formState?.kind === "edit" ? `「${selected?.name ?? ""}」を編集` : "固定資産を登録";
+
   return (
     <Col gap="lg">
       <Row justify="spaceBetween" align="center" wrap>
@@ -83,18 +86,6 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
         </Button>
       </Row>
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
-
-      {formState?.kind === "create" ? (
-        <FixedAssetForm
-          title="固定資産を登録"
-          submitLabel="登録する"
-          value={draft}
-          busy={busy}
-          onChange={setDraft}
-          onSubmit={() => void submitForm()}
-          onCancel={() => setFormState(null)}
-        />
-      ) : null}
 
       {assets.length === 0 ? (
         <Text variant="body">
@@ -115,33 +106,34 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
             }}
           />
           {selected ? (
-            formState?.kind === "edit" && formState.id === selected.id ? (
-              <FixedAssetForm
-                title={`「${selected.name}」を編集`}
-                submitLabel="保存する"
-                value={draft}
-                busy={busy}
-                onChange={setDraft}
-                onSubmit={() => void submitForm()}
-                onCancel={() => setFormState(null)}
-              />
-            ) : (
-              <FixedAssetDetail
-                asset={selected}
-                year={year}
-                images={images[selected.id]}
-                imagesBusy={imagesBusy}
-                busy={busy}
-                deleteArmed={deleteArmedId === selected.id}
-                onEdit={openEdit}
-                onDelete={() => void handleDelete(selected)}
-                onUploadImages={(files) => void handleUploadImages(selected.id, files)}
-                onDeleteImage={(fileId) => void handleDeleteImage(selected.id, fileId)}
-              />
-            )
+            <FixedAssetDetail
+              asset={selected}
+              year={year}
+              images={images[selected.id]}
+              imagesBusy={imagesBusy}
+              busy={busy}
+              deleteArmed={deleteArmedId === selected.id}
+              onEdit={openEdit}
+              onDelete={() => void handleDelete(selected)}
+              onUploadImages={(files) => void handleUploadImages(selected.id, files)}
+              onDeleteImage={(fileId) => void handleDeleteImage(selected.id, fileId)}
+            />
           ) : null}
         </>
       )}
+
+      <Drawer open={formState !== null} title={formTitle} onClose={() => setFormState(null)}>
+        {formState ? (
+          <FixedAssetForm
+            submitLabel={formState.kind === "create" ? "登録する" : "保存する"}
+            value={draft}
+            busy={busy}
+            onChange={setDraft}
+            onSubmit={() => void submitForm()}
+            onCancel={() => setFormState(null)}
+          />
+        ) : null}
+      </Drawer>
     </Col>
   );
 };
