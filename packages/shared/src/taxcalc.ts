@@ -136,8 +136,9 @@ export function businessPortionAmount(amount: number, businessRatioPercent: numb
   const ratio = normalizeBusinessRatio(businessRatioPercent);
   if (ratio === 100) return truncated;
   if (ratio === 0 || truncated === 0) return 0;
-  const sign = truncated < 0 ? -1 : 1;
-  return sign * Math.floor((Math.abs(truncated) * ratio) / 100);
+  const magnitude = Math.floor((Math.abs(truncated) * ratio) / 100);
+  if (magnitude === 0) return 0;
+  return (truncated < 0 ? -1 : 1) * magnitude;
 }
 
 /**
