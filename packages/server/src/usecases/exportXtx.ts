@@ -9,6 +9,11 @@
 import {
   BalanceSheetAccount,
   DepreciationDetailRow,
+  ExpandedIncomeBreakdown,
+  ExpandedIncomeInput,
+  ExpandedIncomeWire,
+  SeparateTaxationAmounts,
+  TaxCreditInputs,
   normalizeMiscIncomeInput,
   normalizeSalaryIncomeInput,
   Transaction,
@@ -16,11 +21,15 @@ import {
   XtxTaxpayer,
   buildXtxFiling,
   computeCorrectedFigures,
+  computeExpandedIncomes,
   computeIncomeTax,
   computeManualIncomes,
   depreciationDetailRow,
+  expandedIncomeFromWire,
+  expandedWithholdingTotal,
   filterYear,
   normalizeTransactions,
+  resolveTaxCreditInputs,
   statementCategoryTotals,
 } from "@etax/shared";
 
@@ -61,6 +70,50 @@ export const exportXtxRoute = createRoute({
     },
   },
 });
+
+/** 拡張所得の配線結果（所得税計算・XTX生成への入力）。 */
+export interface ExpandedTaxWiring {
+  /** 正規化済みの拡張所得入力（XTXビルダーへ渡す。未指定なら undefined） */
+  input?: ExpandedIncomeInput;
+  /** 拡張所得の計算内訳 */
+  breakdown?: ExpandedIncomeBreakdown;
+  /** 総合課税分へ加算する所得金額（配当の総合分＋一時の1/2算入額） */
+  comprehensiveAddition: number;
+  /** 配当控除の対象額を解決済みの税額控除入力 */
+  taxCredits: TaxCreditInputs;
+  /** 申告分離課税の所得（拡張所得がない場合は undefined） */
+  separateTaxation?: SeparateTaxationAmounts;
+  /** 拡張所得分の源泉徴収税額（申告する配当＋株式等譲渡分） */
+  withholdingAddition: number;
+}
+
+/**
+ * 拡張所得入力（ワイヤ形式）を所得税計算・XTX生成で使う形に解決する。
+ * exportXtx / exportReturnPdf / MCP の export_xtx で共用する単一の配線。
+ * 配当の入力がある場合、配当控除の対象額は配当所得の内訳から導出した額が
+ * 優先し、手入力との二重適用を防ぐ。
+ */
+export function resolveExpandedTax(
+  wire: ExpandedIncomeWire | undefined,
+  taxCredits: TaxCreditInputs,
+): ExpandedTaxWiring {
+  if (!wire) {
+    return { comprehensiveAddition: 0, taxCredits, withholdingAddition: 0 };
+  }
+  const input = expandedIncomeFromWire(wire);
+  const breakdown = computeExpandedIncomes(input);
+  return {
+    input,
+    breakdown,
+    comprehensiveAddition: breakdown.comprehensiveAddition,
+    taxCredits: resolveTaxCreditInputs(taxCredits, breakdown),
+    separateTaxation: {
+      stockIncome: breakdown.separateStockIncome,
+      dividendIncome: breakdown.separateDividendIncome,
+    },
+    withholdingAddition: expandedWithholdingTotal(breakdown),
+  };
+}
 
 /** リクエストの固定資産入力から減価償却明細行（事業・不動産別）を組み立てる。 */
 function depreciationFromWire(
@@ -159,12 +212,17 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
     miscIncome,
     figures._detail.business_income + figures._detail.real_estate_income,
   );
+  const expandedTax = resolveExpandedTax(body.expanded_income, body.tax_credits);
   const tax = computeIncomeTax({
     year: body.year,
     totalIncome:
-      figures._detail.business_income + figures._detail.real_estate_income + manual.total,
+      figures._detail.business_income +
+      figures._detail.real_estate_income +
+      manual.total +
+      expandedTax.comprehensiveAddition,
     deductions: body.deductions,
-    taxCredits: body.tax_credits,
+    taxCredits: expandedTax.taxCredits,
+    separateTaxation: expandedTax.separateTaxation,
   });
   let xtx: string;
   try {
@@ -180,12 +238,13 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
       deductionInputs: body.deductions,
       miscIncome,
       salaryIncome,
+      expandedIncome: expandedTax.input,
       tax,
       categoryTotals: {
         business: statementCategoryTotals(transactions, "business"),
         realEstate: statementCategoryTotals(transactions, "real_estate"),
       },
-      withholdingTax: body.withholding_tax,
+      withholdingTax: body.withholding_tax + expandedTax.withholdingAddition,
       prepaidTax: body.prepaid_tax,
       originalThirdPeriodTax: body.original_third_period_tax,
     });
