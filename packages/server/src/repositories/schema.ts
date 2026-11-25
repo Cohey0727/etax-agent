@@ -536,8 +536,9 @@ export const documentsTable = pgTable("documents", {
   taxRounding: text("tax_rounding").notNull().default("floor"),
   /** 備考（振込先など） */
   memo: text("memo").notNull().default(""),
-  /** 修正元の帳票（この帳票が「修正した適格請求書」である場合の当初分） */
-  correctsDocumentId: integer("corrects_document_id").references(() => documentsTable.id),
+  /** 修正元の帳票（この帳票が「修正した適格請求書」である場合の当初分）。
+   * 自己参照のため Drizzle の references は張らず、DDL の REFERENCES で担保する。 */
+  correctsDocumentId: integer("corrects_document_id"),
   /** 発行時点の発行者情報スナップショット（InvoiceIssuer の JSON）。下書きは null */
   issuerSnapshot: jsonb("issuer_snapshot"),
   /** 発行時点の集計スナップショット（InvoiceTotals の JSON）。下書きは null */
