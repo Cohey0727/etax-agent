@@ -332,6 +332,97 @@ export interface FixedAssetInput {
   disposed_date: string | null;
 }
 
+/** 請求書の明細行。サーバーAPIのワイヤ形式（snake_case）。 */
+export interface InvoiceLineRecord {
+  id: number;
+  item_name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  tax_rate_percent: number;
+  is_reduced_rate: boolean;
+  amount: number;
+}
+
+/** 発行時点の発行者スナップショット。 */
+export interface InvoiceIssuerRecord {
+  name: string;
+  zip_code: string;
+  address: string;
+  invoice_number: string;
+}
+
+/** 税率ごとの集計（適格請求書の記載事項）。 */
+export interface InvoiceRateGroupRecord {
+  tax_rate_percent: number;
+  subtotal: number;
+  tax: number;
+}
+
+export interface InvoiceTotalsRecord {
+  groups: InvoiceRateGroupRecord[];
+  subtotal: number;
+  tax_total: number;
+  total: number;
+}
+
+/** 請求書レコード。発行済み（issued）は不変で、修正は新規の修正書類で行う。 */
+export interface InvoiceRecord {
+  id: number;
+  kind: string;
+  status: "draft" | "issued";
+  document_number: string | null;
+  issue_date: string;
+  due_date: string | null;
+  counterparty_name: string;
+  counterparty_address: string;
+  is_qualified: boolean;
+  tax_rounding: InvoiceTaxRounding;
+  memo: string;
+  corrects_document_id: number | null;
+  corrects_document_number: string | null;
+  issuer: InvoiceIssuerRecord | null;
+  lines: InvoiceLineRecord[];
+  totals: InvoiceTotalsRecord;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 消費税額の端数処理方法。 */
+export type InvoiceTaxRounding = "floor" | "round" | "ceil";
+
+/** 請求書の明細入力。 */
+export interface InvoiceLineInput {
+  item_name: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  tax_rate_percent: number;
+  is_reduced_rate: boolean;
+}
+
+/** 請求書の作成・更新入力（サーバーの Create/Update スキーマに対応）。 */
+export interface InvoiceInput {
+  issue_date: string;
+  due_date: string | null;
+  counterparty_name: string;
+  counterparty_address: string;
+  is_qualified: boolean;
+  tax_rounding: InvoiceTaxRounding;
+  memo: string;
+  lines: InvoiceLineInput[];
+}
+
+/** 発行控えの検索条件（日付・金額・取引先）。 */
+export interface InvoiceSearchFilters {
+  q?: string;
+  from?: string;
+  to?: string;
+  min_total?: number;
+  max_total?: number;
+  status?: "draft" | "issued";
+}
+
 /** 固定資産に添付した画像。url は表示用（署名付きURLか配信パス）。 */
 export interface FixedAssetImageRecord {
   id: number;

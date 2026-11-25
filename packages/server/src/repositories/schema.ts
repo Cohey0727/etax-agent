@@ -16,6 +16,7 @@
  */
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -503,6 +504,85 @@ export const filingSubmissionHistoryTable = pgTable("filing_submission_history",
 });
 
 export type FilingSubmissionHistoryRow = typeof filingSubmissionHistoryTable.$inferSelect;
+
+/**
+ * 帳票（請求書）の本体（Issue #25 Phase 1）。
+ * 発行（status = issued）した帳票は不変とする：内容の誤りは、元の帳票を
+ * 書き換えず「修正した適格請求書」を新規発行して correctsDocumentId で
+ * 紐付ける（消費税法57条の4第4項。受領側は修正できないため）。
+ * 発行時点の発行者情報と集計はスナップショットとして帳票側に残し、
+ * プロフィールが後から変わっても再ダウンロードで同じ帳票が再現できる。
+ * 控えの保存期間は交付日から7年（同条第6項）。
+ */
+export const documentsTable = pgTable("documents", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  /** 帳票種別。Phase 1 は invoice（請求書）のみ */
+  kind: text("kind").notNull().default("invoice"),
+  /** draft（下書き）/ issued（発行済み・不変） */
+  status: text("status").notNull().default("draft"),
+  /** 採番した帳票番号（例: 2026-0001）。発行時にだけ付く */
+  documentNumber: text("document_number"),
+  /** 発行日（取引年月日）YYYY-MM-DD */
+  issueDate: text("issue_date").notNull().default(""),
+  /** 支払期限 YYYY-MM-DD。任意 */
+  dueDate: text("due_date"),
+  /** 交付を受ける事業者の氏名又は名称（適格請求書の記載事項） */
+  counterpartyName: text("counterparty_name").notNull().default(""),
+  /** 交付先の住所（任意の記載） */
+  counterpartyAddress: text("counterparty_address").notNull().default(""),
+  /** 適格請求書として発行するか（登録番号を表示し、記載事項を必須にする） */
+  isQualified: boolean("is_qualified").notNull().default(true),
+  /** 消費税額の端数処理: floor / round / ceil */
+  taxRounding: text("tax_rounding").notNull().default("floor"),
+  /** 備考（振込先など） */
+  memo: text("memo").notNull().default(""),
+  /** 修正元の帳票（この帳票が「修正した適格請求書」である場合の当初分）。
+   * 自己参照のため Drizzle の references は張らず、DDL の REFERENCES で担保する。 */
+  correctsDocumentId: integer("corrects_document_id"),
+  /** 発行時点の発行者情報スナップショット（InvoiceIssuer の JSON）。下書きは null */
+  issuerSnapshot: jsonb("issuer_snapshot"),
+  /** 発行時点の集計スナップショット（InvoiceTotals の JSON）。下書きは null */
+  totalsSnapshot: jsonb("totals_snapshot"),
+  /** 税込合計（明細から都度計算して保存する。検索・並び替え用。発行後は不変） */
+  totalAmount: integer("total_amount").notNull().default(0),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: timestampColumn("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
+});
+
+export type DocumentRow = typeof documentsTable.$inferSelect;
+export type NewDocumentRow = typeof documentsTable.$inferInsert;
+
+/** 帳票の明細行。発行済み帳票の明細も本体と同様に不変（更新は下書きのみ）。 */
+export const documentLinesTable = pgTable("document_lines", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  documentId: integer("document_id")
+    .notNull()
+    .references(() => documentsTable.id, { onDelete: "cascade" }),
+  /** 表示順 */
+  lineOrder: integer("line_order").notNull().default(0),
+  /** 取引内容（品目・サービス名） */
+  itemName: text("item_name").notNull().default(""),
+  /** 数量（小数可） */
+  quantity: doublePrecision("quantity").notNull().default(0),
+  /** 単位（表示用） */
+  unit: text("unit").notNull().default(""),
+  /** 税抜単価（円） */
+  unitPrice: integer("unit_price").notNull().default(0),
+  /** 適用税率（%）: 10 / 8 / 0 */
+  taxRatePercent: integer("tax_rate_percent").notNull().default(10),
+  /** 軽減税率の対象品目か */
+  isReducedRate: boolean("is_reduced_rate").notNull().default(false),
+  /** 明細金額（税抜）。数量×単価の円未満切捨てでサーバーが確定させる */
+  amount: integer("amount").notNull().default(0),
+});
+
+export type DocumentLineRow = typeof documentLinesTable.$inferSelect;
+export type NewDocumentLineRow = typeof documentLinesTable.$inferInsert;
 
 /**
  * 課金（Stripe サブスクリプション）の状態。所有者ごとに1件。

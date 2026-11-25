@@ -10,6 +10,8 @@ import { AppView, FilingTab } from "@types";
  * 年度切替で切り替え、過去年度分が履歴として見られる）。
  * 固定資産も年度から独立した独立画面 /fixed-assets（集計の対象年度は
  * サイドバーの年度切替に従う）。
+ * 請求書も年度から独立した独立画面 /invoices（発行控えの検索は
+ * 日付・金額・取引先で行う）。
  * 領収書はアプリ内では /accounts/<年度>/receipt だが、PWA の
  * ショートカットやホーム画面からの起動では年度を持てないため、
  * 年非依存の /receipt でも着地できるようにする（年度は保存済みの
@@ -26,6 +28,7 @@ const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Receipt]: "receipt",
   [AppView.Taxpayer]: "taxpayer",
   [AppView.FixedAssets]: "fixed-assets",
+  [AppView.Invoices]: "invoices",
   [AppView.Settings]: "settings",
   [AppView.Agent]: "agent",
 };
@@ -63,6 +66,7 @@ export const pathForView = (view: AppView, year: number, filingTab?: FilingTab):
   if (view === AppView.Ledger) return "/ledger";
   if (view === AppView.Taxpayer) return "/taxpayer";
   if (view === AppView.FixedAssets) return "/fixed-assets";
+  if (view === AppView.Invoices) return "/invoices";
   const base = `/accounts/${year}/${VIEW_SLUGS[view]}`;
   if (view === AppView.Filing && filingTab) {
     const slug = FILING_TAB_SLUGS[filingTab];
@@ -119,6 +123,9 @@ export const parsePath = (pathname: string): ParsedRoute | null => {
   }
   if (parts[0] === VIEW_SLUGS[AppView.FixedAssets] && parts.length === 1) {
     return { view: AppView.FixedAssets, year: null, filingTab: null };
+  }
+  if (parts[0] === VIEW_SLUGS[AppView.Invoices] && parts.length === 1) {
+    return { view: AppView.Invoices, year: null, filingTab: null };
   }
   if (parts[0] === VIEW_SLUGS[AppView.Receipt] && parts.length === 1) {
     return { view: AppView.Receipt, year: null, filingTab: null };
