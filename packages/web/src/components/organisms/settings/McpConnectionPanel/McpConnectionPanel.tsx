@@ -114,8 +114,13 @@ export const McpConnectionPanel = () => {
           <>
             <Col gap="sm">
               <Text variant="statLabel">エンドポイント</Text>
-              <Row gap="sm">
-                <Input value={endpoint} readOnly aria-label="MCPエンドポイント" />
+              <Row gap="sm" align="center">
+                <Input
+                  value={endpoint}
+                  readOnly
+                  aria-label="MCPエンドポイント"
+                  className={styles.endpointInput}
+                />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -140,7 +145,7 @@ export const McpConnectionPanel = () => {
             <Col gap="sm">
               <Tabs items={CLIENT_TABS} activeId={clientId} onChange={setClientId} />
               <pre className={styles.codeBlock}>{snippet.build(endpoint)}</pre>
-              <Row gap="sm">
+              <Row gap="sm" align="center">
                 <Button
                   variant="ghost"
                   size="sm"
