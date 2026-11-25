@@ -176,7 +176,7 @@ otherRevenue: 0,
 otherExpenses: 0,
 };
 for (const t of transactions) {
-const amount = Math.trunc(t.amount || 0);
+const amount = transactionBusinessAmount(t);
 const itype = t.income_type || "other";
 if (itype === "business") {
 if (amount >= 0) b.businessRevenue += amount;
@@ -370,7 +370,8 @@ export const NON_TAXABLE_EXPENSE_CATEGORIES: ReadonlySet<string> = new Set([
 export function estimateInputTax(transactions: Transaction[]): number {
 let total = 0;
 for (const t of transactions) {
-const amount = Math.trunc(t.amount || 0);
+// 課税仕入れの母数は事業分のみ（家事按分後の金額。消基通11-1-5）。
+const amount = transactionBusinessAmount(t);
 if (amount >= 0) continue;
 if (NON_TAXABLE_EXPENSE_CATEGORIES.has(t.category || "")) continue;
 total += -amount;
@@ -444,7 +445,7 @@ export function computeCorrectedFigures(
   // taxcalc の独立性（ledger に依存しない）を保つためここで数える。
   let rent = 0;
   for (const t of transactions) {
-    const amount = Math.trunc(t.amount || 0);
+    const amount = transactionBusinessAmount(t);
     if (
       (t.income_type || "") === "real_estate" &&
       RESIDENTIAL_RENT_CATEGORIES.has(t.category || "") &&

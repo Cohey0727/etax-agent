@@ -17,6 +17,7 @@ import { filterYear, statementCategoryTotals } from "./ledger";
 import {
   aggregateIncome,
   computeCorrectedFigures,
+  transactionBusinessAmount,
   type CorrectedFigures,
   type FilingType,
 } from "./taxcalc";
@@ -122,12 +123,12 @@ export interface TrialBalanceOptions {
 // 損益計算書の行の組み立て（決算書と同じ規則）
 // ---------------------------------------------------------------------------
 
-/** 収入の内訳（正の金額の科目別合計、金額の大きい順）。合計は区分の収入と一致する。 */
+/** 収入の内訳（事業分の科目別合計、金額の大きい順）。合計は区分の収入と一致する。 */
 function revenueLines(transactions: Transaction[], incomeType: IncomeType): TrialBalanceLine[] {
   const totals = new Map<string, number>();
   for (const t of transactions) {
     if (t.income_type !== incomeType) continue;
-    const amount = Math.trunc(t.amount || 0);
+    const amount = transactionBusinessAmount(t);
     if (amount <= 0) continue;
     totals.set(t.category, (totals.get(t.category) ?? 0) + amount);
   }
@@ -136,7 +137,7 @@ function revenueLines(transactions: Transaction[], incomeType: IncomeType): Tria
     .sort((a, b) => b.amount - a.amount);
 }
 
-/** 支出の内訳（負の金額の絶対値の科目別合計、金額の大きい順）。 */
+/** 支出の内訳（事業分の絶対値の科目別合計、金額の大きい順）。 */
 function expenseLinesBySign(
   transactions: Transaction[],
   incomeType: IncomeType,
@@ -144,7 +145,7 @@ function expenseLinesBySign(
   const totals = new Map<string, number>();
   for (const t of transactions) {
     if (t.income_type !== incomeType) continue;
-    const amount = Math.trunc(t.amount || 0);
+    const amount = transactionBusinessAmount(t);
     if (amount >= 0) continue;
     totals.set(t.category, (totals.get(t.category) ?? 0) + -amount);
   }
@@ -269,7 +270,7 @@ function monthlyRows(yearTx: Transaction[]): TrialBalanceMonth[] {
     let expenses = 0;
     for (const t of scoped) {
       if (Number(t.date.slice(5, 7)) !== month) continue;
-      const amount = Math.trunc(t.amount || 0);
+      const amount = transactionBusinessAmount(t);
       if (amount >= 0) revenue += amount;
       else expenses += -amount;
     }

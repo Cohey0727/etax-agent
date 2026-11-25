@@ -17,6 +17,7 @@
  */
 
 import { normalizeSearchText } from "./text";
+import { normalizeBusinessRatio, transactionBusinessAmount } from "./taxcalc";
 import { VALID_INCOME_TYPES, type IncomeType, type Transaction } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -346,11 +347,11 @@ export function filterYear(transactions: Transaction[], year: number): Transacti
   return transactions.filter((t) => t.year === year);
 }
 
-/** 勘定科目ごとの合計（符号つき）。 */
+/** 勘定科目ごとの合計（符号つき）。金額は事業分（家事按分後）で集計する。 */
 export function categoryTotals(transactions: Transaction[]): Record<string, number> {
   const totals: Record<string, number> = {};
   for (const t of transactions) {
-    totals[t.category] = (totals[t.category] ?? 0) + Math.trunc(t.amount);
+    totals[t.category] = (totals[t.category] ?? 0) + transactionBusinessAmount(t);
   }
   return totals;
 }
@@ -376,11 +377,11 @@ export function statementCategoryTotals(
   return result;
 }
 
-/** 住宅家賃（消費税非課税）の収入合計。category=家賃収入 のものを拾う。 */
+/** 住宅家賃（消費税非課税）の収入合計。category=家賃収入 のものを事業分で拾う。 */
 export function residentialRentTotal(transactions: Transaction[]): number {
   return transactions
     .filter((t) => t.income_type === "real_estate" && t.category === "家賃収入" && t.amount > 0)
-    .reduce((sum, t) => sum + Math.trunc(t.amount), 0);
+    .reduce((sum, t) => sum + transactionBusinessAmount(t), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +399,8 @@ export function normalizeTransaction(raw: Record<string, unknown>): Transaction 
   const amountRaw = raw["amount"];
   const amount = typeof amountRaw === "number" && Number.isFinite(amountRaw) ? Math.trunc(amountRaw) : 0;
   const itypeRaw = typeof raw["income_type"] === "string" ? (raw["income_type"] as string) : "other";
+  const ratioRaw = raw["business_ratio_percent"];
+  const basisRaw = raw["business_ratio_basis"];
   return {
     date,
     year,
@@ -407,6 +410,12 @@ export function normalizeTransaction(raw: Record<string, unknown>): Transaction 
     category: typeof raw["category"] === "string" && raw["category"] ? (raw["category"] as string) : "未分類",
     income_type: VALID_INCOME_TYPES.has(itypeRaw) ? (itypeRaw as IncomeType) : "other",
     tax_category: typeof raw["tax_category"] === "string" ? (raw["tax_category"] as string) : "",
+    // 事業割合は数値で来た場合だけ引き継ぐ（不正値は未指定＝100として扱う）。
+    business_ratio_percent:
+      typeof ratioRaw === "number" && Number.isFinite(ratioRaw)
+        ? normalizeBusinessRatio(ratioRaw)
+        : undefined,
+    business_ratio_basis: typeof basisRaw === "string" ? basisRaw : undefined,
   };
 }
 

@@ -30,6 +30,7 @@ zeimushoXml,
 zipXml,
 } from "./xtx";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
+import { transactionBusinessAmount } from "./taxcalc";
 import { Transaction } from "./types";
 
 const SOFT_NAME = "eTaxAgent";
@@ -204,10 +205,14 @@ export function summarizeConsumptionTax(
       summary.excludedAmount += amount;
       continue;
     }
+    // 申告金額に算入するのは事業分のみ（家事按分後。課税仕入れは
+    // 事業供用部分に限られるため。消基通11-1-5）。未設定・除外の
+    // 診断金額は取引そのものの金額（総額）のまま返す。
+    const businessAmount = transactionBusinessAmount(t);
     if (bucket === "purchasesIncl10" || bucket === "purchasesIncl8") {
-      summary[bucket] += -amount;
+      summary[bucket] += -businessAmount;
     } else {
-      summary[bucket] += amount;
+      summary[bucket] += businessAmount;
     }
   }
   return summary;
