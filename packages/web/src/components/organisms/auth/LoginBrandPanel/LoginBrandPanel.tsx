@@ -1,4 +1,4 @@
-import { Col, Icon, Row, Text } from "@components/atoms";
+import { Col, Icon, Logo, Row, Text } from "@components/atoms";
 import { WorkflowSteps } from "@components/organisms/auth/WorkflowSteps";
 import styles from "./LoginBrandPanel.css";
 
@@ -31,7 +31,7 @@ export const LoginBrandPanel = () => {
       <Col gap="lg" justify="center" className={styles.content}>
         <Row gap="sm" align="center" className={`${styles.rise} ${RISE_DELAYS[0]}`}>
           <div className={styles.brandMark}>
-            <Icon name="bill" size={21} />
+            <Logo variant="icon" size={40} />
           </div>
           <Col gap="none">
             <Text variant="sectionTitle" className={styles.brandTitle}>

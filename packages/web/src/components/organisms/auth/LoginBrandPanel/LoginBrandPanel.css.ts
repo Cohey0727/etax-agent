@@ -88,16 +88,11 @@ const styles = {
     animation: `${riseIn} 0.7s ${theme.animation.springSoft} both`,
   }),
   ...riseDelay,
+  // ロゴ（Logo atom）の受け皿。地と角丸はロゴ側が持つので、ここは登場・浮遊の動きだけ。
   brandMark: style({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: theme.component.brandMarkSize,
-    height: theme.component.brandMarkSize,
-    borderRadius: "11px",
-    background: `linear-gradient(135deg, ${theme.color.gradientStart} 0%, ${theme.color.accent} 100%)`,
-    color: theme.color.onAccent,
-    boxShadow: theme.shadow.button,
     flexShrink: 0,
     animation: `${popIn} 0.5s ${theme.animation.spring} both, ${bob} 3.2s ease-in-out 0.7s infinite`,
   }),
