@@ -20,6 +20,10 @@ export const TransactionSchema = z
     category: z.string(),
     income_type: z.string(),
     tax_category: z.string(),
+    /** 事業専用割合（家事按分、0〜100の整数）。100 は全額事業分 */
+    business_ratio_percent: z.number(),
+    /** 按分根拠のメモ（任意） */
+    business_ratio_basis: z.string(),
     import_id: z.number().nullable(),
     created_at: z.string(),
     updated_at: z.string(),
@@ -90,6 +94,10 @@ export const CreateTransactionRequestSchema = z
     category: z.string().optional().catch(undefined),
     income_type: z.string().optional().catch(undefined),
     tax_category: z.string().optional().catch(undefined),
+    /** 事業専用割合（家事按分、0〜100）。範囲外はハンドラ側で正規化する */
+    business_ratio_percent: z.number().optional().catch(undefined),
+    /** 按分根拠のメモ（任意） */
+    business_ratio_basis: z.string().optional().catch(undefined),
     /** 登録と同時に紐付ける証憑のファイルID（任意） */
     receipt_file_ids: z.array(z.string()).optional().catch(undefined),
   })
@@ -107,6 +115,10 @@ export const UpdateTransactionRequestSchema = z
     category: z.string().optional().catch(undefined),
     income_type: z.string().optional().catch(undefined),
     tax_category: z.string().optional().catch(undefined),
+    /** 事業専用割合（家事按分、0〜100）。範囲外はハンドラ側で正規化する */
+    business_ratio_percent: z.number().optional().catch(undefined),
+    /** 按分根拠のメモ（任意） */
+    business_ratio_basis: z.string().optional().catch(undefined),
   })
   .openapi("UpdateTransactionRequest");
 

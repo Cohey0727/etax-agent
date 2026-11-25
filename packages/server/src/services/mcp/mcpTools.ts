@@ -26,6 +26,7 @@ import {
   consumptionTax,
   depreciationForYear,
   estimateInputTax,
+  normalizeBusinessRatio,
   residentialRentTotal,
   computeManualIncomes,
   smallSpecialUsage,
@@ -196,6 +197,16 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
           type: "integer",
           description: "割り当て年度（任意。既定は日付の年。日付と違う年へ計上する場合に指定）",
         },
+        business_ratio_percent: {
+          type: "integer",
+          minimum: 0,
+          maximum: 100,
+          description: "事業専用割合（家事按分、0〜100の整数。任意、既定は100＝全額事業分）",
+        },
+        business_ratio_basis: {
+          type: "string",
+          description: "按分根拠のメモ（任意。例: 面積割合 20㎡/60㎡）",
+        },
       },
       required: ["date", "description", "amount"],
     },
@@ -215,6 +226,13 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
         category: { type: "string" },
         income_type: { type: "string", enum: ["business", "real_estate", "other"] },
         tax_category: { type: "string" },
+        business_ratio_percent: {
+          type: "integer",
+          minimum: 0,
+          maximum: 100,
+          description: "事業専用割合（家事按分、0〜100の整数）",
+        },
+        business_ratio_basis: { type: "string", description: "按分根拠のメモ" },
       },
       required: ["id"],
     },
@@ -588,6 +606,9 @@ export async function dispatchMcpTool(
           category,
           incomeType: parseIncomeType(args["income_type"]),
           taxCategory: typeof args["tax_category"] === "string" ? args["tax_category"] : "",
+          businessRatioPercent: normalizeBusinessRatio(args["business_ratio_percent"]),
+          businessRatioBasis:
+            typeof args["business_ratio_basis"] === "string" ? args["business_ratio_basis"] : "",
         });
         if (!row) throw new Error("取引の登録に失敗しました");
         if (category !== "未分類") {
@@ -620,6 +641,12 @@ export async function dispatchMcpTool(
         if (typeof args["category"] === "string") patch.category = args["category"];
         if (args["income_type"] !== undefined) patch.incomeType = parseIncomeType(args["income_type"]);
         if (typeof args["tax_category"] === "string") patch.taxCategory = args["tax_category"];
+        if (typeof args["business_ratio_percent"] === "number") {
+          patch.businessRatioPercent = normalizeBusinessRatio(args["business_ratio_percent"]);
+        }
+        if (typeof args["business_ratio_basis"] === "string") {
+          patch.businessRatioBasis = args["business_ratio_basis"];
+        }
         const row = await updateTransactionRow(db, id, patch);
         if (!row) throw new Error(`取引が見つかりません: id=${id}`);
         if (patch.category !== undefined && patch.category !== "未分類") {

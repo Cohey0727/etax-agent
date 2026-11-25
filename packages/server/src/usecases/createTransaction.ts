@@ -5,6 +5,7 @@
  * 400 より先に返す従来順序を保つため（ルート定義にボディは置かない）。
  * スキーマ自体は schemas/transaction.ts の CreateTransactionRequestSchema。
  */
+import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
@@ -88,6 +89,8 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
         category: body.category ? body.category : "未分類",
         incomeType: body.income_type ?? "other",
         taxCategory: body.tax_category ?? "",
+        businessRatioPercent: normalizeBusinessRatio(body.business_ratio_percent),
+        businessRatioBasis: body.business_ratio_basis ?? "",
       });
       if (inserted && body.receipt_file_ids) {
         for (const fileId of body.receipt_file_ids) {

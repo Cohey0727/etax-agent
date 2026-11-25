@@ -5,6 +5,7 @@
  * 判定、証憑の紐付け解除・実体の取得。REST の /api/transactions/*、
  * /api/classify/batch、/api/receipts/* と同じリポジトリ/サービスを使う。
  */
+import { normalizeBusinessRatio } from "@etax/shared";
 import { createStorageClient, receiptObjectKey } from "../../gateways/storageGateway";
 import { loadStorageConfig } from "../../lib/config";
 import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
@@ -46,6 +47,13 @@ const transactionItemProperties = {
   },
   tax_category: { type: "string", description: "消費税の税区分（任意）" },
   fiscal_year: { type: "integer", description: "割り当て年度（任意、既定は置換対象年）" },
+  business_ratio_percent: {
+    type: "integer",
+    minimum: 0,
+    maximum: 100,
+    description: "事業専用割合（家事按分、0〜100の整数。任意、既定は100）",
+  },
+  business_ratio_basis: { type: "string", description: "按分根拠のメモ（任意）" },
 };
 
 export const mcpLedgerTools: McpToolModule = {
@@ -190,6 +198,8 @@ export const mcpLedgerTools: McpToolModule = {
           category: body.category ? body.category : "未分類",
           incomeType: body.income_type ?? "other",
           taxCategory: body.tax_category ?? "",
+          businessRatioPercent: normalizeBusinessRatio(body.business_ratio_percent),
+          businessRatioBasis: body.business_ratio_basis ?? "",
         };
       });
       const rows = await replaceYearTransactionRows(db, year, values);

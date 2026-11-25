@@ -167,6 +167,9 @@ export async function addTransactionForAgent(args: AddTransactionArgs) {
     category,
     incomeType: args.incomeType ?? "other",
     taxCategory: args.taxCategory ?? "",
+    // エージェント経由の登録では按分は扱わない（未指定＝全額事業分）。
+    businessRatioPercent: 100,
+    businessRatioBasis: "",
   });
   if (!row) throw new Error("取引の登録に失敗しました");
   if (category !== "未分類") {

@@ -5,6 +5,7 @@
  * 帳簿（DB）のその年の内容として丸ごと保存する。ボディ検証は
  * createTransaction と同じくハンドラ側で行う（503 を 400 より先に返す）。
  */
+import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
@@ -82,6 +83,8 @@ export const replaceYearTransactionsHandler: RouteHandler<
       category: body.category ? body.category : "未分類",
       incomeType: body.income_type ?? "other",
       taxCategory: body.tax_category ?? "",
+      businessRatioPercent: normalizeBusinessRatio(body.business_ratio_percent),
+      businessRatioBasis: body.business_ratio_basis ?? "",
     };
   });
   let rows;
