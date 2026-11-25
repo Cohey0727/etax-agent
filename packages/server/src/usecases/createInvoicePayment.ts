@@ -3,22 +3,13 @@
  *
  * 発行済み請求書へ入金取引を紐付ける。自動推測の候補も、確定は必ず
  * このエンドポイントへの明示的な承認操作で行う（自動では確定しない）。
- * 差額がある場合は、振込手数料（支払手数料）・売上値引として調整でき、
- * 過入金は預り金として処理して入金取引を使い切ることもできる。
+ * 検証と実行は services/reconciliation（MCP と共用）に集約している。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import { getInvoiceRow } from "../repositories/invoiceRepository";
-import {
-  appliedAmountsByTransaction,
-  fetchPaymentsResponse,
-  insertReconciliation,
-  settlementSummaries,
-} from "../repositories/reconciliationRepository";
-import { getTransactionRow } from "../repositories/transactionRepository";
 import { ErrorSchema } from "../schemas/common";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
 import {
@@ -26,6 +17,10 @@ import {
   InvoicePaymentsResponse,
   InvoicePaymentsResponseSchema,
 } from "../schemas/reconciliation";
+import {
+  applyInvoicePayment,
+  ReconciliationError,
+} from "../services/reconciliation/reconcileInvoice";
 
 export const createInvoicePaymentRoute = createRoute({
   method: "post",
@@ -65,55 +60,15 @@ export const createInvoicePaymentHandler: RouteHandler<typeof createInvoicePayme
   if (!parsed.success) {
     throw new HTTPException(400, { message: "消込の入力が不正です" });
   }
-  const body = parsed.data;
   const id = Number(c.req.valid("param").id);
+  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
   let response: InvoicePaymentsResponse;
   try {
-    const invoice = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
-    if (!invoice) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    if (invoice.status !== "issued") {
-      throw new HTTPException(400, { message: "発行済みの請求書にだけ消込できます" });
-    }
-    const transaction = await getTransactionRow(db, body.transaction_id);
-    if (!transaction || transaction.amount <= 0) {
-      throw new HTTPException(400, { message: "入金取引（プラスの取引）を指定してください" });
-    }
-    const summaries = await settlementSummaries(
-      db,
-      new Map([[invoice.id, invoice.totalAmount]]),
-    );
-    const settlement = summaries.get(invoice.id);
-    if (!settlement || settlement.remainingAmount <= 0) {
-      throw new HTTPException(400, { message: "この請求書はすでに消込済みです" });
-    }
-    const applied = await appliedAmountsByTransaction(db, [transaction.id]);
-    const unapplied = transaction.amount - (applied.get(transaction.id) ?? 0);
-    if (unapplied <= 0) {
-      throw new HTTPException(400, { message: "この入金取引はすでに全額消込済みです" });
-    }
-    const feeAmount = body.fee_amount ?? 0;
-    const discountAmount = body.discount_amount ?? 0;
-    const amount = body.amount ?? Math.min(unapplied, settlement.remainingAmount);
-    if (amount > unapplied) {
-      throw new HTTPException(400, { message: "充当額が入金取引の未消込額を超えています" });
-    }
-    if (amount + feeAmount + discountAmount > settlement.remainingAmount) {
-      throw new HTTPException(400, {
-        message: "充当額と差額調整の合計が請求残額を超えています",
-      });
-    }
-    const excessAsDeposit = body.treat_excess_as_deposit ? unapplied - amount : 0;
-    await insertReconciliation(db, {
-      document: invoice,
-      paymentTransaction: transaction,
-      amount,
-      feeAmount,
-      discountAmount,
-      excessAsDeposit,
-    });
-    response = await fetchPaymentsResponse(db, invoice);
+    response = await applyInvoicePayment(db, { invoiceId: id, ...parsed.data });
   } catch (e) {
-    if (e instanceof HTTPException) throw e;
+    if (e instanceof ReconciliationError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
   return c.json(response, 201);

@@ -3,27 +3,22 @@
  *
  * 金額一致・取引先名の近似・期日の近接から候補を提示するだけであり、
  * 消込はユーザーが候補を承認して作成エンドポイントを呼ぶまで確定しない。
+ * 推測処理は services/reconciliation（MCP と共用）に集約している。
  */
-import { suggestReconciliations } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import { getInvoiceRow } from "../repositories/invoiceRepository";
-import {
-  appliedAmountsByTransaction,
-  settlementSummaries,
-} from "../repositories/reconciliationRepository";
-import {
-  listTransactionRows,
-  transactionToApi,
-} from "../repositories/transactionRepository";
 import { ErrorSchema } from "../schemas/common";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
 import {
   ReconciliationSuggestionsResponse,
   ReconciliationSuggestionsResponseSchema,
 } from "../schemas/reconciliation";
+import {
+  ReconciliationError,
+  suggestInvoicePayments,
+} from "../services/reconciliation/reconcileInvoice";
 
 export const listPaymentSuggestionsRoute = createRoute({
   method: "get",
@@ -54,59 +49,14 @@ export const listPaymentSuggestionsHandler: RouteHandler<
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
   const id = Number(c.req.valid("param").id);
+  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
   let response: ReconciliationSuggestionsResponse;
   try {
-    const invoice = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
-    if (!invoice) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    if (invoice.status !== "issued") {
-      response = { candidates: [] };
-      return c.json(response, 200);
-    }
-    const summaries = await settlementSummaries(
-      db,
-      new Map([[invoice.id, invoice.totalAmount]]),
-    );
-    const remaining = summaries.get(invoice.id)?.remainingAmount ?? invoice.totalAmount;
-    const incomeRows = (await listTransactionRows(db)).filter((row) => row.amount > 0);
-    const applied = await appliedAmountsByTransaction(
-      db,
-      incomeRows.map((row) => row.id),
-    );
-    const candidates = suggestReconciliations(
-      {
-        totalAmount: invoice.totalAmount,
-        remainingAmount: remaining,
-        counterpartyName: invoice.counterpartyName,
-        issueDate: invoice.issueDate,
-        dueDate: invoice.dueDate,
-      },
-      incomeRows.map((row) => ({
-        id: row.id,
-        date: row.date,
-        description: row.description,
-        amount: row.amount,
-        appliedAmount: applied.get(row.id) ?? 0,
-      })),
-    );
-    const byId = new Map(incomeRows.map((row) => [row.id, row]));
-    response = {
-      candidates: candidates.flatMap((candidate) => {
-        const row = byId.get(candidate.transactionId);
-        return row
-          ? [
-              {
-                transaction: transactionToApi(row),
-                unapplied_amount: candidate.unappliedAmount,
-                suggested_amount: candidate.suggestedAmount,
-                score: candidate.score,
-                reasons: candidate.reasons,
-              },
-            ]
-          : [];
-      }),
-    };
+    response = { candidates: await suggestInvoicePayments(db, id) };
   } catch (e) {
-    if (e instanceof HTTPException) throw e;
+    if (e instanceof ReconciliationError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
   return c.json(response, 200);
