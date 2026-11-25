@@ -24,6 +24,29 @@ export type XtxXsdValidation =
   | { kind: "invalid"; errors: string[] }
   | { kind: "unavailable"; reason: string };
 
+/** 生成した XTX が公式スキーマに適合しなかったことを表すエラー。 */
+export class XtxXsdInvalidError extends Error {
+  readonly errors: string[];
+
+  constructor(errors: string[]) {
+    super(`生成したXTXが公式XMLスキーマに適合しませんでした: ${errors.slice(0, 3).join(" / ")}`);
+    this.name = "XtxXsdInvalidError";
+    this.errors = errors;
+  }
+}
+
+/**
+ * 生成ユースケース向けの入口: 検証を通れば警告なし（null）、
+ * 検証できなければ警告文を返し、スキーマ違反なら XtxXsdInvalidError
+ * を投げる（呼び出し側で 400 に変換して生成を止める）。
+ */
+export function xsdWarningOrThrow(xtx: string): string | null {
+  const result = validateXtxWithOfficialXsd(xtx);
+  if (result.kind === "valid") return null;
+  if (result.kind === "invalid") throw new XtxXsdInvalidError(result.errors);
+  return result.reason;
+}
+
 /** 手続ルート要素のプレフィックス → XSD フォルダ名。 */
 const PROCEDURE_FOLDERS: Record<string, string> = {
   RKO: "shotoku",

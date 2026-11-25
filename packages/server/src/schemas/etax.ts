@@ -130,6 +130,11 @@ export const ExportXtxResponseSchema = z
   .object({
     filename: z.string(),
     xtx: z.string(),
+    /**
+     * 公式XSD検証を行えなかった場合の警告（未同梱・検証エンジン不在）。
+     * 検証が通れば null。スキーマ違反の場合は生成自体を 400 で止める。
+     */
+    xsd_warning: z.string().nullable(),
   })
   .openapi("ExportXtxResponse");
 
@@ -224,6 +229,8 @@ export const ExportConsumptionXtxResponseSchema = z
     filename: z.string(),
     xtx: z.string(),
     total_payable: z.number(),
+    /** 公式XSD検証を行えなかった場合の警告。検証が通れば null（ExportXtxResponse と同じ意味）。 */
+    xsd_warning: z.string().nullable(),
   })
   .openapi("ExportConsumptionXtxResponse");
 

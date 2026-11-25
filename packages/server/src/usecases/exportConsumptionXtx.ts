@@ -25,7 +25,23 @@ import {
   ExportConsumptionXtxResponseSchema,
 } from "../schemas/etax";
 import { ErrorSchema } from "../schemas/common";
+import { XtxXsdInvalidError, xsdWarningOrThrow } from "../services/etax/xsdValidator";
 import { toTaxpayer } from "./exportXtx";
+
+/**
+ * 生成した消費税XTXを公式XSDで検証する。スキーマ違反は 400 に変換し、
+ * 検証できない場合は警告文を返す（exportXtx と同じ常時検証の方針）。
+ */
+function validateConsumptionXtx(xtx: string): string | null {
+  try {
+    return xsdWarningOrThrow(xtx);
+  } catch (e) {
+    if (e instanceof XtxXsdInvalidError) {
+      throw new HTTPException(400, { message: e.message });
+    }
+    throw e;
+  }
+}
 
 export const exportConsumptionXtxRoute = createRoute({
   method: "post",
@@ -107,6 +123,7 @@ export const exportConsumptionXtxHandler: RouteHandler<typeof exportConsumptionX
       filename: `etax-shohi-${year}-kanni${body.filing_kind === 3 ? "-shusei" : "-kakutei"}.xtx`,
       xtx,
       total_payable: simplifiedResult.totalPayable,
+      xsd_warning: validateConsumptionXtx(xtx),
     };
     return c.json(response, 200);
   }
@@ -150,6 +167,7 @@ export const exportConsumptionXtxHandler: RouteHandler<typeof exportConsumptionX
       filename: `etax-shohi-${year}-special20${body.filing_kind === 3 ? "-shusei" : "-kakutei"}.xtx`,
       xtx,
       total_payable: specialResult.totalPayable,
+      xsd_warning: validateConsumptionXtx(xtx),
     };
     return c.json(response, 200);
   }
@@ -188,6 +206,7 @@ export const exportConsumptionXtxHandler: RouteHandler<typeof exportConsumptionX
     filename: `etax-shohi-${year}${body.filing_kind === 3 ? "-shusei" : "-kakutei"}.xtx`,
     xtx,
     total_payable: result.totalPayable,
+    xsd_warning: validateConsumptionXtx(xtx),
   };
   return c.json(response, 200);
 };
