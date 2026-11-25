@@ -46,11 +46,8 @@ export function useLedgerSync(options: {
     };
   }, [authChecked, authUserId]);
 
-  const handleUseImported = (next: Transaction[]) => {
-    setTransactions(next);
-    setDataSource("取込CSV");
-    setActiveView(AppView.Dashboard);
-    // 確定した内容は帳簿へも保存する（年ごとに置き換え。失敗しても画面は継続）。
+  /** 確定した取引を帳簿へ保存する（年ごとに置き換え。失敗しても画面は継続）。 */
+  const saveTransactionsByYear = (next: Transaction[]) => {
     const yearsToSave = [...new Set(next.map((tx) => tx.year))];
     for (const saveYear of yearsToSave) {
       const inputs = next
@@ -60,6 +57,22 @@ export function useLedgerSync(options: {
         // 帳簿が未接続の環境ではメモリ上のみで動く
       });
     }
+  };
+
+  const handleUseImported = (next: Transaction[]) => {
+    setTransactions(next);
+    setDataSource("取込CSV");
+    setActiveView(AppView.Dashboard);
+    saveTransactionsByYear(next);
+  };
+
+  /**
+   * 領収書からの登録専用経路。取込と違い、登録しても画面は遷移させない
+   * （その場で続けて撮影・登録できるようにする。スマホの撮影導線の要）。
+   */
+  const handleRegisterTransactions = (next: Transaction[]) => {
+    setTransactions(next);
+    saveTransactionsByYear(next);
   };
 
   // CSV取込（DB保存済み）の「ダッシュボードで使う」専用経路。
@@ -130,6 +143,7 @@ export function useLedgerSync(options: {
     dataSource,
     ledgerLoading,
     handleUseImported,
+    handleRegisterTransactions,
     handleUseCsvImported,
     handleSyncTransactions,
     handleLoadSample,

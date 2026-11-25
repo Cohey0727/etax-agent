@@ -4,8 +4,15 @@
  * 静的アセットはキャッシュ優先＋裏で更新する。/api/ は一切キャッシュしない
  * （帳簿や判定などの業務データは常にサーバーの最新を正とする）。
  */
-const CACHE_NAME = "etaxagent-v1";
-const CORE_ASSETS = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
+const CACHE_NAME = "etaxagent-v2";
+const CORE_ASSETS = [
+  "/",
+  "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-maskable-512.png",
+  "/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

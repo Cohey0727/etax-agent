@@ -10,6 +10,10 @@ import { AppView, FilingTab } from "@types";
  * 年度切替で切り替え、過去年度分が履歴として見られる）。
  * 固定資産も年度から独立した独立画面 /fixed-assets（集計の対象年度は
  * サイドバーの年度切替に従う）。
+ * 領収書はアプリ内では /accounts/<年度>/receipt だが、PWA の
+ * ショートカットやホーム画面からの起動では年度を持てないため、
+ * 年非依存の /receipt でも着地できるようにする（年度は保存済みの
+ * 選択が使われ、着地直後に通常パスへ書き換わる）。
  * 確定申告画面はさらにタブがぶら下がる（総合はスラッグなし）。
  * 例: 収支タブ = /accounts/2024/final-tax/balance。
  */
@@ -115,6 +119,9 @@ export const parsePath = (pathname: string): ParsedRoute | null => {
   }
   if (parts[0] === VIEW_SLUGS[AppView.FixedAssets] && parts.length === 1) {
     return { view: AppView.FixedAssets, year: null, filingTab: null };
+  }
+  if (parts[0] === VIEW_SLUGS[AppView.Receipt] && parts.length === 1) {
+    return { view: AppView.Receipt, year: null, filingTab: null };
   }
   if (parts[0] !== "accounts" || parts.length < 2) return null;
   const year = asYear(parts[1]);

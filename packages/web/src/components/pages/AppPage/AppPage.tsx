@@ -64,6 +64,7 @@ export const AppPage = () => {
     dataSource,
     ledgerLoading,
     handleUseImported,
+    handleRegisterTransactions,
     handleUseCsvImported,
     handleSyncTransactions,
     handleLoadSample,
@@ -273,6 +274,7 @@ export const AppPage = () => {
           transactions={transactions}
           year={year}
           onUseTransactions={handleUseImported}
+          onRegisterTransactions={handleRegisterTransactions}
           onUseImportedCsv={handleUseCsvImported}
           onLoadSample={handleLoadSample}
           onSyncTransactions={handleSyncTransactions}

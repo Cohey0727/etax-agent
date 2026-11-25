@@ -99,7 +99,7 @@ export const ReceiptLibraryPanel = ({ year }: ReceiptLibraryPanelProps) => {
         {receipts?.map((receipt) => {
           const linked = linkedLabel(receipt);
           return (
-            <Row key={receipt.file_id} gap="md" align="start" className={styles.row}>
+            <Row key={receipt.file_id} gap="md" align="start" wrap className={styles.row}>
               <img
                 src={receiptContentUrl(receipt.file_id)}
                 alt="証憑のサムネイル"

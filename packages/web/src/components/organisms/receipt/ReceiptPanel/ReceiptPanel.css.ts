@@ -20,6 +20,12 @@ const styles = {
       "(max-width: 640px)": { gridTemplateColumns: "1fr" },
     },
   }),
+  // 狭い画面では登録ボタンを横幅いっぱいにして押しやすくする。
+  addButton: style({
+    "@media": {
+      "(max-width: 640px)": { flex: 1 },
+    },
+  }),
 };
 
 export default styles;

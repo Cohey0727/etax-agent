@@ -18,6 +18,11 @@ export interface ViewPageProps {
   year: number;
   onUseTransactions: (transactions: Transaction[]) => void;
   /**
+   * 領収書からの登録専用。登録後も画面に留まり、続けて撮影・登録できる
+   * （汎用の onUseTransactions はダッシュボードへ遷移する）。領収書画面だけが使う。
+   */
+  onRegisterTransactions?: (transactions: Transaction[]) => void;
+  /**
    * CSV取込（DB保存済み）の「ダッシュボードで使う」専用。取込レスポンスは
    * 新規分のみで年度の完全な集合ではないため、汎用の onUseTransactions とは
    * 別に、サーバーから影響年度を読み直す経路を使う。取込画面だけが使う。
