@@ -10,19 +10,6 @@
  *   - e-Tax への最終提出は本ツール群でも行わない（納税者本人の操作）。
  */
 import {
-  BlueDeductionOptions,
-  DeductionInputs,
-  EMPTY_DEDUCTION_INPUTS,
-  EMPTY_MISC_INCOME,
-  EMPTY_SALARY_INCOME,
-  EMPTY_TAX_CREDIT_INPUTS,
-  FilingType,
-  IncomeType,
-  MiscIncomeInput,
-  SalaryIncomeInput,
-  TaxCreditInputs,
-  Transaction,
-  VALID_INCOME_TYPES,
   aggregateIncome,
   amendmentDelta,
   blueDeduction,
@@ -47,9 +34,7 @@ import {
 } from "@etax/shared";
 import { billingEnabled } from "../../gateways/stripeGateway";
 import { createSystemOneClient } from "../../gateways/systemOneGateway";
-import { Db, getDb } from "../../lib/db";
 import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
-import { databaseUnavailableMessage } from "../../lib/errors";
 import { authRequired } from "../../lib/tenantContext";
 import { hasActivePlan } from "../../repositories/subscriptionRepository";
 import {
@@ -64,7 +49,6 @@ import {
 import { TransactionRow } from "../../repositories/schema";
 import {
   deleteTransactionRow,
-  effectiveFiscalYear,
   insertTransactionRow,
   listTransactionRows,
   transactionToApi,
@@ -88,33 +72,25 @@ import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
 
-export interface McpToolDef {
-  name: string;
-  description: string;
-  inputSchema: {
-    type: "object";
-    properties: Record<string, unknown>;
-    required?: string[];
-  };
-}
-
-export interface McpToolResult {
-  content: { type: "text"; text: string }[];
-  isError?: boolean;
-}
-
-const yearProperty = { type: "integer", description: "対象年（西暦）" };
-
-const filingTypeProperty = {
-  type: "string",
-  enum: ["blue65", "blue55", "blue10", "white"],
-  description: "申告の種類（青色申告特別控除の区分、任意。既定は blue65）",
-};
-
-const realEstateScaleProperty = {
-  type: "boolean",
-  description: "不動産貸付けが事業的規模か（任意。既定は false）",
-};
+export type { McpToolDef, McpToolResult } from "./mcpToolKit";
+import type { McpToolDef, McpToolResult } from "./mcpToolKit";
+import {
+  filingOptionsArg,
+  filingTypeProperty,
+  ledgerTransactions,
+  mergeDeductionInputs,
+  mergeTaxCreditInputs,
+  miscIncomeArg,
+  numArg,
+  nullableNumArg,
+  parseIncomeType,
+  realEstateScaleProperty,
+  requireDb,
+  salaryIncomeArg,
+  textResult,
+  todayInTokyo,
+  yearProperty,
+} from "./mcpToolKit";
 
 export const MCP_TOOLS: McpToolDef[] = [
   {
@@ -438,137 +414,6 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
 ];
-
-/** DB を必須とするツール用。接続できなければエラーを投げる。 */
-function requireDb(): Db {
-  const db = getDb();
-  if (!db) throw new Error(databaseUnavailableMessage);
-  return db;
-}
-
-/** DB行を指定した割り当て年度の shared 取引形式へ変換する。 */
-function rowsToTransactions(rows: TransactionRow[], year: number): Transaction[] {
-  return rows
-    .filter((row) => effectiveFiscalYear(row) === year)
-    .map((row) => ({
-      date: row.date,
-      year,
-      description: row.description,
-      amount: row.amount,
-      account: row.account,
-      category: row.category,
-      income_type: row.incomeType as IncomeType,
-      tax_category: row.taxCategory,
-    }));
-}
-
-/** 対象年の帳簿取引（shared 形式）をDBから取る（年度絞り込みは SQL 側）。 */
-async function ledgerTransactions(db: Db, year: number): Promise<Transaction[]> {
-  return rowsToTransactions(await listTransactionRows(db, undefined, year), year);
-}
-
-/** 所得控除の入力を、未指定項目ゼロで補完する（ネストも1段だけ補完）。 */
-function mergeDeductionInputs(input: unknown): DeductionInputs {
-  if (typeof input !== "object" || input === null) return EMPTY_DEDUCTION_INPUTS;
-  const partial = input as Partial<DeductionInputs>;
-  return {
-    ...EMPTY_DEDUCTION_INPUTS,
-    ...partial,
-    lifeInsurance: { ...EMPTY_DEDUCTION_INPUTS.lifeInsurance, ...(partial.lifeInsurance ?? {}) },
-    earthquakeInsurance: {
-      ...EMPTY_DEDUCTION_INPUTS.earthquakeInsurance,
-      ...(partial.earthquakeInsurance ?? {}),
-    },
-    dependents: { ...EMPTY_DEDUCTION_INPUTS.dependents, ...(partial.dependents ?? {}) },
-    disability: { ...EMPTY_DEDUCTION_INPUTS.disability, ...(partial.disability ?? {}) },
-  };
-}
-
-/** 税額控除の入力を、未指定項目ゼロで補完する。 */
-function mergeTaxCreditInputs(input: unknown): TaxCreditInputs {
-  if (typeof input !== "object" || input === null) return EMPTY_TAX_CREDIT_INPUTS;
-  return { ...EMPTY_TAX_CREDIT_INPUTS, ...(input as Partial<TaxCreditInputs>) };
-}
-
-/** 所得区分の検証。未指定は business、不正な値はエラーにする。 */
-function parseIncomeType(value: unknown): IncomeType {
-  if (value === undefined || value === null) return "business";
-  if (typeof value === "string" && VALID_INCOME_TYPES.has(value)) return value as IncomeType;
-  throw new Error(`income_type が不正です: ${String(value)}`);
-}
-
-/** 数値引数。未指定なら fallback、不正な型はエラーにする。 */
-function numArg(args: Record<string, unknown>, key: string, fallback = 0): number {
-  const value = args[key];
-  if (value === undefined || value === null) return fallback;
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error(`${key} は数値で渡してください`);
-  }
-  return Math.trunc(value);
-}
-
-/** 数値引数（nullable）。未指定は null。 */
-function nullableNumArg(args: Record<string, unknown>, key: string): number | null {
-  const value = args[key];
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error(`${key} は数値で渡してください`);
-  }
-  return Math.trunc(value);
-}
-
-const FILING_TYPES: readonly string[] = ["blue65", "blue55", "blue10", "white"];
-
-/** 申告設定の引数（filing_type / real_estate_business_scale）を計算用オプションに変換する。 */
-function filingOptionsArg(args: Record<string, unknown>): BlueDeductionOptions {
-  const filingType = args["filing_type"];
-  return {
-    filingType: typeof filingType === "string" && FILING_TYPES.includes(filingType)
-      ? (filingType as FilingType)
-      : undefined,
-    realEstateBusinessScale: args["real_estate_business_scale"] === true,
-  };
-}
-
-/** 雑所得の引数を入力形式に変換する。未指定・不正なら空。 */
-function miscIncomeArg(args: Record<string, unknown>): MiscIncomeInput {
-  const raw = args["misc_income"];
-  if (typeof raw !== "object" || raw === null) return EMPTY_MISC_INCOME;
-  const rec = raw as Record<string, unknown>;
-  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0);
-  return {
-    revenue: num(rec["revenue"]),
-    income: num(rec["income"]),
-    kubun: num(rec["kubun"]),
-    pensionRevenue: num(rec["pensionRevenue"]),
-    pensionOver65: rec["pensionOver65"] === true,
-    businessRevenue: num(rec["businessRevenue"]),
-    businessIncome: num(rec["businessIncome"]),
-    businessKubun: num(rec["businessKubun"]),
-  };
-}
-
-/** 給与所得の引数を入力形式に変換する。未指定・不正なら空。 */
-function salaryIncomeArg(args: Record<string, unknown>): SalaryIncomeInput {
-  const raw = args["salary_income"];
-  if (typeof raw !== "object" || raw === null) return EMPTY_SALARY_INCOME;
-  const rec = raw as Record<string, unknown>;
-  return {
-    revenue: typeof rec["revenue"] === "number" && Number.isFinite(rec["revenue"])
-      ? Math.trunc(rec["revenue"])
-      : 0,
-    adjustmentEligible: rec["adjustmentEligible"] === true,
-  };
-}
-
-/** 今日の日付（日本時間、YYYY-MM-DD）。 */
-function todayInTokyo(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
-}
-
-function textResult(value: unknown): McpToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
-}
 
 /** REST の planGate（/api/etax/*）と対応する、課金対象の MCP ツール。 */
 const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set(["export_xtx", "export_consumption_xtx"]);
