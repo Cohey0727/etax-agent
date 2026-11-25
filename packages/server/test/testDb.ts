@@ -31,6 +31,7 @@ const allTables = [
   "filing_status",
   "filing_submission_history",
   "filing_submissions",
+  "invoice_payments",
   "document_lines",
   "documents",
   "taxpayer_profiles",

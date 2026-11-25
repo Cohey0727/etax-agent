@@ -585,6 +585,45 @@ export type DocumentLineRow = typeof documentLinesTable.$inferSelect;
 export type NewDocumentLineRow = typeof documentLinesTable.$inferInsert;
 
 /**
+ * 入金消込の記録（Issue #17 Phase 1-2）。発行済み請求書と入金取引の
+ * 紐付けで、1件の入金を複数請求書へ分けたり（1対多）、複数回の入金で
+ * 1件の請求書を消し込んだり（多対1）できるよう、充当額をレコードごとに持つ。
+ * kind:
+ * - payment: 入金取引の充当（transaction_id は入金取引）
+ * - fee: 振込手数料の差額調整（transaction_id は自動生成した支払手数料の支出取引）
+ * - discount: 売上値引の差額調整（transaction_id は自動生成した売上値引の取引）
+ * - overpayment: 過入金の預り金処理（transaction_id は入金取引、
+ *   adjustment_transaction_id は自動生成した預り金の取引。消込済み額には数えない）
+ * 消込・解除の履歴は、紐付く取引側の変更履歴（transaction_history）と
+ * 本テーブルの作成・削除で追える。
+ */
+export const invoicePaymentsTable = pgTable("invoice_payments", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  documentId: integer("document_id")
+    .notNull()
+    .references(() => documentsTable.id, { onDelete: "cascade" }),
+  /** 紐付く取引（入金取引、または差額調整で自動生成した取引）。 */
+  transactionId: integer("transaction_id")
+    .notNull()
+    .references(() => transactionsTable.id),
+  /** 過入金の預り金処理で自動生成した取引。overpayment のときだけ入る */
+  adjustmentTransactionId: integer("adjustment_transaction_id").references(
+    () => transactionsTable.id,
+  ),
+  /** payment / fee / discount / overpayment */
+  kind: text("kind").notNull().default("payment"),
+  /** 充当額・調整額（正の金額、円） */
+  amount: integer("amount").notNull(),
+  createdAt: timestampColumn("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+  ownerUserId: integer("owner_user_id").notNull().default(1),
+});
+
+export type InvoicePaymentRow = typeof invoicePaymentsTable.$inferSelect;
+export type NewInvoicePaymentRow = typeof invoicePaymentsTable.$inferInsert;
+
+/**
  * 課金（Stripe サブスクリプション）の状態。所有者ごとに1件。
  * status は Stripe の subscription.status をそのまま持つ
  * （active / trialing / past_due / canceled / incomplete 等）。
