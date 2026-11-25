@@ -156,7 +156,7 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
                 )
               : undefined
         }
-        width={formState ? undefined : "min(720px, 96vw)"}
+        width="min(720px, 96vw)"
         onClose={() => (formState ? setFormState(null) : setDetailId(null))}
       >
         {formState ? (
