@@ -54,6 +54,13 @@ export const FixedAssetDetail = ({
 
   return (
     <Col gap="lg">
+      <FixedAssetImages
+        images={images}
+        busy={imagesBusy}
+        onUpload={onUploadImages}
+        onDelete={onDeleteImage}
+      />
+
       <Row justify="end" gap="sm">
         <Button variant="ghost" onClick={onEdit} disabled={busy}>
           編集
@@ -111,13 +118,6 @@ export const FixedAssetDetail = ({
           が必要経費に算入されます（全期間）。
         </Text>
       </Col>
-
-      <FixedAssetImages
-        images={images}
-        busy={imagesBusy}
-        onUpload={onUploadImages}
-        onDelete={onDeleteImage}
-      />
     </Col>
   );
 };

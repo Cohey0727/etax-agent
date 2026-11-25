@@ -18,7 +18,8 @@ export interface FixedAssetPanelProps {
 type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
 
 /**
- * 固定資産台帳の画面本体。ページはサマリ帯と資産一覧が主役で、詳細・登録・編集はいずれも右 Drawer で開く。
+ * 固定資産台帳の画面本体。ページはサマリ帯と資産一覧が主役で、詳細・登録・編集は1つの右 Drawer で切り替える
+ * （編集は Drawer を重ねず、その場で詳細からフォームへ切り替わる）。
  * 一覧は選択年度の対象資産が既定で、対象外の資産は「過去の資産も表示」トグルで広げる。
  * サマリはフィルタと連動せず、全資産を対象に年度ベースで集計する（従来どおり）。
  */
@@ -142,19 +143,32 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
       )}
 
       <Drawer
-        open={detailAsset !== null}
+        open={formState !== null || detailAsset !== null}
         title={
-          detailAsset ? (
-            <Row gap="sm" align="center">
-              <Text variant="sectionTitle">{detailAsset.name}</Text>
-              {detailAsset.disposed_date ? <Badge>除却済み</Badge> : null}
-            </Row>
-          ) : undefined
+          formState
+            ? formTitle
+            : detailAsset
+              ? (
+                  <Row gap="sm" align="center">
+                    <Text variant="sectionTitle">{detailAsset.name}</Text>
+                    {detailAsset.disposed_date ? <Badge>除却済み</Badge> : null}
+                  </Row>
+                )
+              : undefined
         }
-        width="min(720px, 96vw)"
-        onClose={() => setDetailId(null)}
+        width={formState ? undefined : "min(720px, 96vw)"}
+        onClose={() => (formState ? setFormState(null) : setDetailId(null))}
       >
-        {detailAsset ? (
+        {formState ? (
+          <FixedAssetForm
+            submitLabel={formState.kind === "create" ? "登録する" : "保存する"}
+            value={draft}
+            busy={busy}
+            onChange={setDraft}
+            onSubmit={() => void submitForm()}
+            onCancel={() => setFormState(null)}
+          />
+        ) : detailAsset ? (
           <FixedAssetDetail
             asset={detailAsset}
             year={year}
@@ -166,24 +180,6 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
             onDelete={() => void handleDelete(detailAsset)}
             onUploadImages={(files) => void handleUploadImages(detailAsset.id, files)}
             onDeleteImage={(fileId) => void handleDeleteImage(detailAsset.id, fileId)}
-          />
-        ) : null}
-      </Drawer>
-
-      <Drawer
-        open={formState !== null}
-        title={formTitle}
-        layer={formState?.kind === "edit" ? 1 : 0}
-        onClose={() => setFormState(null)}
-      >
-        {formState ? (
-          <FixedAssetForm
-            submitLabel={formState.kind === "create" ? "登録する" : "保存する"}
-            value={draft}
-            busy={busy}
-            onChange={setDraft}
-            onSubmit={() => void submitForm()}
-            onCancel={() => setFormState(null)}
           />
         ) : null}
       </Drawer>
