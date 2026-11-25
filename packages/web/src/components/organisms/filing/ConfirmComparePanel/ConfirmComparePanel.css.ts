@@ -17,6 +17,10 @@ const styles = {
     textAlign: "right",
     color: theme.color.muted,
     fontVariantNumeric: "tabular-nums",
+    "@media": {
+      // 狭い画面では差額欄の最小幅を緩め、金額表示がはみ出さないようにする。
+      "(max-width: 640px)": { minWidth: "64px" },
+    },
   }),
   // 差額（変更あり）。目立たせる。
   deltaChanged: style({
@@ -25,6 +29,9 @@ const styles = {
     color: theme.color.accentText,
     fontWeight: theme.fontWeight.semibold,
     fontVariantNumeric: "tabular-nums",
+    "@media": {
+      "(max-width: 640px)": { minWidth: "64px" },
+    },
   }),
 };
 
