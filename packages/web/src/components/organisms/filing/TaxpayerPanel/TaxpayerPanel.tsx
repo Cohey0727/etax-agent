@@ -5,9 +5,14 @@ import {
   SalaryIncomeInput,
   TaxCreditInputs,
   Transaction,
+  XtxBalanceSheetInput,
+  balanceSheetToWire,
+  buildTrialBalanceSheet,
+  computeCorrectedFigures,
+  isBalanceSheetEmpty,
   xtxSupportedYears,
 } from "@etax/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
@@ -32,6 +37,8 @@ export interface TaxpayerPanelProps {
   filingType?: FilingType;
   /** 不動産貸付けが事業的規模か */
   realEstateBusinessScale?: boolean;
+  /** 貸借対照表の入力（申告入力に保存されたもの）。XTXの決算書4面に反映する。 */
+  balanceSheet?: XtxBalanceSheetInput | null;
   /**
    * 申告済みの所得税額（過去に確定した分）。入っていれば、その確定分と
    * 比較する修正申告として出力する。null なら確定申告として出力する。
@@ -55,6 +62,7 @@ export const TaxpayerPanel = ({
   salaryIncome,
   filingType,
   realEstateBusinessScale,
+  balanceSheet,
   originalIncomeTax,
   onOpenSection,
 }: TaxpayerPanelProps) => {
@@ -101,7 +109,29 @@ export const TaxpayerPanel = ({
     withholding_tax: withholdingTax,
     prepaid_tax: prepaidTax,
     original_third_period_tax: amendment ? originalIncomeTax : null,
+    balance_sheet:
+      balanceSheet && !isBalanceSheetEmpty(balanceSheet)
+        ? balanceSheetToWire(balanceSheet)
+        : undefined,
   });
+
+  // 貸借対照表の貸借チェック（警告のみ。出力ボタンは止めないが、
+  // 不一致のまま出力するとサーバー側で不整合としてエラーになる）。
+  const balanceSheetCheck = useMemo(() => {
+    if (!balanceSheet || isBalanceSheetEmpty(balanceSheet)) return null;
+    const figures = computeCorrectedFigures(transactions, year, {
+      filingType,
+      realEstateBusinessScale,
+    });
+    const sheet = buildTrialBalanceSheet(
+      balanceSheet,
+      figures._detail.business_income_before_deduction,
+    );
+    const sides: string[] = [];
+    if (!sheet.opening_balanced) sides.push("期首");
+    if (!sheet.closing_balanced) sides.push("期末");
+    return sides.length > 0 ? sides.join("・") : null;
+  }, [balanceSheet, transactions, year, filingType, realEstateBusinessScale]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -263,6 +293,12 @@ export const TaxpayerPanel = ({
           出力します。
         </Text>
 
+        {balanceSheetCheck ? (
+          <AlertBox variant="notice">
+            貸借対照表の貸借が一致していません（{balanceSheetCheck}）。
+            このまま出力するとエラーになります。収支タブの貸借対照表で金額を確認してください。
+          </AlertBox>
+        ) : null}
         {error ? <AlertBox variant="error">{error}</AlertBox> : null}
         {message ? <AlertBox>{message}</AlertBox> : null}
 

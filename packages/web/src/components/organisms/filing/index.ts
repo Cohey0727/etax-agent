@@ -1,4 +1,5 @@
 export * from "./BalanceRecords";
+export * from "./BalanceSheetPanel";
 export * from "./BalanceSummary";
 export * from "./ConsumptionTaxPanel";
 export * from "./DeductionPanel";

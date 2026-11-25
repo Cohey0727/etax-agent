@@ -1,7 +1,15 @@
-import { IncomeType, Transaction } from "@etax/shared";
+import {
+  IncomeType,
+  Transaction,
+  balanceSheetToWire,
+  isBalanceSheetEmpty,
+} from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Card, Col, SkeletonBar, Text } from "@components/atoms";
-import { loadDeductionState } from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import {
+  hydrateDeductionStateFromServer,
+  loadDeductionState,
+} from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppView, TrialBalanceResponse } from "@types";
 import { fetchTrialBalance } from "@utils";
 import { BalanceSheetSection } from "./BalanceSheetSection";
@@ -19,9 +27,8 @@ export interface TrialBalancePanelProps {
  * 残高試算表レポート（Issue #18）。帳簿の取引から、XTXの青色申告
  * 決算書と一致する損益計算書・月次推移・前年比較を表示する。
  * 集計はサーバー側の決定的な計算（POST /api/calc/trial-balance）に寄せ、
- * 申告種別は申告画面の設定（localStorage）を渡して決算書と揃える。
- * 貸借対照表は入力データの供給元がまだ無いため、APIから返った場合のみ
- * 表示する（現行のWebでは通常は出ない）。
+ * 申告種別と貸借対照表は申告入力（サーバー保存が正、localStorageは
+ * キャッシュ）を渡して決算書と揃える。
  */
 export const TrialBalancePanel = ({ transactions, year, onNavigate }: TrialBalancePanelProps) => {
   const [report, setReport] = useState<TrialBalanceResponse | null>(null);
@@ -31,19 +38,27 @@ export const TrialBalancePanel = ({ transactions, year, onNavigate }: TrialBalan
     let cancelled = false;
     setReport(null);
     setFailed(false);
-    const filing = loadDeductionState(year);
-    fetchTrialBalance({
-      transactions,
-      year,
-      filing_type: filing.filingType,
-      real_estate_business_scale: filing.realEstateBusinessScale,
-    })
-      .then((result) => {
+    void (async () => {
+      // 申告入力の正はサーバーDB。取り込んでから読み直して集計に渡す。
+      await hydrateDeductionStateFromServer(year).catch(() => undefined);
+      if (cancelled) return;
+      const filing = loadDeductionState(year);
+      try {
+        const result = await fetchTrialBalance({
+          transactions,
+          year,
+          filing_type: filing.filingType,
+          real_estate_business_scale: filing.realEstateBusinessScale,
+          balance_sheet:
+            filing.balanceSheet && !isBalanceSheetEmpty(filing.balanceSheet)
+              ? balanceSheetToWire(filing.balanceSheet)
+              : undefined,
+        });
         if (!cancelled) setReport(result);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setFailed(true);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };

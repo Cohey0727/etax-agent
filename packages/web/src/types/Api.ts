@@ -1,4 +1,4 @@
-import { FilingType, Transaction } from "@etax/shared";
+import { BalanceSheetWireInput, FilingType, Transaction } from "@etax/shared";
 
 export interface CsvMapping {
   dateColumn: string | null;
@@ -204,6 +204,8 @@ export interface FetchTrialBalanceRequest {
   year: number;
   filing_type?: FilingType;
   real_estate_business_scale?: boolean;
+  /** 貸借対照表の入力（保存済みの申告入力からワイヤ形式で渡す）。 */
+  balance_sheet?: BalanceSheetWireInput;
 }
 
 /** 年度ごとの申告ステータス。サーバーAPIのワイヤ形式（snake_case）。 */
@@ -408,6 +410,8 @@ export interface ExportXtxRequest {
   withholding_tax: number;
   prepaid_tax: number;
   original_third_period_tax: number | null;
+  /** 貸借対照表の入力（事業所得分。保存済みの申告入力からワイヤ形式で渡す）。 */
+  balance_sheet?: BalanceSheetWireInput;
 }
 
 /** e-Tax 申告等データ（XTX）出力のレスポンス。 */

@@ -6,6 +6,7 @@ import {
   DeductionInputs,
   MiscIncomeInput,
   SalaryIncomeInput,
+  XtxBalanceSheetInput,
   filterYear,
   TaxCreditInputs,
   Transaction,
@@ -15,6 +16,7 @@ import { Card, Col, Text } from "@components/atoms";
 import { Tabs } from "@components/molecules";
 import {
   BalanceRecords,
+  BalanceSheetPanel,
   BalanceSummary,
   ConsumptionTaxPanel,
   DeductionPanel,
@@ -103,6 +105,12 @@ export const FilingWorkspace = ({
     () => computeCorrectedFigures(yearTransactions, year, filingOptions),
     [yearTransactions, year, deductionState.filingType, deductionState.realEstateBusinessScale],
   );
+  // 前年の事業所得（青色申告特別控除前）。貸借対照表の繰越で元入金を
+  // 計算するために使う（申告種別は当年の設定で近似する提案値）。
+  const previousComputed = useMemo(
+    () => computeCorrectedFigures(filterYear(transactions, year - 1), year - 1, filingOptions),
+    [transactions, year, deductionState.filingType, deductionState.realEstateBusinessScale],
+  );
 
   const updateDeductions = (next: DeductionInputs) => {
     const state = { ...deductionState, deductions: next };
@@ -121,6 +129,11 @@ export const FilingWorkspace = ({
   };
   const updateSalaryIncome = (next: SalaryIncomeInput) => {
     const state = { ...deductionState, salaryIncome: next };
+    setDeductionState(state);
+    if (hydrated) saveDeductionState(year, state);
+  };
+  const updateBalanceSheet = (next: XtxBalanceSheetInput | null) => {
+    const state = { ...deductionState, balanceSheet: next };
     setDeductionState(state);
     if (hydrated) saveDeductionState(year, state);
   };
@@ -214,6 +227,7 @@ export const FilingWorkspace = ({
           salaryIncome={deductionState.salaryIncome}
           filingType={deductionState.filingType}
           realEstateBusinessScale={deductionState.realEstateBusinessScale}
+          balanceSheet={deductionState.balanceSheet}
           originalIncomeTax={null}
           onOpenSection={openSection}
         />
@@ -243,6 +257,14 @@ export const FilingWorkspace = ({
         </Card>
         <MonthlyBalance transactions={yearTransactions} />
         <BalanceRecords key={year} transactions={yearTransactions} />
+        <BalanceSheetPanel
+          year={year}
+          balanceSheet={deductionState.balanceSheet}
+          incomeBeforeBlue={computed._detail.business_income_before_deduction}
+          previousIncomeBeforeBlue={previousComputed._detail.business_income_before_deduction}
+          filingType={deductionState.filingType}
+          onChange={updateBalanceSheet}
+        />
       </>
     ),
     deductions: (
