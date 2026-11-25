@@ -57,7 +57,6 @@ const styles = {
   dots: style({
     display: "inline-flex",
     gap: "4px",
-    marginLeft: "2px",
   }),
   dot: style({
     width: "5px",
