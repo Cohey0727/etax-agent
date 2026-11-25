@@ -5,6 +5,7 @@ import {
   AgentConnectionConfig,
   AgentTestResult,
   AnalyzeReceiptResponse,
+  ChatAttachmentUpload,
   ChatMessage,
   JevPromptInfo,
   RegexRuleItem,
@@ -67,6 +68,7 @@ export async function agentChat(
   transactions: Transaction[],
   connection?: AgentConnectionConfig,
   deductions?: { year: number; state: unknown },
+  attachments?: ChatAttachmentUpload[],
 ): Promise<AgentChatResponse> {
   // 設定画面の外部接続は、入っている項目だけを上書きとして送る（空はサーバー設定）。
   const agentConfig = {
@@ -82,6 +84,7 @@ export async function agentChat(
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       transactions,
       ...(deductions ? { deductions } : {}),
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
       ...(Object.keys(agentConfig).length > 0 ? { agentConfig } : {}),
     }),
   });

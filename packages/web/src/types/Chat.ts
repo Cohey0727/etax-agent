@@ -11,11 +11,25 @@ export interface ChatToolCall {
   arguments: Record<string, unknown>;
 }
 
+/** チャットに添付したファイルの表示用参照（名前と形式だけ。実データは会話に保持しない）。 */
+export interface ChatAttachmentRef {
+  name: string;
+  mimeType: string;
+}
+
+/** チャット送信時にサーバーへ渡す添付1件（画像・PDF は dataBase64、CSV は text）。 */
+export interface ChatAttachmentUpload extends ChatAttachmentRef {
+  dataBase64?: string;
+  text?: string;
+}
+
 export interface ChatMessage {
   role: ChatRole;
   content: string;
   /** その発言でエージェントが使ったツール（助手の発言のみ）。 */
   toolCalls?: ChatToolCall[];
+  /** その発言に添付したファイル（ユーザーの発言のみ、表示用）。 */
+  attachments?: ChatAttachmentRef[];
 }
 
 /**
