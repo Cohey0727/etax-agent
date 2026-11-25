@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Col,
+  Icon,
   Input,
   Row,
   Select,
@@ -196,7 +197,7 @@ export const LedgerTable = ({
                   </TableCell>
                   <TableCell>
                     <Col gap="sm">
-                      <Row gap="sm" align="center">
+                      <Row gap="sm" align="center" className={styles.ratioRow}>
                         <Input
                           type="number"
                           min={0}
@@ -211,7 +212,9 @@ export const LedgerTable = ({
                           }
                           aria-label="事業割合（%）"
                         />
-                        <Text variant="muted">%</Text>
+                        <Text variant="muted" className={styles.ratioUnit}>
+                          %
+                        </Text>
                         {edit.business_ratio_percent < 100 ? (
                           <Badge>按分 {edit.business_ratio_percent}%</Badge>
                         ) : null}
@@ -242,23 +245,36 @@ export const LedgerTable = ({
                       <Button
                         variant="primary"
                         size="sm"
+                        className={styles.iconButton}
                         disabled={!dirty || busy}
                         disabledReason={busy ? "処理中です" : "変更がありません"}
                         onClick={() => onSave(row)}
+                        aria-label="保存"
+                        title="保存"
                       >
-                        保存
+                        <Icon name="check" size={16} />
                       </Button>
                       <Button
                         variant={deleteArmedId === row.id ? "danger" : "ghost"}
                         size="sm"
+                        className={styles.iconButton}
                         disabled={busy}
                         disabledReason="処理中です"
                         onClick={() => onDelete(row)}
+                        aria-label={deleteArmedId === row.id ? "本当に削除" : "削除"}
+                        title={deleteArmedId === row.id ? "本当に削除" : "削除"}
                       >
-                        {deleteArmedId === row.id ? "本当に削除" : "削除"}
+                        <Icon name="trash" size={16} />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => onHistory(row)}>
-                        履歴
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={styles.iconButton}
+                        onClick={() => onHistory(row)}
+                        aria-label="履歴"
+                        title="履歴"
+                      >
+                        <Icon name="history" size={16} />
                       </Button>
                     </Row>
                   </TableCell>

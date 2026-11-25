@@ -23,6 +23,7 @@ export type IconName =
   | "trash"
   | "paperclip"
   | "check"
+  | "history"
   | "camera"
   | "chart"
   | "user"
@@ -187,6 +188,13 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
   ),
   check: <path d="M20 6 9 17l-5-5" />,
+  history: (
+    <>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </>
+  ),
   camera: (
     <>
       <path d="M4 8h2.2l2-2.5h7.6L17.8 8H20a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V9.5A1.5 1.5 0 0 1 4 8Z" />

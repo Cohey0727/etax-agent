@@ -38,9 +38,10 @@ const styles = {
     fontSize: theme.fontSizes.xs,
     backgroundPosition: "right 6px center",
   }),
-  // 操作列は保存・削除を必ず横並びにする。表の列幅計算で潰れてボタンが
+  // 操作列はアイコンボタンを必ず横並びにする。表の列幅計算で潰れてボタンが
   // 縦に積まれるのを防ぐため、セルは折り返し禁止、行は内容幅に固定する。
-  // あわせて右端に固定し、横スクロールしても操作列が隠れないようにする。
+  // 広い画面では右端に固定し、横スクロールしても操作列が隠れないようにする。
+  // 狭い画面では固定をやめ、表と一緒にスクロールさせる（固定すると表示領域を圧迫する）。
   actionsCell: style({
     whiteSpace: "nowrap",
     position: "sticky",
@@ -48,6 +49,9 @@ const styles = {
     background: theme.color.surface,
     boxShadow: "-10px 0 14px -10px rgba(34, 26, 99, 0.35)",
     zIndex: 1,
+    "@media": {
+      "(max-width: 640px)": { position: "static", boxShadow: "none" },
+    },
   }),
   actionsHeader: style({
     position: "sticky",
@@ -55,9 +59,25 @@ const styles = {
     background: theme.color.surface,
     boxShadow: "-10px 0 14px -10px rgba(34, 26, 99, 0.35)",
     zIndex: 1,
+    "@media": {
+      "(max-width: 640px)": { position: "static", boxShadow: "none" },
+    },
   }),
   actionsRow: style({
     width: "max-content",
+  }),
+  // 行操作のアイコンボタン。表の詰めた行高（28px）に合わせた正方形にする。
+  iconButton: style({
+    width: "28px",
+    height: "28px",
+    padding: 0,
+  }),
+  // 事業割合の入力行は、% の単位が下に折り返さないよう折り返し禁止にする。
+  ratioRow: style({
+    flexWrap: "nowrap",
+  }),
+  ratioUnit: style({
+    flexShrink: 0,
   }),
   // 表の受け皿。背景は白（カードと同じ面の色）にし、幅が足りないときは
   // この中で横スクロールさせる。サイドバーやエージェントパネルを開いて
