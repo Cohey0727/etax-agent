@@ -190,6 +190,14 @@ const schemaDdl: string[] = [
     updated_at timestamptz NOT NULL,
     PRIMARY KEY (owner_user_id, year)
   )`,
+  // 開業届・青色申告承認申請書の専用入力（Issue #22）。年度に属さない
+  // 一度きりの手続きのため、所有者ごとに1件だけ持つ。
+  `CREATE TABLE IF NOT EXISTS business_start_inputs (
+    owner_user_id integer NOT NULL DEFAULT 1,
+    state text NOT NULL,
+    updated_at timestamptz NOT NULL,
+    PRIMARY KEY (owner_user_id)
+  )`,
   // 提出の記録（受付番号・受信通知PDFの紐付け）と、その訂正・削除履歴
   // （Issue #28 Phase 1）。
   `CREATE TABLE IF NOT EXISTS filing_submissions (

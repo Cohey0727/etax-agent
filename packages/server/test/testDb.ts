@@ -34,6 +34,7 @@ const allTables = [
   "taxpayer_profiles",
   "filing_snapshots",
   "filing_inputs",
+  "business_start_inputs",
   "fixed_asset_images",
   "fixed_assets",
   "subscriptions",

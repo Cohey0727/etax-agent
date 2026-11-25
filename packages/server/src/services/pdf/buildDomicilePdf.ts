@@ -8,96 +8,15 @@
  * 空欄で、利用者が印刷後に○を付ける。
  */
 import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, PDFPage, PDFFont, rgb } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 import { DomicileFormValues } from "./domicileFormValues";
-
-const INK = rgb(0.05, 0.05, 0.25);
-
-interface DrawContext {
-  page: PDFPage;
-  font: PDFFont;
-  width: number;
-  height: number;
-  /** A4（595×842pt）換算のフォントサイズを実ページへ直す倍率。 */
-  scale: number;
-}
-
-/** セル中心（上から比率 center）を、文字ベースラインの y 座標へ変換する。 */
-function baseline(ctx: DrawContext, center: number, size: number): number {
-  return ctx.height * (1 - center) - size * 0.35;
-}
-
-function drawText(
-  ctx: DrawContext,
-  text: string,
-  xRatio: number,
-  center: number,
-  size: number,
-): void {
-  if (!text) return;
-  const s = size * ctx.scale;
-  ctx.page.drawText(text, {
-    x: xRatio * ctx.width,
-    y: baseline(ctx, center, s),
-    size: s,
-    font: ctx.font,
-    color: INK,
-  });
-}
-
-function drawTextRight(
-  ctx: DrawContext,
-  text: string,
-  rightRatio: number,
-  center: number,
-  size: number,
-): void {
-  if (!text) return;
-  const s = size * ctx.scale;
-  const w = ctx.font.widthOfTextAtSize(text, s);
-  ctx.page.drawText(text, {
-    x: rightRatio * ctx.width - w,
-    y: baseline(ctx, center, s),
-    size: s,
-    font: ctx.font,
-    color: INK,
-  });
-}
-
-/** 枠の幅に収まるよう、必要ならフォントを縮めて左寄せで描く。 */
-function drawTextFitted(
-  ctx: DrawContext,
-  text: string,
-  xRatio: number,
-  center: number,
-  size: number,
-  maxWidthRatio: number,
-): void {
-  if (!text) return;
-  const width = ctx.font.widthOfTextAtSize(text, size * ctx.scale);
-  const fitted = width > maxWidthRatio * ctx.width
-    ? Math.max(size * ((maxWidthRatio * ctx.width) / width), 4.2)
-    : size;
-  drawText(ctx, text, xRatio, center, fitted);
-}
-
-/** 「○で囲む」欄の○を描く。中心と半径はページ寸法に対する比率。 */
-function drawCircle(
-  ctx: DrawContext,
-  cxRatio: number,
-  cyTopRatio: number,
-  rxRatio: number,
-  ryRatio: number,
-): void {
-  ctx.page.drawEllipse({
-    x: cxRatio * ctx.width,
-    y: ctx.height * (1 - cyTopRatio),
-    xScale: rxRatio * ctx.width,
-    yScale: ryRatio * ctx.height,
-    borderColor: INK,
-    borderWidth: 1.1 * ctx.scale,
-  });
-}
+import {
+  DrawContext,
+  drawCircle,
+  drawText,
+  drawTextFitted,
+  drawTextRight,
+} from "./pdfDraw";
 
 /** 職業欄は狭いため、括弧書きがあればそこで、無ければ半分で2行に分ける。 */
 function splitOccupation(occupation: string): readonly string[] {

@@ -428,6 +428,23 @@ export const filingInputsTable = pgTable(
 export type FilingInputRow = typeof filingInputsTable.$inferSelect;
 
 /**
+ * 開業届・青色申告承認申請書の専用入力（Issue #22）。
+ * 開業は一度きりの手続きで年度に属さないため、年度別の filing_inputs とは
+ * 別に、所有者ごとに1件だけ持つ。形は schemas/businessStart で検証済みの
+ * BusinessStartInputs の JSON。
+ */
+export const businessStartInputsTable = pgTable("business_start_inputs", {
+  ownerUserId: integer("owner_user_id").notNull().default(1),
+  /** BusinessStartInputs の JSON */
+  state: text("state").notNull(),
+  updatedAt: timestampColumn("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, (table) => [primaryKey({ columns: [table.ownerUserId] })]);
+
+export type BusinessStartInputRow = typeof businessStartInputsTable.$inferSelect;
+
+/**
  * 提出の記録（年度×税目ごと）。e-Tax で提出した後に受信通知の受付番号を
  * 手入力で残し、受信通知 PDF を紐づけて保管する（Issue #28 Phase 1）。
  * 受付番号が入ると申告ステータス（filing_status.submitted）と連動する。
