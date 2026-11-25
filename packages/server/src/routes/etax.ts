@@ -8,9 +8,17 @@ import {
   exportConsumptionXtxRoute,
 } from "../usecases/exportConsumptionXtx";
 import {
+  exportBlueReturnPdfHandler,
+  exportBlueReturnPdfRoute,
+} from "../usecases/exportBlueReturnPdf";
+import {
   exportDomicilePdfHandler,
   exportDomicilePdfRoute,
 } from "../usecases/exportDomicilePdf";
+import {
+  exportOpeningNoticePdfHandler,
+  exportOpeningNoticePdfRoute,
+} from "../usecases/exportOpeningNoticePdf";
 import {
   exportReturnPdfHandler,
   exportReturnPdfRoute,
@@ -36,6 +44,16 @@ app.openapi(
 app.openapi(
   exportDomicilePdfRoute,
   exportDomicilePdfHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
+app.openapi(
+  exportOpeningNoticePdfRoute,
+  exportOpeningNoticePdfHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
+app.openapi(
+  exportBlueReturnPdfRoute,
+  exportBlueReturnPdfHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 
