@@ -70,6 +70,7 @@ import {
 import { classifyAccount } from "../classification/classifyAccount";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { mcpImportTools } from "./mcpImportTools";
+import { mcpLedgerTools } from "./mcpLedgerTools";
 import { mcpProfileTools } from "./mcpProfileTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
@@ -418,7 +419,7 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
 ];
 
 /** ドメイン別ツールモジュール（定義と実行関数は各モジュールが持つ）。 */
-const DOMAIN_TOOL_MODULES: McpToolModule[] = [mcpProfileTools, mcpImportTools];
+const DOMAIN_TOOL_MODULES: McpToolModule[] = [mcpProfileTools, mcpImportTools, mcpLedgerTools];
 
 /** 公開ツール一覧（コア＋ドメイン別モジュール）。 */
 export const MCP_TOOLS: McpToolDef[] = [
