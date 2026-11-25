@@ -6,6 +6,7 @@
  * 典型ケース（転居）を前提に、様式の区分は「住所地」「住所」に○を付ける。
  */
 import { TaxpayerProfile } from "../../schemas/taxpayer";
+import { eraOf, parseIsoDate, splitZip } from "./formDates";
 
 export interface DomicileFormValues {
   /** 提出先の税務署名（「税務署」は付けない）。 */
@@ -30,35 +31,6 @@ export interface DomicileFormValues {
   previousZipFirst: string;
   previousZipSecond: string;
   previousAddress: string;
-}
-
-/** 令和表記の年月日。ISO 文字列を分解する（不正なら null）。 */
-function parseIsoDate(iso: string): { year: number; month: number; day: number } | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return null;
-  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
-}
-
-const ERA_TABLE: readonly { from: number; name: string }[] = [
-  { from: 2019, name: "令和" },
-  { from: 1989, name: "平成" },
-  { from: 1926, name: "昭和" },
-  { from: 1912, name: "大正" },
-];
-
-/** 西暦年を元号名＋元号年に変換する。 */
-function eraOf(year: number): { eraName: string; eraYear: number } {
-  for (const era of ERA_TABLE) {
-    if (year >= era.from) return { eraName: era.name, eraYear: year - era.from + 1 };
-  }
-  return { eraName: "明治", eraYear: year - 1867 };
-}
-
-/** 郵便番号を ― の前（3桁）と後（4桁）に分ける。7桁でなければ全体を前に返す。 */
-function splitZip(zipCode: string): { first: string; second: string } {
-  const digits = zipCode.replace(/\D/g, "");
-  if (digits.length === 7) return { first: digits.slice(0, 3), second: digits.slice(3) };
-  return { first: zipCode, second: "" };
 }
 
 /** プロフィールと提出日から、申出書へ重ねる値を組み立てる。 */
