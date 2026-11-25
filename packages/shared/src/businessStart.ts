@@ -183,6 +183,25 @@ export function incomeTaxFilingDeadline(year: number): string {
   return shiftDeadlineToBusinessDay(toIsoDate(new Date(Date.UTC(year + 1, 2, 15))));
 }
 
+/** 青色申告承認申請書 6(2)「備付帳簿名」の選択肢（様式の印字順）。 */
+export const BLUE_BOOK_OPTIONS: readonly { key: string; label: string }[] = [
+  { key: "cash_book", label: "現金出納帳" },
+  { key: "receivables_book", label: "売掛帳" },
+  { key: "payables_book", label: "買掛帳" },
+  { key: "expense_book", label: "経費帳" },
+  { key: "fixed_asset_book", label: "固定資産台帳" },
+  { key: "deposit_book", label: "預金出納帳" },
+  { key: "notes_book", label: "手形記入帳" },
+  { key: "claims_debts_book", label: "債権債務記入帳" },
+  { key: "general_ledger", label: "総勘定元帳" },
+  { key: "journal", label: "仕訳帳" },
+  { key: "receipt_voucher", label: "入金伝票" },
+  { key: "payment_voucher", label: "出金伝票" },
+  { key: "transfer_voucher", label: "振替伝票" },
+  { key: "cash_simple_book", label: "現金式簡易帳簿" },
+  { key: "other", label: "その他" },
+];
+
 /** 1件分の期限（日付と、根拠の説明）。 */
 export interface BusinessStartDeadline {
   /** 期限日（YYYY-MM-DD、平日シフト済み）。 */
