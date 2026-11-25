@@ -543,6 +543,8 @@ export const documentsTable = pgTable("documents", {
   issuerSnapshot: jsonb("issuer_snapshot"),
   /** 発行時点の集計スナップショット（InvoiceTotals の JSON）。下書きは null */
   totalsSnapshot: jsonb("totals_snapshot"),
+  /** 税込合計（明細から都度計算して保存する。検索・並び替え用。発行後は不変） */
+  totalAmount: integer("total_amount").notNull().default(0),
   createdAt: timestampColumn("created_at")
     .notNull()
     .$defaultFn(() => new Date()),
