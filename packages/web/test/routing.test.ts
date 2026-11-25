@@ -58,4 +58,17 @@ describe("pathForView / parsePath（従来のルーティング）", () => {
   test("ルートパスは未知のパスとして null", () => {
     expect(parsePath("/")).toBeNull();
   });
+
+  test("年非依存の /receipt は領収書画面として読める（PWAショートカットの着地先）", () => {
+    expect(parsePath("/receipt")).toEqual({ view: AppView.Receipt, year: null, filingTab: null });
+  });
+
+  test("年度つきの領収書パスも従来どおり読める", () => {
+    expect(parsePath("/accounts/2026/receipt")).toEqual({
+      view: AppView.Receipt,
+      year: 2026,
+      filingTab: null,
+    });
+    expect(pathForView(AppView.Receipt, 2026)).toBe("/accounts/2026/receipt");
+  });
 });
