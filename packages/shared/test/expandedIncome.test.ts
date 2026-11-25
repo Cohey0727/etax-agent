@@ -332,7 +332,7 @@ describe("分離課税を含む所得税計算", () => {
 describe("拡張所得入力の正規化", () => {
   test("欠けた区分は空になり、不正な方式は comprehensive に寄せる", () => {
     const r = normalizeExpandedIncomeInput({
-      dividend: { listedRevenue: 100_000, listedMode: "bogus" as never },
+      dividend: { ...EMPTY_EXPANDED_INCOME.dividend, listedRevenue: 100_000, listedMode: "bogus" as never },
     });
     expect(r.dividend.listedRevenue).toBe(100_000);
     expect(r.dividend.listedMode).toBe("comprehensive");
