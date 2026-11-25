@@ -1,7 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#4a3aff"/>
-  <rect x="10" y="20" width="44" height="24" rx="3" fill="none" stroke="#ffffff" stroke-width="3"/>
-  <circle cx="17.5" cy="32" r="2.2" fill="#ffffff"/>
-  <circle cx="46.5" cy="32" r="2.2" fill="#ffffff"/>
-  <text x="32" y="39.5" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">¥</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="coneTop" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#6a5cff"/>
+    <stop offset="1" stop-color="#4a3aff"/>
+  </linearGradient>
+  <linearGradient id="coneBottom" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2a1c96"/>
+    <stop offset="1" stop-color="#18124d"/>
+  </linearGradient>
+  <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#18124d"/>
+    <stop offset="0.55" stop-color="#2a1c96"/>
+    <stop offset="1" stop-color="#4a3aff"/>
+  </linearGradient>
+</defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#brand)"/><g transform="translate(512 512) scale(0.76) translate(-512 -512)">
+  <path d="M297 208 L512 360 L82 360 Z" fill="#ffffff"/>
+  <path d="M82 360 L512 360 L297 512 Z" fill="#a79dff"/>
+  <path d="M727 208 L942 360 L512 360 Z" fill="#a79dff"/>
+  <path d="M512 360 L942 360 L727 512 Z" fill="#ffffff"/>
+  <path d="M297 512 L512 664 L82 664 Z" fill="#a79dff"/>
+  <path d="M82 664 L512 664 L297 816 Z" fill="#ffffff"/>
+  <path d="M727 512 L942 664 L512 664 Z" fill="#ffffff"/>
+  <path d="M512 664 L942 664 L727 816 Z" fill="#a79dff"/></g>
 </svg>
