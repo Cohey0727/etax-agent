@@ -249,7 +249,7 @@ const styles = {
 // 帳簿テーブルはセルの余白も詰める（全カラムが収まるように）。
 // Table atom 側の指定（クラス+要素）より詳細度を上げて確実に効かせる。
 globalStyle(`${styles.tableWrap} table th, ${styles.tableWrap} table td`, {
-  padding: "4px 6px",
+  padding: "4px 3px",
   verticalAlign: "middle",
 });
 
