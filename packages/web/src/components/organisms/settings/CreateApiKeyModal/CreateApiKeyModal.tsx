@@ -80,7 +80,7 @@ export const CreateApiKeyModal = ({ busy, onClose, onSubmit }: CreateApiKeyModal
           </Text>
         </Col>
         {error ? <Text variant="caption">⚠ {error}</Text> : null}
-        <Row gap="sm">
+        <Row gap="sm" align="center">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>
             キャンセル
           </Button>

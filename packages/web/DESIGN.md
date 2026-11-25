@@ -4,6 +4,11 @@
 スタイルは Atomic Design の各コンポーネントが自分の `<Component>.css.ts` に持ち、
 トークン経由でだけ値を引く。コンポーネント間・画面間での見た目のばらつきはバグとして扱う。
 
+書体は IBM Plex Sans JP（400/500/600/700）。woff2（japanese サブセット）を
+`public/fonts/` に自前ホストし、`configs/global.css.ts` の body スタック
+（`"IBM Plex Sans JP", "Noto Sans JP", sans-serif`）で一元管理する。各所に直書きしない。
+等幅はコード表示専用（ui-monospace 系）で、UI テキストには使わない。
+
 ## デザイントークン（`configs/theme.css.ts`）
 
 | グループ | 内容 | 使い方 |
@@ -22,7 +27,8 @@
 
 - パレットは LP（`public/lp.html`）と共通。地は淡いラベンダーグレー（`bg`）、面は白（`surface`）、基調は濃紺ネイビー（`navy` / `navyDeep`）、アクセントはインディゴ（`accent`）1色、差し色はラベンダー（`lavender`）。
 - サイドバーは濃紺グラデーション（`navy` → `navyDeep`）を地にし、選択中ナビは `accent` のピルで満たす。濃紺地の上の文字は `onNavy` / `onNavySubtle`、淡い面は `navySoft` を使う。
-- グラデーションはブランドマークとサイドバーの地のみ（ブランドマークは `gradientStart` → `accent`）。
+- グラデーションはロゴ（下記）とサイドバーの地のみ。
+- ロゴは 4 つの算盤珠（菱形・上下円錐）を市松 2 トーンで並べたマーク。React 内では `Logo` atom（variant: mark / icon / banner、tone: brand / reversed / auto）で描き、favicon・PWA・OGP 等の静的用途は `public/` のアセット（favicon.svg、icon-192/512、icon-maskable-512、apple-touch-icon）を使う。濃紺地では reversed（白・ラベンダー）、ワードマークは「e」だけ色を変える。
 - 増減は `positive` / `negative`、注意は `warn*`、異常は `error*`。意味のない装飾色を増やさない。
 
 ## アニメーションの方針

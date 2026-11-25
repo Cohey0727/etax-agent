@@ -9,6 +9,7 @@
       content="個人事業主のための確定申告準備ツール。明細の取り込みから e-Tax 用申告データ（XTX）の生成まで、決定的な計算エンジンと AI エージェント連携で支援します。月額490円。"
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/fonts/ibm-plex-sans-jp.css" />
     <style>
       :root {
         --bg: #f3f3f9;
@@ -36,9 +37,7 @@
         margin: 0;
         background: var(--bg);
         color: var(--ink);
-        font-family:
-          "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
-          "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+        font-family: "IBM Plex Sans JP", "Noto Sans JP", sans-serif;
         line-height: 1.75;
         -webkit-font-smoothing: antialiased;
       }
@@ -118,11 +117,11 @@
         width: 34px;
         height: 34px;
         border-radius: 9px;
-        background: #fff;
-        color: var(--navy);
-        display: grid;
-        place-items: center;
-        font-size: 1rem;
+        display: block;
+      }
+      /* ワードマークは「e」だけラベンダーを差す（banner-reversed と同じ配色）。 */
+      .brand-e {
+        color: #a79dff;
       }
       .nav-links {
         display: flex;
@@ -744,8 +743,8 @@
       <div class="wrap">
         <div class="hero-top">
           <a class="brand" href="/lp.html">
-            <span class="brand-mark">e</span>
-            eTaxAgent
+            <img class="brand-mark" src="/favicon.svg" alt="" width="34" height="34" />
+            <span><span class="brand-e">e</span>TaxAgent</span>
           </a>
           <nav class="nav-links">
             <a href="#concept">コンセプト</a>
@@ -1005,8 +1004,8 @@
         <div class="footer-inner">
           <div>
             <a class="brand" href="/lp.html">
-              <span class="brand-mark">e</span>
-              eTaxAgent
+              <img class="brand-mark" src="/favicon.svg" alt="" width="34" height="34" />
+              <span><span class="brand-e">e</span>TaxAgent</span>
             </a>
             <p>運営：合同会社オッカム</p>
             <p>

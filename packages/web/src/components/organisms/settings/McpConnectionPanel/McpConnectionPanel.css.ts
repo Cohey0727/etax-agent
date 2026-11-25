@@ -19,6 +19,11 @@ const styles = {
     maxHeight: "320px",
     overflowY: "auto",
   }),
+  // エンドポイント表示欄。URL が見切れないよう、コピーボタンを除いた残り幅いっぱいに広げる。
+  endpointInput: style({
+    flex: 1,
+    minWidth: 0,
+  }),
 };
 
 export default styles;

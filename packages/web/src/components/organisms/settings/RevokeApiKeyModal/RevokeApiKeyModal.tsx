@@ -25,7 +25,7 @@ export const RevokeApiKeyModal = ({ target, busy, onClose, onConfirm }: RevokeAp
         <Text variant="caption">
           このキーを使っている連携（MCP クライアント等）は直ちに使えなくなります。失効は取り消せません。必要になったら新しいキーを発行してください。
         </Text>
-        <Row gap="sm">
+        <Row gap="sm" align="center">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>
             キャンセル
           </Button>
