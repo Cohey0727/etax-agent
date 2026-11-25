@@ -4,6 +4,11 @@
 スタイルは Atomic Design の各コンポーネントが自分の `<Component>.css.ts` に持ち、
 トークン経由でだけ値を引く。コンポーネント間・画面間での見た目のばらつきはバグとして扱う。
 
+書体は IBM Plex Sans JP（400/500/600/700）。woff2（japanese サブセット）を
+`public/fonts/` に自前ホストし、`configs/global.css.ts` の body スタック
+（`"IBM Plex Sans JP", "Noto Sans JP", sans-serif`）で一元管理する。各所に直書きしない。
+等幅はコード表示専用（ui-monospace 系）で、UI テキストには使わない。
+
 ## デザイントークン（`configs/theme.css.ts`）
 
 | グループ | 内容 | 使い方 |

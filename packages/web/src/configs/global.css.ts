@@ -6,8 +6,8 @@ globalStyle(":root[data-theme=\"dark\"]", { colorScheme: "dark" });
 
 globalStyle("body", {
   margin: 0,
-  fontFamily:
-    "'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif",
+  // サービス内フォントは IBM Plex Sans JP（自前ホストの woff2 を index.html から読み込む）。
+  fontFamily: "'IBM Plex Sans JP', 'Noto Sans JP', sans-serif",
   background: theme.color.bg,
   color: theme.color.text,
   fontSize: theme.fontSizes.base,
