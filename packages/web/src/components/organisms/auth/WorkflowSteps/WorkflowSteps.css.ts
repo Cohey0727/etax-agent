@@ -67,11 +67,9 @@ const styles = {
     animation: `${pulse} 1.4s ease-in-out infinite`,
   }),
   ...dotDelay,
+  // 縦線を絶対配置するための受け皿（並び自体は Col atom が持つ）。
   steps: style({
     position: "relative",
-    display: "flex",
-    flexDirection: "column",
-    gap: theme.space.sm,
   }),
   // ノードの中心を貫く縦線。グラデーションで流れの向きを示す。
   line: style({

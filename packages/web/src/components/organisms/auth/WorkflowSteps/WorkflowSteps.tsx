@@ -49,7 +49,7 @@ export const WorkflowSteps = () => {
             ))}
           </span>
         </Row>
-        <div className={styles.steps}>
+        <Col gap="sm" className={styles.steps}>
           <div className={styles.line} aria-hidden="true" />
           {STEPS.map((step, index) => (
             <Row
@@ -67,7 +67,7 @@ export const WorkflowSteps = () => {
               </Text>
             </Row>
           ))}
-        </div>
+        </Col>
       </Col>
     </div>
   );

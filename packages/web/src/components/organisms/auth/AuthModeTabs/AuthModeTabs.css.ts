@@ -4,8 +4,6 @@ import { theme } from "@configs";
 const styles = {
   // ピル型の土台に2つのタブを等幅で並べる。
   root: style({
-    display: "flex",
-    gap: theme.space.xs,
     padding: "4px",
     borderRadius: theme.borderRadius.pill,
     background: theme.color.hover,

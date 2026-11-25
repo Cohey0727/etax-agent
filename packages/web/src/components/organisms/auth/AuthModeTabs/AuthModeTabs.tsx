@@ -1,4 +1,4 @@
-import { Button } from "@components/atoms";
+import { Button, Row } from "@components/atoms";
 import { PasswordAuthMode } from "@components/organisms/auth/PasswordAuthForm";
 import styles from "./AuthModeTabs.css";
 
@@ -18,7 +18,7 @@ const TABS: readonly { key: PasswordAuthMode; label: string }[] = [
  */
 export const AuthModeTabs = ({ mode, onChange }: AuthModeTabsProps) => {
   return (
-    <div className={styles.root}>
+    <Row gap="none" className={styles.root}>
       {TABS.map((tab) => (
         <Button
           key={tab.key}
@@ -31,6 +31,6 @@ export const AuthModeTabs = ({ mode, onChange }: AuthModeTabsProps) => {
           {tab.label}
         </Button>
       ))}
-    </div>
+    </Row>
   );
 };

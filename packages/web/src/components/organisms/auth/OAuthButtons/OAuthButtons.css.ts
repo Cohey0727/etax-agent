@@ -2,11 +2,6 @@ import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
-  divider: style({
-    display: "flex",
-    alignItems: "center",
-    gap: theme.space.sm,
-  }),
   dividerLine: style({
     flex: 1,
     height: "1px",

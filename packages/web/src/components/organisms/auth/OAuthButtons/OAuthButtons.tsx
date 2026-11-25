@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Button, Col, Text } from "@components/atoms";
+import { Button, Col, Row, Text } from "@components/atoms";
 import styles from "./OAuthButtons.css";
 import { GitHubLogo, GoogleLogo } from "./oauthLogos";
 
@@ -29,13 +29,13 @@ export const OAuthButtons = ({ providers, onSelect }: OAuthButtonsProps) => {
   if (providers.length === 0) return null;
   return (
     <Col gap="sm">
-      <div className={styles.divider}>
+      <Row gap="sm" align="center">
         <span className={styles.dividerLine} />
         <Text variant="caption" className={styles.dividerText}>
           または
         </Text>
         <span className={styles.dividerLine} />
-      </div>
+      </Row>
       {providers.map((provider) => (
         <Button
           key={provider.key}
