@@ -9,11 +9,28 @@
  */
 import { z } from "@hono/zod-openapi";
 
+/**
+ * チャット添付1件。画像・PDF は dataBase64、CSV は text で中身を送る。
+ * 形式・サイズの検証は services/agent の validateChatAttachments が担う。
+ */
+export const AgentChatAttachmentSchema = z
+  .object({
+    name: z.string(),
+    mimeType: z.string(),
+    dataBase64: z.string().optional().catch(undefined),
+    text: z.string().optional().catch(undefined),
+  })
+  .openapi("AgentChatAttachment");
+
+export type AgentChatAttachment = z.infer<typeof AgentChatAttachmentSchema>;
+
 export const AgentChatRequestSchema = z
   .object({
     messages: z.array(z.unknown()),
     transactions: z.unknown().optional(),
     csvText: z.string().optional().catch(undefined),
+    // このターンに添付されたファイル（最後のユーザー発言へ付けて LLM へ渡す）。
+    attachments: z.array(AgentChatAttachmentSchema).optional().catch(undefined),
     // 画面が保持する控除入力のスナップショット（対象年つき）。
     deductions: z
       .object({ year: z.number().int(), state: z.unknown() })

@@ -92,10 +92,6 @@ const styles = {
     background: theme.color.accent,
     transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
   }),
-  // 詳細パネル。
-  detailCard: style({
-    animation: `${popIn} 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)`,
-  }),
   tableWrap: style({
     width: "100%",
     overflowX: "auto",
@@ -172,11 +168,14 @@ const styles = {
     color: theme.color.muted,
     marginBottom: "4px",
   }),
-  chipRow: style({
-    display: "flex",
-    flexWrap: "wrap",
-    gap: theme.space.xs,
-    marginTop: "6px",
+  // 耐用年数フィールド：数値入力と候補セレクトをフィールド内の1行に収める。
+  lifeInput: style({
+    flex: "1 1 auto",
+    minWidth: 0,
+  }),
+  lifePreset: style({
+    flex: "0 0 auto",
+    width: "92px",
   }),
   hiddenFileInput: style({
     display: "none",
@@ -190,7 +189,6 @@ const styles = {
   skeletonValue: style({ width: "70%", height: "24px" }),
   skeletonLabel: style({ width: "45%", height: "14px" }),
   skeletonCard: style({ height: "132px" }),
-  skeletonDetail: style({ height: "320px" }),
 };
 
 export default styles;

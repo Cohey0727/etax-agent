@@ -4,6 +4,7 @@ import { AgentConnectionConfig, SendKeyMode, ThemeMode } from "@types";
 import { testAgentSettings } from "@utils";
 import { AiMemoryPanel } from "../AiMemoryPanel";
 import { AccountPanel } from "../AccountPanel";
+import { ApiKeysPanel } from "../ApiKeysPanel";
 import { SystemOneSettingsPanel } from "../SystemOneSettingsPanel";
 import styles from "./SettingsPanel.css";
 
@@ -202,6 +203,7 @@ export const SettingsPanel = ({
       </Card>
       <SystemOneSettingsPanel />
       <AiMemoryPanel />
+      <ApiKeysPanel />
       <Card>
         <Col gap="md">
           <Text variant="sectionTitle">アプリについて</Text>

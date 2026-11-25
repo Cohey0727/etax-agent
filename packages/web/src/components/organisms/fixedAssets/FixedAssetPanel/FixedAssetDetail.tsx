@@ -1,7 +1,5 @@
 import {
-  Badge,
   Button,
-  Card,
   Col,
   Row,
   Table,
@@ -28,7 +26,7 @@ export interface FixedAssetDetailProps {
   onDeleteImage: (fileId: string) => void;
 }
 
-/** 選択中資産の詳細（属性・全期間の償却スケジュール・画像）。 */
+/** 選択中資産の詳細（属性・全期間の償却スケジュール・画像）。右 Drawer の中身として使う。 */
 export const FixedAssetDetail = ({
   asset,
   year,
@@ -55,79 +53,71 @@ export const FixedAssetDetail = ({
   ];
 
   return (
-    <Card className={styles.detailCard}>
-      <Col gap="lg">
-        <Row justify="spaceBetween" align="center" wrap>
-          <Row gap="sm" align="center">
-            <Text variant="title">{asset.name}</Text>
-            {asset.disposed_date ? <Badge>除却済み</Badge> : null}
-          </Row>
-          <Row gap="sm">
-            <Button variant="ghost" onClick={onEdit} disabled={busy}>
-              編集
-            </Button>
-            <Button variant="danger" onClick={onDelete} disabled={busy}>
-              {deleteArmed ? "本当に削除しますか" : "削除"}
-            </Button>
-          </Row>
-        </Row>
+    <Col gap="lg">
+      <Row justify="end" gap="sm">
+        <Button variant="ghost" onClick={onEdit} disabled={busy}>
+          編集
+        </Button>
+        <Button variant="danger" onClick={onDelete} disabled={busy}>
+          {deleteArmed ? "本当に削除しますか" : "削除"}
+        </Button>
+      </Row>
 
-        <div className={styles.formGrid}>
-          {meta.map((item) => (
-            <Col key={item.label} gap="none">
-              <Text variant="caption">{item.label}</Text>
-              <Text variant="body">{item.value}</Text>
-            </Col>
-          ))}
-        </div>
+      <div className={styles.formGrid}>
+        {meta.map((item) => (
+          <Col key={item.label} gap="none">
+            <Text variant="caption">{item.label}</Text>
+            <Text variant="body">{item.value}</Text>
+          </Col>
+        ))}
+      </div>
 
-        <Col gap="sm">
-          <Text variant="sectionTitle">減価償却スケジュール</Text>
-          {schedule.length === 0 ? (
-            <Text variant="muted">スケジュールを計算できませんでした。</Text>
-          ) : (
-            <div className={styles.tableWrap}>
-              <Table>
-                <thead>
-                  <tr>
-                    <TableHeaderCell>年度</TableHeaderCell>
-                    <TableHeaderCell>月数</TableHeaderCell>
-                    <TableHeaderCell>期首残高</TableHeaderCell>
-                    <TableHeaderCell>償却率</TableHeaderCell>
-                    <TableHeaderCell>普通償却費</TableHeaderCell>
-                    <TableHeaderCell>必要経費算入額</TableHeaderCell>
-                    <TableHeaderCell>期末残高</TableHeaderCell>
+      <Col gap="sm">
+        <Text variant="sectionTitle">減価償却スケジュール</Text>
+        {schedule.length === 0 ? (
+          <Text variant="muted">スケジュールを計算できませんでした。</Text>
+        ) : (
+          <div className={styles.tableWrap}>
+            <Table>
+              <thead>
+                <tr>
+                  <TableHeaderCell>年度</TableHeaderCell>
+                  <TableHeaderCell>月数</TableHeaderCell>
+                  <TableHeaderCell>期首残高</TableHeaderCell>
+                  <TableHeaderCell>償却率</TableHeaderCell>
+                  <TableHeaderCell>普通償却費</TableHeaderCell>
+                  <TableHeaderCell>必要経費算入額</TableHeaderCell>
+                  <TableHeaderCell>期末残高</TableHeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                {schedule.map((row) => (
+                  <tr key={row.year} className={row.year === year ? styles.scheduleRowCurrent : undefined}>
+                    <TableCell>{row.year}年</TableCell>
+                    <TableCell>{row.months}か月</TableCell>
+                    <TableCell>{formatYen(row.openingBookValue)}</TableCell>
+                    <TableCell>{row.rate > 0 ? row.rate.toFixed(3) : "—"}</TableCell>
+                    <TableCell>{formatYen(row.ordinary)}</TableCell>
+                    <TableCell>{formatYen(row.deductible)}</TableCell>
+                    <TableCell>{formatYen(row.closingBookValue)}</TableCell>
                   </tr>
-                </thead>
-                <tbody>
-                  {schedule.map((row) => (
-                    <tr key={row.year} className={row.year === year ? styles.scheduleRowCurrent : undefined}>
-                      <TableCell>{row.year}年</TableCell>
-                      <TableCell>{row.months}か月</TableCell>
-                      <TableCell>{formatYen(row.openingBookValue)}</TableCell>
-                      <TableCell>{row.rate > 0 ? row.rate.toFixed(3) : "—"}</TableCell>
-                      <TableCell>{formatYen(row.ordinary)}</TableCell>
-                      <TableCell>{formatYen(row.deductible)}</TableCell>
-                      <TableCell>{formatYen(row.closingBookValue)}</TableCell>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          )}
-          <Text variant="caption">
-            合計 {formatNumber(schedule.reduce((sum, row) => sum + row.deductible, 0))}円
-            が必要経費に算入されます（全期間）。
-          </Text>
-        </Col>
-
-        <FixedAssetImages
-          images={images}
-          busy={imagesBusy}
-          onUpload={onUploadImages}
-          onDelete={onDeleteImage}
-        />
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        )}
+        <Text variant="caption">
+          合計 {formatNumber(schedule.reduce((sum, row) => sum + row.deductible, 0))}円
+          が必要経費に算入されます（全期間）。
+        </Text>
       </Col>
-    </Card>
+
+      <FixedAssetImages
+        images={images}
+        busy={imagesBusy}
+        onUpload={onUploadImages}
+        onDelete={onDeleteImage}
+      />
+    </Col>
   );
 };

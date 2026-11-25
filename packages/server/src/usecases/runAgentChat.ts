@@ -15,6 +15,7 @@ import { readJsonBody } from "../lib/readJsonBody";
 import { assertSafeUserBaseUrl, UnsafeUrlError } from "../lib/ssrfGuard";
 import { AgentChatRequestSchema, AgentChatResponse, AgentChatResponseSchema } from "../schemas/agentChat";
 import { ErrorSchema } from "../schemas/common";
+import { singleCsvText, validateChatAttachments } from "../services/agent/agentAttachments";
 import { runAgentTurn } from "../services/agent/runAgentTurn";
 
 export const runAgentChatRoute = createRoute({
@@ -30,7 +31,7 @@ export const runAgentChatRoute = createRoute({
     },
     400: {
       content: { "application/json": { schema: ErrorSchema } },
-      description: "messages 配列が不足",
+      description: "messages 配列が不足・添付ファイルが不正",
     },
     500: {
       content: { "application/json": { schema: ErrorSchema } },
@@ -113,10 +114,17 @@ export const runAgentChatHandler: RouteHandler<typeof runAgentChatRoute> = async
     )
     .map((m) => ({ role: m.role, content: m.content }));
   const transactions = normalizeTransactions(body.transactions ?? []);
-  const csvText = body.csvText;
+  const attachments = body.attachments ?? [];
+  try {
+    validateChatAttachments(attachments);
+  } catch (e) {
+    throw new HTTPException(400, { message: errorMessage(e) });
+  }
+  // CSV 添付が1件だけなら、従来の csvText 経路（import_csv_info）にも載せる。
+  const csvText = body.csvText ?? singleCsvText(attachments);
   const deductions = body.deductions;
   try {
-    const result = await runAgentTurn(cfg, history, { transactions, csvText, deductions });
+    const result = await runAgentTurn(cfg, history, { transactions, csvText, deductions }, attachments);
     const response: AgentChatResponse = result;
     return c.json(response, 200);
   } catch (e) {

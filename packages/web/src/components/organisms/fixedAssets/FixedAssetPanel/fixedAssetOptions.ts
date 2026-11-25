@@ -34,8 +34,8 @@ export const INCOME_TYPE_LABELS: Record<string, string> = {
   real_estate: "不動産",
 };
 
-/** 耐用年数の入力補助チップ（よく使う年数）。 */
-export const USEFUL_LIFE_CHIPS: readonly number[] = [2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 47];
+/** 耐用年数の候補セレクトに出す、よく使う年数。候補に無い年数は数値入力で直接指定する。 */
+export const USEFUL_LIFE_PRESETS: readonly number[] = [2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 47];
 
 export const toInput = (row: FixedAssetRecord): FixedAssetInput => ({
   name: row.name,
@@ -112,6 +112,16 @@ export function deductibleAt(asset: FixedAssetRecord, year: number): number {
   if (disposedYear !== null && year > disposedYear) return 0;
   const row = fullSchedule(asset).find((entry) => entry.year === year);
   return row?.deductible ?? 0;
+}
+
+/**
+ * 指定年度の台帳の対象か。その年度の償却スケジュールに現れる資産を対象とし、
+ * 除却年がその年度より前の資産は対象外（除却した年度までは対象）。
+ */
+export function isAssetInYear(asset: FixedAssetRecord, year: number): boolean {
+  const disposedYear = disposedYearOf(asset);
+  if (disposedYear !== null && disposedYear < year) return false;
+  return fullSchedule(asset).some((row) => row.year === year);
 }
 
 /** 償却の進み具合（0〜1）。少額特例は取得年に全額償却される。 */

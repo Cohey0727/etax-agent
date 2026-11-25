@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { Icon } from "@components/atoms";
 import { ChatMessage, ChatRole } from "@types";
 import { summarizeToolArgs, toolLabel } from "./agentChatHelpers";
 import styles from "./AgentChatPanel.css";
@@ -43,6 +44,16 @@ export const MessageBubbles = ({ items }: { items: ChatMessage[] }) => {
         ) : (
           <div key={i} className={clsx(styles.bubble, styles.role[m.role])}>
             {m.content}
+            {m.attachments && m.attachments.length > 0 ? (
+              <div className={styles.bubbleAttachments}>
+                {m.attachments.map((attachment, j) => (
+                  <span key={j} className={styles.bubbleAttachmentChip}>
+                    <Icon name="fileCheck" size={13} />
+                    <span className={styles.attachmentName}>{attachment.name}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         ),
       )}

@@ -10,11 +10,88 @@ const bubbleIn = keyframes({
 const styles = {
   // パネル全体。枠（Card）は付けず、会話が伸びて入力欄が一番下に残る縦フレックス。
   root: style({
+    position: "relative",
     display: "flex",
     flexDirection: "column",
     gap: theme.space.sm,
     flex: "1 1 auto",
     minHeight: 0,
+  }),
+  // ファイルをドラッグしている間の受け口表示。操作は背後へ通さない。
+  dropOverlay: style({
+    position: "absolute",
+    inset: 0,
+    zIndex: 5,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.space.sm,
+    background: theme.color.accentSoft,
+    border: `2px dashed ${theme.color.accent}`,
+    borderRadius: theme.borderRadius.md,
+    pointerEvents: "none",
+    animation: `${bubbleIn} 0.25s ${theme.animation.spring} both`,
+  }),
+  // 送信前の添付チップの並び。
+  attachmentList: style({
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.space.xs,
+    flexShrink: 0,
+  }),
+  attachmentChip: style({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: theme.space.xs,
+    background: theme.color.accentSoft,
+    color: theme.color.accentText,
+    borderRadius: theme.borderRadius.sm,
+    padding: "2px 4px 2px 8px",
+    fontSize: theme.fontSizes.xs,
+    lineHeight: 1.6,
+    whiteSpace: "nowrap",
+    maxWidth: "100%",
+  }),
+  attachmentName: style({
+    maxWidth: "180px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  }),
+  attachmentRemove: style({
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "2px",
+    border: "none",
+    background: "transparent",
+    color: "inherit",
+    cursor: "pointer",
+    borderRadius: theme.borderRadius.sm,
+  }),
+  hiddenFileInput: style({
+    display: "none",
+  }),
+  // 送信済みの発言に添えた添付チップ（吹き出し地の上でも読めるよう面色を変える）。
+  bubbleAttachments: style({
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.space.xs,
+    marginTop: theme.space.xs,
+  }),
+  bubbleAttachmentChip: style({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: theme.space.xs,
+    background: theme.color.surface,
+    color: theme.color.accentText,
+    borderRadius: theme.borderRadius.sm,
+    padding: "2px 8px",
+    fontSize: theme.fontSizes.xs,
+    lineHeight: 1.6,
+    whiteSpace: "nowrap",
+    maxWidth: "100%",
   }),
   // 会話ログだけがスクロールする。
   chatLog: style({

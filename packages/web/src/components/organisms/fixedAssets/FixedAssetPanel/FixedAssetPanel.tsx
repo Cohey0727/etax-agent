@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { Button, Col, Icon, Row, Text } from "@components/atoms";
-import { AlertBox } from "@components/molecules";
+import { Badge, Button, Col, Icon, Row, Text } from "@components/atoms";
+import { AlertBox, Drawer } from "@components/molecules";
 import { FixedAssetInput } from "@types";
 import { FixedAssetDetail } from "./FixedAssetDetail";
 import { FixedAssetForm } from "./FixedAssetForm";
 import { FixedAssetList } from "./FixedAssetList";
 import { FixedAssetSkeleton } from "./FixedAssetSkeleton";
 import { FixedAssetSummary } from "./FixedAssetSummary";
-import { emptyDraft, toInput } from "./fixedAssetOptions";
+import { emptyDraft, isAssetInYear, toInput } from "./fixedAssetOptions";
 import { useFixedAssetsData } from "./useFixedAssetsData";
 
 export interface FixedAssetPanelProps {
@@ -17,7 +17,11 @@ export interface FixedAssetPanelProps {
 
 type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
 
-/** 固定資産台帳の画面本体。サマリ帯・資産カード・詳細（償却表と画像）・登録/編集フォーム。 */
+/**
+ * 固定資産台帳の画面本体。ページはサマリ帯と資産一覧が主役で、詳細・登録・編集はいずれも右 Drawer で開く。
+ * 一覧は選択年度の対象資産が既定で、対象外の資産は「過去の資産も表示」トグルで広げる。
+ * サマリはフィルタと連動せず、全資産を対象に年度ベースで集計する（従来どおり）。
+ */
 export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   const {
     status,
@@ -38,6 +42,8 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   } = useFixedAssetsData(year);
   const [formState, setFormState] = useState<FormState>(null);
   const [draft, setDraft] = useState<FixedAssetInput>(() => emptyDraft(year));
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [showPastAssets, setShowPastAssets] = useState(false);
 
   if (status === "loading") {
     return <FixedAssetSkeleton />;
@@ -52,7 +58,15 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
     );
   }
 
-  const selected = assets.find((asset) => asset.id === selectedId) ?? null;
+  const detailAsset =
+    detailId !== null ? (assets.find((asset) => asset.id === detailId) ?? null) : null;
+  const editingAsset =
+    formState?.kind === "edit"
+      ? (assets.find((asset) => asset.id === formState.id) ?? null)
+      : null;
+  const inYearAssets = assets.filter((asset) => isAssetInYear(asset, year));
+  const pastCount = assets.length - inYearAssets.length;
+  const visibleAssets = showPastAssets ? assets : inYearAssets;
 
   const openCreate = () => {
     setDraft(emptyDraft(year));
@@ -60,9 +74,9 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   };
 
   const openEdit = () => {
-    if (!selected) return;
-    setDraft(toInput(selected));
-    setFormState({ kind: "edit", id: selected.id });
+    if (!detailAsset) return;
+    setDraft(toInput(detailAsset));
+    setFormState({ kind: "edit", id: detailAsset.id });
   };
 
   const submitForm = async () => {
@@ -74,6 +88,9 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
     if (ok) setFormState(null);
   };
 
+  const formTitle =
+    formState?.kind === "edit" ? `「${editingAsset?.name ?? ""}」を編集` : "固定資産を登録";
+
   return (
     <Col gap="lg">
       <Row justify="spaceBetween" align="center" wrap>
@@ -84,18 +101,6 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
       </Row>
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
 
-      {formState?.kind === "create" ? (
-        <FixedAssetForm
-          title="固定資産を登録"
-          submitLabel="登録する"
-          value={draft}
-          busy={busy}
-          onChange={setDraft}
-          onSubmit={() => void submitForm()}
-          onCancel={() => setFormState(null)}
-        />
-      ) : null}
-
       {assets.length === 0 ? (
         <Text variant="body">
           まだ固定資産がありません。「資産を登録」から、パソコンや備品などの
@@ -104,44 +109,84 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
       ) : (
         <>
           <FixedAssetSummary assets={assets} summary={summary} year={year} />
-          <FixedAssetList
-            assets={assets}
-            year={year}
-            selectedId={selectedId}
-            images={images}
-            onSelect={(assetId) => {
-              setFormState(null);
-              select(assetId);
-            }}
-          />
-          {selected ? (
-            formState?.kind === "edit" && formState.id === selected.id ? (
-              <FixedAssetForm
-                title={`「${selected.name}」を編集`}
-                submitLabel="保存する"
-                value={draft}
-                busy={busy}
-                onChange={setDraft}
-                onSubmit={() => void submitForm()}
-                onCancel={() => setFormState(null)}
-              />
-            ) : (
-              <FixedAssetDetail
-                asset={selected}
-                year={year}
-                images={images[selected.id]}
-                imagesBusy={imagesBusy}
-                busy={busy}
-                deleteArmed={deleteArmedId === selected.id}
-                onEdit={openEdit}
-                onDelete={() => void handleDelete(selected)}
-                onUploadImages={(files) => void handleUploadImages(selected.id, files)}
-                onDeleteImage={(fileId) => void handleDeleteImage(selected.id, fileId)}
-              />
-            )
+          {pastCount > 0 ? (
+            <Row justify="end">
+              <Button
+                variant={showPastAssets ? "tabActive" : "tab"}
+                size="sm"
+                onClick={() => setShowPastAssets((prev) => !prev)}
+              >
+                過去の資産も表示（{pastCount}件）
+              </Button>
+            </Row>
           ) : null}
+          {visibleAssets.length === 0 ? (
+            <Text variant="body">
+              {year}年に対象の資産はありません。「過去の資産も表示」をオンにすると、
+              すべての資産を確認できます。
+            </Text>
+          ) : (
+            <FixedAssetList
+              assets={visibleAssets}
+              year={year}
+              selectedId={selectedId}
+              images={images}
+              onSelect={(assetId) => {
+                setFormState(null);
+                select(assetId);
+                setDetailId(assetId);
+              }}
+            />
+          )}
         </>
       )}
+
+      <Drawer
+        open={detailAsset !== null}
+        title={
+          detailAsset ? (
+            <Row gap="sm" align="center">
+              <Text variant="sectionTitle">{detailAsset.name}</Text>
+              {detailAsset.disposed_date ? <Badge>除却済み</Badge> : null}
+            </Row>
+          ) : undefined
+        }
+        width="min(720px, 96vw)"
+        onClose={() => setDetailId(null)}
+      >
+        {detailAsset ? (
+          <FixedAssetDetail
+            asset={detailAsset}
+            year={year}
+            images={images[detailAsset.id]}
+            imagesBusy={imagesBusy}
+            busy={busy}
+            deleteArmed={deleteArmedId === detailAsset.id}
+            onEdit={openEdit}
+            onDelete={() => void handleDelete(detailAsset)}
+            onUploadImages={(files) => void handleUploadImages(detailAsset.id, files)}
+            onDeleteImage={(fileId) => void handleDeleteImage(detailAsset.id, fileId)}
+          />
+        ) : null}
+      </Drawer>
+
+      <Drawer
+        open={formState !== null}
+        title={formTitle}
+        layer={formState?.kind === "edit" ? 1 : 0}
+        onClose={() => setFormState(null)}
+      >
+        {formState ? (
+          <FixedAssetForm
+            submitLabel={formState.kind === "create" ? "登録する" : "保存する"}
+            value={draft}
+            busy={busy}
+            onChange={setDraft}
+            onSubmit={() => void submitForm()}
+            onCancel={() => setFormState(null)}
+          />
+        ) : null}
+      </Drawer>
     </Col>
   );
 };

@@ -23,7 +23,6 @@ export const FixedAssetSkeleton = () => {
           <div key={i} className={`${styles.skeleton} ${styles.skeletonCard}`} />
         ))}
       </div>
-      <div className={`${styles.skeleton} ${styles.skeletonDetail}`} />
     </Col>
   );
 };
