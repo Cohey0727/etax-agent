@@ -82,6 +82,7 @@ import { mcpInvoiceTools } from "./mcpInvoiceTools";
 import { mcpLedgerTools } from "./mcpLedgerTools";
 import { mcpMetaTools } from "./mcpMetaTools";
 import { mcpProfileTools } from "./mcpProfileTools";
+import { mcpSubmissionTools } from "./mcpSubmissionTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
 
@@ -476,6 +477,7 @@ const DOMAIN_TOOL_MODULES: McpToolModule[] = [
   mcpMetaTools,
   mcpInvoiceTools,
   mcpCashFlowTools,
+  mcpSubmissionTools,
 ];
 
 /** 公開ツール一覧（コア＋ドメイン別モジュール）。 */
