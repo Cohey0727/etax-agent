@@ -1,6 +1,6 @@
 import { filterYear, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Col, Row, Text } from "@components/atoms";
+import { Badge, Button, Card, Col, Row, Text } from "@components/atoms";
 import { AppView, FilingStatus } from "@types";
 import { fetchFilingStatuses } from "@utils/api";
 import styles from "./FilingStatusPanel.css";
@@ -126,9 +126,7 @@ export const FilingStatusPanel = ({ transactions, year, onNavigate }: FilingStat
             <div key={row.label} className={styles.statusRow}>
               <Text className={styles.itemLabel}>
                 {row.label}
-                <span className={row.done ? styles.stateDone : styles.stateTodo}>
-                  {row.done ? "確定" : "未確定"}
-                </span>
+                <Badge tone={row.done ? "accent" : "muted"}>{row.done ? "確定" : "未確定"}</Badge>
               </Text>
               <Text variant="muted">{row.state}</Text>
             </div>

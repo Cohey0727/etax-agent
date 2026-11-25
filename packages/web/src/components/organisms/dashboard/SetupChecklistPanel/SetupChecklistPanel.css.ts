@@ -21,26 +21,6 @@ const styles = {
   }),
   // 補足テキスト。行の中で自然に折り返す。
   detail: style({}),
-  stateDone: style({
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.color.accentText,
-    backgroundColor: theme.color.accentSoft,
-    borderRadius: theme.borderRadius.pill,
-    padding: "2px 8px",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  }),
-  stateTodo: style({
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.color.muted,
-    backgroundColor: theme.color.lineSoft,
-    borderRadius: theme.borderRadius.pill,
-    padding: "2px 8px",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  }),
 };
 
 export default styles;

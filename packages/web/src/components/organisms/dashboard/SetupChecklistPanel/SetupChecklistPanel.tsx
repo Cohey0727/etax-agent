@@ -1,6 +1,6 @@
 import { filterYear, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Col, Text } from "@components/atoms";
+import { Badge, Button, Card, Col, Text } from "@components/atoms";
 import { AppView } from "@types";
 import { fetchFilingInputs, fetchTaxpayerProfile } from "@utils/api";
 import styles from "./SetupChecklistPanel.css";
@@ -92,9 +92,7 @@ export const SetupChecklistPanel = ({ transactions, year, onNavigate }: SetupChe
             <div key={item.label} className={styles.row}>
               <Text className={styles.itemLabel}>
                 {item.label}
-                <span className={item.done ? styles.stateDone : styles.stateTodo}>
-                  {item.done ? "設定済み" : "未設定"}
-                </span>
+                <Badge tone={item.done ? "accent" : "muted"}>{item.done ? "設定済み" : "未設定"}</Badge>
               </Text>
               <Text variant="muted" className={styles.detail}>{item.detail}</Text>
               {!item.done && onNavigate ? (
