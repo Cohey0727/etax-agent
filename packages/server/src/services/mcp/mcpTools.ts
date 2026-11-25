@@ -76,6 +76,7 @@ import {
 import { classifyAccount } from "../classification/classifyAccount";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { mcpAssetTools } from "./mcpAssetTools";
+import { mcpBusinessStartTools } from "./mcpBusinessStartTools";
 import { mcpCashFlowTools } from "./mcpCashFlowTools";
 import { mcpImportTools } from "./mcpImportTools";
 import { mcpInvoiceTools } from "./mcpInvoiceTools";
@@ -478,6 +479,7 @@ const DOMAIN_TOOL_MODULES: McpToolModule[] = [
   mcpInvoiceTools,
   mcpCashFlowTools,
   mcpSubmissionTools,
+  mcpBusinessStartTools,
 ];
 
 /** 公開ツール一覧（コア＋ドメイン別モジュール）。 */
