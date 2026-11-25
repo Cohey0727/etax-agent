@@ -30,6 +30,7 @@
  *   POST   /api/files/presign-upload アップロード受け口URLの発行（ローカル保存）
  *   GET    /api/freee/trial-balance freee試算表（データディレクトリの取り込み済み実績）
  *   POST   /api/etax/export-xtx     e-Tax 申告等データ（XTX）の出力（DB不要・ステートレス）
+ *   GET    /openapi.json            OpenAPI ドキュメント（全ルートのスペック）
  *   ALL    /mcp                     MCP（外部エージェント連携。認証はユーザーごとの
  *                                   APIトークン（設定画面で発行、Bearer）。認証フロー
  *                                   自体は対象外でトークンが代替する。MCP_TOKEN は
@@ -55,6 +56,10 @@ import { billingEnabled } from "./gateways/stripeGateway";
 import { hasActivePlan } from "./repositories/subscriptionRepository";
 import { authRequired, runWithTenant } from "./lib/tenantContext";
 import { resolveRequestUserId } from "./usecases/authSession";
+import {
+  OPENAPI_DOCUMENT_PATH,
+  createOpenApiDocumentHandler,
+} from "./usecases/getOpenApiDocument";
 import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
 import { deleteExpiredAuthRows } from "./repositories/userRepository";
 import { createSystemOneClient } from "./gateways/systemOneGateway";
@@ -201,6 +206,11 @@ app.route("/", taxpayerRoutes);
 app.route("/", fixedAssetsRoutes);
 app.route("/", etaxRoutes);
 app.route("/", mcpRoutes);
+
+// OpenAPI ドキュメントの公開。全ルートの登録が済んだ後に載せる
+// （ドキュメントは集約済みレジストリから生成する）。/api/* の認証
+// ミドルウェアの対象外パスに置き、スペック自体は公開情報として返す。
+app.get(OPENAPI_DOCUMENT_PATH, createOpenApiDocumentHandler(app));
 
 // 画面（React のビルド成果物）を API と同一ポートで配信する。
 // API ルートより後に登録するので、/api/* は上のルートが先に処理する。

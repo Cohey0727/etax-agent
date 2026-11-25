@@ -11,6 +11,12 @@
  *   - 提出記録の保存で申告ステータスが「提出済み」に連動すること
  *   - 開業の専用入力の保存→取得の往復と、様式 PDF の生成
  *   - 試算表・取引履歴一覧・課金プランの取得
+ * 全面カバレッジ（2026-11-25 追補）では次も担保する:
+ *   - 接続テスト2件（SystemOne / 外部接続）と agent_chat が tools/list に
+ *     含まれ、REST と同じ本体で応答すること（未設定環境では ok=false /
+ *     AGENT_API_KEY 未設定エラー）
+ *   - /api/auth/mcp-info のツール件数が tools/list と一致すること
+ *   - GET /openapi.json が全ルート（99 オペレーション）のスペックを返すこと
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, writeFile } from "node:fs/promises";
@@ -482,5 +488,91 @@ describe("MCP 棚卸しで追加したツール", () => {
     const plan = toolJson(await callTool("get_billing_plan", {}, key));
     expect(plan["status"]).toBe("none");
     expect(typeof plan["billing_enabled"]).toBe("boolean");
+  });
+});
+
+describe("MCP 全面カバレッジ（接続テスト・エージェント・OpenAPI）", () => {
+  test("tools/list に接続テストと agent_chat が含まれ、mcp-info の件数と一致する", async () => {
+    const [key] = await makeUsers("mcp-full-coverage@example.com");
+    const list = await mcp("tools/list", {}, key);
+    const names = (list.body.result?.tools ?? []).map((t) => t.name);
+    for (const name of ["test_systemone_connection", "test_agent_connection", "agent_chat"]) {
+      expect(names).toContain(name);
+    }
+
+    // MCP 設定画面向け情報（ツール件数・一覧）が tools/list と一致する
+    const infoRes = await appFetch(
+      new Request("http://localhost/api/auth/mcp-info", {
+        headers: { Authorization: `Bearer ${key}` },
+      }),
+    );
+    expect(infoRes.status).toBe(200);
+    const info = (await infoRes.json()) as {
+      endpoint_path: string;
+      tool_count: number;
+      tools: { name: string }[];
+    };
+    expect(info.endpoint_path).toBe("/mcp");
+    expect(info.tool_count).toBe(names.length);
+    expect(info.tools.map((t) => t.name)).toEqual(names);
+  });
+
+  test("接続テスト2件は未設定環境でも ok=false の形で返る（REST と同じ本体）", async () => {
+    const [key] = await makeUsers("mcp-conn-test@example.com");
+
+    // SystemOne は既定のローカル宛先へ届かず ok=false（例外にはならない）
+    const systemOne = await callTool("test_systemone_connection", {}, key);
+    expect(systemOne.body.result?.isError).toBeUndefined();
+    const systemOneJson = toolJson(systemOne);
+    expect(systemOneJson["ok"]).toBe(false);
+    expect(systemOneJson["top"]).toBeNull();
+    expect(typeof systemOneJson["error"]).toBe("string");
+
+    // 外部接続（AI）は APIキー未設定のため ok=false
+    const agent = await callTool("test_agent_connection", {}, key);
+    expect(agent.body.result?.isError).toBeUndefined();
+    const agentJson = toolJson(agent);
+    expect(agentJson["ok"]).toBe(false);
+    expect(String(agentJson["error"])).toContain("APIキー");
+  });
+
+  test("agent_chat は AGENT_API_KEY 未設定なら REST と同じ理由でエラーになる", async () => {
+    const [key] = await makeUsers("mcp-agent-chat@example.com");
+    const res = await callTool(
+      "agent_chat",
+      { messages: [{ role: "user", content: "こんにちは" }] },
+      key,
+    );
+    expect(res.body.result?.isError).toBe(true);
+    expect(res.body.result?.content?.[0]?.text ?? "").toContain("AGENT_API_KEY");
+  });
+
+  test("GET /openapi.json が全ルートのスペックを返す（99 オペレーション）", async () => {
+    const res = await appFetch(new Request("http://localhost/openapi.json"));
+    expect(res.status).toBe(200);
+    const doc = (await res.json()) as {
+      openapi: string;
+      paths: Record<string, Record<string, unknown>>;
+    };
+    expect(doc.openapi).toBe("3.0.0");
+    // 2026-11-25 の棚卸し時点の全オペレーション数（ルートを足したら更新する）
+    let operations = 0;
+    for (const methods of Object.values(doc.paths)) {
+      operations += Object.keys(methods).length;
+    }
+    expect(operations).toBe(99);
+    // 代表パス（今回ツール化した3件と、手書きオブジェクト定義の試算表を含む）
+    for (const path of [
+      "/api/settings/systemone/test",
+      "/api/settings/agent/test",
+      "/api/agent/chat",
+      "/api/calc/trial-balance",
+      "/api/transactions",
+      "/api/auth/register",
+      "/api/billing/webhook",
+      "/api/auth/mcp-info",
+    ]) {
+      expect(doc.paths[path]).toBeDefined();
+    }
   });
 });
