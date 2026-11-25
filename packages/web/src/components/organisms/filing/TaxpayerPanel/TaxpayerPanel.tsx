@@ -1,5 +1,6 @@
 import {
   DeductionInputs,
+  ExpandedIncomeInput,
   FilingType,
   MiscIncomeInput,
   SalaryIncomeInput,
@@ -9,7 +10,9 @@ import {
   balanceSheetToWire,
   buildTrialBalanceSheet,
   computeCorrectedFigures,
+  expandedIncomeToWire,
   isBalanceSheetEmpty,
+  isExpandedIncomeEmpty,
   xtxSupportedYears,
 } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
@@ -34,6 +37,8 @@ export interface TaxpayerPanelProps {
   miscIncome?: MiscIncomeInput;
   /** 給与所得。帳簿に載らない給与として申告数値に含める。 */
   salaryIncome?: SalaryIncomeInput;
+  /** 配当・一時・株式等譲渡。申告数値とXTX（第三表・計算明細書）に含める。 */
+  expandedIncome?: ExpandedIncomeInput;
   /** 申告の種類（青色申告特別控除の区分）。出力する申告数値の計算に使う。 */
   filingType?: FilingType;
   /** 不動産貸付けが事業的規模か */
@@ -61,6 +66,7 @@ export const TaxpayerPanel = ({
   taxCredits,
   miscIncome,
   salaryIncome,
+  expandedIncome,
   filingType,
   realEstateBusinessScale,
   balanceSheet,
@@ -108,6 +114,10 @@ export const TaxpayerPanel = ({
     tax_credits: taxCredits,
     misc_income: miscIncome,
     salary_income: salaryIncome,
+    expanded_income:
+      expandedIncome && !isExpandedIncomeEmpty(expandedIncome)
+        ? expandedIncomeToWire(expandedIncome)
+        : undefined,
     filing_type: filingType,
     real_estate_business_scale: realEstateBusinessScale,
     withholding_tax: withholdingTax,
@@ -282,6 +292,11 @@ export const TaxpayerPanel = ({
             aria-label="源泉徴収税額"
           />
         </Row>
+        {expandedIncome && !isExpandedIncomeEmpty(expandedIncome) ? (
+          <Text variant="muted">
+            配当・株式等譲渡の源泉徴収税額は、各所得の入力欄で入れた金額が自動で加算されます（ここには含めないでください）。
+          </Text>
+        ) : null}
         <Row gap="sm">
           <div className={styles.fieldLabel}>
             <Text variant="muted">予定納税額</Text>

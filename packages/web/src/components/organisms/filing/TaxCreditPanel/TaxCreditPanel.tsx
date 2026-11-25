@@ -18,10 +18,12 @@ export interface TaxCreditPanelProps {
   taxCredits: TaxCreditInputs;
   /** 所得税額の計算結果（税額控除の内訳と確定税額を含む） */
   result: IncomeTaxResult;
+  /** 配当所得の入力がある場合、配当控除の対象額はそちらの内訳が優先する */
+  dividendCreditDerived?: boolean;
   onChange: (next: TaxCreditInputs) => void;
 }
 
-export const TaxCreditPanel = ({ taxCredits, result, onChange }: TaxCreditPanelProps) => {
+export const TaxCreditPanel = ({ taxCredits, result, dividendCreditDerived, onChange }: TaxCreditPanelProps) => {
   const set = (patch: Partial<TaxCreditInputs>) => onChange({ ...taxCredits, ...patch });
   const credits = result.taxCredits;
 
@@ -69,6 +71,12 @@ export const TaxCreditPanel = ({ taxCredits, result, onChange }: TaxCreditPanelP
         />
 
         <Text className={styles.subhead}>配当控除</Text>
+        {dividendCreditDerived ? (
+          <Text variant="muted">
+            配当所得の入力があるため、配当控除の対象額は配当・一時所得パネルの
+            内訳から自動で計算しています（下の手入力は使われません）。
+          </Text>
+        ) : null}
         <AmountField
           label="配当等の金額（剰余金の配当など・総合課税）"
           value={taxCredits.dividendCorporate}
