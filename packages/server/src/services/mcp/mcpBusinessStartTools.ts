@@ -46,8 +46,7 @@ const submissionDateProperty = {
 };
 
 /** 保存済みの納税者プロフィールを引く（対象年の行が無ければ引き継ぎ元）。 */
-async function savedTaxpayer(db: Db): Promise<TaxpayerProfile> {
-  const year = Number(todayInTokyo().slice(0, 4));
+export async function savedTaxpayerProfile(db: Db, year: number): Promise<TaxpayerProfile> {
   const row =
     (await getTaxpayerProfileRow(db, year)) ?? (await findTaxpayerCarryRow(db, year));
   if (!row) {
@@ -56,6 +55,10 @@ async function savedTaxpayer(db: Db): Promise<TaxpayerProfile> {
     );
   }
   return taxpayerProfileToApi(row);
+}
+
+async function savedTaxpayer(db: Db): Promise<TaxpayerProfile> {
+  return savedTaxpayerProfile(db, Number(todayInTokyo().slice(0, 4)));
 }
 
 /** 保存済みの開業の専用入力を引く（壊れていれば未保存として扱う。REST の取得と同じ）。 */

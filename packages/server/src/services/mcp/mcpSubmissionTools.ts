@@ -2,12 +2,21 @@
  * mcpSubmissionTools.ts — MCP の提出の記録まわりのツール（services/mcp）。
  *
  * 提出記録（受付番号・提出日）の一覧・保存・削除、変更履歴の閲覧、
- * 受信通知PDFの添付・取得。REST の /api/filing-submissions/* と同じ
- * サービス（services/filingSubmission）を使うため、受付番号の記録で
- * 申告ステータスが「提出済み」に連動する仕様や、添付の重複チェックは
- * MCP 経由でも同じに効く。ここで扱うのは提出の「記録」までで、
- * e-Tax への送信そのものは MCP の対象外（送信は本人が行う）。
+ * 受信通知PDFの添付・取得と、申告書の紙イメージ PDF の生成。REST の
+ * /api/filing-submissions/* と同じサービス（services/filingSubmission）を
+ * 使うため、受付番号の記録で申告ステータスが「提出済み」に連動する仕様や、
+ * 添付の重複チェックは MCP 経由でも同じに効く。ここで扱うのは提出の
+ * 「記録」と確認用 PDF までで、e-Tax への送信そのものは MCP の対象外
+ * （送信は本人が行う）。
  */
+import {
+  computeCorrectedFigures,
+  computeExpandedIncomes,
+  computeIncomeTax,
+  computeManualIncomes,
+  expandedWithholdingTotal,
+  resolveTaxCreditInputs,
+} from "@etax/shared";
 import {
   createStorageClient,
   filingReceiptObjectKey,
@@ -31,7 +40,30 @@ import {
   getFilingReceiptBytes,
   saveFilingSubmissionRecord,
 } from "../filingSubmission/filingSubmissionRecords";
-import { McpToolModule, requireDb, textResult, yearArg } from "./mcpToolKit";
+import { buildReturnPdf } from "../pdf/buildReturnPdf";
+import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
+import { loadReturnFormTemplate } from "../pdf/loadReturnFormTemplate";
+import { buildReturnFormValues } from "../pdf/returnFormValues";
+import { toTaxpayer } from "../../usecases/exportXtx";
+import { ExportXtxRequest } from "../../schemas/etax";
+import { savedTaxpayerProfile } from "./mcpBusinessStartTools";
+import {
+  McpToolModule,
+  agricultureArg,
+  expandedIncomeArg,
+  filingOptionsArg,
+  filingTypeProperty,
+  ledgerTransactions,
+  mergeDeductionInputs,
+  mergeTaxCreditInputs,
+  miscIncomeArg,
+  realEstateScaleProperty,
+  requireDb,
+  salaryIncomeArg,
+  textResult,
+  todayInTokyo,
+  yearArg,
+} from "./mcpToolKit";
 
 const kindProperty = {
   type: "string",
@@ -127,6 +159,41 @@ export const mcpSubmissionTools: McpToolModule = {
         required: ["year", "kind"],
       },
     },
+    {
+      name: "export_return_pdf",
+      description:
+        "申告書の紙イメージ PDF を生成し、{filename, pdf_base64} を返す。計算は export_xtx / income_tax と同じ（帳簿＋控除＋拡張所得）。taxpayer は省略でき、省略時は対象年の保存済みプロフィールを使う。生成物は確認用で、提出データは export_xtx を使う。配当・一時行の印字と第三表の描画は未対応（税額・合計には反映される）。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          year: { type: "integer" },
+          taxpayer: {
+            type: "object",
+            description: "納税者プロフィール（省略時は保存済みの値を使う）",
+          },
+          filing_type: filingTypeProperty,
+          real_estate_business_scale: realEstateScaleProperty,
+          deductions: { type: "object", description: "所得控除の入力（任意）" },
+          tax_credits: { type: "object", description: "税額控除の入力（任意）" },
+          misc_income: { type: "object", description: "雑所得の入力（任意）" },
+          salary_income: { type: "object", description: "給与所得の入力（任意）" },
+          expanded_income: {
+            type: "object",
+            description: "配当・一時・株式等譲渡の入力（任意、income_tax と同じ形）",
+          },
+          agriculture: { type: "object", description: "農業所得の入力（任意）" },
+          withholding_tax: { type: "number", description: "源泉徴収税額（任意）" },
+          prepaid_tax: { type: "number", description: "予定納税額（任意）" },
+          original_third_period_tax: {
+            type: "number",
+            description: "修正申告時の当初の第3期分の税額（任意）",
+          },
+          amendment: { type: "boolean", description: "修正申告か（任意）" },
+          submission_date: { type: "string", description: "提出日（YYYY-MM-DD、任意）" },
+        },
+        required: ["year"],
+      },
+    },
   ],
   handlers: {
     list_filing_submissions: async (args) => {
@@ -200,6 +267,100 @@ export const mcpSubmissionTools: McpToolModule = {
         filename: result.filename,
         mime_type: result.mimeType,
         content_base64: result.dataBase64,
+      });
+    },
+    export_return_pdf: async (args) => {
+      const db = requireDb();
+      const year = yearArg(args);
+      const taxpayerArg = args["taxpayer"];
+      const taxpayer =
+        taxpayerArg !== undefined ? taxpayerArg : await savedTaxpayerProfile(db, year);
+      if (typeof taxpayer !== "object" || taxpayer === null) {
+        throw new Error("taxpayer（納税者情報）が必要です");
+      }
+      // 計算は income_tax / export_xtx と同じ部品・同じ順序で行う。
+      const tx = await ledgerTransactions(db, year);
+      const agricultureInput = agricultureArg(args);
+      const figures = computeCorrectedFigures(tx, year, {
+        ...filingOptionsArg(args),
+        agriculture: agricultureInput,
+      });
+      const miscIncome = miscIncomeArg(args);
+      const salaryIncome = salaryIncomeArg(args);
+      const manual = computeManualIncomes(
+        year,
+        salaryIncome,
+        miscIncome,
+        figures._detail.business_income +
+          figures._detail.real_estate_income +
+          figures._detail.agriculture_income,
+      );
+      const expandedInput = expandedIncomeArg(args);
+      const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
+      const deductions = mergeDeductionInputs(args["deductions"]);
+      const baseTaxCredits = mergeTaxCreditInputs(args["tax_credits"]);
+      const tax = computeIncomeTax({
+        year,
+        totalIncome:
+          figures._detail.business_income +
+          figures._detail.real_estate_income +
+          figures._detail.agriculture_income +
+          manual.total +
+          (expanded?.comprehensiveAddition ?? 0),
+        deductions,
+        taxCredits: expanded ? resolveTaxCreditInputs(baseTaxCredits, expanded) : baseTaxCredits,
+        separateTaxation: expanded
+          ? {
+              stockIncome: expanded.separateStockIncome,
+              dividendIncome: expanded.separateDividendIncome,
+            }
+          : undefined,
+      });
+      const [template, font] = await Promise.all([
+        loadReturnFormTemplate(),
+        loadJapaneseFont(),
+      ]);
+      if (!template) {
+        throw new Error(
+          "申告書の様式 PDF を用意できませんでした。サーバーのデータフォルダ forms へ公式様式を配置するか、ネットワーク接続を確認してください。",
+        );
+      }
+      if (!font) {
+        throw new Error(
+          "日本語フォントがサーバーに配置されていないため、紙イメージ PDF を生成できません。データフォルダの fonts へ IPAex ゴシック等を配置してください。",
+        );
+      }
+      const amendment = args["amendment"] === true;
+      const values = buildReturnFormValues({
+        year,
+        amendment,
+        submissionDate:
+          typeof args["submission_date"] === "string" ? args["submission_date"] : todayInTokyo(),
+        taxpayer: toTaxpayer(taxpayer as ExportXtxRequest["taxpayer"]),
+        figures,
+        tax,
+        miscIncome,
+        salaryIncome,
+        manual,
+        deductionInputs: deductions,
+        withholdingTax:
+          (typeof args["withholding_tax"] === "number" ? args["withholding_tax"] : 0) +
+          (expanded ? expandedWithholdingTotal(expanded) : 0),
+        prepaidTax: typeof args["prepaid_tax"] === "number" ? args["prepaid_tax"] : 0,
+        originalThirdPeriodTax:
+          typeof args["original_third_period_tax"] === "number"
+            ? args["original_third_period_tax"]
+            : null,
+      });
+      let pdf: Uint8Array;
+      try {
+        pdf = await buildReturnPdf(values, template, font);
+      } catch (e) {
+        throw new Error(e instanceof Error ? e.message : "紙イメージ PDF の生成に失敗しました");
+      }
+      return textResult({
+        filename: `shinkokusho-${year}${amendment ? "-shusei" : "-kakutei"}.pdf`,
+        pdf_base64: Buffer.from(pdf).toString("base64"),
       });
     },
   },
