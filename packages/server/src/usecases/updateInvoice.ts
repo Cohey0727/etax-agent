@@ -9,11 +9,6 @@ import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import {
-  fetchInvoiceResponse,
-  getInvoiceRow,
-  updateInvoice,
-} from "../repositories/invoiceRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
   InvoiceIdParamSchema,
@@ -21,7 +16,10 @@ import {
   SingleInvoiceResponseSchema,
   UpdateInvoiceRequestSchema,
 } from "../schemas/invoice";
-import { toInvoiceDrafts } from "../services/invoice/invoiceDraft";
+import {
+  InvoiceDocumentError,
+  updateInvoiceDocument,
+} from "../services/invoice/invoiceDocuments";
 
 export const updateInvoiceRoute = createRoute({
   method: "put",
@@ -60,21 +58,14 @@ export const updateInvoiceHandler: RouteHandler<typeof updateInvoiceRoute> = asy
   if (!parsed.success) {
     throw new HTTPException(400, { message: "請求書の入力が不正です" });
   }
-  const { header, lines } = toInvoiceDrafts(parsed.data);
+  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
   let response: SingleInvoiceResponse;
   try {
-    const existing = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
-    if (!existing) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    if (existing.status === "issued") {
-      throw new HTTPException(400, {
-        message: "発行済みの請求書は変更できません。修正は「修正した適格請求書」の新規発行で行ってください",
-      });
-    }
-    const row = await updateInvoice(db, id, header, lines);
-    if (!row) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    response = { invoice: await fetchInvoiceResponse(db, row) };
+    response = { invoice: await updateInvoiceDocument(db, id, parsed.data) };
   } catch (e) {
-    if (e instanceof HTTPException) throw e;
+    if (e instanceof InvoiceDocumentError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
   return c.json(response, 200);

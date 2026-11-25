@@ -12,18 +12,15 @@ import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import {
-  filingSubmissionToApi,
-  upsertFilingSubmissionRow,
-} from "../repositories/filingSubmissionRepository";
-import { upsertFilingStatusRow } from "../repositories/filingStatusRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
+  FilingSubmissionResponse,
   FilingSubmissionKindParamSchema,
   SaveFilingSubmissionRequestSchema,
   SingleFilingSubmissionResponse,
   SingleFilingSubmissionResponseSchema,
 } from "../schemas/filingSubmission";
+import { saveFilingSubmissionRecord } from "../services/filingSubmission/filingSubmissionRecords";
 
 export const saveFilingSubmissionRoute = createRoute({
   method: "put",
@@ -64,19 +61,12 @@ export const saveFilingSubmissionHandler: RouteHandler<
   if (!parsed.success) {
     throw new HTTPException(400, { message: "受付番号・提出日が不正です" });
   }
-  let row;
+  let submission: FilingSubmissionResponse;
   try {
-    row = await upsertFilingSubmissionRow(db, year, params.kind, {
-      acceptanceNumber: parsed.data.acceptance_number.trim(),
-      submittedDate: parsed.data.submitted_date,
-    });
-    // 受付番号の記録をもって「申告済み」表示と連動させる。
-    if (parsed.data.acceptance_number.trim() !== "") {
-      await upsertFilingStatusRow(db, year, { submitted: true });
-    }
+    submission = await saveFilingSubmissionRecord(db, year, params.kind, parsed.data);
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
-  const response: SingleFilingSubmissionResponse = { submission: filingSubmissionToApi(row) };
+  const response: SingleFilingSubmissionResponse = { submission };
   return c.json(response, 200);
 };

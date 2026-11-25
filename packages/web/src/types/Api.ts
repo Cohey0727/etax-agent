@@ -51,18 +51,33 @@ export interface SystemOneTestResult {
   error: string | null;
 }
 
+/** API キーの状態: active（有効）/ revoked（失効）/ expired（期限切れ）。 */
+export type ApiKeyStatus = "active" | "revoked" | "expired";
+
 /** 外部エージェント連携（MCP）用 API キー。平文キーは発行時のみ返る。 */
 export interface ApiKeyItem {
   id: number;
   name: string;
   key_prefix: string;
   last_used_at: string | null;
+  /** 有効期限。null は無期限。 */
+  expires_at: string | null;
+  /** 失効日時。null は失効していない。 */
+  revoked_at: string | null;
+  status: ApiKeyStatus;
   created_at: string;
 }
 
 /** API キー発行の結果（平文キーを含む、この応答でしか見られない）。 */
 export interface CreatedApiKey extends ApiKeyItem {
   key: string;
+}
+
+/** MCP 接続情報（設定画面の接続セクション用）。 */
+export interface McpInfo {
+  endpoint_path: string;
+  tool_count: number;
+  tools: { name: string; description: string }[];
 }
 
 /** 外部接続（AI）の接続テスト結果。 */
@@ -564,7 +579,7 @@ export interface DepreciationRowRecord {
 export interface DepreciationSummary {
   year: number;
   rows: DepreciationRowRecord[];
-  deductible_totals: { business: number; real_estate: number };
+  deductible_totals: { business: number; real_estate: number; agriculture: number };
   small_special: { total: number; cap: number; exceeded: boolean };
 }
 
@@ -616,6 +631,27 @@ export interface ExportXtxRequest {
   balance_sheet?: BalanceSheetWireInput;
   /** 配当・一時・株式等譲渡の入力（ワイヤ形式、Issue #27）。 */
   expanded_income?: ExpandedIncomeWireInput;
+  /** 農業所得の入力（ワイヤ形式、Issue #24）。 */
+  agriculture?: AgricultureWireInput;
+}
+
+/** 農業所得のワイヤ形式（Issue #24）。shared の AgricultureWire と同じ形。 */
+export interface AgricultureWireInput {
+  farm_name: string;
+  sales_amount: number;
+  household_consumption: number;
+  misc_revenue: number;
+  produce_opening_inventory: number;
+  produce_closing_inventory: number;
+  other_opening_inventory: number;
+  other_closing_inventory: number;
+  expense_totals: Record<string, number>;
+  family_worker_salary: number;
+  family_worker_deduction: number;
+  bad_debt_provision_in: number;
+  bad_debt_provision_back: number;
+  cultivation_cost_deduction: number;
+  beef_cattle_exemption_amount: number;
 }
 
 /** 拡張所得のワイヤ形式（Issue #27）。shared の ExpandedIncomeWire と同じ形。 */

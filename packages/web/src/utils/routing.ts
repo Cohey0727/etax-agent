@@ -5,7 +5,7 @@ import { AppView, FilingTab } from "@types";
  * 年度 → 画面の順にぶら下がる。
  * 例: ダッシュボード = /accounts/2024/dashboard。
  * 帳簿は全年度をひとつの画面で管理するため年度から独立して /ledger、
- * 設定も年度から独立して /settings。
+ * 設定も年度から独立して /settings。MCP設定も年度から独立して /mcp-settings。
  * 納税者情報も年度から独立した独立画面 /taxpayer（年度はサイドバーの
  * 年度切替で切り替え、過去年度分が履歴として見られる）。
  * 固定資産も年度から独立した独立画面 /fixed-assets（集計の対象年度は
@@ -33,6 +33,7 @@ const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.FixedAssets]: "fixed-assets",
   [AppView.Invoices]: "invoices",
   [AppView.Settings]: "settings",
+  [AppView.McpSettings]: "mcp-settings",
   [AppView.Agent]: "agent",
 };
 
@@ -66,6 +67,7 @@ const asYear = (part: string): number | null => {
 /** 画面と年度（と確定申告タブ）からURLパスを作る。 */
 export const pathForView = (view: AppView, year: number, filingTab?: FilingTab): string => {
   if (view === AppView.Settings) return "/settings";
+  if (view === AppView.McpSettings) return "/mcp-settings";
   if (view === AppView.Ledger) return "/ledger";
   if (view === AppView.Taxpayer) return "/taxpayer";
   if (view === AppView.FixedAssets) return "/fixed-assets";
@@ -118,6 +120,9 @@ export const parsePath = (pathname: string): ParsedRoute | null => {
   if (parts.length === 0) return null;
   if (parts[0] === VIEW_SLUGS[AppView.Settings]) {
     return { view: AppView.Settings, year: null, filingTab: null };
+  }
+  if (parts[0] === VIEW_SLUGS[AppView.McpSettings] && parts.length === 1) {
+    return { view: AppView.McpSettings, year: null, filingTab: null };
   }
   if (parts[0] === VIEW_SLUGS[AppView.Ledger] && parts.length === 1) {
     return { view: AppView.Ledger, year: null, filingTab: null };

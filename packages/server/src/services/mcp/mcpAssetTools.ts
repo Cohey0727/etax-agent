@@ -22,6 +22,7 @@ import {
 import {
   deleteFixedAssetImageRow,
   fixedAssetImageToApi,
+  getFixedAssetImageRowByFileId,
   insertFixedAssetImageRow,
   listFixedAssetImageRows,
 } from "../../repositories/fixedAssetImageRepository";
@@ -31,7 +32,7 @@ import { McpToolModule, idArg, requireDb, textResult } from "./mcpToolKit";
 const assetPatchProperties = {
   name: { type: "string", description: "資産の名称等" },
   quantity: { type: "string", description: "面積又は数量" },
-  income_type: { type: "string", enum: ["business", "real_estate"], description: "所得区分" },
+  income_type: { type: "string", enum: ["business", "real_estate", "agriculture"], description: "所得区分" },
   acquisition_date: { type: "string", description: "取得年月日（YYYY-MM-DD）" },
   service_start_date: {
     type: "string",
@@ -105,6 +106,16 @@ export const mcpAssetTools: McpToolModule = {
           file_id: { type: "string", description: "画像のファイルID" },
         },
         required: ["asset_id", "file_id"],
+      },
+    },
+    {
+      name: "get_fixed_asset_image_content",
+      description:
+        "固定資産画像の実体を Base64 で返す。台帳で所有者を確認できたファイルだけを返す（REST の配信と同じ IDOR 対策）。",
+      inputSchema: {
+        type: "object",
+        properties: { file_id: { type: "string", description: "画像のファイルID" } },
+        required: ["file_id"],
       },
     },
   ],
@@ -200,6 +211,21 @@ export const mcpAssetTools: McpToolModule = {
       const storage = createStorageClient(loadStorageConfig());
       await storage.deleteObject(fixedAssetObjectKey(fileId)).catch(() => undefined);
       return textResult({ detached: true, asset_id: assetId, file_id: fileId });
+    },
+    get_fixed_asset_image_content: async (args) => {
+      const db = requireDb();
+      const fileId = args["file_id"];
+      if (typeof fileId !== "string" || !fileId) throw new Error("file_id が必要です");
+      // 台帳で所有者を確認できたファイルだけを返す（REST の配信と同じ IDOR 対策）。
+      const row = await getFixedAssetImageRowByFileId(db, fileId);
+      if (!row) throw new Error(`固定資産画像が見つかりません: file_id=${fileId}`);
+      const storage = createStorageClient(loadStorageConfig());
+      const downloaded = await storage.download(fixedAssetObjectKey(fileId));
+      return textResult({
+        file_id: fileId,
+        mime_type: downloaded.mimeType,
+        content_base64: downloaded.dataBase64,
+      });
     },
   },
 };

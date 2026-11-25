@@ -1,4 +1,5 @@
 import {
+  AgricultureInput,
   DeductionInputs,
   ExpandedIncomeInput,
   FilingType,
@@ -7,10 +8,12 @@ import {
   TaxCreditInputs,
   Transaction,
   XtxBalanceSheetInput,
+  agricultureToWire,
   balanceSheetToWire,
   buildTrialBalanceSheet,
   computeCorrectedFigures,
   expandedIncomeToWire,
+  isAgricultureEmpty,
   isBalanceSheetEmpty,
   isExpandedIncomeEmpty,
   xtxSupportedYears,
@@ -39,6 +42,8 @@ export interface TaxpayerPanelProps {
   salaryIncome?: SalaryIncomeInput;
   /** 配当・一時・株式等譲渡。申告数値とXTX（第三表・計算明細書）に含める。 */
   expandedIncome?: ExpandedIncomeInput;
+  /** 農業所得。申告数値とXTX（農業所得用の決算書）に含める。 */
+  agriculture?: AgricultureInput;
   /** 申告の種類（青色申告特別控除の区分）。出力する申告数値の計算に使う。 */
   filingType?: FilingType;
   /** 不動産貸付けが事業的規模か */
@@ -67,6 +72,7 @@ export const TaxpayerPanel = ({
   miscIncome,
   salaryIncome,
   expandedIncome,
+  agriculture,
   filingType,
   realEstateBusinessScale,
   balanceSheet,
@@ -117,6 +123,10 @@ export const TaxpayerPanel = ({
     expanded_income:
       expandedIncome && !isExpandedIncomeEmpty(expandedIncome)
         ? expandedIncomeToWire(expandedIncome)
+        : undefined,
+    agriculture:
+      agriculture && !isAgricultureEmpty(agriculture)
+        ? agricultureToWire(agriculture)
         : undefined,
     filing_type: filingType,
     real_estate_business_scale: realEstateBusinessScale,

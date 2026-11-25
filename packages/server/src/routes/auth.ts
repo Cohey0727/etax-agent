@@ -16,11 +16,12 @@ import {
 import {
   createApiKeyHandler,
   createApiKeyRoute,
-  deleteApiKeyHandler,
-  deleteApiKeyRoute,
   listApiKeysHandler,
   listApiKeysRoute,
+  revokeApiKeyHandler,
+  revokeApiKeyRoute,
 } from "../usecases/authApiKeys";
+import { getMcpInfoHandler, getMcpInfoRoute } from "../usecases/getMcpInfo";
 import { authConfigHandler, authConfigRoute } from "../usecases/authConfig";
 import {
   magicLinkConsumeHandler,
@@ -66,6 +67,7 @@ app.get("/api/auth/oauth/:provider/start", oauthStartHandler);
 app.get("/api/auth/oauth/:provider/callback", oauthCallbackHandler);
 app.openapi(createApiKeyRoute, createApiKeyHandler);
 app.openapi(listApiKeysRoute, listApiKeysHandler);
-app.openapi(deleteApiKeyRoute, deleteApiKeyHandler);
+app.openapi(revokeApiKeyRoute, revokeApiKeyHandler);
+app.openapi(getMcpInfoRoute, getMcpInfoHandler);
 
 export default app;

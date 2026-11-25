@@ -9,7 +9,9 @@
  * 保存値が壊れていても空の入力にフォールバックする。
  */
 import {
+  AgricultureInput,
   DeductionInputs,
+  EMPTY_AGRICULTURE_INPUT,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_EXPANDED_INCOME,
   EMPTY_MISC_INCOME,
@@ -21,6 +23,7 @@ import {
   SalaryIncomeInput,
   TaxCreditInputs,
   XtxBalanceSheetInput,
+  normalizeAgricultureInput,
   normalizeBalanceSheetInput,
   normalizeExpandedIncomeInput,
 } from "@etax/shared";
@@ -54,6 +57,8 @@ export interface DeductionState {
   salaryIncome: SalaryIncomeInput;
   /** 配当・一時・株式等譲渡の入力（Issue #27） */
   expandedIncome: ExpandedIncomeInput;
+  /** 農業所得の入力（Issue #24）。帳簿の取引とは混ぜない申告入力 */
+  agriculture: AgricultureInput;
   /** 申告の種類（青色申告特別控除の区分） */
   filingType: FilingType;
   /** 不動産貸付けが事業的規模か */
@@ -104,6 +109,8 @@ export interface DeductionPatch {
   miscIncome?: Partial<MiscIncomeInput>;
   /** 配当・一時・株式等譲渡の部分上書き（区分ごとに浅くマージ、特定口座の明細は差し替え）。 */
   expandedIncome?: Partial<ExpandedIncomeInput>;
+  /** 農業所得の部分上書き（科目別合計は指定があれば差し替え）。 */
+  agriculture?: Partial<AgricultureInput>;
   /** 内訳の差し替え（キーごとに全件差し替え、合計は自動同期）。 */
   entries?: Partial<Record<BreakdownEntriesKey, BreakdownEntry[]>>;
 }
@@ -126,6 +133,15 @@ export function applyDeductionPatch(state: DeductionState, patch: DeductionPatch
         dependents: { ...next.deductions.dependents, ...(d.dependents ?? {}) },
         disability: { ...next.deductions.disability, ...(d.disability ?? {}) },
       },
+    };
+  }
+  if (patch.agriculture) {
+    next = {
+      ...next,
+      agriculture: normalizeAgricultureInput({
+        ...next.agriculture,
+        ...patch.agriculture,
+      }),
     };
   }
   if (patch.filingType) next = { ...next, filingType: patch.filingType };
@@ -187,6 +203,7 @@ export function freshDeductionState(): DeductionState {
     miscIncome: { ...EMPTY_MISC_INCOME },
     salaryIncome: { ...EMPTY_SALARY_INCOME },
     expandedIncome: normalizeExpandedIncomeInput(EMPTY_EXPANDED_INCOME),
+    agriculture: normalizeAgricultureInput(EMPTY_AGRICULTURE_INPUT),
     filingType: "blue65",
     realEstateBusinessScale: false,
     donationEntries: [],
@@ -273,6 +290,7 @@ export function parseDeductionState(parsed: Partial<DeductionState>): DeductionS
     miscIncome: parseMiscIncome(parsed.miscIncome),
     salaryIncome: parseSalaryIncome(parsed.salaryIncome),
     expandedIncome: normalizeExpandedIncomeInput(parsed.expandedIncome),
+    agriculture: normalizeAgricultureInput(parsed.agriculture),
     filingType: FILING_TYPES.includes(parsed.filingType as FilingType)
       ? (parsed.filingType as FilingType)
       : "blue65",

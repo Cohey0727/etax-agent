@@ -26,7 +26,7 @@ import { buildReturnPdf } from "../services/pdf/buildReturnPdf";
 import { loadJapaneseFont } from "../services/pdf/loadJapaneseFont";
 import { loadReturnFormTemplate } from "../services/pdf/loadReturnFormTemplate";
 import { buildReturnFormValues } from "../services/pdf/returnFormValues";
-import { resolveExpandedTax, toTaxpayer } from "./exportXtx";
+import { resolveAgriculture, resolveExpandedTax, toTaxpayer } from "./exportXtx";
 
 export const exportReturnPdfRoute = createRoute({
   method: "post",
@@ -72,9 +72,11 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     });
   }
   const transactions = filterYear(normalizeTransactions(body.transactions ?? []), body.year);
+  const agriculture = resolveAgriculture(body.agriculture);
   const figures = computeCorrectedFigures(transactions, body.year, {
     filingType: body.filing_type,
     realEstateBusinessScale: body.real_estate_business_scale,
+    agriculture: agriculture.input,
   });
   const miscIncome = normalizeMiscIncomeInput(body.misc_income);
   const salaryIncome = normalizeSalaryIncomeInput(body.salary_income);
@@ -82,7 +84,9 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     body.year,
     salaryIncome,
     miscIncome,
-    figures._detail.business_income + figures._detail.real_estate_income,
+    figures._detail.business_income +
+      figures._detail.real_estate_income +
+      figures._detail.agriculture_income,
   );
   // 拡張所得（配当・一時・株式等譲渡）の配線は XTX 出力と共通。
   // 税額・合計には反映するが、紙イメージへの配当・一時行の印字と
@@ -93,6 +97,7 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     totalIncome:
       figures._detail.business_income +
       figures._detail.real_estate_income +
+      figures._detail.agriculture_income +
       manual.total +
       expandedTax.comprehensiveAddition,
     deductions: body.deductions,

@@ -21,6 +21,7 @@ export const FixedAssetSummary = ({ assets, summary, year }: FixedAssetSummaryPr
   const totalBookValue = active.reduce((sum, asset) => sum + bookValueAt(asset, year), 0);
   const businessDeductible = summary?.deductible_totals.business ?? 0;
   const realEstateDeductible = summary?.deductible_totals.real_estate ?? 0;
+  const agricultureDeductible = summary?.deductible_totals.agriculture ?? 0;
   const smallSpecial = summary?.small_special ?? null;
   const smallSpecialPercent = smallSpecial
     ? Math.min(100, (smallSpecial.total / smallSpecial.cap) * 100)
@@ -34,6 +35,7 @@ export const FixedAssetSummary = ({ assets, summary, year }: FixedAssetSummaryPr
     { label: "取得価額 合計", value: formatYen(totalCost) },
     { label: `${year}年の償却費（事業）`, value: formatYen(businessDeductible) },
     { label: `${year}年の償却費（不動産）`, value: formatYen(realEstateDeductible) },
+    { label: `${year}年の償却費（農業）`, value: formatYen(agricultureDeductible) },
     { label: `${year}年末の未償却残高`, value: formatYen(totalBookValue) },
   ];
 

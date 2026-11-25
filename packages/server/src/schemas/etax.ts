@@ -129,12 +129,36 @@ export const ExpandedIncomeWireSchema = z
 
 export type ExpandedIncomeWireRequest = z.infer<typeof ExpandedIncomeWireSchema>;
 
+/** 農業所得の入力（ワイヤ形式、Issue #24） */
+export const AgricultureWireSchema = z
+  .object({
+    farm_name: z.string(),
+    sales_amount: z.number(),
+    household_consumption: z.number(),
+    misc_revenue: z.number(),
+    produce_opening_inventory: z.number(),
+    produce_closing_inventory: z.number(),
+    other_opening_inventory: z.number(),
+    other_closing_inventory: z.number(),
+    /** 経費の科目別合計（科目名 → 金額、支出は正の金額） */
+    expense_totals: z.record(z.string(), z.number()),
+    family_worker_salary: z.number(),
+    family_worker_deduction: z.number(),
+    bad_debt_provision_in: z.number(),
+    bad_debt_provision_back: z.number(),
+    cultivation_cost_deduction: z.number(),
+    beef_cattle_exemption_amount: z.number(),
+  })
+  .openapi("AgricultureWire");
+
+export type AgricultureWireRequest = z.infer<typeof AgricultureWireSchema>;
+
 /** 減価償却明細の元になる固定資産の入力（XTX出力用。台帳DBとは別に直接渡せる）。 */
 export const XtxFixedAssetSchema = z
   .object({
     name: z.string(),
     quantity: z.string().optional(),
-    income_type: z.enum(["business", "real_estate"]),
+    income_type: z.enum(["business", "real_estate", "agriculture"]),
     acquisition_date: z.string(),
     service_start_date: z.string().optional(),
     cost: z.number(),
@@ -180,6 +204,8 @@ export const ExportXtxRequestSchema = z
     salary_income: SalaryIncomeSchema.optional(),
     /** 配当・一時・株式等譲渡の入力（Issue #27）。源泉徴収税額は拡張分を自動加算する */
     expanded_income: ExpandedIncomeWireSchema.optional(),
+    /** 農業所得の入力（Issue #24）。農業様式（KOA240/KOA120）を添付する */
+    agriculture: AgricultureWireSchema.optional(),
     filing_type: z.enum(["blue65", "blue55", "blue10", "white"]).optional(),
     real_estate_business_scale: z.boolean().optional(),
     withholding_tax: z.number(),

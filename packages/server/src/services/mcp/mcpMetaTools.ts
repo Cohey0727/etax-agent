@@ -8,7 +8,8 @@
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ACCOUNT_CRITERIA, aggregateIncome } from "@etax/shared";
+import { ACCOUNT_CRITERIA, aggregateIncome, buildTrialBalance, FilingType, XtxBalanceSheetInput } from "@etax/shared";
+import { billingEnabled } from "../../gateways/stripeGateway";
 import {
   getJevPromptOverride,
   getSystemOneOverrides,
@@ -25,14 +26,21 @@ import { loadClassificationHistory } from "../../repositories/classificationHist
 import { saveJevPromptOverride } from "../../repositories/jevPromptRepository";
 import { saveRegexRulesOverride } from "../../repositories/regexRulesRepository";
 import { saveSystemOneSettings } from "../../repositories/systemOneSettingsRepository";
+import { getSubscriptionRow } from "../../repositories/subscriptionRepository";
+import { listTransactionRows } from "../../repositories/transactionRepository";
+import { BalanceSheetInputSchema } from "../../schemas/etax";
+import { balanceSheetFromWire } from "../../usecases/exportXtx";
 import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsView";
 import { generateRules, RegexRule } from "../classification/generateRules";
 import { buildRegexRulesView } from "../classification/regexRulesView";
 import { validateRegexRules } from "../classification/validateRegexRules";
 import {
   McpToolModule,
+  filingTypeProperty,
   ledgerTransactions,
+  realEstateScaleProperty,
   requireDb,
+  rowsToTransactions,
   textResult,
   yearArg,
   yearProperty,
@@ -108,6 +116,31 @@ export const mcpMetaTools: McpToolModule = {
       name: "get_freee_trial_balance",
       description:
         "取り込み済みの freee 試算表（損益計算書ベースの実績データ）を返す。未取り込みの場合はエラーになる。",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "get_trial_balance",
+      description:
+        "帳簿の取引から残高試算表（損益計算書＋貸借対照表）を組み立てて返す。前年分も previous に含む（レポート画面の試算表と同じ集計）。貸借対照表セクションは balance_sheet（期首・期末の残高入力）を渡したときだけ付く。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          year: yearProperty,
+          filing_type: filingTypeProperty,
+          real_estate_business_scale: realEstateScaleProperty,
+          balance_sheet: {
+            type: "object",
+            description:
+              "貸借対照表の入力（任意）: {opening: {科目キー: 期首残高}, closing: {科目キー: 期末残高}, extra_asset / extra_liability1 / extra_liability2: {name, opening, closing}, owner_loan, owner_borrowing}",
+          },
+        },
+        required: ["year"],
+      },
+    },
+    {
+      name: "get_billing_plan",
+      description:
+        "課金プランの状態を返す（読み取り専用）: 課金が有効か、契約ステータス、現在の期間の終了日時。契約・支払い自体は本人がブラウザで行うため、ここでは変更できない。",
       inputSchema: { type: "object", properties: {} },
     },
   ],
@@ -236,6 +269,43 @@ export const mcpMetaTools: McpToolModule = {
         throw new Error("freee試算表データがまだ取り込まれていません");
       }
       return textResult(JSON.parse(text) as unknown);
+    },
+    get_trial_balance: async (args) => {
+      const db = requireDb();
+      const year = yearArg(args);
+      const filingType =
+        typeof args["filing_type"] === "string"
+          ? (args["filing_type"] as FilingType)
+          : undefined;
+      const realEstateBusinessScale =
+        typeof args["real_estate_business_scale"] === "boolean"
+          ? args["real_estate_business_scale"]
+          : undefined;
+      let balanceSheet: XtxBalanceSheetInput | undefined;
+      if (args["balance_sheet"] !== undefined) {
+        const parsed = BalanceSheetInputSchema.safeParse(args["balance_sheet"]);
+        if (!parsed.success) throw new Error("balance_sheet の形式が正しくありません");
+        balanceSheet = balanceSheetFromWire({ balance_sheet: parsed.data });
+      }
+      const currentRows = await listTransactionRows(db, undefined, year);
+      const previousRows = await listTransactionRows(db, undefined, year - 1);
+      const transactions = [
+        ...rowsToTransactions(currentRows, year),
+        ...rowsToTransactions(previousRows, year - 1),
+      ];
+      const options = { filingType, realEstateBusinessScale };
+      const current = buildTrialBalance(transactions, year, { ...options, balanceSheet });
+      const previous = buildTrialBalance(transactions, year - 1, options);
+      return textResult({ ...current, previous });
+    },
+    get_billing_plan: async () => {
+      const db = requireDb();
+      const row = await getSubscriptionRow(db);
+      return textResult({
+        billing_enabled: billingEnabled(),
+        status: row?.status ?? "none",
+        current_period_end: row?.currentPeriodEnd?.toISOString() ?? null,
+      });
     },
   },
 };

@@ -4,8 +4,10 @@
  * （所得控除 → 課税所得 → 速算表 → 税額控除 → 復興特別所得税 → 確定税額）。
  */
 import {
+  computeAgricultureStatement,
   computeExpandedIncomes,
   computeIncomeTax,
+  normalizeAgricultureInput,
   normalizeExpandedIncomeInput,
   resolveTaxCreditInputs,
 } from "@etax/shared";
@@ -48,6 +50,12 @@ export const calculateIncomeTaxHandler: RouteHandler<typeof calculateIncomeTaxRo
   const expanded = body.expandedIncome
     ? computeExpandedIncomes(normalizeExpandedIncomeInput(body.expandedIncome))
     : undefined;
+  // 農業所得（Issue #24）: 決算書の計算内訳を返す。農業所得そのものは
+  // 事業所得の一部として totalIncome に含めて渡される前提（青色申告
+  // 特別控除の配分は申告数値の計算側で行う）。
+  const agriculture = body.agriculture
+    ? computeAgricultureStatement(normalizeAgricultureInput(body.agriculture))
+    : undefined;
   const result = computeIncomeTax({
     year: body.year,
     totalIncome: body.totalIncome + (expanded?.comprehensiveAddition ?? 0),
@@ -72,6 +80,7 @@ export const calculateIncomeTaxHandler: RouteHandler<typeof calculateIncomeTaxRo
     income_tax_separate_dividends: result.incomeTaxSeparateDividends,
     income_tax_separate_total: result.incomeTaxSeparateTotal,
     expanded_income: expanded ?? null,
+    agriculture: agriculture ?? null,
     tax_credits: result.taxCredits,
     tax_credits_total: result.taxCreditsTotal,
     reconstruction_tax: result.reconstructionTax,

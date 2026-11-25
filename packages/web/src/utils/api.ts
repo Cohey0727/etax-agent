@@ -24,6 +24,7 @@ import {
   FilingSnapshot,
   ApiKeyItem,
   CreatedApiKey,
+  McpInfo,
   FilingSnapshotFigures,
   FilingStatus,
   FilingSubmission,
@@ -171,20 +172,26 @@ export async function fetchApiKeys(): Promise<ApiKeyItem[]> {
   return parseJson<ApiKeyItem[]>(resp);
 }
 
-/** API キーを発行する。平文キーはこの応答でしか返らない。 */
-export async function createApiKey(name: string): Promise<CreatedApiKey> {
+/** API キーを発行する。平文キーはこの応答でしか返らない。expiresAt が null なら無期限。 */
+export async function createApiKey(name: string, expiresAt: string | null): Promise<CreatedApiKey> {
   const resp = await fetch("/api/auth/api-keys", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, expires_at: expiresAt }),
   });
   return parseJson<CreatedApiKey>(resp);
 }
 
-/** API キーを取り消す（削除）。 */
-export async function deleteApiKey(id: number): Promise<void> {
+/** API キーを失効させる（サーバー側では行が残り、認証だけが即座に拒否される）。 */
+export async function revokeApiKey(id: number): Promise<void> {
   const resp = await fetch(`/api/auth/api-keys/${id}`, { method: "DELETE" });
-  await parseJson<{ deleted: boolean }>(resp);
+  await parseJson<{ revoked: boolean }>(resp);
+}
+
+/** MCP の接続情報（エンドポイントと公開ツール一覧）を取得する。 */
+export async function fetchMcpInfo(): Promise<McpInfo> {
+  const resp = await fetch("/api/auth/mcp-info");
+  return parseJson<McpInfo>(resp);
 }
 
 /** 外部接続（AI）への接続テスト。入力中の値（未保存）でも試せる。 */

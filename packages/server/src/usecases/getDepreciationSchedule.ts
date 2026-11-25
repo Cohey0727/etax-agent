@@ -60,7 +60,7 @@ export const getDepreciationScheduleHandler: RouteHandler<
   }
   const active = rows.filter((row) => isActiveInYear(row, year));
   const result: DepreciationScheduleResponse["rows"] = [];
-  const totals = { business: 0, real_estate: 0 };
+  const totals = { business: 0, real_estate: 0, agriculture: 0 };
   for (const row of active) {
     const input = fixedAssetToInput(row);
     let dep;
@@ -88,6 +88,7 @@ export const getDepreciationScheduleHandler: RouteHandler<
     });
     if (row.incomeType === "business") totals.business += dep.deductible;
     if (row.incomeType === "real_estate") totals.real_estate += dep.deductible;
+    if (row.incomeType === "agriculture") totals.agriculture += dep.deductible;
   }
   const usage = smallSpecialUsage(active.map(fixedAssetToInput), year);
   const response: DepreciationScheduleResponse = {

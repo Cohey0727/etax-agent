@@ -32,12 +32,14 @@ interface AmountCell {
 
 const AMOUNT_CELLS: Record<ReturnAmountKey, AmountCell> = {
   revBusiness: { row: 1, side: "left" },
+  revAgriculture: { row: 2, side: "left" },
   revRealEstate: { row: 3, side: "left" },
   revSalary: { row: 5, side: "left" },
   revPension: { row: 6, side: "left" },
   revMiscBusiness: { row: 7, side: "left" },
   revMiscOther: { row: 8, side: "left" },
   incBusiness: { row: 12, side: "left" },
+  incAgriculture: { row: 13, side: "left" },
   incRealEstate: { row: 14, side: "left" },
   incSalary: { row: 17, side: "left" },
   incPension: { row: 18, side: "left" },

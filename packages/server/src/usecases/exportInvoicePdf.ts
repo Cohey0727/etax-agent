@@ -10,14 +10,9 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "@hono/zod-openapi";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import {
-  fetchInvoiceResponse,
-  getInvoiceRow,
-} from "../repositories/invoiceRepository";
 import { ErrorSchema } from "../schemas/common";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
-import { buildInvoicePdf } from "../services/pdf/buildInvoicePdf";
-import { loadJapaneseFont } from "../services/pdf/loadJapaneseFont";
+import { getInvoicePdf, InvoiceDocumentError } from "../services/invoice/invoiceDocuments";
 
 export const exportInvoicePdfRoute = createRoute({
   method: "get",
@@ -50,32 +45,20 @@ export const exportInvoicePdfHandler: RouteHandler<typeof exportInvoicePdfRoute>
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
   const id = Number(c.req.valid("param").id);
-  let invoice;
+  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
+  let result: { filename: string; pdf: Uint8Array };
   try {
-    const row = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
-    if (!row) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    if (row.status !== "issued") {
-      throw new HTTPException(400, {
-        message: "PDFは発行済みの請求書だけダウンロードできます（先に発行してください）",
-      });
-    }
-    invoice = await fetchInvoiceResponse(db, row);
+    result = await getInvoicePdf(db, id);
   } catch (e) {
-    if (e instanceof HTTPException) throw e;
+    if (e instanceof InvoiceDocumentError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
-  const fontBytes = await loadJapaneseFont();
-  if (!fontBytes) {
-    throw new HTTPException(503, {
-      message:
-        "PDF用の日本語フォントがサーバーに配置されていません。データフォルダの fonts/ に日本語フォント（ipaexg.ttf 等）を置いてください。",
-    });
-  }
-  const pdf = await buildInvoicePdf(invoice, fontBytes);
-  const body = new Uint8Array(pdf.byteLength);
-  body.set(pdf);
+  const body = new Uint8Array(result.pdf.byteLength);
+  body.set(result.pdf);
   return c.body(body, 200, {
     "Content-Type": "application/pdf",
-    "Content-Disposition": `attachment; filename="invoice-${invoice.document_number ?? id}.pdf"`,
+    "Content-Disposition": `attachment; filename="${result.filename}"`,
   });
 };

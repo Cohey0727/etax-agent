@@ -19,12 +19,14 @@ import {
 /** 紙イメージの金額セル識別子。buildReturnPdf のレイアウト表と対応する。 */
 export type ReturnAmountKey =
   | "revBusiness"
+  | "revAgriculture"
   | "revRealEstate"
   | "revSalary"
   | "revPension"
   | "revMiscBusiness"
   | "revMiscOther"
   | "incBusiness"
+  | "incAgriculture"
   | "incRealEstate"
   | "incSalary"
   | "incPension"
@@ -133,12 +135,14 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
 
   const amounts: Partial<Record<ReturnAmountKey, number>> = {
     revBusiness: figures.business_revenue,
+    revAgriculture: figures.agriculture_revenue,
     revRealEstate: figures.real_estate_revenue,
     revSalary: source.salaryIncome.revenue,
     revPension: source.miscIncome.pensionRevenue,
     revMiscBusiness: source.miscIncome.businessRevenue,
     revMiscOther: source.miscIncome.revenue,
     incBusiness: figures._detail.business_income,
+    incAgriculture: figures._detail.agriculture_income,
     incRealEstate: figures._detail.real_estate_income,
     incSalary: source.manual.salary,
     incPension: source.manual.pension,

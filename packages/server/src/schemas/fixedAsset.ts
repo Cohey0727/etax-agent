@@ -42,7 +42,7 @@ export const CreateFixedAssetRequestSchema = z
   .object({
     name: z.string().min(1),
     quantity: z.string().optional(),
-    income_type: z.enum(["business", "real_estate"]).optional(),
+    income_type: z.enum(["business", "real_estate", "agriculture"]).optional(),
     acquisition_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     service_start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     cost: z.number().int().positive(),
@@ -143,6 +143,7 @@ export const DepreciationScheduleResponseSchema = z
     deductible_totals: z.object({
       business: z.number(),
       real_estate: z.number(),
+      agriculture: z.number(),
     }),
     /** 少額特例の年間上限（300万円）の使用状況 */
     small_special: z.object({

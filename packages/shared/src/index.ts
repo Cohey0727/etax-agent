@@ -4,6 +4,7 @@ export * from "./taxcalc";
 export * from "./taxParameters";
 export * from "./deductions";
 export * from "./expandedIncome";
+export * from "./agriculture";
 export * from "./ledger";
 export * from "./sample";
 export * from "./xtx";

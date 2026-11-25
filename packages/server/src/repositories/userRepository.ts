@@ -252,30 +252,56 @@ export async function deleteSession(db: Db, token: string): Promise<void> {
   await db.delete(sessionsTable).where(eq(sessionsTable.tokenHash, hashToken(token)));
 }
 
-/** API キーを発行し、平文キーを返す（DBにはハッシュと接頭辞だけを保存）。 */
+/** API キーの状態。失効が期限切れより優先する（失効済みは期限を過ぎても「失効」）。 */
+export type ApiKeyStatus = "active" | "revoked" | "expired";
+
+/**
+ * API キーの状態を判定する純関数。
+ * 期限の境界: 有効期限の時刻ちょうど（expiresAt === now）で期限切れとする
+ * （JWT の exp と同じく「期限時刻以降は無効」の解釈）。
+ */
+export function apiKeyStatus(row: ApiKeyRow, now: Date = new Date()): ApiKeyStatus {
+  if (row.revokedAt) return "revoked";
+  if (row.expiresAt && row.expiresAt.getTime() <= now.getTime()) return "expired";
+  return "active";
+}
+
+/**
+ * API キーを発行し、平文キーを返す（DBにはハッシュと接頭辞だけを保存）。
+ * expiresAt が null なら無期限。
+ */
 export async function createApiKey(
   db: Db,
   userId: number,
   name: string,
+  expiresAt: Date | null = null,
 ): Promise<{ row: ApiKeyRow; key: string }> {
   const key = `etax_${randomBytes(24).toString("base64url")}`;
   const [row] = await db
     .insert(apiKeysTable)
-    .values({ userId, name, keyHash: hashToken(key), keyPrefix: key.slice(0, 10) })
+    .values({ userId, name, keyHash: hashToken(key), keyPrefix: key.slice(0, 10), expiresAt })
     .returning();
   return { row, key };
 }
 
-/** API キーからユーザーIDを解決する。最終利用日時も更新する。 */
-export async function resolveApiKeyUserId(db: Db, key: string): Promise<number | undefined> {
+/**
+ * API キーからユーザーIDを解決する。失効済み・期限切れは拒否する
+ * （最終利用日時も更新しない）。有効な場合だけ最終利用日時を更新する。
+ */
+export async function resolveApiKeyUserId(
+  db: Db,
+  key: string,
+  now: Date = new Date(),
+): Promise<number | undefined> {
   const [row] = await db
     .select()
     .from(apiKeysTable)
     .where(eq(apiKeysTable.keyHash, hashToken(key)));
   if (!row) return undefined;
+  if (apiKeyStatus(row, now) !== "active") return undefined;
   await db
     .update(apiKeysTable)
-    .set({ lastUsedAt: new Date() })
+    .set({ lastUsedAt: now })
     .where(eq(apiKeysTable.id, row.id));
   return row.userId;
 }
@@ -289,11 +315,24 @@ export async function listApiKeyRows(db: Db, userId: number): Promise<ApiKeyRow[
     .orderBy(desc(apiKeysTable.id));
 }
 
-/** API キーを削除する（本人のものだけ）。 */
-export async function deleteApiKeyRow(db: Db, userId: number, id: number): Promise<boolean> {
+/**
+ * API キーを失効させる（本人のものだけ）。行は履歴として残し revoked_at を打つ。
+ * 既に失効済みでも成功扱い（冪等）。見つからない・他人のものは false。
+ */
+export async function revokeApiKeyRow(
+  db: Db,
+  userId: number,
+  id: number,
+  now: Date = new Date(),
+): Promise<boolean> {
   const [row] = await db.select().from(apiKeysTable).where(eq(apiKeysTable.id, id));
   if (!row || row.userId !== userId) return false;
-  await db.delete(apiKeysTable).where(eq(apiKeysTable.id, id));
+  if (!row.revokedAt) {
+    await db
+      .update(apiKeysTable)
+      .set({ revokedAt: now })
+      .where(and(eq(apiKeysTable.id, id), isNull(apiKeysTable.revokedAt)));
+  }
   return true;
 }
 

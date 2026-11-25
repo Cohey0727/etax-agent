@@ -348,7 +348,7 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
     }),
     set_deductions: tool({
       description:
-        "控除入力を変更する（画面側の保存値へ反映される）。deductions は DeductionInputs の部分JSON（例: {\"socialInsurancePaid\": 140080, \"donationsTotal\": 47000}。内訳がある控除は *_entries で明細を渡すと合計も自動で合う）。filing_type は blue65 / blue55 / blue10 / white。misc_income は雑所得（revenue / income / kubun）。expanded_income は配当・一時・株式等譲渡の入力。",
+        "控除入力を変更する（画面側の保存値へ反映される）。deductions は DeductionInputs の部分JSON（例: {\"socialInsurancePaid\": 140080, \"donationsTotal\": 47000}。内訳がある控除は *_entries で明細を渡すと合計も自動で合う）。filing_type は blue65 / blue55 / blue10 / white。misc_income は雑所得（revenue / income / kubun）。expanded_income は配当・一時・株式等譲渡の入力。agriculture は農業所得の入力。",
       inputSchema: z.object({
         year: z.number().int().describe("対象年（西暦）"),
         deductions: z
@@ -372,6 +372,12 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
           .optional()
           .describe(
             "配当・一時・株式等譲渡の入力（ExpandedIncomeInput の部分JSON、camelCase）: temp{revenue,expenses}、dividend{listedRevenue,listedTrustRevenue,listedWithholding,listedMode(comprehensive/separate/none),generalRevenue,generalTrustRevenue,generalWithholding,interestExpense}、stocks{general/listed{revenue,otherRevenue,acquisitionCost,transferFees,otherExpenses},listedWithholding,specialAccounts[{brokerName,branchName,withholdingAccount,revenue,cost,withholding}]}",
+          ),
+        agriculture: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            "農業所得の入力（AgricultureInput の部分JSON、camelCase）: farmName、salesAmount（販売金額）、householdConsumption（家事消費・事業消費金額）、miscRevenue（雑収入）、produceOpeningInventory/produceClosingInventory（農産物の棚卸高）、otherOpeningInventory/otherClosingInventory（農産物以外の棚卸高）、expenseTotals（科目名→金額の合計。支出は正の金額）、familyWorkerSalary（専従者給与・青色）、familyWorkerDeduction（専従者控除・白色）、badDebtProvisionIn/badDebtProvisionBack（貸倒引当金）、cultivationCostDeduction（育成費用）、beefCattleExemptionAmount（肉用牛特例金額・表示のみ）",
           ),
         donation_entries: z
           .array(z.object({ recipient: z.string(), amount: z.number() }))

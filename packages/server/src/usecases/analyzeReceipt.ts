@@ -10,28 +10,17 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { createLlmClient } from "../gateways/llmGateway";
-import {
-  createStorageClient,
-  receiptObjectKey,
-  StorageError,
-  StorageObjectNotFoundError,
-} from "../gateways/storageGateway";
-import { createSystemOneClient } from "../gateways/systemOneGateway";
-import {
-  getJevPromptOverride,
-  getRegexRulesOverride,
-  loadAgentConfig,
-  loadStorageConfig,
-  loadSystemOneConfig,
-} from "../lib/config";
 import { getDb } from "../lib/db";
-import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
-import { upsertReceiptExtraction } from "../repositories/receiptRepository";
 import { ErrorSchema } from "../schemas/common";
-import { AnalyzeReceiptRequestSchema, AnalyzeReceiptResponseSchema } from "../schemas/receipt";
-import { classifyAccount } from "../services/classification/classifyAccount";
-import { extractReceipt, ReceiptImage } from "../services/receipts/extractReceipt";
+import {
+  AnalyzeReceiptRequestSchema,
+  AnalyzeReceiptResponse,
+  AnalyzeReceiptResponseSchema,
+} from "../schemas/receipt";
+import {
+  analyzeReceiptDraft,
+  ReceiptAnalysisError,
+} from "../services/receipts/analyzeReceiptDraft";
 
 export const analyzeReceiptRoute = createRoute({
   method: "post",
@@ -65,97 +54,20 @@ export const analyzeReceiptRoute = createRoute({
   },
 });
 
-const RECEIPT_MIME_TYPES: readonly string[] = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-];
-
-/** リクエストから解析対象の画像（Base64 + MIME）を解決する。 */
-async function resolveReceiptImage(body: {
-  fileId?: string;
-  imageBase64?: string;
-  mimeType?: string;
-}): Promise<ReceiptImage> {
-  if (body.fileId && body.imageBase64) {
-    throw new HTTPException(400, {
-      message: "fileId と imageBase64 は同時に指定できません",
-    });
-  }
-  if (body.fileId) {
-    const storageConfig = loadStorageConfig();
-    try {
-      const storage = createStorageClient(storageConfig);
-      const downloaded = await storage.download(receiptObjectKey(body.fileId));
-      if (!RECEIPT_MIME_TYPES.includes(downloaded.mimeType)) {
-        throw new HTTPException(400, {
-          message: `対応していない画像形式です: ${downloaded.mimeType}`,
-        });
-      }
-      return {
-        mimeType: downloaded.mimeType,
-        dataBase64: downloaded.dataBase64,
-      };
-    } catch (e) {
-      if (e instanceof HTTPException) throw e;
-      if (e instanceof StorageObjectNotFoundError) {
-        throw new HTTPException(404, { message: e.message });
-      }
-      if (e instanceof StorageError) {
-        throw new HTTPException(503, { message: e.message });
-      }
-      throw e;
-    }
-  }
-  if (body.imageBase64 && body.mimeType) {
-    return {
-      mimeType: body.mimeType,
-      dataBase64: body.imageBase64,
-    };
-  }
-  throw new HTTPException(400, {
-    message: "fileId、または imageBase64 と mimeType の組み合わせを指定してください",
-  });
-}
-
 export const analyzeReceiptHandler: RouteHandler<typeof analyzeReceiptRoute> = async (c) => {
   const body = c.req.valid("json");
-  const agentConfig = loadAgentConfig();
-  if (!agentConfig.apiKey) {
-    throw new HTTPException(503, {
-      message: "AGENT_API_KEY が設定されていないため、画像の読み取りができません",
-    });
-  }
-  const image = await resolveReceiptImage(body);
-  const llm = createLlmClient(agentConfig);
-  let extracted;
+  let result: AnalyzeReceiptResponse;
   try {
-    extracted = await extractReceipt(image, llm);
-  } catch (e) {
-    throw new HTTPException(503, {
-      message: e instanceof Error ? e.message : String(e),
+    result = await analyzeReceiptDraft(getDb(), {
+      fileId: body.fileId,
+      imageBase64: body.imageBase64,
+      mimeType: body.mimeType,
     });
-  }
-  const state = [extracted.payee, extracted.description].filter(Boolean).join(" ");
-  const history = await loadClassificationHistory();
-  const systemOne = createSystemOneClient(loadSystemOneConfig());
-  const classification = await classifyAccount(state || extracted.description, {
-    history,
-    systemOne,
-    jevPromptOverride: getJevPromptOverride(),
-    regexRulesOverride: getRegexRulesOverride(),
-  });
-  const result = { ...extracted, classification };
-  // 証憑と取引の紐付けの土台として、fileId 経路の解析結果を証憑台帳へ
-  // 記録する（DB未設定・記録失敗でも解析自体は成功として返す）。
-  if (body.fileId) {
-    try {
-      const db = getDb();
-      if (db) await upsertReceiptExtraction(db, body.fileId, image.mimeType, result);
-    } catch {
-      // 証憑台帳への記録は付随処理のため、失敗しても解析結果は返す
+  } catch (e) {
+    if (e instanceof ReceiptAnalysisError) {
+      throw new HTTPException(e.status, { message: e.message });
     }
+    throw e;
   }
   return c.json(result, 200);
 };

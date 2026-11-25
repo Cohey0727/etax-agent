@@ -6,6 +6,7 @@
  * で共有するために切り出したもの。計算そのものは持たない。
  */
 import {
+  AgricultureInput,
   BlueDeductionOptions,
   DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
@@ -21,6 +22,7 @@ import {
   TaxCreditInputs,
   Transaction,
   VALID_INCOME_TYPES,
+  normalizeAgricultureInput,
   normalizeExpandedIncomeInput,
 } from "@etax/shared";
 import { Db, getDb } from "../../lib/db";
@@ -250,6 +252,44 @@ export function expandedIncomeArg(args: Record<string, unknown>): ExpandedIncome
         };
       }),
     },
+  });
+}
+
+/**
+ * 農業所得（Issue #24）の引数を入力形式に変換する。内側は camelCase 形式。
+ * 未指定なら undefined、指定があれば欠けた項目は正規化で補う。
+ * 農業所得は帳簿の取引とは混ぜず、申告入力として独立に扱う。
+ */
+export function agricultureArg(args: Record<string, unknown>): AgricultureInput | undefined {
+  const raw = args["agriculture"];
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const rec = raw as Record<string, unknown>;
+  const num = (v: unknown): number =>
+    typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0;
+  const expenseRaw =
+    typeof rec["expenseTotals"] === "object" && rec["expenseTotals"] !== null
+      ? (rec["expenseTotals"] as Record<string, unknown>)
+      : {};
+  const expenseTotals: Record<string, number> = {};
+  for (const [name, value] of Object.entries(expenseRaw)) {
+    expenseTotals[name] = num(value);
+  }
+  return normalizeAgricultureInput({
+    farmName: typeof rec["farmName"] === "string" ? rec["farmName"] : "",
+    salesAmount: num(rec["salesAmount"]),
+    householdConsumption: num(rec["householdConsumption"]),
+    miscRevenue: num(rec["miscRevenue"]),
+    produceOpeningInventory: num(rec["produceOpeningInventory"]),
+    produceClosingInventory: num(rec["produceClosingInventory"]),
+    otherOpeningInventory: num(rec["otherOpeningInventory"]),
+    otherClosingInventory: num(rec["otherClosingInventory"]),
+    expenseTotals,
+    familyWorkerSalary: num(rec["familyWorkerSalary"]),
+    familyWorkerDeduction: num(rec["familyWorkerDeduction"]),
+    badDebtProvisionIn: num(rec["badDebtProvisionIn"]),
+    badDebtProvisionBack: num(rec["badDebtProvisionBack"]),
+    cultivationCostDeduction: num(rec["cultivationCostDeduction"]),
+    beefCattleExemptionAmount: num(rec["beefCattleExemptionAmount"]),
   });
 }
 

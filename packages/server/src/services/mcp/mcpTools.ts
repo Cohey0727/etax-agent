@@ -18,6 +18,7 @@ import {
   buildSpecial20ConsumptionXtx,
   buildXtxFiling,
   categoryTotals,
+  computeAgricultureStatement,
   computeConsumptionReturn,
   computeSimplifiedConsumptionReturn,
   computeSpecial20ConsumptionReturn,
@@ -28,6 +29,7 @@ import {
   depreciationForYear,
   estimateInputTax,
   expandedWithholdingTotal,
+  isAgricultureEmpty,
   normalizeBusinessRatio,
   residentialRentTotal,
   resolveTaxCreditInputs,
@@ -74,18 +76,21 @@ import {
 import { classifyAccount } from "../classification/classifyAccount";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { mcpAssetTools } from "./mcpAssetTools";
+import { mcpBusinessStartTools } from "./mcpBusinessStartTools";
 import { mcpCashFlowTools } from "./mcpCashFlowTools";
 import { mcpImportTools } from "./mcpImportTools";
 import { mcpInvoiceTools } from "./mcpInvoiceTools";
 import { mcpLedgerTools } from "./mcpLedgerTools";
 import { mcpMetaTools } from "./mcpMetaTools";
 import { mcpProfileTools } from "./mcpProfileTools";
+import { mcpSubmissionTools } from "./mcpSubmissionTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
 
 export type { McpToolDef, McpToolResult } from "./mcpToolKit";
 import type { McpToolDef, McpToolHandler, McpToolModule, McpToolResult } from "./mcpToolKit";
 import {
+  agricultureArg,
   expandedIncomeArg,
   filingOptionsArg,
   filingTypeProperty,
@@ -155,6 +160,11 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
           type: "object",
           description:
             "配当・一時・株式等譲渡の入力（任意、camelCase）: temp{revenue,expenses}、dividend{listedRevenue,listedTrustRevenue,listedWithholding,listedMode(comprehensive/separate/none),generalRevenue,generalTrustRevenue,generalWithholding,interestExpense}、stocks{general/listed{revenue,otherRevenue,acquisitionCost,transferFees,otherExpenses},listedWithholding,specialAccounts[{brokerName,branchName,withholdingAccount,revenue,cost,withholding}]}。配当控除の対象額は配当の内訳から自動で決まる",
+        },
+        agriculture: {
+          type: "object",
+          description:
+            "農業所得の入力（任意、camelCase）: farmName、salesAmount（販売金額）、householdConsumption（家事消費・事業消費金額）、miscRevenue（雑収入）、produceOpeningInventory/produceClosingInventory（農産物の棚卸高）、otherOpeningInventory/otherClosingInventory（農産物以外の棚卸高）、expenseTotals（科目名→金額の合計。支出は正の金額）、familyWorkerSalary（専従者給与・青色）、familyWorkerDeduction（専従者控除・白色）、badDebtProvisionIn/badDebtProvisionBack（貸倒引当金）、cultivationCostDeduction（育成費用）、beefCattleExemptionAmount（肉用牛特例金額・表示のみ）。農業所得は帳簿の取引とは混ぜず、決算書（農業所得用）の計算と青色申告特別控除の配分まで行う",
         },
         filing_type: filingTypeProperty,
         real_estate_business_scale: realEstateScaleProperty,
@@ -314,6 +324,11 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
           description:
             "配当・一時・株式等譲渡の入力（任意、camelCase）: temp{revenue,expenses}、dividend{listedRevenue,listedTrustRevenue,listedWithholding,listedMode(comprehensive/separate/none),generalRevenue,generalTrustRevenue,generalWithholding,interestExpense}、stocks{general/listed{revenue,otherRevenue,acquisitionCost,transferFees,otherExpenses},listedWithholding,specialAccounts[{brokerName,branchName,withholdingAccount,revenue,cost,withholding}]}。申告分離課税がある場合は第三表、株式等譲渡がある場合は計算明細書（KOC080）を添付する。源泉徴収税額は拡張分を自動加算する",
         },
+        agriculture: {
+          type: "object",
+          description:
+            "農業所得の入力（任意、camelCase）: farmName、salesAmount（販売金額）、householdConsumption（家事消費・事業消費金額）、miscRevenue（雑収入）、produceOpeningInventory/produceClosingInventory（農産物の棚卸高）、otherOpeningInventory/otherClosingInventory（農産物以外の棚卸高）、expenseTotals（科目名→金額の合計。支出は正の金額）、familyWorkerSalary（専従者給与・青色）、familyWorkerDeduction（専従者控除・白色）、badDebtProvisionIn/badDebtProvisionBack（貸倒引当金）、cultivationCostDeduction（育成費用）、beefCattleExemptionAmount（肉用牛特例金額・表示のみ）。指定すると農業所得用の決算書（青色はKOA240、白色はKOA120）を添付し、申告書の農業欄と合計所得へ反映する。農業分は一般用の決算書には混ぜない",
+        },
         filing_type: filingTypeProperty,
         real_estate_business_scale: realEstateScaleProperty,
         withholding_tax: { type: "number", description: "源泉徴収税額（任意）" },
@@ -386,7 +401,7 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
       properties: {
         name: { type: "string", description: "資産の名称等" },
         quantity: { type: "string", description: "面積又は数量（任意）" },
-        income_type: { type: "string", enum: ["business", "real_estate"], description: "所得区分（既定 business）" },
+        income_type: { type: "string", enum: ["business", "real_estate", "agriculture"], description: "所得区分（既定 business）" },
         acquisition_date: { type: "string", description: "取得年月日（YYYY-MM-DD）" },
         service_start_date: { type: "string", description: "事業供用年月日（任意、省略時は取得日）" },
         cost: { type: "number", description: "取得価額（円）" },
@@ -463,6 +478,8 @@ const DOMAIN_TOOL_MODULES: McpToolModule[] = [
   mcpMetaTools,
   mcpInvoiceTools,
   mcpCashFlowTools,
+  mcpSubmissionTools,
+  mcpBusinessStartTools,
 ];
 
 /** 公開ツール一覧（コア＋ドメイン別モジュール）。 */
@@ -477,12 +494,20 @@ const DOMAIN_HANDLERS: Record<string, McpToolHandler> = Object.assign(
 );
 
 /** REST の planGate（/api/etax/*）と対応する、課金対象の MCP ツール。 */
-const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set(["export_xtx", "export_consumption_xtx"]);
+const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set([
+  "export_xtx",
+  "export_consumption_xtx",
+  "export_return_pdf",
+  "export_opening_notice_pdf",
+  "export_blue_return_pdf",
+  "export_domicile_change_pdf",
+]);
 
 /**
  * プランゲート（REST 側 planGateMiddleware と同じ条件、Issue #8）。
- * SaaS モード（認証必須＋課金有効）のときだけ、XTX 出力系ツールは
- * 有効なプランを必須にする。ローカル運用・課金未設定では制限しない。
+ * SaaS モード（認証必須＋課金有効）のときだけ、/api/etax/* に対応する
+ * 出力系ツールは有効なプランを必須にする。ローカル運用・課金未設定では
+ * 制限しない。
  */
 async function assertPlanForGatedTool(name: string): Promise<void> {
   if (!PLAN_GATED_TOOLS.has(name)) return;
@@ -557,12 +582,22 @@ export async function dispatchMcpTool(
         const db = requireDb();
         const year = Number(args["year"]);
         const tx = await ledgerTransactions(db, year);
-        const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
+        const agricultureInput = agricultureArg(args);
+        const agriculture =
+          agricultureInput && !isAgricultureEmpty(agricultureInput)
+            ? computeAgricultureStatement(agricultureInput)
+            : undefined;
+        const figures = computeCorrectedFigures(tx, year, {
+          ...filingOptionsArg(args),
+          agriculture: agricultureInput,
+        });
         const manual = computeManualIncomes(
           year,
           salaryIncomeArg(args),
           miscIncomeArg(args),
-          figures._detail.business_income + figures._detail.real_estate_income,
+          figures._detail.business_income +
+            figures._detail.real_estate_income +
+            figures._detail.agriculture_income,
         );
         const expandedInput = expandedIncomeArg(args);
         const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
@@ -572,6 +607,7 @@ export async function dispatchMcpTool(
           totalIncome:
             figures._detail.business_income +
             figures._detail.real_estate_income +
+            figures._detail.agriculture_income +
             manual.total +
             (expanded?.comprehensiveAddition ?? 0),
           deductions: mergeDeductionInputs(args["deductions"]),
@@ -580,7 +616,11 @@ export async function dispatchMcpTool(
             ? { stockIncome: expanded.separateStockIncome, dividendIncome: expanded.separateDividendIncome }
             : undefined,
         });
-        return textResult(expanded ? { ...result, expanded_income: expanded } : result);
+        return textResult({
+          ...result,
+          ...(expanded ? { expanded_income: expanded } : {}),
+          ...(agriculture ? { agriculture } : {}),
+        });
       }
       case "amendment_delta": {
         const original = args["original"];
@@ -718,14 +758,24 @@ export async function dispatchMcpTool(
         const tx = await ledgerTransactions(db, year);
         const deductions = mergeDeductionInputs(args["deductions"]);
         const taxCredits = mergeTaxCreditInputs(args["tax_credits"]);
-        const figures = computeCorrectedFigures(tx, year, filingOptionsArg(args));
+        const agricultureInput = agricultureArg(args);
+        const agricultureStatement =
+          agricultureInput && !isAgricultureEmpty(agricultureInput)
+            ? computeAgricultureStatement(agricultureInput)
+            : undefined;
+        const figures = computeCorrectedFigures(tx, year, {
+          ...filingOptionsArg(args),
+          agriculture: agricultureInput,
+        });
         const miscIncome = miscIncomeArg(args);
         const salaryIncome = salaryIncomeArg(args);
         const manual = computeManualIncomes(
           year,
           salaryIncome,
           miscIncome,
-          figures._detail.business_income + figures._detail.real_estate_income,
+          figures._detail.business_income +
+            figures._detail.real_estate_income +
+            figures._detail.agriculture_income,
         );
         const expandedInput = expandedIncomeArg(args);
         const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
@@ -734,6 +784,7 @@ export async function dispatchMcpTool(
           totalIncome:
             figures._detail.business_income +
             figures._detail.real_estate_income +
+            figures._detail.agriculture_income +
             manual.total +
             (expanded?.comprehensiveAddition ?? 0),
           deductions,
@@ -755,13 +806,21 @@ export async function dispatchMcpTool(
           figures,
           filingType: filingOptionsArg(args).filingType,
           depreciation:
-            depreciation.business.length > 0 || depreciation.realEstate.length > 0
+            depreciation.business.length > 0 ||
+            depreciation.realEstate.length > 0 ||
+            depreciation.agriculture.length > 0
               ? depreciation
               : undefined,
           deductionInputs: deductions,
           miscIncome,
           salaryIncome,
           expandedIncome: expandedInput,
+          agriculture: agricultureStatement
+            ? {
+                statement: agricultureStatement,
+                blueDeduction: figures._detail.blue_deduction_agriculture,
+              }
+            : undefined,
           tax,
           categoryTotals: {
             business: statementCategoryTotals(tx, "business"),
@@ -937,7 +996,12 @@ export async function dispatchMcpTool(
         const row = await insertFixedAssetRow(db, {
           name,
           quantity: typeof args["quantity"] === "string" ? args["quantity"] : "",
-          incomeType: args["income_type"] === "real_estate" ? "real_estate" : "business",
+          incomeType:
+            args["income_type"] === "real_estate"
+              ? "real_estate"
+              : args["income_type"] === "agriculture"
+                ? "agriculture"
+                : "business",
           acquisitionDate,
           serviceStartDate:
             typeof args["service_start_date"] === "string" ? args["service_start_date"] : null,
@@ -960,7 +1024,7 @@ export async function dispatchMcpTool(
         const year = Number(args["year"]);
         const rows = (await listFixedAssetRows(db)).filter((row) => isActiveInYear(row, year));
         const detail = [];
-        const totals = { business: 0, real_estate: 0 };
+        const totals = { business: 0, real_estate: 0, agriculture: 0 };
         for (const row of rows) {
           const dep = depreciationForYear(fixedAssetToInput(row), year);
           if (!dep) continue;
@@ -979,6 +1043,7 @@ export async function dispatchMcpTool(
           });
           if (row.incomeType === "business") totals.business += dep.deductible;
           if (row.incomeType === "real_estate") totals.real_estate += dep.deductible;
+          if (row.incomeType === "agriculture") totals.agriculture += dep.deductible;
         }
         return textResult({
           year,

@@ -7,6 +7,9 @@
  * （検証できない場合は xsd_warning として理由を返す）。
  */
 import {
+  AgricultureInput,
+  AgricultureStatement,
+  AgricultureWire,
   BalanceSheetAccount,
   DepreciationDetailRow,
   ExpandedIncomeBreakdown,
@@ -14,6 +17,9 @@ import {
   ExpandedIncomeWire,
   SeparateTaxationAmounts,
   TaxCreditInputs,
+  agricultureFromWire,
+  computeAgricultureStatement,
+  isAgricultureEmpty,
   normalizeMiscIncomeInput,
   normalizeSalaryIncomeInput,
   Transaction,
@@ -115,13 +121,40 @@ export function resolveExpandedTax(
   };
 }
 
-/** リクエストの固定資産入力から減価償却明細行（事業・不動産別）を組み立てる。 */
+/** 農業所得の配線（入力と計算済みの決算書内訳）。 */
+export interface AgricultureWiring {
+  /** 正規化済みの農業所得入力（空の場合は undefined） */
+  input?: AgricultureInput;
+  /** 決算書の計算内訳（XTX ビルダーへ渡す） */
+  statement?: AgricultureStatement;
+}
+
+/**
+ * 農業所得入力（ワイヤ形式）を計算・XTX生成で使う形に解決する。
+ * exportXtx / exportReturnPdf / MCP の export_xtx で共用する単一の配線。
+ * 農業所得は帳簿の取引とは混ぜず、申告入力として独立に扱う。
+ */
+export function resolveAgriculture(
+  wire: AgricultureWire | undefined,
+): AgricultureWiring {
+  if (!wire) return {};
+  const input = agricultureFromWire(wire);
+  if (isAgricultureEmpty(input)) return {};
+  return { input, statement: computeAgricultureStatement(input) };
+}
+
+/** リクエストの固定資産入力から減価償却明細行（事業・不動産・農業別）を組み立てる。 */
 function depreciationFromWire(
   body: ExportXtxRequest,
-): { business: DepreciationDetailRow[]; realEstate: DepreciationDetailRow[] } | undefined {
+): {
+  business: DepreciationDetailRow[];
+  realEstate: DepreciationDetailRow[];
+  agriculture: DepreciationDetailRow[];
+} | undefined {
   if (!body.fixed_assets || body.fixed_assets.length === 0) return undefined;
   const business: DepreciationDetailRow[] = [];
   const realEstate: DepreciationDetailRow[] = [];
+  const agriculture: DepreciationDetailRow[] = [];
   for (const asset of body.fixed_assets) {
     // 償却計算が投げる例外を未捕捉の 500 にせず、対象資産が分かる
     // 400 として返す（Issue #11）。
@@ -147,9 +180,10 @@ function depreciationFromWire(
     }
     if (!row) continue;
     if (asset.income_type === "real_estate") realEstate.push(row);
+    else if (asset.income_type === "agriculture") agriculture.push(row);
     else business.push(row);
   }
-  return { business, realEstate };
+  return { business, realEstate, agriculture };
 }
 
 /** リクエストの貸借対照表入力を XTX ビルダーの形式へ変換する。試算表からも使う。 */
@@ -198,9 +232,11 @@ export function toTaxpayer(t: ExportXtxRequest["taxpayer"]): XtxTaxpayer {
 export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) => {
   const body = c.req.valid("json");
   const transactions = filterYear(normalizeTransactions(body.transactions ?? []), body.year);
+  const agriculture = resolveAgriculture(body.agriculture);
   const figures = computeCorrectedFigures(transactions, body.year, {
     filingType: body.filing_type,
     realEstateBusinessScale: body.real_estate_business_scale,
+    agriculture: agriculture.input,
   });
   const depreciation = depreciationFromWire(body);
   const balanceSheet = balanceSheetFromWire(body);
@@ -210,7 +246,9 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
     body.year,
     salaryIncome,
     miscIncome,
-    figures._detail.business_income + figures._detail.real_estate_income,
+    figures._detail.business_income +
+      figures._detail.real_estate_income +
+      figures._detail.agriculture_income,
   );
   const expandedTax = resolveExpandedTax(body.expanded_income, body.tax_credits);
   const tax = computeIncomeTax({
@@ -218,6 +256,7 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
     totalIncome:
       figures._detail.business_income +
       figures._detail.real_estate_income +
+      figures._detail.agriculture_income +
       manual.total +
       expandedTax.comprehensiveAddition,
     deductions: body.deductions,
@@ -239,6 +278,12 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
       miscIncome,
       salaryIncome,
       expandedIncome: expandedTax.input,
+      agriculture: agriculture.statement
+        ? {
+            statement: agriculture.statement,
+            blueDeduction: figures._detail.blue_deduction_agriculture,
+          }
+        : undefined,
       tax,
       categoryTotals: {
         business: statementCategoryTotals(transactions, "business"),

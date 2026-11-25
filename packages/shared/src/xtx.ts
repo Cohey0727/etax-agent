@@ -36,6 +36,14 @@ import {
   isExpandedIncomeEmpty,
 } from "./expandedIncome";
 import { CorrectedFigures, FilingType } from "./taxcalc";
+import {
+  AGRICULTURE_BLUE_EXPENSE_CATEGORIES,
+  AGRICULTURE_WHITE_OTHER_EXPENSE_CATEGORIES,
+  AgricultureStatement,
+  EMPTY_AGRICULTURE_INPUT,
+  agricultureIncomeBeforeBlueDeduction,
+  computeAgricultureStatement,
+} from "./agriculture";
 import { DepreciationDetailRow } from "./depreciation";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
 
@@ -113,6 +121,16 @@ export interface XtxFilingData {
   salaryIncome?: SalaryIncomeInput;
   /** 配当・一時・株式等譲渡の入力（Issue #27）。省略・全て空なら従来どおり。 */
   expandedIncome?: ExpandedIncomeInput;
+  /**
+   * 農業所得（Issue #24）。計算済みの決算書内訳と、青色申告特別控除の
+   * 農業への配分額。ある場合は青色申告決算書（農業所得用）KOA240 /
+   * 収支内訳書（農業所得用）KOA120 を添付する。
+   */
+  agriculture?: {
+    statement: AgricultureStatement;
+    /** 青色申告特別控除の農業への配分額（白色は0） */
+    blueDeduction: number;
+  };
   /** 所得税の計算結果（控除・税額控除の内訳を含む） */
   tax: IncomeTaxResult;
   /** 勘定科目別の経費合計（決算書の経費欄に振り分ける） */
@@ -139,6 +157,8 @@ export interface XtxFilingData {
   depreciation?: {
     business: DepreciationDetailRow[];
     realEstate: DepreciationDetailRow[];
+    /** 農業分は KOA240（3面）/ KOA120（2面）の明細欄に出力する */
+    agriculture?: DepreciationDetailRow[];
   };
   /** 貸借対照表（KOA210 4面）の入力。事業所得分のみ。貸借一致しない場合は例外。 */
   balanceSheet?: XtxBalanceSheetInput;
@@ -175,6 +195,8 @@ interface YearVersions {
   koa220: string;
   koa110: string;
   koa130: string;
+  koa240: string;
+  koa120: string;
   koc080: string;
 }
 
@@ -188,10 +210,14 @@ const YEAR_VERSIONS: Record<number, YearVersions> = {
   // KOC080（株式等に係る譲渡所得等の金額の計算明細書）の様式バージョンは
   // 手続XSD（RKO0010）の include で確認: 2023=17.0 / 2024=18.0 / 2025=19.0。
   // 2026年分の 20.0 は連番からの推定（2026年分の手続XSDは未同梱で検証不能）。
-  2023: { procedure: "23.1.1", koa020: "21.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koc080: "17.0" },
-  2024: { procedure: "24.0.1", koa020: "22.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koc080: "18.0" },
-  2025: { procedure: "25.0.1", koa020: "23.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koc080: "19.0" },
-  2026: { procedure: "26.0.1", koa020: "24.0", koa210: "12.0", koa220: "9.0", koa110: "13.0", koa130: "10.0", koc080: "20.0" },
+  // 農業様式（KOA240 青色・農業所得用 / KOA120 収支内訳書・農業所得用）の
+  // バージョンは、同梱XSD（KOA240=8.0 / KOA120=9.0、2025年分の受付セット）と
+  // e-Tax 公式「令和9年1月受付開始予定の帳票一覧」（2026年分: KOA240=9.0 /
+  // KOA120=10.0）で確認。2023・2024年分は同梱XSDの版が継続する前提。
+  2023: { procedure: "23.1.1", koa020: "21.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koa240: "8.0", koa120: "9.0", koc080: "17.0" },
+  2024: { procedure: "24.0.1", koa020: "22.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koa240: "8.0", koa120: "9.0", koc080: "18.0" },
+  2025: { procedure: "25.0.1", koa020: "23.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koa240: "8.0", koa120: "9.0", koc080: "19.0" },
+  2026: { procedure: "26.0.1", koa020: "24.0", koa210: "12.0", koa220: "9.0", koa110: "13.0", koa130: "10.0", koa240: "9.0", koa120: "10.0", koc080: "20.0" },
 };
 
 const SOFT_NAME = "eTaxAgent";
@@ -424,8 +450,16 @@ function buildKoa020Face1(data: XtxFilingData): string {
 
   // 収入金額等
   const revenues: string[] = [];
-  if (f.business_revenue) {
-    revenues.push(`<ABB00020>${amount("ABB00030", f.business_revenue)}</ABB00020>`);
+  if (f.business_revenue || f.agriculture_revenue) {
+    const businessRevenueParts: string[] = [];
+    if (f.business_revenue) {
+      businessRevenueParts.push(amount("ABB00030", f.business_revenue));
+    }
+    // 農業の収入金額は決算書（農業所得用）の「収入金額の計」を出す
+    if (f.agriculture_revenue) {
+      businessRevenueParts.push(amount("ABB00040", f.agriculture_revenue));
+    }
+    revenues.push(`<ABB00020>${businessRevenueParts.join("")}</ABB00020>`);
   }
   revenues.push(amount("ABB00050", f.real_estate_revenue));
   // 配当（総合課税分のみ。申告分離分は第三表、申告不要分は記載しない）
@@ -458,8 +492,15 @@ function buildKoa020Face1(data: XtxFilingData): string {
 
   // 所得金額等
   const incomes: string[] = [];
-  if (f.business_revenue || f.business_expenses) {
-    incomes.push(`<ABB00280>${amountAlways("ABB00300", f._detail.business_income)}</ABB00280>`);
+  if (f.business_revenue || f.business_expenses || f.agriculture_revenue || f.agriculture_expenses) {
+    const businessIncomeParts: string[] = [];
+    if (f.business_revenue || f.business_expenses) {
+      businessIncomeParts.push(amountAlways("ABB00300", f._detail.business_income));
+    }
+    if (f.agriculture_revenue || f.agriculture_expenses) {
+      businessIncomeParts.push(amountAlways("ABB00320", f._detail.agriculture_income));
+    }
+    incomes.push(`<ABB00280>${businessIncomeParts.join("")}</ABB00280>`);
   }
   incomes.push(amount("ABB00340", f._detail.real_estate_income));
   // 配当（総合課税分の所得金額）
@@ -1211,6 +1252,215 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// 農業所得用様式（Issue #24 Phase 1）
+// KOA240 青色申告決算書（農業所得用） / KOA120 収支内訳書（農業所得用）。
+// 項目対応は同梱XSD（KOA240 VR8.0 / KOA120 VR9.0）の appinfo で確認した。
+// 1面（損益計算書）と減価償却費の計算のみを出力し、2面（収入金額の内訳等）・
+// 育成費用の計算・貸借対照表（KOA240 4面）は Phase 1 では省略する
+// （対象要素は全て min=0）。
+// ---------------------------------------------------------------------------
+
+/** KOA240 の固定経費行のタグ（AGRICULTURE_BLUE_EXPENSE_CATEGORIES と同じ並び） */
+const KOA240_EXPENSE_TAGS: string[] = [
+  "APF00200", "APF00210", "APF00220", "APF00230", "APF00240", "APF00250",
+  "APF00260", "APF00270", "APF00280", "APF00290", "APF00300", "APF00310",
+  "APF00320", "APF00330", "APF00340", "APF00350", "APF00360", "APF00370",
+];
+
+/** KOA240 の固定経費行: [科目名, タグ]（様式の並び順） */
+const KOA240_EXPENSE_LINES: [string, string][] = AGRICULTURE_BLUE_EXPENSE_CATEGORIES.map(
+  (category, i) => [category, KOA240_EXPENSE_TAGS[i] as string],
+);
+
+/** KOA240（青色申告決算書・農業所得用）を組み立てる。 */
+function buildKoa240(data: XtxFilingData, vr: string): string {
+  const t = data.taxpayer;
+  const agriculture = data.agriculture;
+  if (!agriculture) return "";
+  const stmt = agriculture.statement;
+
+  const parts: string[] = [];
+  parts.push(ref("APA00000", "NENBUN"));
+  const taxpayer: string[] = [];
+  if (t.address) taxpayer.push(ref("APB00010", "NOZEISHA_ADR"));
+  const nameParts: string[] = [];
+  if (t.nameKana) nameParts.push(ref("APB00030", "NOZEISHA_NM_KN"));
+  if (t.name) nameParts.push(ref("APB00040", "NOZEISHA_NM"));
+  if (nameParts.length > 0) taxpayer.push(`<APB00020>${nameParts.join("")}</APB00020>`);
+  if (t.occupation) taxpayer.push(ref("APB00050", "SHOKUGYO"));
+  if (stmt.farmName) taxpayer.push(`<APB00060>${esc(stmt.farmName)}</APB00060>`);
+  if (phoneXml(t.phone)) taxpayer.push(ref("APB00070", "NOZEISHA_TEL"));
+  if (taxpayer.length > 0) parts.push(`<APB00000>${taxpayer.join("")}</APB00000>`);
+  if (toEraDate(data.submissionDate)) parts.push(ref("APE00000", "TEISYUTSU_DAY"));
+
+  const amounts: string[] = [];
+  const revenue: string[] = [];
+  revenue.push(amount("APF00110", stmt.salesAmount));
+  revenue.push(amount("APF00120", stmt.householdConsumption));
+  revenue.push(amount("APF00130", stmt.miscRevenue));
+  revenue.push(amountAlways("APF00140", stmt.revenueSubtotal));
+  if (stmt.produceOpeningInventory || stmt.produceClosingInventory) {
+    revenue.push(
+      `<APF00150>${amount("APF00160", stmt.produceOpeningInventory)}${amount("APF00170", stmt.produceClosingInventory)}</APF00150>`,
+    );
+  }
+  revenue.push(amountAlways("APF00180", stmt.revenueTotal));
+  amounts.push(`<APF00100>${revenue.join("")}</APF00100>`);
+
+  const expense: string[] = [];
+  const blueAmounts = new Map(stmt.blueExpenseRows.map((row) => [row.category, row.amount]));
+  for (const [category, tag] of KOA240_EXPENSE_LINES) {
+    expense.push(amount(tag, blueAmounts.get(category) ?? 0));
+  }
+  for (const extra of stmt.blueExtraExpenses) {
+    expense.push(
+      `<APF00375><APF00060>${esc(extra.category)}</APF00060>${amountAlways("APF00380", extra.amount)}</APF00375>`,
+    );
+  }
+  expense.push(amount("APF00390", stmt.blueMiscExpense));
+  expense.push(amountAlways("APF00400", stmt.expensesSubtotal));
+  if (stmt.otherOpeningInventory || stmt.otherClosingInventory) {
+    expense.push(
+      `<APF00410>${amount("APF00420", stmt.otherOpeningInventory)}${amount("APF00430", stmt.otherClosingInventory)}</APF00410>`,
+    );
+  }
+  amounts.push(`<APF00190>${expense.join("")}</APF00190>`);
+  amounts.push(amount("APF00440", stmt.cultivationCostDeduction));
+  amounts.push(amountAlways("APF00450", stmt.expensesTotal));
+  amounts.push(amountAlways("APF00460", stmt.balanceAmount));
+
+  const back: string[] = [];
+  back.push(amount("APF00490", stmt.badDebtProvisionBack));
+  back.push(amountAlways("APF00510", stmt.provisionBackTotal));
+  const into: string[] = [];
+  into.push(amount("APF00530", stmt.familyWorkerSalary));
+  into.push(amount("APF00540", stmt.badDebtProvisionIn));
+  into.push(amountAlways("APF00560", stmt.provisionInTotal));
+  amounts.push(
+    `<APF00470><APF00480>${back.join("")}</APF00480><APF00520>${into.join("")}</APF00520></APF00470>`,
+  );
+
+  const beforeBlue = agricultureIncomeBeforeBlueDeduction(stmt, false);
+  amounts.push(amountAlways("APF00570", beforeBlue));
+  amounts.push(amount("APF00580", agriculture.blueDeduction));
+  amounts.push(amountAlways("APF00600", beforeBlue - agriculture.blueDeduction));
+  amounts.push(amount("APF00610", stmt.beefCattleExemptionAmount));
+
+  parts.push(
+    `<APF00000><APF00010><APF00020><APF00030><gen:mm>1</gen:mm><gen:dd>1</gen:dd></APF00030><APF00040><gen:mm>12</gen:mm><gen:dd>31</gen:dd></APF00040></APF00020><APF00090>${amounts.join("")}</APF00090></APF00010></APF00000>`,
+  );
+
+  const depDetail240 = buildDepreciationDetail(
+    data.depreciation?.agriculture ?? [],
+    DEP_TAGS_KOA240,
+  );
+  const page3 = depDetail240 ? `<KOA240-3 page="3">${depDetail240}</KOA240-3>` : "";
+  return `<KOA240 VR="${vr}" id="KOA240" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA240-1 page="1">${parts.join("")}</KOA240-1>${page3}</KOA240>`;
+}
+
+/** KOA120 の経費の先頭の独立行: [科目名, タグ]。「地代賃借料」は様式の「小作料・賃借料」行。 */
+const KOA120_TOP_EXPENSE_LINES: [string, string][] = [
+  ["雇人費", "AJG00120"],
+  ["地代賃借料", "AJG00130"],
+  ["減価償却費", "AJG00140"],
+  ["貸倒金", "AJG00150"],
+  ["利子割引料", "AJG00160"],
+];
+
+/** KOA120 の「その他の経費」の固定行のタグ（AGRICULTURE_WHITE_OTHER_EXPENSE_CATEGORIES と同じ並び） */
+const KOA120_OTHER_EXPENSE_TAGS: string[] = [
+  "AJG00180", "AJG00190", "AJG00200", "AJG00210", "AJG00220", "AJG00230",
+  "AJG00240", "AJG00250", "AJG00260", "AJG00270", "AJG00280", "AJG00290",
+  "AJG00300", "AJG00310",
+];
+
+/** KOA120 の「その他の経費」の固定行: [科目名, タグ]（様式の並び順） */
+const KOA120_OTHER_EXPENSE_LINES: [string, string][] =
+  AGRICULTURE_WHITE_OTHER_EXPENSE_CATEGORIES.map(
+    (category, i) => [category, KOA120_OTHER_EXPENSE_TAGS[i] as string],
+  );
+
+/** KOA120（収支内訳書・農業所得用）を組み立てる。 */
+function buildKoa120(data: XtxFilingData, vr: string): string {
+  const t = data.taxpayer;
+  const agriculture = data.agriculture;
+  if (!agriculture) return "";
+  const stmt = agriculture.statement;
+
+  const parts: string[] = [];
+  parts.push(ref("AJA00000", "NENBUN"));
+  const taxpayer: string[] = [];
+  if (t.address) taxpayer.push(ref("AJB00010", "NOZEISHA_ADR"));
+  const nameParts: string[] = [];
+  if (t.nameKana) nameParts.push(ref("AJB00030", "NOZEISHA_NM_KN"));
+  if (t.name) nameParts.push(ref("AJB00040", "NOZEISHA_NM"));
+  if (nameParts.length > 0) taxpayer.push(`<AJB00020>${nameParts.join("")}</AJB00020>`);
+  if (t.occupation) taxpayer.push(ref("AJB00050", "SHOKUGYO"));
+  if (stmt.farmName) taxpayer.push(`<AJB00060>${esc(stmt.farmName)}</AJB00060>`);
+  if (phoneXml(t.phone)) taxpayer.push(ref("AJB00070", "NOZEISHA_TEL"));
+  if (taxpayer.length > 0) parts.push(`<AJB00000>${taxpayer.join("")}</AJB00000>`);
+  if (toEraDate(data.submissionDate)) parts.push(ref("AJE00000", "TEISYUTSU_DAY"));
+  parts.push(
+    `<AJF00000><AJF00010><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AJF00010><AJF00020><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AJF00020></AJF00000>`,
+  );
+
+  const pl: string[] = [];
+  const revenue: string[] = [];
+  revenue.push(amount("AJG00030", stmt.salesAmount));
+  revenue.push(amount("AJG00040", stmt.householdConsumption));
+  revenue.push(amount("AJG00050", stmt.miscRevenue));
+  revenue.push(amountAlways("AJG00060", stmt.revenueSubtotal));
+  if (stmt.produceOpeningInventory || stmt.produceClosingInventory) {
+    revenue.push(
+      `<AJG00070>${amount("AJG00080", stmt.produceOpeningInventory)}${amount("AJG00090", stmt.produceClosingInventory)}</AJG00070>`,
+    );
+  }
+  revenue.push(amountAlways("AJG00100", stmt.revenueTotal));
+  pl.push(`<AJG00020>${revenue.join("")}</AJG00020>`);
+
+  const expenses: string[] = [];
+  const topAmounts = new Map(stmt.whiteTopExpenseRows.map((row) => [row.category, row.amount]));
+  for (const [category, tag] of KOA120_TOP_EXPENSE_LINES) {
+    expenses.push(amount(tag, topAmounts.get(category) ?? 0));
+  }
+  const other: string[] = [];
+  const otherAmounts = new Map(
+    stmt.whiteOtherExpenseRows.map((row) => [row.category, row.amount]),
+  );
+  for (const [category, tag] of KOA120_OTHER_EXPENSE_LINES) {
+    other.push(amount(tag, otherAmounts.get(category) ?? 0));
+  }
+  for (const extra of stmt.whiteExtraExpenses) {
+    other.push(
+      `<AJG00315><AJG00010>${esc(extra.category)}</AJG00010>${amountAlways("AJG00320", extra.amount)}</AJG00315>`,
+    );
+  }
+  other.push(amount("AJG00330", stmt.whiteMiscExpense));
+  if (stmt.otherOpeningInventory || stmt.otherClosingInventory) {
+    other.push(
+      `<AJG00340>${amount("AJG00350", stmt.otherOpeningInventory)}${amount("AJG00360", stmt.otherClosingInventory)}</AJG00340>`,
+    );
+  }
+  other.push(amount("AJG00370", stmt.cultivationCostDeduction));
+  other.push(amountAlways("AJG00380", stmt.whiteOtherExpensesSubtotal));
+  expenses.push(`<AJG00170>${other.join("")}</AJG00170>`);
+  expenses.push(amountAlways("AJG00390", stmt.expensesTotal));
+  pl.push(`<AJG00110>${expenses.join("")}</AJG00110>`);
+  pl.push(amountAlways("AJG00400", stmt.balanceAmount));
+  pl.push(amount("AJG00410", stmt.familyWorkerDeduction));
+  pl.push(amountAlways("AJG00430", stmt.balanceAmount - stmt.familyWorkerDeduction));
+  pl.push(amount("AJG00440", stmt.beefCattleExemptionAmount));
+  parts.push(`<AJG00000>${pl.join("")}</AJG00000>`);
+
+  const depDetail120 = buildDepreciationDetail(
+    data.depreciation?.agriculture ?? [],
+    DEP_TAGS_KOA120,
+  );
+  const page2 = depDetail120 ? `<KOA120-2 page="2">${depDetail120}</KOA120-2>` : "";
+  return `<KOA120 VR="${vr}" id="KOA120" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA120-1 page="1">${parts.join("")}</KOA120-1>${page2}</KOA120>`;
+}
+
+// ---------------------------------------------------------------------------
 // 減価償却費の計算（明細）と貸借対照表
 // ---------------------------------------------------------------------------
 
@@ -1287,6 +1537,28 @@ const DEP_TAGS_KOA130: DepDetailTags = {
   ratio: "AKK00180", deductible: "AKK00190", closing: "AKK00200",
   totalsWrap: "AKK00220", tOrdinary: "AKK00230", tSpecial: "AKK00240",
   tTotal: "AKK00250", tDeductible: "AKK00260", tClosing: "AKK00270",
+};
+
+const DEP_TAGS_KOA240: DepDetailTags = {
+  maxRows: 12,
+  group: "APF02030", row: "APF02040", name: "APF02050", quantity: "APF02060",
+  acquisition: "APF02070", cost: "APF02080", guarantee: "APF02085", basis: "APF02090",
+  method: "APF02100", life: "APF02110", rateWrap: "APF02120", rate: "APF02130",
+  months: "APF02160", ordinary: "APF02170", special: "APF02180", total: "APF02190",
+  ratio: "APF02200", deductible: "APF02210", closing: "APF02220",
+  totalsWrap: "APF02240", tOrdinary: "APF02250", tSpecial: "APF02260",
+  tTotal: "APF02270", tDeductible: "APF02280", tClosing: "APF02290",
+};
+
+const DEP_TAGS_KOA120: DepDetailTags = {
+  maxRows: 7,
+  group: "AJL00000", row: "AJL00010", name: "AJL00020", quantity: "AJL00030",
+  acquisition: "AJL00050", cost: "AJL00060", guarantee: "AJL00065", basis: "AJL00070",
+  method: "AJL00080", life: "AJL00090", rateWrap: "AJL00100", rate: "AJL00110",
+  months: "AJL00140", ordinary: "AJL00150", special: "AJL00160", total: "AJL00170",
+  ratio: "AJL00180", deductible: "AJL00190", closing: "AJL00200",
+  totalsWrap: "AJL00220", tOrdinary: "AJL00230", tSpecial: "AJL00240",
+  tTotal: "AJL00250", tDeductible: "AJL00260", tClosing: "AJL00270",
 };
 
 /** 取得年月を era + yy + mm の複合型で出す。 */
@@ -1523,6 +1795,35 @@ export function buildXtxFiling(data: XtxFilingData): string {
       white
         ? { id: "KOA110", xml: buildKoa110(normalized, versions.koa110) }
         : { id: "KOA210", xml: buildKoa210(normalized, versions.koa210) },
+    );
+  }
+  // 農業所得がある場合は農業所得用の様式を添付する（Issue #24）。
+  // 農業分は一般用の決算書には混ぜず、専用様式でのみ申告する。
+  // 農業区分の固定資産だけがある場合も、減価償却明細を落とさないよう
+  // 空の決算書で様式を添付する（事業所得側の明細添付と同じ扱い）。
+  const agricultureDepRows = data.depreciation?.agriculture ?? [];
+  let agricultureData = normalized;
+  if (!agricultureData.agriculture && agricultureDepRows.length > 0) {
+    agricultureData = {
+      ...normalized,
+      agriculture: {
+        statement: computeAgricultureStatement(EMPTY_AGRICULTURE_INPUT),
+        blueDeduction: 0,
+      },
+    };
+  }
+  const agricultureStatement = agricultureData.agriculture?.statement;
+  if (
+    agricultureStatement &&
+    (agricultureStatement.revenueTotal !== 0 ||
+      agricultureStatement.expensesTotal !== 0 ||
+      agricultureStatement.beefCattleExemptionAmount !== 0 ||
+      agricultureDepRows.length > 0)
+  ) {
+    forms.push(
+      white
+        ? { id: "KOA120", xml: buildKoa120(agricultureData, versions.koa120) }
+        : { id: "KOA240", xml: buildKoa240(agricultureData, versions.koa240) },
     );
   }
   if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0) {

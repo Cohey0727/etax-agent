@@ -8,6 +8,7 @@ import { FixedAssetsPage } from "../FixedAssetsPage";
 import { InvoicesPage } from "../InvoicesPage";
 import { ImportPage } from "../ImportPage";
 import { LedgerPage } from "../LedgerPage";
+import { McpSettingsPage } from "../McpSettingsPage";
 import { ReceiptPage } from "../ReceiptPage";
 import { ReportsPage } from "../ReportsPage";
 import { SettingsPage } from "../SettingsPage";
@@ -28,6 +29,7 @@ export const appViews = [
   { id: AppView.Invoices, label: "請求書", icon: "receipt", nav: true, Component: InvoicesPage },
   { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },
   { id: AppView.Filing, label: "確定申告", icon: "fileCheck", nav: true, Component: FilingPage },
+  { id: AppView.McpSettings, label: "MCP設定", icon: "settings", nav: true, Component: McpSettingsPage },
   { id: AppView.Settings, label: "設定", icon: "settings", nav: true, Component: SettingsPage },
 ] as const satisfies readonly {
   id: AppView;

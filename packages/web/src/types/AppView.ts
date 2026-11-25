@@ -10,6 +10,7 @@ export const AppView = {
   Filing: "filing",
   Taxpayer: "taxpayer",
   Settings: "settings",
+  McpSettings: "mcpSettings",
   Agent: "agent",
 } as const;
 
