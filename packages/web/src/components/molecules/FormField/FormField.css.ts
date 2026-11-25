@@ -1,4 +1,4 @@
-import { style } from "@vanilla-extract/css";
+import { style, styleVariants } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
@@ -22,6 +22,11 @@ const styles = {
   }),
   input: style({
     width: "100%",
+  }),
+  size: styleVariants({
+    md: {},
+    // 単独フォーム用にひと回り大きく（高さ・文字）。
+    lg: { height: "46px", fontSize: theme.fontSizes.base },
   }),
   inputWithIcon: style({
     paddingLeft: "38px",
