@@ -31,6 +31,7 @@ export const InvoicePanel = () => {
     busy,
     deleteArmedId,
     setDeleteArmedId,
+    refreshList,
     applyFilters,
     handleCreate,
     handleUpdate,
@@ -225,6 +226,7 @@ export const InvoicePanel = () => {
               })();
             }}
             onDownloadPdf={() => void handleDownloadPdf(detailInvoice)}
+            onReconciliationChanged={() => void refreshList()}
           />
         ) : null}
       </Drawer>
