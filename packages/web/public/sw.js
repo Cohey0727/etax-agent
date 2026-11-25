@@ -4,7 +4,7 @@
  * 静的アセットはキャッシュ優先＋裏で更新する。/api/ は一切キャッシュしない
  * （帳簿や判定などの業務データは常にサーバーの最新を正とする）。
  */
-const CACHE_NAME = "etaxagent-v2";
+const CACHE_NAME = "etaxagent-v3";
 const CORE_ASSETS = [
   "/",
   "/manifest.json",
