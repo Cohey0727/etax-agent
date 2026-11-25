@@ -172,11 +172,14 @@ const styles = {
     color: theme.color.muted,
     marginBottom: "4px",
   }),
-  chipRow: style({
-    display: "flex",
-    flexWrap: "wrap",
-    gap: theme.space.xs,
-    marginTop: "6px",
+  // 耐用年数フィールド：数値入力と候補セレクトをフィールド内の1行に収める。
+  lifeInput: style({
+    flex: "1 1 auto",
+    minWidth: 0,
+  }),
+  lifePreset: style({
+    flex: "0 0 auto",
+    width: "92px",
   }),
   hiddenFileInput: style({
     display: "none",

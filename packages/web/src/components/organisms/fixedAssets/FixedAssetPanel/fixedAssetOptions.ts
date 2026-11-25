@@ -34,8 +34,8 @@ export const INCOME_TYPE_LABELS: Record<string, string> = {
   real_estate: "不動産",
 };
 
-/** 耐用年数の入力補助チップ（よく使う年数）。 */
-export const USEFUL_LIFE_CHIPS: readonly number[] = [2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 47];
+/** 耐用年数の候補セレクトに出す、よく使う年数。候補に無い年数は数値入力で直接指定する。 */
+export const USEFUL_LIFE_PRESETS: readonly number[] = [2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 47];
 
 export const toInput = (row: FixedAssetRecord): FixedAssetInput => ({
   name: row.name,

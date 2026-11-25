@@ -1,7 +1,7 @@
 import { Button, Col, Input, Row, Select } from "@components/atoms";
 import { FixedAssetInput } from "@types";
 import styles from "./FixedAssetPanel.css";
-import { INCOME_TYPE_OPTIONS, METHOD_OPTIONS, USEFUL_LIFE_CHIPS } from "./fixedAssetOptions";
+import { INCOME_TYPE_OPTIONS, METHOD_OPTIONS, USEFUL_LIFE_PRESETS } from "./fixedAssetOptions";
 
 export interface FixedAssetFormProps {
   submitLabel: string;
@@ -93,25 +93,36 @@ export const FixedAssetForm = ({
         </div>
         <div>
           <label className={styles.fieldLabel} htmlFor="fa-life">耐用年数（年）</label>
-          <Input
-            id="fa-life"
-            type="number"
-            min={1}
-            step={1}
-            value={value.useful_life_years}
-            onChange={(e) => patch({ useful_life_years: Number(e.target.value) })}
-          />
-          <div className={styles.chipRow}>
-            {USEFUL_LIFE_CHIPS.map((years) => (
-              <Button
-                key={years}
-                variant={value.useful_life_years === years ? "tabActive" : "tab"}
-                onClick={() => patch({ useful_life_years: years })}
-              >
-                {years}年
-              </Button>
-            ))}
-          </div>
+          <Row gap="sm">
+            <Input
+              id="fa-life"
+              className={styles.lifeInput}
+              type="number"
+              min={1}
+              step={1}
+              value={value.useful_life_years}
+              onChange={(e) => patch({ useful_life_years: Number(e.target.value) })}
+            />
+            <Select
+              aria-label="耐用年数の候補から選ぶ"
+              className={styles.lifePreset}
+              value={
+                USEFUL_LIFE_PRESETS.includes(value.useful_life_years)
+                  ? value.useful_life_years
+                  : ""
+              }
+              onChange={(e) => patch({ useful_life_years: Number(e.target.value) })}
+            >
+              <option value="" disabled>
+                候補
+              </option>
+              {USEFUL_LIFE_PRESETS.map((years) => (
+                <option key={years} value={years}>
+                  {years}年
+                </option>
+              ))}
+            </Select>
+          </Row>
         </div>
         <div>
           <label className={styles.fieldLabel} htmlFor="fa-method">償却方法</label>
