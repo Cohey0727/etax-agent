@@ -1,0 +1,248 @@
+/**
+ * reconciliationService.test.ts — 消込サービス（検証・所有者分離・削除追随）の検証。
+ *
+ * REST と MCP が共用する services/reconciliation の検証ルール（二重消込の
+ * 防止、金額の範囲、未発行・削除済み取引の拒否）と、所有者分離、帳簿側で
+ * 取引が論理削除された場合に消込が集計から外れることを担保する。
+ * テスト用 PostgreSQL が必要。
+ */
+import { describe, expect, test } from "bun:test";
+import { createTestDb } from "./testDb";
+import { runWithTenant } from "../src/lib/tenantContext";
+import {
+  insertInvoice,
+  InvoiceHeaderDraft,
+  InvoiceLineDraft,
+  markInvoiceIssued,
+} from "../src/repositories/invoiceRepository";
+import { DocumentRow } from "../src/repositories/schema";
+import { fetchPaymentsResponse } from "../src/repositories/reconciliationRepository";
+import {
+  insertTransactionRow,
+  TransactionRow,
+  updateTransactionRow,
+} from "../src/repositories/transactionRepository";
+import { createUser } from "../src/repositories/userRepository";
+import {
+  applyInvoicePayment,
+  ReconciliationError,
+  releaseInvoicePayment,
+  suggestInvoicePayments,
+} from "../src/services/reconciliation/reconcileInvoice";
+import { Db } from "../src/lib/db";
+
+async function makeInvoice(db: Db, totalAmount: number, issue = true): Promise<DocumentRow> {
+  const header: InvoiceHeaderDraft = {
+    issue_date: "2026-03-01",
+    due_date: "2026-03-31",
+    counterparty_name: "株式会社テスト商事",
+    counterparty_address: "東京都港区芝公園4-2-8",
+    is_qualified: true,
+    tax_rounding: "floor",
+    memo: "",
+  };
+  const unitPrice = Math.round(totalAmount / 1.1);
+  const lines: InvoiceLineDraft[] = [
+    {
+      item_name: "Webサイト制作費",
+      quantity: 1,
+      unit: "式",
+      unit_price: unitPrice,
+      tax_rate_percent: 10,
+      is_reduced_rate: false,
+    },
+  ];
+  const created = await insertInvoice(db, header, lines, null);
+  if (!created) throw new Error("請求書の作成に失敗");
+  if (!issue) return created;
+  const issued = await markInvoiceIssued(db, created.id, "2026-0001", {
+    name: "山田太郎",
+    zip_code: "100-0001",
+    address: "東京都千代田区千代田1-1",
+    invoice_number: "T1234567890123",
+  });
+  if (!issued) throw new Error("発行に失敗");
+  return issued;
+}
+
+async function makeTx(db: Db, amount: number, description = "入金"): Promise<TransactionRow> {
+  return insertTransactionRow(db, {
+    date: "2026-03-15",
+    fiscalYear: 2026,
+    description,
+    amount,
+    account: "普通預金",
+    category: amount > 0 ? "売上高" : "支払手数料",
+    incomeType: "business",
+    taxCategory: "",
+  });
+}
+
+/** ReconciliationError の status を取り出す（投げられなければ null）。 */
+async function errorStatus(fn: () => Promise<unknown>): Promise<number | null> {
+  try {
+    await fn();
+    return null;
+  } catch (e) {
+    if (e instanceof ReconciliationError) return e.status;
+    throw e;
+  }
+}
+
+describe("消込サービスの検証ルール", () => {
+  test("未発行・支出取引・削除済み取引・存在しない請求書を拒否する", async () => {
+    const db = await createTestDb();
+    const draft = await makeInvoice(db, 110000, false);
+    const issued = await makeInvoice(db, 110000);
+    const income = await makeTx(db, 110000);
+    const expense = await makeTx(db, -440);
+    const deleted = await makeTx(db, 50000);
+    await updateTransactionRow(db, deleted.id, { deletedAt: new Date() });
+
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, { invoiceId: draft.id, transaction_id: income.id }),
+      ),
+    ).toBe(400);
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, { invoiceId: issued.id, transaction_id: expense.id }),
+      ),
+    ).toBe(400);
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, { invoiceId: issued.id, transaction_id: deleted.id }),
+      ),
+    ).toBe(400);
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, { invoiceId: 99999999, transaction_id: income.id }),
+      ),
+    ).toBe(404);
+  });
+
+  test("金額の範囲超過と二重消込を拒否する", async () => {
+    const db = await createTestDb();
+    const invoice = await makeInvoice(db, 110000);
+    const income = await makeTx(db, 110000);
+    // 充当額が請求残額を超える
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, { invoiceId: invoice.id, transaction_id: income.id, amount: 120000 }),
+      ),
+    ).toBe(400);
+    // 充当＋手数料が請求残額を超える
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, {
+          invoiceId: invoice.id,
+          transaction_id: income.id,
+          amount: 109000,
+          fee_amount: 2000,
+        }),
+      ),
+    ).toBe(400);
+    // 全額消込した後は、二重消込も入金の再利用もできない
+    await applyInvoicePayment(db, { invoiceId: invoice.id, transaction_id: income.id });
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, { invoiceId: invoice.id, transaction_id: income.id }),
+      ),
+    ).toBe(400);
+    const other = await makeInvoice(db, 55000);
+    expect(
+      await errorStatus(() =>
+        applyInvoicePayment(db, { invoiceId: other.id, transaction_id: income.id }),
+      ),
+    ).toBe(400);
+    // 存在しない消込の解除は 404
+    expect(await errorStatus(() => releaseInvoicePayment(db, other.id, 99999999))).toBe(404);
+  });
+
+  test("入金取引が論理削除されると消込は集計から外れ、解除で掃除できる", async () => {
+    const db = await createTestDb();
+    const invoice = await makeInvoice(db, 110000);
+    const income = await makeTx(db, 50000);
+    const applied = await applyInvoicePayment(db, {
+      invoiceId: invoice.id,
+      transaction_id: income.id,
+    });
+    expect(applied.settlement.status).toBe("partial");
+    const paymentId = applied.payments[0]?.id ?? 0;
+
+    await updateTransactionRow(db, income.id, { deletedAt: new Date() });
+    const afterDelete = await fetchPaymentsResponse(db, invoice);
+    expect(afterDelete.settlement.status).toBe("unpaid");
+    expect(afterDelete.settlement.settled_amount).toBe(0);
+    expect(afterDelete.payments).toHaveLength(0);
+
+    // レコード自体は残っているため、解除で掃除できる
+    const released = await releaseInvoicePayment(db, invoice.id, paymentId);
+    expect(released.settlement.status).toBe("unpaid");
+  });
+
+  test("差額調整の取引が論理削除されると調整分が集計から外れる", async () => {
+    const db = await createTestDb();
+    const invoice = await makeInvoice(db, 110000);
+    const income = await makeTx(db, 109560, "振込 株式会社テスト商事");
+    const applied = await applyInvoicePayment(db, {
+      invoiceId: invoice.id,
+      transaction_id: income.id,
+      fee_amount: 440,
+    });
+    expect(applied.settlement.status).toBe("paid");
+    const feeRow = applied.payments.find((p) => p.kind === "fee");
+    expect(feeRow).toBeDefined();
+
+    // fee 行の transaction_id が自動生成した支払手数料の取引そのもの
+    await updateTransactionRow(db, feeRow?.transaction_id ?? 0, {
+      deletedAt: new Date(),
+    });
+    const after = await fetchPaymentsResponse(db, invoice);
+    expect(after.settlement.status).toBe("partial");
+    expect(after.settlement.settled_amount).toBe(109560);
+  });
+});
+
+describe("消込の所有者分離", () => {
+  test("他ユーザーの請求書・取引は消込できず、候補にも出ない", async () => {
+    const db = await createTestDb();
+    const userA = await createUser(db, "recon-a@example.com", "password-123");
+    const userB = await createUser(db, "recon-b@example.com", "password-456");
+
+    const { invoiceA, incomeA } = await runWithTenant(userA.id, async () => ({
+      invoiceA: await makeInvoice(db, 110000),
+      incomeA: await makeTx(db, 110000, "振込 株式会社テスト商事"),
+    }));
+
+    // B からは A の請求書が見えない（404）
+    expect(
+      await runWithTenant(userB.id, () =>
+        errorStatus(() =>
+          applyInvoicePayment(db, { invoiceId: invoiceA.id, transaction_id: incomeA.id }),
+        ),
+      ),
+    ).toBe(404);
+    expect(
+      await runWithTenant(userB.id, () => errorStatus(() => suggestInvoicePayments(db, invoiceA.id))),
+    ).toBe(404);
+
+    // B の請求書に A の取引は紐付けできない（取引が見えないため 400）
+    const invoiceB = await runWithTenant(userB.id, () => makeInvoice(db, 110000));
+    expect(
+      await runWithTenant(userB.id, () =>
+        errorStatus(() =>
+          applyInvoicePayment(db, { invoiceId: invoiceB.id, transaction_id: incomeA.id }),
+        ),
+      ),
+    ).toBe(400);
+
+    // A の文脈では通常どおり消込でき、候補にも A の取引だけが出る
+    const candidates = await runWithTenant(userA.id, () => suggestInvoicePayments(db, invoiceA.id));
+    expect(candidates.map((c) => c.transaction.id)).toEqual([incomeA.id]);
+    const applied = await runWithTenant(userA.id, () =>
+      applyInvoicePayment(db, { invoiceId: invoiceA.id, transaction_id: incomeA.id }),
+    );
+    expect(applied.settlement.status).toBe("paid");
+  });
+});
