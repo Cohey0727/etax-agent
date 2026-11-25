@@ -494,12 +494,20 @@ const DOMAIN_HANDLERS: Record<string, McpToolHandler> = Object.assign(
 );
 
 /** REST の planGate（/api/etax/*）と対応する、課金対象の MCP ツール。 */
-const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set(["export_xtx", "export_consumption_xtx"]);
+const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set([
+  "export_xtx",
+  "export_consumption_xtx",
+  "export_return_pdf",
+  "export_opening_notice_pdf",
+  "export_blue_return_pdf",
+  "export_domicile_change_pdf",
+]);
 
 /**
  * プランゲート（REST 側 planGateMiddleware と同じ条件、Issue #8）。
- * SaaS モード（認証必須＋課金有効）のときだけ、XTX 出力系ツールは
- * 有効なプランを必須にする。ローカル運用・課金未設定では制限しない。
+ * SaaS モード（認証必須＋課金有効）のときだけ、/api/etax/* に対応する
+ * 出力系ツールは有効なプランを必須にする。ローカル運用・課金未設定では
+ * 制限しない。
  */
 async function assertPlanForGatedTool(name: string): Promise<void> {
   if (!PLAN_GATED_TOOLS.has(name)) return;
