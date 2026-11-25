@@ -18,6 +18,12 @@ const styles = {
     paddingTop: theme.space.md,
     borderTop: `1px solid ${theme.color.border}`,
     flexWrap: "wrap",
+    "@media": {
+      // 狭い画面ではテキスト列とボタン列を縦に積む。横並びのままだと
+      // ボタン列（縮まない）に押されてテキスト列が潰れ、本文が
+      // 1文字ずつ折り返す崩れになるため。
+      "(max-width: 640px)": { flexDirection: "column", alignItems: "stretch" },
+    },
   }),
   // 左側のテキスト列。縮められるようにして、右のボタンが改行しないようにする。
   itemMain: style({
@@ -34,6 +40,7 @@ const styles = {
     alignItems: "center",
     gap: theme.space.sm,
     fontWeight: theme.fontWeight.semibold,
+    flexWrap: "wrap",
   }),
   // 状態（済み）。アクセント色の小さな文字で示す。
   stateDone: style({
@@ -43,6 +50,8 @@ const styles = {
     backgroundColor: theme.color.accentSoft,
     borderRadius: theme.borderRadius.pill,
     padding: "2px 8px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
   // 状態（未）。
   stateTodo: style({
@@ -52,6 +61,8 @@ const styles = {
     backgroundColor: theme.color.lineSoft,
     borderRadius: theme.borderRadius.pill,
     padding: "2px 8px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   }),
 };
 
