@@ -50,6 +50,15 @@ export interface YearTaxParameters {
   workingStudentLimit: number;
   /** 給与所得控除の段階表（国税庁 No.1410 の速算表）。 */
   salaryDeductionTiers: readonly SalaryDeductionTier[];
+  /**
+   * 株式等に係る譲渡所得等の申告分離課税の所得税率（No.1463）。
+   * 所得税15%＋住民税5%＝20.315% のうち、確定申告で計算するのは
+   * 所得税分の 15%。復興特別所得税は基準所得税額への 2.1% として
+   * 別途計算される（15% × 1.021 = 15.315%）。
+   */
+  stockSeparateTaxRate: number;
+  /** 上場株式等の配当等の申告分離課税の所得税率（No.1330）。株式等と同じ 15%。 */
+  listedDividendSeparateTaxRate: number;
 }
 
 const INF = Number.POSITIVE_INFINITY;
@@ -135,6 +144,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 480_000,
     workingStudentLimit: 750_000,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
+    stockSeparateTaxRate: 0.15,
+    listedDividendSeparateTaxRate: 0.15,
   },
   2024: {
     basicDeductionTiers: BASIC_TIERS_2023_2024,
@@ -143,6 +154,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 480_000,
     workingStudentLimit: 750_000,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
+    stockSeparateTaxRate: 0.15,
+    listedDividendSeparateTaxRate: 0.15,
   },
   2025: {
     // 本則58万円＋令和7・8年分限りの上乗せ特例（措法41条の16の2）
@@ -162,6 +175,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 580_000,
     workingStudentLimit: 850_000,
     salaryDeductionTiers: SALARY_TIERS_2025,
+    stockSeparateTaxRate: 0.15,
+    listedDividendSeparateTaxRate: 0.15,
   },
   2026: {
     // 令和8年度税制改正後の本則（No.1199）。令和9年分と同額
@@ -172,6 +187,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 620_000,
     workingStudentLimit: 890_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
+    stockSeparateTaxRate: 0.15,
+    listedDividendSeparateTaxRate: 0.15,
   },
   2027: {
     // 令和9年分も令和8年分と同額（No.1199）
@@ -181,6 +198,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 620_000,
     workingStudentLimit: 890_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
+    stockSeparateTaxRate: 0.15,
+    listedDividendSeparateTaxRate: 0.15,
   },
 };
 

@@ -29,6 +29,12 @@
  * FORM_SEC には様式IDを列挙する。帳票の中身は CONTENTS 側が正。
  */
 import { DeductionInputs, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, computeManualIncomes } from "./deductions";
+import {
+  ExpandedIncomeBreakdown,
+  ExpandedIncomeInput,
+  computeExpandedIncomes,
+  isExpandedIncomeEmpty,
+} from "./expandedIncome";
 import { CorrectedFigures, FilingType } from "./taxcalc";
 import { DepreciationDetailRow } from "./depreciation";
 import { normalizeXtxTaxpayer } from "./taxpayerNormalize";
@@ -105,6 +111,8 @@ export interface XtxFilingData {
   miscIncome: MiscIncomeInput;
   /** 給与所得の入力（収入金額）。第一表オ・⑥に出力する。省略時は給与なし。 */
   salaryIncome?: SalaryIncomeInput;
+  /** 配当・一時・株式等譲渡の入力（Issue #27）。省略・全て空なら従来どおり。 */
+  expandedIncome?: ExpandedIncomeInput;
   /** 所得税の計算結果（控除・税額控除の内訳を含む） */
   tax: IncomeTaxResult;
   /** 勘定科目別の経費合計（決算書の経費欄に振り分ける） */
@@ -167,6 +175,7 @@ interface YearVersions {
   koa220: string;
   koa110: string;
   koa130: string;
+  koc080: string;
 }
 
 /**
@@ -176,10 +185,13 @@ interface YearVersions {
  * 連番パターンで 26.0.1（XSD は RKO0010-260.xsd）。
  */
 const YEAR_VERSIONS: Record<number, YearVersions> = {
-  2023: { procedure: "23.1.1", koa020: "21.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0" },
-  2024: { procedure: "24.0.1", koa020: "22.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0" },
-  2025: { procedure: "25.0.1", koa020: "23.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0" },
-  2026: { procedure: "26.0.1", koa020: "24.0", koa210: "12.0", koa220: "9.0", koa110: "13.0", koa130: "10.0" },
+  // KOC080（株式等に係る譲渡所得等の金額の計算明細書）の様式バージョンは
+  // 手続XSD（RKO0010）の include で確認: 2023=17.0 / 2024=18.0 / 2025=19.0。
+  // 2026年分の 20.0 は連番からの推定（2026年分の手続XSDは未同梱で検証不能）。
+  2023: { procedure: "23.1.1", koa020: "21.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koc080: "17.0" },
+  2024: { procedure: "24.0.1", koa020: "22.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koc080: "18.0" },
+  2025: { procedure: "25.0.1", koa020: "23.0", koa210: "11.0", koa220: "8.0", koa110: "12.0", koa130: "9.0", koc080: "19.0" },
+  2026: { procedure: "26.0.1", koa020: "24.0", koa210: "12.0", koa220: "9.0", koa110: "13.0", koa130: "10.0", koc080: "20.0" },
 };
 
 const SOFT_NAME = "eTaxAgent";
@@ -350,6 +362,12 @@ function buildIt(data: XtxFilingData): string {
 // KOA020 第一表
 // ---------------------------------------------------------------------------
 
+/** 拡張所得の決定的な内訳。入力が未指定・全て空なら undefined（従来どおりの申告書）。 */
+function expandedOf(data: XtxFilingData): ExpandedIncomeBreakdown | undefined {
+  if (!data.expandedIncome || isExpandedIncomeEmpty(data.expandedIncome)) return undefined;
+  return computeExpandedIncomes(data.expandedIncome);
+}
+
 function buildKoa020Face1(data: XtxFilingData): string {
   const t = data.taxpayer;
   const f = data.figures;
@@ -385,7 +403,10 @@ function buildKoa020Face1(data: XtxFilingData): string {
   if (toEraDate(t.birthDate)) taxpayer.push(ref("ABA00200", "BIRTHDAY"));
   if (phoneXml(t.phone)) taxpayer.push(ref("ABA00220", "NOZEISHA_TEL"));
   // 申告区分: 青色申告 = 1、白色申告 = 2
+  const expanded = expandedOf(data);
   const kinds: string[] = [kubun("ABA00240", data.filingType === "white" ? 2 : 1)];
+  // 分離区分: 第三表（申告分離課税）を使う場合は 1
+  if (expanded?.hasSeparateTaxation) kinds.push(kubun("ABA00250", 1));
   if (data.amendment) kinds.push(kubun("ABA00256", 1)); // 修正区分: 該当
   taxpayer.push(`<ABA00230>${kinds.join("")}</ABA00230>`);
   header.push(`<ABA00050>${taxpayer.join("")}</ABA00050>`);
@@ -407,6 +428,8 @@ function buildKoa020Face1(data: XtxFilingData): string {
     revenues.push(`<ABB00020>${amount("ABB00030", f.business_revenue)}</ABB00020>`);
   }
   revenues.push(amount("ABB00050", f.real_estate_revenue));
+  // 配当（総合課税分のみ。申告分離分は第三表、申告不要分は記載しない）
+  if (expanded) revenues.push(amount("ABB00070", expanded.dividend.comprehensiveRevenue));
   if (data.salaryIncome && data.salaryIncome.revenue > 0) {
     revenues.push(amountAlways("ABB00080", data.salaryIncome.revenue));
   }
@@ -429,6 +452,8 @@ function buildKoa020Face1(data: XtxFilingData): string {
     }
     revenues.push(`<ABB00090>${misc.join("")}</ABB00090>`);
   }
+  // 一時（収入金額。所得金額は1/2算入後の額を ABB00400 に出す）
+  if (expanded) revenues.push(amount("ABB00230", expanded.temp.revenue));
   if (revenues.length > 0) body.push(`<ABB00010>${revenues.join("")}</ABB00010>`);
 
   // 所得金額等
@@ -437,6 +462,8 @@ function buildKoa020Face1(data: XtxFilingData): string {
     incomes.push(`<ABB00280>${amountAlways("ABB00300", f._detail.business_income)}</ABB00280>`);
   }
   incomes.push(amount("ABB00340", f._detail.real_estate_income));
+  // 配当（総合課税分の所得金額）
+  if (expanded) incomes.push(amount("ABB00360", expanded.dividend.comprehensiveIncome));
   if (data.salaryIncome && data.salaryIncome.revenue > 0) {
     incomes.push(amountAlways("ABB00370", manual.salary));
   }
@@ -458,6 +485,8 @@ function buildKoa020Face1(data: XtxFilingData): string {
     miscParts.push(amountAlways("ABB01130", manual.miscTotal));
     incomes.push(`<ABB01050>${miscParts.join("")}</ABB01050>`);
   }
+  // 総合譲渡・一時（⑫）: 一時所得の1/2算入後の額（総合譲渡は対象外）
+  if (expanded) incomes.push(amount("ABB00400", expanded.temp.includedAmount));
   incomes.push(amountAlways("ABB00410", data.tax.totalIncome));
   body.push(`<ABB00270>${incomes.join("")}</ABB00270>`);
 
@@ -499,7 +528,13 @@ function buildKoa020Face1(data: XtxFilingData): string {
   // 外国税額控除等は所得税等の額から引く（ABB01040）。
   const differential = tax.taxAfterOtherCredits + c.flatReduction;
   const taxTotal = tax.standardIncomeTax + tax.reconstructionTaxGross;
-  taxCalc.push(amountAlways("ABB00580", tax.taxableIncome));
+  // 課税される所得金額: 第三表がある場合は総合＋分離課税分の合計
+  const taxableTotal =
+    tax.taxableIncome +
+    (expanded?.hasSeparateTaxation
+      ? tax.taxableSeparateStocks + tax.taxableSeparateDividends
+      : 0);
+  taxCalc.push(amountAlways("ABB00580", taxableTotal));
   taxCalc.push(amountAlways("ABB00590", tax.incomeTaxBase));
   taxCalc.push(amount("ABB00600", c.dividend));
   taxCalc.push(amount("ABB00650", c.housingLoan));
@@ -584,6 +619,222 @@ function buildKoa020Face2(data: XtxFilingData): string {
   const parts: string[] = [`<ABC00000>${header.join("")}</ABC00000>`];
   if (detail.length > 0) parts.push(`<ABH00000>${detail.join("")}</ABH00000>`);
   return `<KOA020-2 page="1">${parts.join("")}</KOA020-2>`;
+}
+
+// ---------------------------------------------------------------------------
+// KOA020 第三表（分離課税用）— Issue #27 Phase C
+// ---------------------------------------------------------------------------
+
+/**
+ * 第三表（KOA020-3）。申告分離課税の所得（株式等譲渡・上場配当）がある
+ * 場合のみ出力する。タグ対応は同梱の公式XSD（KOA020）で確認:
+ * 収入金額 ト=ABL00125（一般株式等）/ チ=ABL00130（上場株式等）/
+ * リ収入金額=ABL00137、所得金額 ト=ABL00305 / チ=ABL00310 /
+ * リ所得金額=ABL00325、税金の計算 ヲ=ABL00500（株式等）/
+ * ワ=ABL00505（配当）/ 税額 ル=ABL00600 / ヲ（配当）=ABL00610。
+ * 金額要素（gen:kingaku）は符号なしのため、赤字の区分の所得金額は
+ * 要素ごと省略する（損益通算・課税所得は正の区分と合計で表す）。
+ */
+function buildKoa020Face3(data: XtxFilingData): string {
+  const expanded = expandedOf(data);
+  if (!expanded || !expanded.hasSeparateTaxation) return "";
+  const t = data.taxpayer;
+  const tax = data.tax;
+
+  const header: string[] = [];
+  header.push(ref("ABK00010", "NENBUN"));
+  header.push(ref("ABK00020", "SHINKOKU_KBN"));
+  const taxpayer: string[] = [];
+  if (t.address) taxpayer.push(`<ABK00040>${ref("ABK00060", "NOZEISHA_ADR")}</ABK00040>`);
+  if (t.shopName) taxpayer.push(ref("ABK00066", "NOZEISHA_YAGO"));
+  if (t.nameKana) taxpayer.push(ref("ABK00070", "NOZEISHA_NM_KN"));
+  if (t.name) taxpayer.push(ref("ABK00080", "NOZEISHA_NM"));
+  if (taxpayer.length > 0) header.push(`<ABK00030>${taxpayer.join("")}</ABK00030>`);
+
+  const body: string[] = [];
+  // 収入金額
+  const revenues: string[] = [];
+  const stockRevenues: string[] = [];
+  stockRevenues.push(amount("ABL00125", expanded.stocks.general.revenue + expanded.stocks.general.otherRevenue));
+  stockRevenues.push(amount("ABL00130", expanded.stocks.listed.revenueTotal));
+  if (stockRevenues.some((s) => s !== "")) {
+    revenues.push(`<ABL00100>${stockRevenues.join("")}</ABL00100>`);
+  }
+  if (expanded.dividend.listedMode === "separate" && expanded.dividend.separateRevenue > 0) {
+    revenues.push(`<ABL00134>${amountAlways("ABL00137", expanded.dividend.separateRevenue)}</ABL00134>`);
+  }
+  if (revenues.length > 0) body.push(`<ABL00010><ABL00020>${revenues.join("")}</ABL00020></ABL00010>`);
+
+  // 所得金額（リは上場譲渡損失との損益通算後の額）
+  const incomes: string[] = [];
+  const stockIncomes: string[] = [];
+  stockIncomes.push(amount("ABL00305", Math.max(expanded.stocks.general.income, 0)));
+  stockIncomes.push(amount("ABL00310", Math.max(expanded.stocks.listed.income, 0)));
+  if (stockIncomes.some((s) => s !== "")) {
+    incomes.push(`<ABL00280>${stockIncomes.join("")}</ABL00280>`);
+  }
+  if (expanded.dividend.listedMode === "separate" && expanded.separateDividendIncome > 0) {
+    incomes.push(`<ABL00320>${amountAlways("ABL00325", expanded.separateDividendIncome)}</ABL00320>`);
+  }
+  if (incomes.length > 0) body.push(`<ABL00190><ABL00200>${incomes.join("")}</ABL00200></ABL00190>`);
+
+  // 税金の計算
+  const calc: string[] = [];
+  calc.push(amountAlways("ABL00440", tax.totalIncome));
+  calc.push(amountAlways("ABL00450", tax.deductionsTotal));
+  const taxable: string[] = [];
+  taxable.push(amountAlways("ABL00470", tax.taxableIncome));
+  taxable.push(amountAlways("ABL00500", tax.taxableSeparateStocks));
+  taxable.push(amountAlways("ABL00505", tax.taxableSeparateDividends));
+  calc.push(`<ABL00460>${taxable.join("")}</ABL00460>`);
+  const taxes: string[] = [];
+  taxes.push(amountAlways("ABL00550", tax.incomeTaxComprehensive));
+  taxes.push(amountAlways("ABL00600", tax.incomeTaxSeparateStocks));
+  taxes.push(amountAlways("ABL00610", tax.incomeTaxSeparateDividends));
+  calc.push(`<ABL00540>${taxes.join("")}</ABL00540>`);
+  calc.push(amountAlways("ABL00620", tax.incomeTaxBase));
+  body.push(`<ABL00430>${calc.join("")}</ABL00430>`);
+
+  // 上場株式等の譲渡所得等の源泉徴収税額の合計額
+  if (expanded.stocks.withholding > 0) {
+    body.push(amountAlways("ABL00867", expanded.stocks.withholding));
+  }
+
+  return `<KOA020-3 page="1"><ABK00000>${header.join("")}</ABK00000><ABL00000>${body.join("")}</ABL00000></KOA020-3>`;
+}
+
+// ---------------------------------------------------------------------------
+// KOC080 株式等に係る譲渡所得等の金額の計算明細書 — Issue #27 Phase C
+// ---------------------------------------------------------------------------
+
+/**
+ * 計算明細書（KOC080）。株式等譲渡の入力がある場合のみ生成する。
+ * 1面は一般株式等・上場株式等の収入・費用・差引・所得金額、
+ * 2面は源泉徴収口座（特定口座）の明細（様式の上限5行まで）。
+ * タグ対応は同梱の公式XSD（KOC080）で確認。金額要素は符号なしのため、
+ * 差引金額・所得金額が赤字の場合は要素ごと省略する。
+ */
+function buildKoc080(data: XtxFilingData, vr: string): string {
+  const expanded = expandedOf(data);
+  if (!expanded || !expanded.hasStockTransfer) return "";
+  const t = data.taxpayer;
+  const stocks = expanded.stocks;
+
+  const header: string[] = [];
+  header.push(ref("EHN00000", "NENBUN"));
+  if (t.taxOfficeName) header.push(ref("EHP00000", "ZEIMUSHO"));
+  const taxpayer: string[] = [];
+  if (t.address) taxpayer.push(ref("EHB00010", "NOZEISHA_ADR"));
+  const nameParts: string[] = [];
+  if (t.nameKana) nameParts.push(ref("EHB00040", "NOZEISHA_NM_KN"));
+  if (t.name) nameParts.push(ref("EHB00050", "NOZEISHA_NM"));
+  if (nameParts.length > 0) taxpayer.push(`<EHB00030>${nameParts.join("")}</EHB00030>`);
+  if (taxpayer.length > 0) header.push(`<EHB00000>${taxpayer.join("")}</EHB00000>`);
+
+  interface CategoryTags {
+    wrap: string;
+    revenueInner: string;
+    revenue: string;
+    otherRevenue: string;
+    subtotalRevenue: string;
+    costWrap: string;
+    cost: string;
+    fees: string;
+    otherExpenses: string;
+    subtotalCost: string;
+    diff: string;
+    income: string;
+  }
+  const categoryXml = (
+    tags: CategoryTags,
+    cat: { revenue: number; otherRevenue: number; acquisitionCost: number; transferFees: number; otherExpenses: number; income: number },
+  ): string => {
+    const revenueTotal = cat.revenue + cat.otherRevenue;
+    const costTotal = cat.acquisitionCost + cat.transferFees + cat.otherExpenses;
+    if (revenueTotal === 0 && costTotal === 0) return "";
+    const diff = revenueTotal - costTotal;
+    const parts: string[] = [];
+    parts.push(
+      `<${tags.revenueInner}>` +
+        amountAlways(tags.revenue, cat.revenue) +
+        amount(tags.otherRevenue, cat.otherRevenue) +
+        amountAlways(tags.subtotalRevenue, revenueTotal) +
+        `</${tags.revenueInner}>`,
+    );
+    parts.push(
+      `<${tags.costWrap}>` +
+        amountAlways(tags.cost, cat.acquisitionCost) +
+        amount(tags.fees, cat.transferFees) +
+        amount(tags.otherExpenses, cat.otherExpenses) +
+        amountAlways(tags.subtotalCost, costTotal) +
+        `</${tags.costWrap}>`,
+    );
+    if (diff > 0) parts.push(amountAlways(tags.diff, diff));
+    if (cat.income > 0) parts.push(amountAlways(tags.income, cat.income));
+    return `<${tags.wrap}>${parts.join("")}</${tags.wrap}>`;
+  };
+
+  const general = categoryXml(
+    {
+      wrap: "EHD00030", revenueInner: "EHD00040",
+      revenue: "EHD00050", otherRevenue: "EHD00060", subtotalRevenue: "EHD00070",
+      costWrap: "EHD00080", cost: "EHD00090", fees: "EHD00100", otherExpenses: "EHD00110",
+      subtotalCost: "EHD00130", diff: "EHD00140", income: "EHD00160",
+    },
+    stocks.general,
+  );
+  const listed = categoryXml(
+    {
+      wrap: "EHD00190", revenueInner: "EHD00200",
+      revenue: "EHD00210", otherRevenue: "EHD00220", subtotalRevenue: "EHD00230",
+      costWrap: "EHD00240", cost: "EHD00250", fees: "EHD00260", otherExpenses: "EHD00270",
+      subtotalCost: "EHD00290", diff: "EHD00300", income: "EHD00320",
+    },
+    // 1面の上場株式等欄は特定口座分を含む総額を書き、2面がその内訳になる
+    // （内訳の合算は shared の computeStockTransfer が済ませている）
+    {
+      revenue: stocks.listed.revenue,
+      otherRevenue: stocks.listed.otherRevenue,
+      acquisitionCost: stocks.listed.acquisitionCost,
+      transferFees: stocks.listed.transferFees,
+      otherExpenses: stocks.listed.otherExpenses,
+      income: stocks.listed.income,
+    },
+  );
+  const page1 =
+    `<KOC080-1 page="1">${header.join("")}` +
+    `<EHD00000>${general}${listed}</EHD00000></KOC080-1>`;
+
+  // 2面: 源泉徴収口座（特定口座）の明細。様式の繰り返し上限は5行
+  let page2 = "";
+  const accounts = data.expandedIncome?.stocks.specialAccounts ?? [];
+  if (accounts.length > 0) {
+    const rows = accounts.slice(0, 5).map((a) => {
+      const parts: string[] = [];
+      const broker: string[] = [];
+      if (a.brokerName) broker.push(`<EHQ00040>${esc(a.brokerName)}</EHQ00040>`);
+      if (a.branchName) broker.push(`<EHQ00070>${esc(a.branchName)}</EHQ00070>`);
+      if (broker.length > 0) parts.push(`<EHQ00030>${broker.join("")}</EHQ00030>`);
+      parts.push(amountAlways("EHQ00100", a.revenue));
+      parts.push(amountAlways("EHQ00110", a.cost));
+      if (a.revenue - a.cost > 0) parts.push(amountAlways("EHQ00120", a.revenue - a.cost));
+      parts.push(amount("EHQ00130", a.withholding));
+      return `<EHQ00010>${parts.join("")}</EHQ00010>`;
+    });
+    const totals = stocks.specialAccountsTotal;
+    const totalsParts: string[] = [];
+    totalsParts.push(amountAlways("EHQ00150", totals.revenue));
+    totalsParts.push(amountAlways("EHQ00160", totals.cost));
+    if (totals.revenue - totals.cost > 0) {
+      totalsParts.push(amountAlways("EHQ00170", totals.revenue - totals.cost));
+    }
+    totalsParts.push(amount("EHQ00180", totals.withholding));
+    page2 =
+      `<KOC080-2 page="2"><EHQ00000>${rows.join("")}` +
+      `<EHQ00140>${totalsParts.join("")}</EHQ00140></EHQ00000></KOC080-2>`;
+  }
+
+  return `<KOC080 VR="${vr}" id="KOC080" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${page1}${page2}</KOC080>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1262,7 +1513,7 @@ export function buildXtxFiling(data: XtxFilingData): string {
   forms.push({
     id: "KOA020",
     xml:
-      `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}</KOA020>`,
+      `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}${buildKoa020Face3(normalized)}</KOA020>`,
   });
   // 白色申告では青色申告決算書は添付せず、収支内訳書を添付する
   // （従来は申告種別によらず決算書が含まれていた不整合をここで解消）。
@@ -1281,6 +1532,10 @@ export function buildXtxFiling(data: XtxFilingData): string {
         : { id: "KOA220", xml: buildKoa220(normalized, versions.koa220) },
     );
   }
+  // 株式等に係る譲渡所得等の金額の計算明細書（KOC080）: 株式等譲渡の
+  // 入力がある場合に添付する（Issue #27 Phase C）
+  const koc080 = buildKoc080(normalized, versions.koc080);
+  if (koc080) forms.push({ id: "KOC080", xml: koc080 });
 
   const catalog =
     `<CATALOG id="CATALOG">` +

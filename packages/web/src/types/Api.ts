@@ -614,6 +614,48 @@ export interface ExportXtxRequest {
   original_third_period_tax: number | null;
   /** 貸借対照表の入力（事業所得分。保存済みの申告入力からワイヤ形式で渡す）。 */
   balance_sheet?: BalanceSheetWireInput;
+  /** 配当・一時・株式等譲渡の入力（ワイヤ形式、Issue #27）。 */
+  expanded_income?: ExpandedIncomeWireInput;
+}
+
+/** 拡張所得のワイヤ形式（Issue #27）。shared の ExpandedIncomeWire と同じ形。 */
+export interface ExpandedIncomeWireInput {
+  temp: { revenue: number; expenses: number };
+  dividend: {
+    listed_revenue: number;
+    listed_trust_revenue: number;
+    listed_withholding: number;
+    listed_mode: "comprehensive" | "separate" | "none";
+    general_revenue: number;
+    general_trust_revenue: number;
+    general_withholding: number;
+    interest_expense: number;
+  };
+  stocks: {
+    general: {
+      revenue: number;
+      other_revenue: number;
+      acquisition_cost: number;
+      transfer_fees: number;
+      other_expenses: number;
+    };
+    listed: {
+      revenue: number;
+      other_revenue: number;
+      acquisition_cost: number;
+      transfer_fees: number;
+      other_expenses: number;
+    };
+    listed_withholding: number;
+    special_accounts: {
+      broker_name: string;
+      branch_name: string;
+      withholding_account: boolean;
+      revenue: number;
+      cost: number;
+      withholding: number;
+    }[];
+  };
 }
 
 /** e-Tax 申告等データ（XTX）出力のレスポンス。 */

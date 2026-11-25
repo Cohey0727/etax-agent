@@ -12,13 +12,16 @@ import {
   EMPTY_MISC_INCOME,
   EMPTY_SALARY_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
+  ExpandedIncomeInput,
   FilingType,
   IncomeType,
   MiscIncomeInput,
   SalaryIncomeInput,
+  StockTransferCategoryInput,
   TaxCreditInputs,
   Transaction,
   VALID_INCOME_TYPES,
+  normalizeExpandedIncomeInput,
 } from "@etax/shared";
 import { Db, getDb } from "../../lib/db";
 import { databaseUnavailableMessage } from "../../lib/errors";
@@ -187,6 +190,67 @@ export function salaryIncomeArg(args: Record<string, unknown>): SalaryIncomeInpu
       : 0,
     adjustmentEligible: rec["adjustmentEligible"] === true,
   };
+}
+
+/**
+ * 拡張所得（配当・一時・株式等譲渡）の引数を入力形式に変換する。
+ * 内側は雑所得・給与と同じ camelCase 形式。未指定なら undefined、
+ * 指定があれば欠けた項目は正規化で補う。
+ */
+export function expandedIncomeArg(args: Record<string, unknown>): ExpandedIncomeInput | undefined {
+  const raw = args["expanded_income"];
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const rec = raw as Record<string, unknown>;
+  const obj = (v: unknown): Record<string, unknown> =>
+    typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
+  const num = (v: unknown): number =>
+    typeof v === "number" && Number.isFinite(v) ? Math.trunc(v) : 0;
+  const str = (v: unknown): string => (typeof v === "string" ? v : "");
+  const category = (v: unknown): StockTransferCategoryInput => {
+    const c = obj(v);
+    return {
+      revenue: num(c["revenue"]),
+      otherRevenue: num(c["otherRevenue"]),
+      acquisitionCost: num(c["acquisitionCost"]),
+      transferFees: num(c["transferFees"]),
+      otherExpenses: num(c["otherExpenses"]),
+    };
+  };
+  const dividend = obj(rec["dividend"]);
+  const stocks = obj(rec["stocks"]);
+  const accountsRaw = Array.isArray(stocks["specialAccounts"]) ? stocks["specialAccounts"] : [];
+  return normalizeExpandedIncomeInput({
+    temp: {
+      revenue: num(obj(rec["temp"])["revenue"]),
+      expenses: num(obj(rec["temp"])["expenses"]),
+    },
+    dividend: {
+      listedRevenue: num(dividend["listedRevenue"]),
+      listedTrustRevenue: num(dividend["listedTrustRevenue"]),
+      listedWithholding: num(dividend["listedWithholding"]),
+      listedMode: dividend["listedMode"] as never,
+      generalRevenue: num(dividend["generalRevenue"]),
+      generalTrustRevenue: num(dividend["generalTrustRevenue"]),
+      generalWithholding: num(dividend["generalWithholding"]),
+      interestExpense: num(dividend["interestExpense"]),
+    },
+    stocks: {
+      general: category(stocks["general"]),
+      listed: category(stocks["listed"]),
+      listedWithholding: num(stocks["listedWithholding"]),
+      specialAccounts: accountsRaw.map((a) => {
+        const account = obj(a);
+        return {
+          brokerName: str(account["brokerName"]),
+          branchName: str(account["branchName"]),
+          withholdingAccount: account["withholdingAccount"] === true,
+          revenue: num(account["revenue"]),
+          cost: num(account["cost"]),
+          withholding: num(account["withholding"]),
+        };
+      }),
+    },
+  });
 }
 
 /** 今日の日付（日本時間、YYYY-MM-DD）。 */

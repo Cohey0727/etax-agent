@@ -22,12 +22,15 @@ import {
   computeSimplifiedConsumptionReturn,
   computeSpecial20ConsumptionReturn,
   computeCorrectedFigures,
+  computeExpandedIncomes,
   computeIncomeTax,
   consumptionTax,
   depreciationForYear,
   estimateInputTax,
+  expandedWithholdingTotal,
   normalizeBusinessRatio,
   residentialRentTotal,
+  resolveTaxCreditInputs,
   computeManualIncomes,
   smallSpecialUsage,
   taxableSalesFromBreakdown,
@@ -83,6 +86,7 @@ import { ExportXtxRequest } from "../../schemas/etax";
 export type { McpToolDef, McpToolResult } from "./mcpToolKit";
 import type { McpToolDef, McpToolHandler, McpToolModule, McpToolResult } from "./mcpToolKit";
 import {
+  expandedIncomeArg,
   filingOptionsArg,
   filingTypeProperty,
   ledgerTransactions,
@@ -147,6 +151,11 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
         year: yearProperty,
         deductions: { type: "object", description: "所得控除の入力（DeductionInputs、camelCase）" },
         tax_credits: { type: "object", description: "税額控除の入力（TaxCreditInputs、camelCase）" },
+        expanded_income: {
+          type: "object",
+          description:
+            "配当・一時・株式等譲渡の入力（任意、camelCase）: temp{revenue,expenses}、dividend{listedRevenue,listedTrustRevenue,listedWithholding,listedMode(comprehensive/separate/none),generalRevenue,generalTrustRevenue,generalWithholding,interestExpense}、stocks{general/listed{revenue,otherRevenue,acquisitionCost,transferFees,otherExpenses},listedWithholding,specialAccounts[{brokerName,branchName,withholdingAccount,revenue,cost,withholding}]}。配当控除の対象額は配当の内訳から自動で決まる",
+        },
         filing_type: filingTypeProperty,
         real_estate_business_scale: realEstateScaleProperty,
       },
@@ -299,6 +308,11 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
           type: "object",
           description:
             "給与所得の入力（任意）: revenue（給与等の収入金額）, adjustmentEligible（所得金額調整控除の対象か）。所得金額は給与所得控除と調整控除で自動計算する",
+        },
+        expanded_income: {
+          type: "object",
+          description:
+            "配当・一時・株式等譲渡の入力（任意、camelCase）: temp{revenue,expenses}、dividend{listedRevenue,listedTrustRevenue,listedWithholding,listedMode(comprehensive/separate/none),generalRevenue,generalTrustRevenue,generalWithholding,interestExpense}、stocks{general/listed{revenue,otherRevenue,acquisitionCost,transferFees,otherExpenses},listedWithholding,specialAccounts[{brokerName,branchName,withholdingAccount,revenue,cost,withholding}]}。申告分離課税がある場合は第三表、株式等譲渡がある場合は計算明細書（KOC080）を添付する。源泉徴収税額は拡張分を自動加算する",
         },
         filing_type: filingTypeProperty,
         real_estate_business_scale: realEstateScaleProperty,
@@ -550,14 +564,23 @@ export async function dispatchMcpTool(
           miscIncomeArg(args),
           figures._detail.business_income + figures._detail.real_estate_income,
         );
+        const expandedInput = expandedIncomeArg(args);
+        const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
+        const baseTaxCredits = mergeTaxCreditInputs(args["tax_credits"]);
         const result = computeIncomeTax({
           year,
           totalIncome:
-            figures._detail.business_income + figures._detail.real_estate_income + manual.total,
+            figures._detail.business_income +
+            figures._detail.real_estate_income +
+            manual.total +
+            (expanded?.comprehensiveAddition ?? 0),
           deductions: mergeDeductionInputs(args["deductions"]),
-          taxCredits: mergeTaxCreditInputs(args["tax_credits"]),
+          taxCredits: expanded ? resolveTaxCreditInputs(baseTaxCredits, expanded) : baseTaxCredits,
+          separateTaxation: expanded
+            ? { stockIncome: expanded.separateStockIncome, dividendIncome: expanded.separateDividendIncome }
+            : undefined,
         });
-        return textResult(result);
+        return textResult(expanded ? { ...result, expanded_income: expanded } : result);
       }
       case "amendment_delta": {
         const original = args["original"];
@@ -704,12 +727,20 @@ export async function dispatchMcpTool(
           miscIncome,
           figures._detail.business_income + figures._detail.real_estate_income,
         );
+        const expandedInput = expandedIncomeArg(args);
+        const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
         const tax = computeIncomeTax({
           year,
           totalIncome:
-            figures._detail.business_income + figures._detail.real_estate_income + manual.total,
+            figures._detail.business_income +
+            figures._detail.real_estate_income +
+            manual.total +
+            (expanded?.comprehensiveAddition ?? 0),
           deductions,
-          taxCredits,
+          taxCredits: expanded ? resolveTaxCreditInputs(taxCredits, expanded) : taxCredits,
+          separateTaxation: expanded
+            ? { stockIncome: expanded.separateStockIncome, dividendIncome: expanded.separateDividendIncome }
+            : undefined,
         });
         const amendment = args["amendment"] === true;
         const assetRows = await listFixedAssetRows(db);
@@ -730,12 +761,15 @@ export async function dispatchMcpTool(
           deductionInputs: deductions,
           miscIncome,
           salaryIncome,
+          expandedIncome: expandedInput,
           tax,
           categoryTotals: {
             business: statementCategoryTotals(tx, "business"),
             realEstate: statementCategoryTotals(tx, "real_estate"),
           },
-          withholdingTax: typeof args["withholding_tax"] === "number" ? args["withholding_tax"] : 0,
+          withholdingTax:
+            (typeof args["withholding_tax"] === "number" ? args["withholding_tax"] : 0) +
+            (expanded ? expandedWithholdingTotal(expanded) : 0),
           prepaidTax: typeof args["prepaid_tax"] === "number" ? args["prepaid_tax"] : 0,
           originalThirdPeriodTax: typeof args["original_third_period_tax"] === "number"
             ? args["original_third_period_tax"]

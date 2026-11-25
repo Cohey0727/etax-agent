@@ -26,7 +26,7 @@ import { buildReturnPdf } from "../services/pdf/buildReturnPdf";
 import { loadJapaneseFont } from "../services/pdf/loadJapaneseFont";
 import { loadReturnFormTemplate } from "../services/pdf/loadReturnFormTemplate";
 import { buildReturnFormValues } from "../services/pdf/returnFormValues";
-import { toTaxpayer } from "./exportXtx";
+import { resolveExpandedTax, toTaxpayer } from "./exportXtx";
 
 export const exportReturnPdfRoute = createRoute({
   method: "post",
@@ -84,12 +84,20 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     miscIncome,
     figures._detail.business_income + figures._detail.real_estate_income,
   );
+  // 拡張所得（配当・一時・株式等譲渡）の配線は XTX 出力と共通。
+  // 税額・合計には反映するが、紙イメージへの配当・一時行の印字と
+  // 第三表の描画は未対応（提出データは XTX を使う）。
+  const expandedTax = resolveExpandedTax(body.expanded_income, body.tax_credits);
   const tax = computeIncomeTax({
     year: body.year,
     totalIncome:
-      figures._detail.business_income + figures._detail.real_estate_income + manual.total,
+      figures._detail.business_income +
+      figures._detail.real_estate_income +
+      manual.total +
+      expandedTax.comprehensiveAddition,
     deductions: body.deductions,
-    taxCredits: body.tax_credits,
+    taxCredits: expandedTax.taxCredits,
+    separateTaxation: expandedTax.separateTaxation,
   });
   const values = buildReturnFormValues({
     year: body.year,
@@ -102,7 +110,7 @@ export const exportReturnPdfHandler: RouteHandler<typeof exportReturnPdfRoute> =
     salaryIncome,
     manual,
     deductionInputs: body.deductions,
-    withholdingTax: body.withholding_tax,
+    withholdingTax: body.withholding_tax + expandedTax.withholdingAddition,
     prepaidTax: body.prepaid_tax,
     originalThirdPeriodTax: body.original_third_period_tax,
   });

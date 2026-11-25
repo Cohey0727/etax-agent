@@ -63,6 +63,72 @@ export const SalaryIncomeSchema = z
 
 export type SalaryIncomeRequest = z.infer<typeof SalaryIncomeSchema>;
 
+/** 一時所得の入力（ワイヤ形式、Issue #27 Phase A） */
+export const TempIncomeWireSchema = z
+  .object({
+    revenue: z.number(),
+    expenses: z.number(),
+  })
+  .openapi("TempIncomeWire");
+
+/** 配当所得の入力（ワイヤ形式、Issue #27 Phase B）。listed_mode は上場配当等全体の課税方式。 */
+export const DividendIncomeWireSchema = z
+  .object({
+    listed_revenue: z.number(),
+    listed_trust_revenue: z.number(),
+    listed_withholding: z.number(),
+    listed_mode: z.enum(["comprehensive", "separate", "none"]),
+    general_revenue: z.number(),
+    general_trust_revenue: z.number(),
+    general_withholding: z.number(),
+    interest_expense: z.number(),
+  })
+  .openapi("DividendIncomeWire");
+
+/** 株式等譲渡の区分（一般／上場）入力（ワイヤ形式、Issue #27 Phase C） */
+export const StockTransferCategoryWireSchema = z
+  .object({
+    revenue: z.number(),
+    other_revenue: z.number(),
+    acquisition_cost: z.number(),
+    transfer_fees: z.number(),
+    other_expenses: z.number(),
+  })
+  .openapi("StockTransferCategoryWire");
+
+/** 特定口座（源泉徴収口座）の明細行（ワイヤ形式、Issue #27 Phase C） */
+export const SpecialAccountWireSchema = z
+  .object({
+    broker_name: z.string(),
+    branch_name: z.string(),
+    withholding_account: z.boolean(),
+    revenue: z.number(),
+    cost: z.number(),
+    withholding: z.number(),
+  })
+  .openapi("SpecialAccountWire");
+
+/** 株式等譲渡の入力（ワイヤ形式、Issue #27 Phase C） */
+export const StockTransferWireSchema = z
+  .object({
+    general: StockTransferCategoryWireSchema,
+    listed: StockTransferCategoryWireSchema,
+    listed_withholding: z.number(),
+    special_accounts: z.array(SpecialAccountWireSchema),
+  })
+  .openapi("StockTransferWire");
+
+/** 拡張所得の入力（配当・一時・株式等譲渡、ワイヤ形式、Issue #27） */
+export const ExpandedIncomeWireSchema = z
+  .object({
+    temp: TempIncomeWireSchema,
+    dividend: DividendIncomeWireSchema,
+    stocks: StockTransferWireSchema,
+  })
+  .openapi("ExpandedIncomeWire");
+
+export type ExpandedIncomeWireRequest = z.infer<typeof ExpandedIncomeWireSchema>;
+
 /** 減価償却明細の元になる固定資産の入力（XTX出力用。台帳DBとは別に直接渡せる）。 */
 export const XtxFixedAssetSchema = z
   .object({
@@ -112,6 +178,8 @@ export const ExportXtxRequestSchema = z
     tax_credits: TaxCreditInputsSchema,
     misc_income: MiscIncomeSchema.optional(),
     salary_income: SalaryIncomeSchema.optional(),
+    /** 配当・一時・株式等譲渡の入力（Issue #27）。源泉徴収税額は拡張分を自動加算する */
+    expanded_income: ExpandedIncomeWireSchema.optional(),
     filing_type: z.enum(["blue65", "blue55", "blue10", "white"]).optional(),
     real_estate_business_scale: z.boolean().optional(),
     withholding_tax: z.number(),

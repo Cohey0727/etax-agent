@@ -30,6 +30,7 @@
  *   通常の医療費控除のみを計算する。
  */
 import { lookupTier, taxParametersFor } from "./taxParameters";
+import { separateTaxAmount } from "./expandedIncome";
 
 /** 円未満を切り捨てる。浮動小数の誤差吸収つき（taxcalc.ts と同じ流儀）。 */
 function floorYen(x: number): number {
@@ -420,20 +421,29 @@ export interface IncomeDeductionBreakdown {
   total: number;
 }
 
-/** 所得控除の内訳と合計を計算する。基礎控除は合計所得金額から自動で決まる。 */
+/**
+ * 所得控除の内訳と合計を計算する。基礎控除は合計所得金額から自動で決まる。
+ * grandTotalIncome（合計所得金額＝総合＋申告分離の所得金額）を渡すと、
+ * 基礎控除・配偶者（特別）控除・寡婦・ひとり親・勤労学生の所得要件の
+ * 判定にそちらを使う（これらの要件は合計所得金額が基準）。医療費控除の
+ * 足切り・寄附金控除の40%上限・雑損控除の10%は総所得金額等が基準のため、
+ * 常に totalIncome（総合課税分）で判定する。省略時は totalIncome と同じ。
+ */
 export function computeIncomeDeductions(
   year: number,
   totalIncome: number,
   inputs: DeductionInputs,
+  grandTotalIncome?: number,
 ): IncomeDeductionBreakdown {
   const t = amount(totalIncome);
+  const tg = grandTotalIncome !== undefined ? amount(grandTotalIncome) : t;
   // 寡婦・ひとり親は合計所得金額500万円以下が要件。両方に該当する場合は
   // ひとり親控除が優先し、寡婦控除は適用しない（排他）。
-  const singleParent = inputs.isSingleParent && t <= 5_000_000 ? 350_000 : 0;
-  const widow = inputs.isWidow && !inputs.isSingleParent && t <= 5_000_000 ? 270_000 : 0;
+  const singleParent = inputs.isSingleParent && tg <= 5_000_000 ? 350_000 : 0;
+  const widow = inputs.isWidow && !inputs.isSingleParent && tg <= 5_000_000 ? 270_000 : 0;
   // 勤労学生は合計所得金額が年度パラメータの上限以下が要件
   const workingStudent =
-    inputs.isWorkingStudent && t <= taxParametersFor(year).workingStudentLimit ? 270_000 : 0;
+    inputs.isWorkingStudent && tg <= taxParametersFor(year).workingStudentLimit ? 270_000 : 0;
   const breakdown: IncomeDeductionBreakdown = {
     casualtyLoss: inputs.casualtyLoss ? casualtyLossDeduction(inputs.casualtyLoss, totalIncome) : 0,
     medical: medicalDeduction(inputs.medicalExpensesPaid, inputs.medicalReimbursement, totalIncome),
@@ -446,11 +456,11 @@ export function computeIncomeDeductions(
     widow,
     singleParent,
     workingStudent,
-    spouse: spouseDeduction(inputs.spouseCategory, totalIncome),
-    spouseSpecial: spouseSpecialDeduction(year, inputs.spouseTotalIncome, totalIncome),
+    spouse: spouseDeduction(inputs.spouseCategory, tg),
+    spouseSpecial: spouseSpecialDeduction(year, inputs.spouseTotalIncome, tg),
     dependents: dependentDeduction(inputs.dependents),
     specialRelative: specialRelativeDeduction(year, inputs.specialRelativeTotalIncome),
-    basic: basicDeduction(year, totalIncome),
+    basic: basicDeduction(year, tg),
     total: 0,
   };
   breakdown.total =
@@ -997,24 +1007,54 @@ export function computeManualIncomes(
   };
 }
 
+/**
+ * 申告分離課税の所得（Issue #27 Phase C）。金額は損益通算後・
+ * 所得控除の配分前で、いずれも0以上。所得控除は総合課税分から先に
+ * 差し引き、引き切れない分を株式等→上場配当の順に配分する
+ * （分離課税への控除配分順のうち本スコープの区分）。
+ */
+export interface SeparateTaxationAmounts {
+  /** 株式等に係る譲渡所得等（一般＋上場の黒字分） */
+  stockIncome: number;
+  /** 上場株式等の配当等（申告分離選択分） */
+  dividendIncome: number;
+}
+
 export interface IncomeTaxOptions {
   year: number;
-  /** 合計所得金額（青色申告特別控除後・所得控除前） */
+  /** 合計所得金額のうち総合課税分（青色申告特別控除後・所得控除前） */
   totalIncome: number;
   deductions: DeductionInputs;
   taxCredits: TaxCreditInputs;
+  /** 申告分離課税の所得。省略時は分離課税なし（従来どおりの計算） */
+  separateTaxation?: SeparateTaxationAmounts;
 }
 
 export interface IncomeTaxResult {
   year: number;
+  /** 総合課税分の合計所得金額（分離課税分は含まない） */
   totalIncome: number;
+  /** 合計所得金額（総合課税分＋申告分離分） */
+  grandTotalIncome: number;
   deductions: IncomeDeductionBreakdown;
   /** 所得控除の合計 */
   deductionsTotal: number;
-  /** 課税所得金額（1,000円未満切捨て後） */
+  /** 課税総所得金額（総合課税分、1,000円未満切捨て後） */
   taxableIncome: number;
-  /** 所得税額（税額控除前） */
+  /** 課税株式等譲渡所得金額（申告分離、控除配分後・1,000円未満切捨て後） */
+  taxableSeparateStocks: number;
+  /** 課税上場株式等の配当等の金額（申告分離、控除配分後・1,000円未満切捨て後） */
+  taxableSeparateDividends: number;
+  /** 所得税額（税額控除前、総合課税分＋申告分離分の合計） */
   incomeTaxBase: number;
+  /** 所得税額のうち総合課税分（速算表） */
+  incomeTaxComprehensive: number;
+  /** 所得税額のうち株式等譲渡の申告分離分（15%） */
+  incomeTaxSeparateStocks: number;
+  /** 所得税額のうち上場配当の申告分離分（15%） */
+  incomeTaxSeparateDividends: number;
+  /** 所得税額のうち申告分離分の合計 */
+  incomeTaxSeparateTotal: number;
   taxCredits: TaxCreditBreakdown;
   /** 税額控除の合計 */
   taxCreditsTotal: number;
@@ -1041,11 +1081,30 @@ export interface IncomeTaxResult {
 export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
   const year = Math.trunc(options.year || 0);
   const totalIncome = amount(options.totalIncome);
-  const deductions = computeIncomeDeductions(year, totalIncome, options.deductions);
+  const separateStocks = amount(options.separateTaxation?.stockIncome ?? 0);
+  const separateDividends = amount(options.separateTaxation?.dividendIncome ?? 0);
+  const grandTotalIncome = totalIncome + separateStocks + separateDividends;
+  const deductions = computeIncomeDeductions(year, totalIncome, options.deductions, grandTotalIncome);
   const taxableRaw = Math.max(totalIncome - deductions.total, 0);
   const taxableIncome = Math.floor(taxableRaw / 1000) * 1000;
-  const incomeTaxBase = incomeTaxOnTaxableIncome(taxableIncome);
-  const taxCredits = computeTaxCredits(options.taxCredits, incomeTaxBase, taxableIncome, totalIncome);
+  // 所得控除の配分: 総合課税分で引き切れなかった分は、株式等→上場配当の
+  // 順に申告分離課税の所得から差し引く。各区分の課税所得金額は
+  // 1,000円未満を切り捨てる。
+  let excessDeductions = Math.max(deductions.total - totalIncome, 0);
+  const stocksAfterDeductions = Math.max(separateStocks - excessDeductions, 0);
+  excessDeductions = Math.max(excessDeductions - separateStocks, 0);
+  const dividendsAfterDeductions = Math.max(separateDividends - excessDeductions, 0);
+  const taxableSeparateStocks = Math.floor(stocksAfterDeductions / 1000) * 1000;
+  const taxableSeparateDividends = Math.floor(dividendsAfterDeductions / 1000) * 1000;
+  const incomeTaxComprehensive = incomeTaxOnTaxableIncome(taxableIncome);
+  const incomeTaxSeparateStocks = separateTaxAmount(year, "stocks", taxableSeparateStocks);
+  const incomeTaxSeparateDividends = separateTaxAmount(year, "listedDividend", taxableSeparateDividends);
+  const incomeTaxSeparateTotal = incomeTaxSeparateStocks + incomeTaxSeparateDividends;
+  const incomeTaxBase = incomeTaxComprehensive + incomeTaxSeparateTotal;
+  // 配当控除の1,000万円枠の判定に使う課税総所得金額等には、申告分離課税の
+  // 課税所得金額も含める（No.1250 の「課税総所得金額等」）。
+  const taxableForCredits = taxableIncome + taxableSeparateStocks + taxableSeparateDividends;
+  const taxCredits = computeTaxCredits(options.taxCredits, incomeTaxBase, taxableForCredits, totalIncome);
   const taxAfterOtherCredits = Math.max(
     incomeTaxBase - (taxCredits.total - taxCredits.foreignTax),
     0,
@@ -1057,10 +1116,17 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
   return {
     year,
     totalIncome,
+    grandTotalIncome,
     deductions,
     deductionsTotal: deductions.total,
     taxableIncome,
+    taxableSeparateStocks,
+    taxableSeparateDividends,
     incomeTaxBase,
+    incomeTaxComprehensive,
+    incomeTaxSeparateStocks,
+    incomeTaxSeparateDividends,
+    incomeTaxSeparateTotal,
     taxCredits,
     taxCreditsTotal: taxCredits.total,
     taxAfterOtherCredits,

@@ -1,13 +1,16 @@
 import {
   BlueDeductionOptions,
   computeCorrectedFigures,
+  computeExpandedIncomes,
   computeIncomeTax,
   computeManualIncomes,
   DeductionInputs,
+  ExpandedIncomeInput,
   MiscIncomeInput,
   SalaryIncomeInput,
   XtxBalanceSheetInput,
   filterYear,
+  resolveTaxCreditInputs,
   TaxCreditInputs,
   Transaction,
 } from "@etax/shared";
@@ -20,6 +23,7 @@ import {
   BalanceSummary,
   ConsumptionTaxPanel,
   DeductionPanel,
+  ExpandedIncomePanel,
   FilingPanel,
   FilingSection,
   FilingStatusToggle,
@@ -133,6 +137,11 @@ export const FilingWorkspace = ({
     setDeductionState(state);
     if (hydrated) saveDeductionState(year, state);
   };
+  const updateExpandedIncome = (next: ExpandedIncomeInput) => {
+    const state = { ...deductionState, expandedIncome: next };
+    setDeductionState(state);
+    if (hydrated) saveDeductionState(year, state);
+  };
   const updateBalanceSheet = (next: XtxBalanceSheetInput | null) => {
     const state = { ...deductionState, balanceSheet: next };
     setDeductionState(state);
@@ -164,17 +173,31 @@ export const FilingWorkspace = ({
     deductionState.miscIncome,
     computed._detail.business_income + computed._detail.real_estate_income,
   );
+  // 拡張所得（配当・一時・株式等譲渡）の内訳。総合課税分は合計所得へ加算し、
+  // 申告分離分は分離課税として計算する。配当控除の対象額は配当の内訳から
+  // 導出した額を優先する（税額控除パネルの手入力との二重適用を防ぐ）。
+  const expandedBreakdown = useMemo(
+    () => computeExpandedIncomes(deductionState.expandedIncome),
+    [deductionState.expandedIncome],
+  );
   const totalIncome =
-    computed._detail.business_income + computed._detail.real_estate_income + manualIncomes.total;
+    computed._detail.business_income +
+    computed._detail.real_estate_income +
+    manualIncomes.total +
+    expandedBreakdown.comprehensiveAddition;
   const taxResult = useMemo(
     () =>
       computeIncomeTax({
         year,
         totalIncome,
         deductions: deductionState.deductions,
-        taxCredits: deductionState.taxCredits,
+        taxCredits: resolveTaxCreditInputs(deductionState.taxCredits, expandedBreakdown),
+        separateTaxation: {
+          stockIncome: expandedBreakdown.separateStockIncome,
+          dividendIncome: expandedBreakdown.separateDividendIncome,
+        },
       }),
-    [year, totalIncome, deductionState],
+    [year, totalIncome, deductionState, expandedBreakdown],
   );
 
   // 確定スナップショット（前回確定との比較用）。確定は総合タブと控除タブの
@@ -226,6 +249,7 @@ export const FilingWorkspace = ({
           taxCredits={deductionState.taxCredits}
           miscIncome={deductionState.miscIncome}
           salaryIncome={deductionState.salaryIncome}
+          expandedIncome={deductionState.expandedIncome}
           filingType={deductionState.filingType}
           realEstateBusinessScale={deductionState.realEstateBusinessScale}
           balanceSheet={deductionState.balanceSheet}
@@ -273,6 +297,12 @@ export const FilingWorkspace = ({
       <>
         <SalaryPanel year={year} salaryIncome={deductionState.salaryIncome} onChange={updateSalaryIncome} />
         <MiscIncomePanel miscIncome={deductionState.miscIncome} onChange={updateMiscIncome} />
+        <ExpandedIncomePanel
+          expandedIncome={deductionState.expandedIncome}
+          breakdown={expandedBreakdown}
+          taxResult={taxResult}
+          onChange={updateExpandedIncome}
+        />
         <DeductionPanel
           year={year}
           deductions={deductionState.deductions}
@@ -289,6 +319,7 @@ export const FilingWorkspace = ({
         <TaxCreditPanel
           taxCredits={deductionState.taxCredits}
           result={taxResult}
+          dividendCreditDerived={expandedBreakdown.dividendDeclared}
           onChange={updateTaxCredits}
         />
         <ConfirmComparePanel year={year} snapshots={snapshots} currentFigures={currentFigures} />
