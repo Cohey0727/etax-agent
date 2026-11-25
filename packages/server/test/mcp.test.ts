@@ -151,6 +151,56 @@ describe("MCP エンドポイント", () => {
     expect(parsedAgg["business_revenue"]).toBe(100000);
   });
 
+  test("add_transaction / update_transaction で事業割合と按分根拠を扱える（Issue #26）", async () => {
+    const db = await createTestDb();
+    const user = await createUser(db, "ratio-mcp@example.com", "password-123");
+    const { key } = await createApiKey(db, user.id, "ratio");
+
+    const added = await mcp(
+      "tools/call",
+      {
+        name: "add_transaction",
+        arguments: {
+          date: "2026-03-01",
+          description: "家賃",
+          amount: -120000,
+          category: "地代家賃",
+          income_type: "business",
+          business_ratio_percent: 50,
+          business_ratio_basis: "面積割合",
+        },
+      },
+      key,
+    );
+    expect(added.body.result?.isError).toBeUndefined();
+    const addedTx = toolJson(added)["transaction"] as {
+      id: number;
+      business_ratio_percent: number;
+      business_ratio_basis: string;
+    };
+    expect(addedTx.business_ratio_percent).toBe(50);
+    expect(addedTx.business_ratio_basis).toBe("面積割合");
+
+    const updated = await mcp(
+      "tools/call",
+      {
+        name: "update_transaction",
+        arguments: { id: addedTx.id, business_ratio_percent: 25 },
+      },
+      key,
+    );
+    const updatedTx = toolJson(updated)["transaction"] as { business_ratio_percent: number };
+    expect(updatedTx.business_ratio_percent).toBe(25);
+
+    // 集計（aggregate_year）は事業分で計算される: 経費は 120,000 × 25% = 30,000
+    const agg = await mcp(
+      "tools/call",
+      { name: "aggregate_year", arguments: { year: 2026 } },
+      key,
+    );
+    expect(toolJson(agg)["business_expenses"]).toBe(30000);
+  });
+
   test("認証必須モードではトークンなし・不正トークンは 401", async () => {
     await createTestDb();
     const noToken = await mcp("tools/list", {});
