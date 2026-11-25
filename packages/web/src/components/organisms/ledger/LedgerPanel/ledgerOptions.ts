@@ -31,6 +31,8 @@ export const toInput = (row: LedgerTransaction): LedgerTransactionInput => ({
   category: row.category,
   income_type: row.income_type,
   tax_category: row.tax_category,
+  business_ratio_percent: row.business_ratio_percent ?? 100,
+  business_ratio_basis: row.business_ratio_basis ?? "",
 });
 
 export const emptyDraft = (fiscalYear: number): LedgerTransactionInput => ({
@@ -42,7 +44,27 @@ export const emptyDraft = (fiscalYear: number): LedgerTransactionInput => ({
   category: "未分類",
   income_type: "business",
   tax_category: "",
+  business_ratio_percent: 100,
+  business_ratio_basis: "",
 });
+
+/**
+ * 家事按分を設定しやすい科目（自宅家賃・光熱費・通信費など）。
+ * これらの科目では割合入力の近くに軽いガイドを出す。割合の妥当性は
+ * 判定しない（税理士法フェンシング: 案内のみに留める）。
+ */
+export const BUSINESS_RATIO_GUIDE_CATEGORIES: ReadonlySet<string> = new Set([
+  "地代家賃",
+  "水道光熱費",
+  "通信費",
+  "車両費",
+  "租税公課",
+  "保険料",
+]);
+
+/** 按分ガイドの文言（候補科目で割合が100%のときだけ出す）。 */
+export const BUSINESS_RATIO_GUIDE_TEXT =
+  "家事按分がある場合は事業割合を設定してください（例: 家賃は面積割合、通信費は使用時間割合）";
 
 /** ページネーションの並び。先頭・末尾と現在ページの前後だけ出し、間は「…」で畳む。 */
 export function pageList(current: number, total: number): readonly (number | "gap")[] {

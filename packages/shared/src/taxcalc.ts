@@ -105,6 +105,51 @@ return floorYen((salesInclTax * 10) / 110);
 }
 
 // ---------------------------------------------------------------------------
+// 家事按分（事業分金額の算出）
+// ---------------------------------------------------------------------------
+
+/**
+ * 按分の端数処理方式（定数）。事業分は取引単位で、金額の絶対値に割合を
+ * 掛けた余りを切り捨てる（端数は私用分に寄せる）。この方式により
+ * 事業分＋私用分＝元の金額 が常に成り立つ。方式を変える場合は
+ * この定数と businessPortionAmount の1か所だけを変更する。
+ */
+export const BUSINESS_PORTION_ROUNDING = "truncate" as const;
+
+/** 事業割合（0〜100）に正規化する。未指定・不正値は 100（全額事業分）。 */
+export function normalizeBusinessRatio(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 100;
+  return Math.min(100, Math.max(0, Math.trunc(value)));
+}
+
+/** 取引の事業割合（0〜100）。未指定は 100。 */
+export function businessRatioOf(transaction: Transaction): number {
+  return normalizeBusinessRatio(transaction.business_ratio_percent);
+}
+
+/**
+ * 金額（符号つき）と事業割合から事業分金額を求める（符号つき）。
+ * 端数処理は BUSINESS_PORTION_ROUNDING（取引単位・絶対値の切り捨て）。
+ */
+export function businessPortionAmount(amount: number, businessRatioPercent: number): number {
+  const truncated = Math.trunc(amount || 0);
+  const ratio = normalizeBusinessRatio(businessRatioPercent);
+  if (ratio === 100) return truncated;
+  if (ratio === 0 || truncated === 0) return 0;
+  const magnitude = Math.floor((Math.abs(truncated) * ratio) / 100);
+  if (magnitude === 0) return 0;
+  return (truncated < 0 ? -1 : 1) * magnitude;
+}
+
+/**
+ * 取引の事業分金額。必要経費の集計・月次集計・決算書・試算表など、
+ * 金額を集計する経路はすべてこの関数経由に統一する（単一の決定的関数）。
+ */
+export function transactionBusinessAmount(transaction: Transaction): number {
+  return businessPortionAmount(transaction.amount, businessRatioOf(transaction));
+}
+
+// ---------------------------------------------------------------------------
 // 所得の集計（事業所得 / 不動産所得）
 // ---------------------------------------------------------------------------
 
@@ -132,7 +177,7 @@ otherRevenue: 0,
 otherExpenses: 0,
 };
 for (const t of transactions) {
-const amount = Math.trunc(t.amount || 0);
+const amount = transactionBusinessAmount(t);
 const itype = t.income_type || "other";
 if (itype === "business") {
 if (amount >= 0) b.businessRevenue += amount;
@@ -326,7 +371,8 @@ export const NON_TAXABLE_EXPENSE_CATEGORIES: ReadonlySet<string> = new Set([
 export function estimateInputTax(transactions: Transaction[]): number {
 let total = 0;
 for (const t of transactions) {
-const amount = Math.trunc(t.amount || 0);
+// 課税仕入れの母数は事業分のみ（家事按分後の金額。消基通11-1-5）。
+const amount = transactionBusinessAmount(t);
 if (amount >= 0) continue;
 if (NON_TAXABLE_EXPENSE_CATEGORIES.has(t.category || "")) continue;
 total += -amount;
@@ -400,7 +446,7 @@ export function computeCorrectedFigures(
   // taxcalc の独立性（ledger に依存しない）を保つためここで数える。
   let rent = 0;
   for (const t of transactions) {
-    const amount = Math.trunc(t.amount || 0);
+    const amount = transactionBusinessAmount(t);
     if (
       (t.income_type || "") === "real_estate" &&
       RESIDENTIAL_RENT_CATEGORIES.has(t.category || "") &&

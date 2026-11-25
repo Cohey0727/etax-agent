@@ -27,6 +27,8 @@ import {
   FixedAssetInput,
   FixedAssetRecord,
   FreeeTrialBalance,
+  FetchTrialBalanceRequest,
+  TrialBalanceResponse,
   ImportCsvResponse,
   LedgerTransaction,
   LedgerTransactionInput,
@@ -434,6 +436,13 @@ export async function deleteFixedAssetImage(assetId: number, fileId: string): Pr
 }
 
 /** freee試算表（取り込み済みの実績データ）。未取り込みなら null。 */
+/** 試算表レポート（当年＋前年）を計算系APIから取得する。 */
+export async function fetchTrialBalance(
+  request: FetchTrialBalanceRequest,
+): Promise<TrialBalanceResponse> {
+  return postJson<TrialBalanceResponse>("/api/calc/trial-balance", request);
+}
+
 export async function fetchFreeeTrialBalance(): Promise<FreeeTrialBalance | null> {
   try {
     const resp = await fetch("/api/freee/trial-balance");
@@ -635,6 +644,10 @@ export function ledgerRowToTransaction(row: LedgerTransaction): Transaction {
     category: row.category,
     income_type: incomeType,
     tax_category: row.tax_category ?? "",
+    // 旧サーバーの応答など割合が無い場合は未指定（100）として扱う
+    business_ratio_percent:
+      typeof row.business_ratio_percent === "number" ? row.business_ratio_percent : undefined,
+    business_ratio_basis: row.business_ratio_basis ?? undefined,
   };
 }
 
@@ -649,6 +662,8 @@ export function transactionToLedgerInput(tx: Transaction): LedgerTransactionInpu
     category: tx.category,
     income_type: tx.income_type,
     tax_category: tx.tax_category,
+    business_ratio_percent: tx.business_ratio_percent ?? 100,
+    business_ratio_basis: tx.business_ratio_basis ?? "",
   };
 }
 

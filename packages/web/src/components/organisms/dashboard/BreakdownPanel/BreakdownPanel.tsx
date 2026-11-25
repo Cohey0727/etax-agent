@@ -1,4 +1,4 @@
-import { filterYear, Transaction } from "@etax/shared";
+import { filterYear, transactionBusinessAmount, Transaction } from "@etax/shared";
 import { useMemo } from "react";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
@@ -33,12 +33,13 @@ export const BreakdownPanel = ({ transactions, year }: BreakdownPanelProps) => {
     () => yearTransactions.filter((t) => t.income_type !== "other"),
     [yearTransactions],
   );
+  // 金額は事業分（家事按分後）で集計し、申告画面の内訳と揃える。
   const income = useMemo(
-    () => sumByCategory(scopedTransactions.filter((t) => t.amount > 0), false),
+    () => sumByCategory(scopedTransactions.filter((t) => transactionBusinessAmount(t) > 0), false),
     [scopedTransactions],
   );
   const expenses = useMemo(
-    () => sumByCategory(scopedTransactions.filter((t) => t.amount < 0), true),
+    () => sumByCategory(scopedTransactions.filter((t) => transactionBusinessAmount(t) < 0), true),
     [scopedTransactions],
   );
   if (yearTransactions.length === 0) return null;
@@ -131,11 +132,12 @@ const BreakdownColumn = ({ title, rows, total }: BreakdownColumnProps) => {
   );
 };
 
-// 科目ごとに合計する。支出（マイナス）は絶対値で積む。金額の大きい順。
+// 科目ごとに事業分を合計する。支出（マイナス）は絶対値で積む。金額の大きい順。
 function sumByCategory(transactions: Transaction[], absolute: boolean): CategoryAmount[] {
   const totals = new Map<string, number>();
   for (const t of transactions) {
-    const amount = absolute ? Math.abs(Math.trunc(t.amount)) : Math.trunc(t.amount);
+    const businessAmount = transactionBusinessAmount(t);
+    const amount = absolute ? Math.abs(businessAmount) : businessAmount;
     totals.set(t.category, (totals.get(t.category) ?? 0) + amount);
   }
   return [...totals.entries()]

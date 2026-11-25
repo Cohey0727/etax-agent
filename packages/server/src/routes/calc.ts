@@ -8,6 +8,10 @@ import {
   calculateAggregateRoute,
 } from "../usecases/calculateAggregate";
 import {
+  calculateTrialBalanceHandler,
+  calculateTrialBalanceRoute,
+} from "../usecases/calculateTrialBalance";
+import {
   calculateAmendmentHandler,
   calculateAmendmentRoute,
   calculateAmendmentValidationMessage,
@@ -25,6 +29,11 @@ const app = new OpenAPIHono();
 app.openapi(
   calculateAggregateRoute,
   calculateAggregateHandler,
+  legacyValidationHook(() => "JSONボディが必要です"),
+);
+app.openapi(
+  calculateTrialBalanceRoute,
+  calculateTrialBalanceHandler,
   legacyValidationHook(() => "JSONボディが必要です"),
 );
 app.openapi(

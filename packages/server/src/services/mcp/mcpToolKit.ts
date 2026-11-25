@@ -85,6 +85,8 @@ export function rowsToTransactions(rows: TransactionRow[], year: number): Transa
       category: row.category,
       income_type: row.incomeType as IncomeType,
       tax_category: row.taxCategory,
+      business_ratio_percent: row.businessRatioPercent,
+      business_ratio_basis: row.businessRatioBasis,
     }));
 }
 

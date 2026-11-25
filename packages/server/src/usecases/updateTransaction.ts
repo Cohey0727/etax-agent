@@ -5,6 +5,7 @@
  * 従来順序で返すため（ルート定義にボディは置かない）。
  * 指定されたフィールドだけを更新する（従来どおりの部分更新）。
  */
+import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
@@ -81,6 +82,10 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
   if (body.category !== undefined) patch.category = body.category;
   if (body.income_type !== undefined) patch.incomeType = body.income_type;
   if (body.tax_category !== undefined) patch.taxCategory = body.tax_category;
+  if (typeof body.business_ratio_percent === "number" && Number.isFinite(body.business_ratio_percent)) {
+    patch.businessRatioPercent = normalizeBusinessRatio(body.business_ratio_percent);
+  }
+  if (body.business_ratio_basis !== undefined) patch.businessRatioBasis = body.business_ratio_basis;
   let row;
   try {
     row = await updateTransactionRow(db, id, patch);

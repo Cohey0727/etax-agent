@@ -1,5 +1,6 @@
 import { TAX_CATEGORIES } from "@etax/shared";
 import {
+  Badge,
   Button,
   Col,
   Input,
@@ -12,6 +13,8 @@ import {
 } from "@components/atoms";
 import { LedgerTransaction, LedgerTransactionInput } from "@types";
 import {
+  BUSINESS_RATIO_GUIDE_CATEGORIES,
+  BUSINESS_RATIO_GUIDE_TEXT,
   CATEGORY_OPTIONS,
   INCOME_TYPE_OPTIONS,
   PAGE_SIZE,
@@ -54,9 +57,21 @@ export const LedgerTable = ({
   onDelete: (row: LedgerTransaction) => void;
   onPageChange: (page: number) => void;
 }) => {
+  // 按分候補科目で割合が未設定（100%）の行があれば、軽いガイドを出す。
+  const showRatioGuide = displayedRows.some((row) => {
+    const edit = edits[row.id] ?? toInput(row);
+    return (
+      BUSINESS_RATIO_GUIDE_CATEGORIES.has(edit.category) && edit.business_ratio_percent >= 100
+    );
+  });
   return (
     <>
-      <Row gap="sm" align="center" justify="end">
+      <Row gap="sm" align="center" justify="spaceBetween">
+        {showRatioGuide ? (
+          <Text variant="caption">{BUSINESS_RATIO_GUIDE_TEXT}</Text>
+        ) : (
+          <span />
+        )}
         <Text variant="muted">{visibleCount}件ヒット</Text>
       </Row>
       <div className={styles.tableWrap}>
@@ -70,6 +85,7 @@ export const LedgerTable = ({
               <TableHeaderCell>勘定科目</TableHeaderCell>
               <TableHeaderCell>区分</TableHeaderCell>
               <TableHeaderCell>税区分</TableHeaderCell>
+              <TableHeaderCell>事業割合</TableHeaderCell>
               <TableHeaderCell>出所</TableHeaderCell>
               <TableHeaderCell className={styles.actionsHeader}>操作</TableHeaderCell>
             </tr>
@@ -175,6 +191,41 @@ export const LedgerTable = ({
                         <option value={edit.tax_category}>{edit.tax_category}</option>
                       ) : null}
                     </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Col gap="sm">
+                      <Row gap="sm" align="center">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          className={`${styles.ratioInput} ${styles.cellControl}`}
+                          value={edit.business_ratio_percent}
+                          onChange={(e) =>
+                            onEdit(row.id, {
+                              business_ratio_percent: Number(e.target.value),
+                            })
+                          }
+                          aria-label="事業割合（%）"
+                        />
+                        <Text variant="muted">%</Text>
+                        {edit.business_ratio_percent < 100 ? (
+                          <Badge>按分 {edit.business_ratio_percent}%</Badge>
+                        ) : null}
+                      </Row>
+                      {edit.business_ratio_percent < 100 ? (
+                        <Input
+                          className={`${styles.basisInput} ${styles.cellControl}`}
+                          value={edit.business_ratio_basis}
+                          onChange={(e) =>
+                            onEdit(row.id, { business_ratio_basis: e.target.value })
+                          }
+                          placeholder="按分根拠（任意）"
+                          aria-label="按分根拠"
+                        />
+                      ) : null}
+                    </Col>
                   </TableCell>
                   <TableCell>
                     <Input

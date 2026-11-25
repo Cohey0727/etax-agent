@@ -2,7 +2,7 @@
  * importRepository.ts — 取込履歴（imports）テーブルへのデータアクセス（repositories）。
  */
 import { desc, eq } from "drizzle-orm";
-import { Transaction } from "@etax/shared";
+import { Transaction, normalizeBusinessRatio } from "@etax/shared";
 import { Db } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { CsvMapping } from "../schemas/importCsv";
@@ -81,6 +81,8 @@ export async function createImportWithTransactions(
               category: t.category,
               incomeType: t.income_type,
               taxCategory: t.tax_category,
+              businessRatioPercent: normalizeBusinessRatio(t.business_ratio_percent),
+              businessRatioBasis: t.business_ratio_basis ?? "",
               importId,
               ownerUserId,
             })),

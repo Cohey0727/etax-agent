@@ -590,8 +590,8 @@ function buildKoa020Face2(data: XtxFilingData): string {
 // KOA210 青色申告決算書（一般用）1ページ目
 // ---------------------------------------------------------------------------
 
-/** KOA210 の固定経費欄（勘定科目名 → タグ）。 */
-const KOA210_EXPENSE_LINES: [string, string][] = [
+/** KOA210 の固定経費欄（勘定科目名 → タグ）。試算表も同じ並びを使うため export する。 */
+export const KOA210_EXPENSE_LINES: [string, string][] = [
   ["租税公課", "AMF00190"],
   ["荷造運賃", "AMF00200"],
   ["水道光熱費", "AMF00210"],
@@ -687,8 +687,8 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
 // KOA220 青色申告決算書（不動産所得用）1ページ目
 // ---------------------------------------------------------------------------
 
-/** KOA220 の固定経費欄（勘定科目名 → タグ）。 */
-const KOA220_EXPENSE_LINES: [string, string][] = [
+/** KOA220 の固定経費欄（勘定科目名 → タグ）。試算表も同じ並びを使うため export する。 */
+export const KOA220_EXPENSE_LINES: [string, string][] = [
   ["租税公課", "ANF00130"],
   ["損害保険料", "ANF00140"],
   ["修繕費", "ANF00150"],
@@ -1090,8 +1090,8 @@ function buildDepreciationDetail(rows: DepreciationDetailRow[], tags: DepDetailT
   return `<${tags.group}>${body.join("")}</${tags.group}>`;
 }
 
-/** 貸借対照表の資産勘定: [キー, 期首タグ, 期末タグ] */
-const BS_ASSET_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
+/** 貸借対照表の資産勘定: [キー, 期首タグ, 期末タグ]。試算表も同じ並びを使うため export する。 */
+export const BS_ASSET_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
   ["cash", "AMG00060", "AMG00260"],
   ["checking_deposit", "AMG00070", "AMG00270"],
   ["time_deposit", "AMG00080", "AMG00280"],
@@ -1110,8 +1110,8 @@ const BS_ASSET_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
   ["land", "AMG00210", "AMG00410"],
 ];
 
-/** 貸借対照表の負債勘定（貸倒引当金・元入金は別枠）: [キー, 期首タグ, 期末タグ] */
-const BS_LIABILITY_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
+/** 貸借対照表の負債勘定（貸倒引当金・元入金は別枠）: [キー, 期首タグ, 期末タグ]。試算表も同じ並びを使うため export する。 */
+export const BS_LIABILITY_ACCOUNTS: [BalanceSheetAccount, string, string][] = [
   ["notes_payable", "AMG00510", "AMG00640"],
   ["accounts_payable", "AMG00520", "AMG00650"],
   ["borrowings", "AMG00530", "AMG00660"],

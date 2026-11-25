@@ -29,6 +29,14 @@ export interface Transaction {
    * この区分で帳簿を集計して決める。"" は未設定（集計から漏れる）。
    */
   tax_category: string;
+  /**
+   * 事業専用割合（家事按分、0〜100の整数）。未指定は 100（全額が事業分）。
+   * 集計は taxcalc の transactionBusinessAmount 経由で事業分だけを
+   * 収入・経費に算入する（私用分は経費に含めない）。
+   */
+  business_ratio_percent?: number;
+  /** 按分根拠のメモ（例: 面積割合 20㎡/60㎡）。任意。集計には使わない。 */
+  business_ratio_basis?: string;
 }
 
 /** 税区分の選択肢（"" は未設定）。帳簿の編集や取込マッピングで使う。 */
