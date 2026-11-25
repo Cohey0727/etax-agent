@@ -24,6 +24,7 @@ export type IconName =
   | "paperclip"
   | "check"
   | "camera"
+  | "chart"
   | "user";
 
 // 線画アイコンのパス集。色は currentColor で呼び出し側に委ねる。
@@ -116,6 +117,14 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
       <circle cx="12" cy="12" r="2" />
       <path d="M6 12h.01" />
       <path d="M18 12h.01" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+      <path d="M7 15v3" />
+      <path d="M12 10v8" />
+      <path d="M17 6v12" />
     </>
   ),
   fileCheck: (

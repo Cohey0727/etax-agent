@@ -43,6 +43,8 @@ import {
   FreeeTrialBalance,
   FetchTrialBalanceRequest,
   TrialBalanceResponse,
+  CashFlowReport,
+  FetchCashFlowRequest,
   ImportCsvResponse,
   LedgerTransaction,
   LedgerTransactionInput,
@@ -455,6 +457,21 @@ export async function fetchTrialBalance(
   request: FetchTrialBalanceRequest,
 ): Promise<TrialBalanceResponse> {
   return postJson<TrialBalanceResponse>("/api/calc/trial-balance", request);
+}
+
+/** 資金繰りレポート（実績＋未消込請求書の入金予定）をサーバーから取得する。 */
+export async function fetchCashFlowReport(
+  request: FetchCashFlowRequest = {},
+): Promise<CashFlowReport> {
+  const params = new URLSearchParams();
+  if (request.from) params.set("from", request.from);
+  if (request.months !== undefined) params.set("months", String(request.months));
+  if (request.opening_balance !== undefined) {
+    params.set("opening_balance", String(request.opening_balance));
+  }
+  const query = params.toString();
+  const resp = await fetch(query ? `/api/cash-flow?${query}` : "/api/cash-flow");
+  return parseJson<CashFlowReport>(resp);
 }
 
 export async function fetchFreeeTrialBalance(): Promise<FreeeTrialBalance | null> {

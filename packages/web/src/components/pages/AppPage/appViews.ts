@@ -1,6 +1,7 @@
 import { ComponentType } from "react";
 import { IconName } from "@components/atoms";
 import { AppView, ViewPageProps } from "@types";
+import { CashFlowPage } from "../CashFlowPage";
 import { DashboardPage } from "../DashboardPage";
 import { FilingPage } from "../FilingPage";
 import { FixedAssetsPage } from "../FixedAssetsPage";
@@ -22,6 +23,7 @@ export const appViews = [
   { id: AppView.Receipt, label: "領収書から帳簿", icon: "receipt", nav: false, Component: ReceiptPage },
   { id: AppView.Ledger, label: "帳簿", icon: "book", nav: true, Component: LedgerPage },
   { id: AppView.Reports, label: "試算表", icon: "bill", nav: true, Component: ReportsPage },
+  { id: AppView.CashFlow, label: "資金繰り", icon: "chart", nav: true, Component: CashFlowPage },
   { id: AppView.FixedAssets, label: "固定資産", icon: "building", nav: true, Component: FixedAssetsPage },
   { id: AppView.Invoices, label: "請求書", icon: "receipt", nav: true, Component: InvoicesPage },
   { id: AppView.Taxpayer, label: "納税者情報", icon: "user", nav: true, Component: TaxpayerPage },

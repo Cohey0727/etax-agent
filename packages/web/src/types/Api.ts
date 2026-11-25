@@ -208,6 +208,58 @@ export interface FetchTrialBalanceRequest {
   balance_sheet?: BalanceSheetWireInput;
 }
 
+/* ---------- 資金繰りレポート（GET /api/cash-flow） ---------- */
+
+export interface CashFlowMonth {
+  /** YYYY-MM */
+  month: string;
+  phase: "past" | "current" | "future";
+  actual_inflow: number;
+  actual_outflow: number;
+  scheduled_inflow: number;
+  net_change: number;
+  closing_balance: number;
+}
+
+export interface CashFlowReceipt {
+  document_id: number;
+  document_number: string | null;
+  counterparty_name: string;
+  issue_date: string;
+  due_date: string | null;
+  total_amount: number;
+  remaining_amount: number;
+  status: "unpaid" | "partial" | "paid";
+}
+
+export interface CashFlowScheduledReceipt extends CashFlowReceipt {
+  scheduled_month: string;
+  overdue: boolean;
+}
+
+export interface CashFlowReport {
+  from_month: string;
+  to_month: string;
+  opening_balance: number;
+  months: CashFlowMonth[];
+  upcoming_receipts: CashFlowScheduledReceipt[];
+  undated_receipts: CashFlowReceipt[];
+  total_actual_inflow: number;
+  total_actual_outflow: number;
+  total_scheduled_inflow: number;
+  overdue_amount: number;
+  projected_closing_balance: number;
+}
+
+export interface FetchCashFlowRequest {
+  /** 表示窓の開始月（YYYY-MM）。省略時はサーバーの既定窓 */
+  from?: string;
+  /** 表示する月数（1〜24） */
+  months?: number;
+  /** 窓の開始月初時点の残高 */
+  opening_balance?: number;
+}
+
 /** 年度ごとの申告ステータス。サーバーAPIのワイヤ形式（snake_case）。 */
 export interface FilingStatus {
   year: number;
