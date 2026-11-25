@@ -10,7 +10,7 @@
  * 解除時は、自動生成した調整取引も一緒に論理削除し、帳簿に残骸を残さない
  * （入金取引そのものは利用者の記録なので消さない）。
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
   computeInvoiceSettlement,
   InvoicePaymentKind,
@@ -28,6 +28,7 @@ import {
   InvoicePaymentRow,
   invoicePaymentsTable,
   TransactionRow,
+  transactionsTable,
 } from "./schema";
 import {
   deleteTransactionRowWith,
@@ -41,19 +42,30 @@ function paymentOwnerCondition() {
   return owner !== undefined ? eq(invoicePaymentsTable.ownerUserId, owner) : undefined;
 }
 
-/** 請求書の消込レコードを作成順に取得する。 */
+/**
+ * 消込レコードのうち、紐付く取引が論理削除されていないものだけを返す条件。
+ * 帳簿側で取引が削除された消込は、集計・表示の対象から外す（帳簿の状態に
+ * 消込を追随させる。レコード自体は残り、解除で掃除できる）。
+ */
+function activePaymentCondition() {
+  return isNull(transactionsTable.deletedAt);
+}
+
+/** 請求書の消込レコードを作成順に取得する（削除済み取引に紐付く分は除く）。 */
 export async function listInvoicePaymentRows(
   db: Db,
   documentId: number,
 ): Promise<InvoicePaymentRow[]> {
-  const conditions = [eq(invoicePaymentsTable.documentId, documentId)];
+  const conditions = [eq(invoicePaymentsTable.documentId, documentId), activePaymentCondition()];
   const ownerCondition = paymentOwnerCondition();
   if (ownerCondition) conditions.push(ownerCondition);
-  return db
-    .select()
+  const rows = await db
+    .select({ payment: invoicePaymentsTable })
     .from(invoicePaymentsTable)
+    .innerJoin(transactionsTable, eq(invoicePaymentsTable.transactionId, transactionsTable.id))
     .where(and(...conditions))
     .orderBy(invoicePaymentsTable.id);
+  return rows.map((row) => row.payment);
 }
 
 /** 消込レコードを API 形式へ変換する（紐付く取引を添える）。 */
@@ -112,13 +124,18 @@ export async function settlementSummaries(
   const result = new Map<number, InvoiceSettlement>();
   const documentIds = [...totals.keys()];
   if (documentIds.length === 0) return result;
-  const conditions = [inArray(invoicePaymentsTable.documentId, documentIds)];
+  const conditions = [
+    inArray(invoicePaymentsTable.documentId, documentIds),
+    activePaymentCondition(),
+  ];
   const ownerCondition = paymentOwnerCondition();
   if (ownerCondition) conditions.push(ownerCondition);
-  const rows = await db
-    .select()
+  const joined = await db
+    .select({ payment: invoicePaymentsTable })
     .from(invoicePaymentsTable)
+    .innerJoin(transactionsTable, eq(invoicePaymentsTable.transactionId, transactionsTable.id))
     .where(and(...conditions));
+  const rows = joined.map((row) => row.payment);
   const byDocument = new Map<number, InvoicePaymentRow[]>();
   for (const row of rows) {
     const list = byDocument.get(row.documentId) ?? [];
@@ -142,13 +159,18 @@ export async function appliedAmountsByTransaction(
 ): Promise<Map<number, number>> {
   const result = new Map<number, number>();
   if (transactionIds.length === 0) return result;
-  const conditions = [inArray(invoicePaymentsTable.transactionId, [...transactionIds])];
+  const conditions = [
+    inArray(invoicePaymentsTable.transactionId, [...transactionIds]),
+    activePaymentCondition(),
+  ];
   const ownerCondition = paymentOwnerCondition();
   if (ownerCondition) conditions.push(ownerCondition);
-  const rows = await db
-    .select()
+  const joined = await db
+    .select({ payment: invoicePaymentsTable })
     .from(invoicePaymentsTable)
+    .innerJoin(transactionsTable, eq(invoicePaymentsTable.transactionId, transactionsTable.id))
     .where(and(...conditions));
+  const rows = joined.map((row) => row.payment);
   for (const row of rows) {
     // 入金取引を使い切るのは payment（充当）と overpayment（預り金化）の2種。
     // fee / discount の transaction_id は自動生成取引で、入金取引とは別物。
