@@ -31,7 +31,7 @@ import { McpToolModule, idArg, requireDb, textResult } from "./mcpToolKit";
 const assetPatchProperties = {
   name: { type: "string", description: "資産の名称等" },
   quantity: { type: "string", description: "面積又は数量" },
-  income_type: { type: "string", enum: ["business", "real_estate"], description: "所得区分" },
+  income_type: { type: "string", enum: ["business", "real_estate", "agriculture"], description: "所得区分" },
   acquisition_date: { type: "string", description: "取得年月日（YYYY-MM-DD）" },
   service_start_date: {
     type: "string",

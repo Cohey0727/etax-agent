@@ -112,21 +112,27 @@ export async function deleteFixedAssetRow(db: Db, id: number): Promise<boolean> 
 }
 
 /**
- * 台帳の行から指定年の決算書明細行（事業・不動産別）を組み立てる。
+ * 台帳の行から指定年の決算書明細行（事業・不動産・農業別）を組み立てる。
  * XTX 出力（API / MCP）が使う。その年に償却の無い資産は含まない。
  */
 export function depreciationDetailRowsForYear(
   rows: FixedAssetRow[],
   year: number,
-): { business: DepreciationDetailRow[]; realEstate: DepreciationDetailRow[] } {
+): {
+  business: DepreciationDetailRow[];
+  realEstate: DepreciationDetailRow[];
+  agriculture: DepreciationDetailRow[];
+} {
   const business: DepreciationDetailRow[] = [];
   const realEstate: DepreciationDetailRow[] = [];
+  const agriculture: DepreciationDetailRow[] = [];
   for (const row of rows) {
     if (!isActiveInYear(row, year)) continue;
     const detail = depreciationDetailRow(row.name, fixedAssetToInput(row), year, row.quantity);
     if (!detail) continue;
     if (row.incomeType === "real_estate") realEstate.push(detail);
+    else if (row.incomeType === "agriculture") agriculture.push(detail);
     else business.push(detail);
   }
-  return { business, realEstate };
+  return { business, realEstate, agriculture };
 }

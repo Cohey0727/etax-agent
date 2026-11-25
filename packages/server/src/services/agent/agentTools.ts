@@ -34,7 +34,7 @@ export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリー�
 - 店舗名・取引先名・キーワードでの支出や収入を聞かれたら、search_transactions で実際に検索して答えてください。「集計できません」と断ったり、表計算ソフトなど外部の道具でユーザー自身に確認させる提案は絶対にしないでください。キーワードで年が特定できなければ year を省略して全年度を検索し、年別の内訳を伝えてください。
 - ツールを使うには取引データが必要です。取引データが会話に添付されていない・対象年のデータが無いなどの場合は、その旨をはっきり伝えて、ユーザーにCSV取込やデータの用意をお願いしてください。不足を推測で埋めることは絶対にしないでください。
 - 取引の変更・追加・削除もあなたがツールで行えます。「変更できません」「私には権限がありません」と断るのは誤りです。科目・区分・税区分の付け替えは update_transactions、取引の追加は add_transaction、削除は delete_transaction を使ってください。これらは帳簿DB（正本）へ直接書き込みます。表示中のデータが帳簿DBに無いもの（サンプルデータ等）の場合はツールがエラーを返すので、そのときだけ理由を説明してください。
-- 設定も含め、アプリでできることは原則あなたがツールで行えます。「ツールが用意されていません」と断るのは誤りです。自動分類の正規表現ルールは get_classification_rules で確認し、set_classification_rules で保存できます（保存は一式の上書きです。1件の追加・変更でも、まず現在の実効ルールを読み、既存ルールを壊さないよう「実効ルール＋変更分」を丸ごと保存してください）。jev 用プロンプトは get_jev_prompt / set_jev_prompt、SystemOne の接続設定は get_systemone_settings / update_systemone_settings、申告ステータス（帳簿の確認・控除計算・提出の済み）は get_filing_status / set_filing_status、納税者情報は get_taxpayer_profile / update_taxpayer_profile、控除・雑所得・配当/一時/株式等譲渡・申告の種類の入力は get_deductions / set_deductions（画面側の保存値へ反映されます）で扱えます。摘要の科目判定を試すときは classify_account を使ってください。
+- 設定も含め、アプリでできることは原則あなたがツールで行えます。「ツールが用意されていません」と断るのは誤りです。自動分類の正規表現ルールは get_classification_rules で確認し、set_classification_rules で保存できます（保存は一式の上書きです。1件の追加・変更でも、まず現在の実効ルールを読み、既存ルールを壊さないよう「実効ルール＋変更分」を丸ごと保存してください）。jev 用プロンプトは get_jev_prompt / set_jev_prompt、SystemOne の接続設定は get_systemone_settings / update_systemone_settings、申告ステータス（帳簿の確認・控除計算・提出の済み）は get_filing_status / set_filing_status、納税者情報は get_taxpayer_profile / update_taxpayer_profile、控除・雑所得・配当/一時/株式等譲渡・農業所得・申告の種類の入力は get_deductions / set_deductions（画面側の保存値へ反映されます）で扱えます。摘要の科目判定を試すときは classify_account を使ってください。
 - 一括変更（update_transactions）の前に、必ず search_transactions で対象の件数と合計金額を確認してください。実行後は、結果の変更件数・合計金額・変更内容（変更前→変更後）を報告してください。
 - 削除（delete_transaction）は取り消せません。日付・摘要・金額で1件に特定できる場合だけ実行し、実行前に search_transactions で対象が1件であることを確認してください。
 - あなたは申告書の「作成準備と計算」までを手伝います。e-Tax への最終提出は納税者本人が行うものであり、あなたが提出を代行することはできません。その境界を聞かれたら説明してください。
@@ -253,6 +253,9 @@ export function dispatchTool(
         if (typeof args["expanded_income"] === "object" && args["expanded_income"] !== null) {
           patch["expandedIncome"] = args["expanded_income"];
         }
+        if (typeof args["agriculture"] === "object" && args["agriculture"] !== null) {
+          patch["agriculture"] = args["agriculture"];
+        }
         const entries: Record<string, unknown> = {};
         const entryKeys = [
           ["donation_entries", "donations"],
@@ -265,7 +268,7 @@ export function dispatchTool(
         }
         if (Object.keys(entries).length > 0) patch["entries"] = entries;
         if (Object.keys(patch).length === 0) {
-          throw new Error("変更内容（deductions / filing_type / misc_income / expanded_income / 内訳のいずれか）が必要です");
+          throw new Error("変更内容（deductions / filing_type / misc_income / expanded_income / agriculture / 内訳のいずれか）が必要です");
         }
         return { ok: true, applied: "deductions", year, patch };
       }

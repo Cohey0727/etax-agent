@@ -18,7 +18,7 @@ import {
 } from "@etax/shared";
 
 process.env.DATABASE_URL ??=
-  process.env.TEST_DATABASE_URL ?? "postgres://localhost:1/etaxagent_test";
+  process.env.TEST_DATABASE_URL ?? "postgres://etax:etax@127.0.0.1:5432/etaxagent_test";
 delete process.env.ETAX_AUTH_MODE;
 delete process.env.ETAX_XSD_DIR;
 
