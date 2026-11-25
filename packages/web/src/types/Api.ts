@@ -51,6 +51,20 @@ export interface SystemOneTestResult {
   error: string | null;
 }
 
+/** 外部エージェント連携（MCP）用 API キー。平文キーは発行時のみ返る。 */
+export interface ApiKeyItem {
+  id: number;
+  name: string;
+  key_prefix: string;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+/** API キー発行の結果（平文キーを含む、この応答でしか見られない）。 */
+export interface CreatedApiKey extends ApiKeyItem {
+  key: string;
+}
+
 /** 外部接続（AI）の接続テスト結果。 */
 export interface AgentTestResult {
   ok: boolean;

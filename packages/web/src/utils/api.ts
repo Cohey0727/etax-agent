@@ -17,6 +17,8 @@ import {
   ExportReturnPdfResponse,
   ExportXtxResponse,
   FilingSnapshot,
+  ApiKeyItem,
+  CreatedApiKey,
   FilingSnapshotFigures,
   FilingStatus,
   DepreciationSummary,
@@ -140,6 +142,28 @@ export async function updateSystemOneSettings(input: {
     body: JSON.stringify(input),
   });
   return parseJson<SystemOneSettings>(resp);
+}
+
+/** 外部エージェント連携（MCP）用 API キーの一覧を取得する。 */
+export async function fetchApiKeys(): Promise<ApiKeyItem[]> {
+  const resp = await fetch("/api/auth/api-keys");
+  return parseJson<ApiKeyItem[]>(resp);
+}
+
+/** API キーを発行する。平文キーはこの応答でしか返らない。 */
+export async function createApiKey(name: string): Promise<CreatedApiKey> {
+  const resp = await fetch("/api/auth/api-keys", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  return parseJson<CreatedApiKey>(resp);
+}
+
+/** API キーを取り消す（削除）。 */
+export async function deleteApiKey(id: number): Promise<void> {
+  const resp = await fetch(`/api/auth/api-keys/${id}`, { method: "DELETE" });
+  await parseJson<{ deleted: boolean }>(resp);
 }
 
 /** 外部接続（AI）への接続テスト。入力中の値（未保存）でも試せる。 */
