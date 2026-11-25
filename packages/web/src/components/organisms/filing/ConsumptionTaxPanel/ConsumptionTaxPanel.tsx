@@ -8,6 +8,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
+import { EtaxImportGuide } from "@components/organisms/filing/EtaxImportGuide";
 import {
   emptyTaxpayer,
   loadTaxpayer,
@@ -76,6 +77,9 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // XTX出力直後の取り込みガイドと、公式XSD検証を行えなかった場合の警告。
+  const [exportedFilename, setExportedFilename] = useState<string | null>(null);
+  const [xsdWarning, setXsdWarning] = useState<string | null>(null);
 
   const preview = useMemo(
     () =>
@@ -103,6 +107,8 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
     setExporting(true);
     setMessage(null);
     setError(null);
+    setExportedFilename(null);
+    setXsdWarning(null);
     try {
       const request: ExportConsumptionXtxRequest = {
         taxpayer,
@@ -124,8 +130,10 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
       };
       const result = await exportConsumptionXtxFile(request);
       downloadTextFile(result.filename, result.xtx);
+      setExportedFilename(result.filename);
+      setXsdWarning(result.xsd_warning);
       setMessage(
-        `${result.filename} をダウンロードしました（合計納付税額 ${formatNumber(result.total_payable)}円）。e-Taxソフト／WEB版に組み込んで内容を確認し、送信はご自身のマイナンバーカードで行ってください。`,
+        `${result.filename} をダウンロードしました（合計納付税額 ${formatNumber(result.total_payable)}円）。下の手順で e-Taxソフト（WEB版）に取り込んでください。`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "消費税XTXの出力に失敗しました");
@@ -263,12 +271,19 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
 
         {error ? <AlertBox variant="error">{error}</AlertBox> : null}
         {message ? <AlertBox>{message}</AlertBox> : null}
+        {xsdWarning ? (
+          <AlertBox variant="notice">
+            公式XMLスキーマでの検証は行えませんでした: {xsdWarning}
+            XTXは出力されていますが、取り込み時に内容をよく確認してください。
+          </AlertBox>
+        ) : null}
 
         <Row gap="sm">
           <Button variant="primary" onClick={handleExport} disabled={exporting} disabledReason="出力中です">
             {exporting ? "出力中…" : "消費税のe-Tax用データを出力（XTX）"}
           </Button>
         </Row>
+        {exportedFilename ? <EtaxImportGuide filename={exportedFilename} /> : null}
       </Col>
     </Card>
   );

@@ -36,3 +36,25 @@ export function servedContentType(storedContentType: string): string {
   const normalized = normalizeContentType(storedContentType);
   return isAllowedUploadContentType(normalized) ? normalized : "application/octet-stream";
 }
+
+/**
+ * 文書アップロード（受信通知PDF）で許可する Content-Type。
+ * 画像のリストとは分ける: PDF は領収書・固定資産画像の受け口では
+ * 受け付けず、受信通知の受け口（presign の purpose=filing_receipt と
+ * 添付時の検証）でのみ許可する。配信時は nosniff + CSP sandbox を
+ * 併用し、PDF 内スクリプトを自オリジンで解釈させない。
+ */
+export const ALLOWED_DOCUMENT_CONTENT_TYPES = ["application/pdf"] as const;
+
+/** 文書ホワイトリストにある Content-Type か。 */
+export function isAllowedDocumentContentType(contentType: string): boolean {
+  return (ALLOWED_DOCUMENT_CONTENT_TYPES as readonly string[]).includes(
+    normalizeContentType(contentType),
+  );
+}
+
+/** 文書配信時に使う Content-Type を決める（servedContentType の文書版）。 */
+export function servedDocumentContentType(storedContentType: string): string {
+  const normalized = normalizeContentType(storedContentType);
+  return isAllowedDocumentContentType(normalized) ? normalized : "application/octet-stream";
+}

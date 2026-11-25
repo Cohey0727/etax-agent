@@ -22,6 +22,8 @@ import {
   CreatedApiKey,
   FilingSnapshotFigures,
   FilingStatus,
+  FilingSubmission,
+  FilingSubmissionKind,
   DepreciationSummary,
   FixedAssetImageRecord,
   FixedAssetInput,
@@ -482,6 +484,96 @@ export async function updateFilingStatus(
   } catch {
     return null;
   }
+}
+
+/** 対象年の提出の記録（受付番号・受信通知）一覧。取得できない場合は null。 */
+export async function fetchFilingSubmissions(
+  year: number,
+): Promise<FilingSubmission[] | null> {
+  try {
+    const resp = await fetch(`/api/filing-submissions/${year}`);
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { submissions: FilingSubmission[] };
+    return data.submissions;
+  } catch {
+    return null;
+  }
+}
+
+/** 提出の記録（受付番号・提出日）を保存する。失敗した場合は null。 */
+export async function saveFilingSubmission(
+  year: number,
+  kind: FilingSubmissionKind,
+  input: { acceptance_number: string; submitted_date: string | null },
+): Promise<FilingSubmission | null> {
+  try {
+    const resp = await fetch(`/api/filing-submissions/${year}/${kind}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { submission: FilingSubmission };
+    return data.submission;
+  } catch {
+    return null;
+  }
+}
+
+/** 提出の記録を削除する（受信通知PDFの実体も消える）。 */
+export async function deleteFilingSubmission(
+  year: number,
+  kind: FilingSubmissionKind,
+): Promise<boolean> {
+  try {
+    const resp = await fetch(`/api/filing-submissions/${year}/${kind}`, {
+      method: "DELETE",
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 受信通知PDFを提出の記録へ添付する。署名付きURLでストレージへ直接
+ * アップロードし（APIサーバーはバイト列を経由しない）、完了後に
+ * 年度×税目へ登録する。
+ */
+export async function uploadFilingReceiptPdf(
+  year: number,
+  kind: FilingSubmissionKind,
+  file: File,
+): Promise<FilingSubmission> {
+  if (file.type !== "application/pdf") {
+    throw new Error("対応していないファイル形式です（PDFのみ添付できます）");
+  }
+  const presignResp = await fetch("/api/files/presign-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType: file.type, purpose: "filing_receipt" }),
+  });
+  const presign = await parseJson<PresignUploadFileResponse>(presignResp);
+  const uploadResp = await fetch(presign.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!uploadResp.ok) {
+    throw new Error(`ファイルのアップロードに失敗しました (HTTP ${uploadResp.status})`);
+  }
+  const resp = await fetch(`/api/filing-submissions/${year}/${kind}/receipt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: presign.fileId }),
+  });
+  const data = await parseJson<{ submission: FilingSubmission }>(resp);
+  return data.submission;
+}
+
+/** 受信通知PDFの配信URL（サーバー経由で両ドライバ共通）。 */
+export function filingReceiptContentPath(year: number, kind: FilingSubmissionKind): string {
+  return `/api/filing-submissions/${year}/${kind}/receipt/content`;
 }
 
 /** 対象年の確定スナップショット一覧（確定日時の昇順）。失敗した場合は null。 */

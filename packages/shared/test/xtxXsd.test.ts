@@ -1,9 +1,10 @@
 /**
  * xtxXsd.test.ts — 生成 XTX の公式 XML スキーマ検証（常時実行）。
  *
- * 公式 XSD は fixtures/etax-xsd に取り込み済み（e-Tax 仕様書「19 XML
- * スキーマ」令和8年9月版から、検証対象の手続が参照する 296 ファイルの
- * 閉包のみ）。環境変数 ETAX_XSD_DIR があればそちらを優先する。
+ * 公式 XSD は packages/shared/assets/etax-xsd に同梱済み（e-Tax 仕様書
+ * 「19 XMLスキーマ」令和8年9月版から、検証対象の手続が参照する 296
+ * ファイルの閉包のみ。取得・更新手順は同フォルダの README 参照）。
+ * 環境変数 ETAX_XSD_DIR があればそちらを優先する。
  * 検証には python3 + lxml が必要（無い環境ではスキップ扱いで通過）。
  *
  * 2026-11-19、WEB版「作成済みデータの利用」で SE00S170 になった原因は
@@ -35,7 +36,7 @@ import {
   salaryIncomeAmount,
 } from "../src";
 
-const XSD_DIR = process.env.ETAX_XSD_DIR ?? join(import.meta.dir, "fixtures/etax-xsd");
+const XSD_DIR = process.env.ETAX_XSD_DIR ?? join(import.meta.dir, "../assets/etax-xsd");
 const maybe = existsSync(join(XSD_DIR, "shotoku/RKO0010-250.xsd")) ? test : test.skip;
 
 const TAXPAYER: XtxTaxpayer = {
@@ -424,7 +425,7 @@ describe("公式XMLスキーマ検証", () => {
     if (existsSync(join(XSD_DIR, "shotoku/RKO0010-260.xsd"))) {
       samples.push(["shotoku2026.xtx", incomeSample(2026), "shotoku/RKO0010-260.xsd"]);
     }
-    const args: string[] = [join(import.meta.dir, "validate-xtx-xsd.py"), XSD_DIR];
+    const args: string[] = [join(import.meta.dir, "../assets/validate-xtx-xsd.py"), XSD_DIR];
     for (const [name, xml, schema] of samples) {
       const path = join(dir, name);
       writeFileSync(path, xml);

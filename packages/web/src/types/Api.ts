@@ -418,6 +418,8 @@ export interface ExportXtxRequest {
 export interface ExportXtxResponse {
   filename: string;
   xtx: string;
+  /** 公式XSD検証を行えなかった場合の警告。検証が通れば null。 */
+  xsd_warning: string | null;
 }
 
 /** 申告書の紙イメージ PDF 出力のレスポンス。リクエストは XTX 出力と共通。 */
@@ -464,6 +466,24 @@ export interface ExportConsumptionXtxResponse {
   filename: string;
   xtx: string;
   total_payable: number;
+  /** 公式XSD検証を行えなかった場合の警告。検証が通れば null。 */
+  xsd_warning: string | null;
+}
+
+/** 提出の記録の税目。income = 所得税、consumption = 消費税。 */
+export type FilingSubmissionKind = "income" | "consumption";
+
+/** 提出の記録（受付番号・提出日・受信通知PDF）。年度×税目ごとに1件。 */
+export interface FilingSubmission {
+  year: number;
+  kind: FilingSubmissionKind;
+  /** 受信通知の受付番号。未記録なら空文字 */
+  acceptance_number: string;
+  /** 提出日 YYYY-MM-DD。未記録なら null */
+  submitted_date: string | null;
+  /** 受信通知PDF。未添付なら null */
+  receipt: { file_id: string; mime_type: string } | null;
+  updated_at: string;
 }
 
 /** ログインユーザー（/api/auth/me・ログイン応答）。 */

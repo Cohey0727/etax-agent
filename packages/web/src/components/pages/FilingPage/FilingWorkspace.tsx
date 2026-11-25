@@ -26,6 +26,7 @@ import {
   MiscIncomePanel,
   MonthlyBalance,
   SalaryPanel,
+  SubmissionRecordPanel,
   TaxCreditPanel,
   TaxpayerPanel,
 } from "@components/organisms/filing";
@@ -231,6 +232,7 @@ export const FilingWorkspace = ({
           originalIncomeTax={null}
           onOpenSection={openSection}
         />
+        <SubmissionRecordPanel year={year} kind="income" />
       </>
     ),
     balance: (
@@ -300,7 +302,10 @@ export const FilingWorkspace = ({
       </>
     ),
     consumption: (
-      <ConsumptionTaxPanel transactions={transactions} year={year} onOpenLedger={openLedgerFiltered} />
+      <>
+        <ConsumptionTaxPanel transactions={transactions} year={year} onOpenLedger={openLedgerFiltered} />
+        <SubmissionRecordPanel year={year} kind="consumption" />
+      </>
     ),
   };
 

@@ -17,6 +17,7 @@ import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportDomicilePdfFile, exportReturnPdfFile, exportXtxFile } from "@utils/api";
+import { EtaxImportGuide } from "@components/organisms/filing/EtaxImportGuide";
 import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingSection } from "../FilingPanel";
 import { emptyTaxpayer, loadTaxpayer } from "../TaxpayerProfilePanel";
@@ -75,6 +76,9 @@ export const TaxpayerPanel = ({
   const [exportingDomicile, setExportingDomicile] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // XTX出力直後の取り込みガイドと、公式XSD検証を行えなかった場合の警告。
+  const [exportedFilename, setExportedFilename] = useState<string | null>(null);
+  const [xsdWarning, setXsdWarning] = useState<string | null>(null);
 
   const supported = xtxSupportedYears().includes(year);
 
@@ -137,11 +141,15 @@ export const TaxpayerPanel = ({
     setExporting(true);
     setMessage(null);
     setError(null);
+    setExportedFilename(null);
+    setXsdWarning(null);
     try {
       const result = await exportXtxFile(buildRequest());
       downloadTextFile(result.filename, result.xtx);
+      setExportedFilename(result.filename);
+      setXsdWarning(result.xsd_warning);
       setMessage(
-        `${result.filename} をダウンロードしました。e-Taxソフト／WEB版に組み込んで内容を確認し、送信はご自身のマイナンバーカードで行ってください。`,
+        `${result.filename} をダウンロードしました。下の手順で e-Taxソフト（WEB版）に取り込んでください。`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "XTXの出力に失敗しました");
@@ -301,6 +309,13 @@ export const TaxpayerPanel = ({
         ) : null}
         {error ? <AlertBox variant="error">{error}</AlertBox> : null}
         {message ? <AlertBox>{message}</AlertBox> : null}
+        {xsdWarning ? (
+          <AlertBox variant="notice">
+            公式XMLスキーマでの検証は行えませんでした: {xsdWarning}
+            XTXは出力されていますが、取り込み時に内容をよく確認してください。
+          </AlertBox>
+        ) : null}
+        {exportedFilename ? <EtaxImportGuide filename={exportedFilename} /> : null}
 
         <Row gap="sm">
           <Button

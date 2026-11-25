@@ -3,6 +3,8 @@
  * DB不要・ステートレス。数値計算はすべて @etax/shared の決定的な関数が行い、
  * XTXの組み立ては buildXtxFiling に委ねる。生成物は署名なしの組み込み用
  * データで、送信（マイナンバーカード署名）は e-Tax 側で本人が行う。
+ * 生成後は公式XSD検証を常時実行し、スキーマ違反なら 400 で止める
+ * （検証できない場合は xsd_warning として理由を返す）。
  */
 import {
   BalanceSheetAccount,
@@ -27,6 +29,7 @@ import {
 export { statementCategoryTotals };
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
+import { XtxXsdInvalidError, xsdWarningOrThrow } from "../services/etax/xsdValidator";
 import {
   ExportXtxRequest,
   ExportXtxRequestSchema,
@@ -139,7 +142,7 @@ export function toTaxpayer(t: ExportXtxRequest["taxpayer"]): XtxTaxpayer {
   };
 }
 
-export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
+export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) => {
   const body = c.req.valid("json");
   const transactions = filterYear(normalizeTransactions(body.transactions ?? []), body.year);
   const figures = computeCorrectedFigures(transactions, body.year, {
@@ -191,9 +194,21 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = (c) => {
       message: e instanceof Error ? e.message : "XTXの生成に失敗しました",
     });
   }
+  // 公式XSD検証は常時実行する。スキーマ違反なら生成を止め、検証自体が
+  // できない場合（未同梱・エンジン不在）は警告を応答に含めて続行する。
+  let xsdWarning: string | null;
+  try {
+    xsdWarning = xsdWarningOrThrow(xtx);
+  } catch (e) {
+    if (e instanceof XtxXsdInvalidError) {
+      throw new HTTPException(400, { message: e.message });
+    }
+    throw e;
+  }
   const response: ExportXtxResponse = {
     filename: `etax-shotoku-${body.year}${body.amendment ? "-shusei" : "-kakutei"}.xtx`,
     xtx,
+    xsd_warning: xsdWarning,
   };
   return c.json(response, 200);
 };
