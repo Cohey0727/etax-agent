@@ -194,12 +194,78 @@ export const TaxCreditInputsSchema = z
   })
   .openapi("TaxCreditInputs");
 
+/** 一時所得の入力（Issue #27 Phase A） */
+export const TempIncomeInputSchema = z
+  .object({
+    revenue: z.number(),
+    expenses: z.number(),
+  })
+  .openapi("TempIncomeInput");
+
+/** 配当所得の入力（Issue #27 Phase B）。listedMode は上場配当等全体の課税方式。 */
+export const DividendIncomeInputSchema = z
+  .object({
+    listedRevenue: z.number(),
+    listedTrustRevenue: z.number(),
+    listedWithholding: z.number(),
+    listedMode: z.enum(["comprehensive", "separate", "none"]),
+    generalRevenue: z.number(),
+    generalTrustRevenue: z.number(),
+    generalWithholding: z.number(),
+    interestExpense: z.number(),
+  })
+  .openapi("DividendIncomeInput");
+
+/** 株式等譲渡の区分（一般／上場）入力（Issue #27 Phase C） */
+export const StockTransferCategoryInputSchema = z
+  .object({
+    revenue: z.number(),
+    otherRevenue: z.number(),
+    acquisitionCost: z.number(),
+    transferFees: z.number(),
+    otherExpenses: z.number(),
+  })
+  .openapi("StockTransferCategoryInput");
+
+/** 特定口座（源泉徴収口座）の明細行（Issue #27 Phase C） */
+export const SpecialAccountInputSchema = z
+  .object({
+    brokerName: z.string(),
+    branchName: z.string(),
+    withholdingAccount: z.boolean(),
+    revenue: z.number(),
+    cost: z.number(),
+    withholding: z.number(),
+  })
+  .openapi("SpecialAccountInput");
+
+/** 株式等譲渡の入力（Issue #27 Phase C） */
+export const StockTransferInputSchema = z
+  .object({
+    general: StockTransferCategoryInputSchema,
+    listed: StockTransferCategoryInputSchema,
+    listedWithholding: z.number(),
+    specialAccounts: z.array(SpecialAccountInputSchema),
+  })
+  .openapi("StockTransferInput");
+
+/** 拡張所得の入力（配当・一時・株式等譲渡、Issue #27） */
+export const ExpandedIncomeInputSchema = z
+  .object({
+    temp: TempIncomeInputSchema,
+    dividend: DividendIncomeInputSchema,
+    stocks: StockTransferInputSchema,
+  })
+  .openapi("ExpandedIncomeInput");
+
 export const CalculateIncomeTaxRequestSchema = z
   .object({
     year: z.number(),
     totalIncome: z.number(),
     deductions: DeductionInputsSchema,
     taxCredits: TaxCreditInputsSchema,
+    /** 配当・一時・株式等譲渡の入力（任意）。totalIncome は拡張分を含まない総合課税分の所得として渡す */
+    expandedIncome: ExpandedIncomeInputSchema.optional(),
   })
   .openapi("CalculateIncomeTaxRequest");
 
@@ -240,14 +306,98 @@ export const TaxCreditBreakdownSchema = z
   })
   .openapi("TaxCreditBreakdown");
 
+export const TempIncomeBreakdownSchema = z
+  .object({
+    revenue: z.number(),
+    expenses: z.number(),
+    specialDeduction: z.number(),
+    amount: z.number(),
+    includedAmount: z.number(),
+  })
+  .openapi("TempIncomeBreakdown");
+
+export const DividendIncomeBreakdownSchema = z
+  .object({
+    listedMode: z.enum(["comprehensive", "separate", "none"]),
+    comprehensiveRevenue: z.number(),
+    separateRevenue: z.number(),
+    interestComprehensive: z.number(),
+    interestSeparate: z.number(),
+    comprehensiveIncome: z.number(),
+    separateIncome: z.number(),
+    creditCorporate: z.number(),
+    creditTrust: z.number(),
+    withholding: z.number(),
+  })
+  .openapi("DividendIncomeBreakdown");
+
+export const StockTransferCategoryBreakdownSchema = z
+  .object({
+    revenue: z.number(),
+    otherRevenue: z.number(),
+    acquisitionCost: z.number(),
+    transferFees: z.number(),
+    otherExpenses: z.number(),
+    revenueTotal: z.number(),
+    costTotal: z.number(),
+    income: z.number(),
+  })
+  .openapi("StockTransferCategoryBreakdown");
+
+export const StockTransferBreakdownSchema = z
+  .object({
+    general: StockTransferCategoryBreakdownSchema,
+    listed: StockTransferCategoryBreakdownSchema,
+    specialAccountsTotal: z.object({
+      revenue: z.number(),
+      cost: z.number(),
+      withholding: z.number(),
+      count: z.number(),
+    }),
+    withholding: z.number(),
+  })
+  .openapi("StockTransferBreakdown");
+
+export const ExpandedIncomeBreakdownSchema = z
+  .object({
+    temp: TempIncomeBreakdownSchema,
+    dividend: DividendIncomeBreakdownSchema,
+    stocks: StockTransferBreakdownSchema,
+    dividendDeclared: z.boolean(),
+    comprehensiveAddition: z.number(),
+    separateStockIncome: z.number(),
+    separateDividendIncome: z.number(),
+    listedLossOffsetToDividend: z.number(),
+    unabsorbedListedLoss: z.number(),
+    hasSeparateTaxation: z.boolean(),
+    hasStockTransfer: z.boolean(),
+  })
+  .openapi("ExpandedIncomeBreakdown");
+
 export const CalculateIncomeTaxResponseSchema = z
   .object({
     year: z.number(),
     total_income: z.number(),
+    /** 合計所得金額（総合課税分＋申告分離分） */
+    grand_total_income: z.number(),
     deductions: IncomeDeductionBreakdownSchema,
     deductions_total: z.number(),
     taxable_income: z.number(),
+    /** 課税株式等譲渡所得金額（申告分離） */
+    taxable_separate_stocks: z.number(),
+    /** 課税上場株式等の配当等の金額（申告分離） */
+    taxable_separate_dividends: z.number(),
     income_tax_base: z.number(),
+    /** 所得税額のうち総合課税分 */
+    income_tax_comprehensive: z.number(),
+    /** 所得税額のうち株式等譲渡の申告分離分 */
+    income_tax_separate_stocks: z.number(),
+    /** 所得税額のうち上場配当の申告分離分 */
+    income_tax_separate_dividends: z.number(),
+    /** 所得税額のうち申告分離分の合計 */
+    income_tax_separate_total: z.number(),
+    /** 拡張所得の計算内訳（入力がない場合は null） */
+    expanded_income: ExpandedIncomeBreakdownSchema.nullable(),
     tax_credits: TaxCreditBreakdownSchema,
     tax_credits_total: z.number(),
     reconstruction_tax: z.number(),
