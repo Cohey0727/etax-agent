@@ -21,7 +21,7 @@ import {
 } from "./pdfDraw";
 
 /** 備付帳簿名の○の位置（様式の印字順。中心 x と半径 x は比率、y は行の中心）。 */
-const BOOK_CIRCLES: readonly { key: string; cx: number; rx: number; row: 0 | 1 }[] = [
+export const BOOK_CIRCLES: readonly { key: string; cx: number; rx: number; row: 0 | 1 }[] = [
   { key: "cash_book", cx: 0.117, rx: 0.036, row: 0 },
   { key: "receivables_book", cx: 0.207, rx: 0.021, row: 0 },
   { key: "payables_book", cx: 0.262, rx: 0.021, row: 0 },
