@@ -1,6 +1,6 @@
 import { Fragment, ReactNode, useEffect, useState } from "react";
 import { clsx } from "clsx";
-import { Button, Col, Icon, IconName, Row, Select, Text } from "@components/atoms";
+import { Button, Col, Icon, IconName, Logo, Row, Select, Text } from "@components/atoms";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
 import {
@@ -108,7 +108,7 @@ export const AppTemplate = ({
             <div className={styles.sidebarInner}>
               <Row gap="sm" align="center">
                 <div className={styles.brandMark}>
-                  <Icon name="bill" size={21} />
+                  <Logo variant="icon" size={40} />
                 </div>
                 <Col gap="none">
                   <Text variant="sectionTitle" className={styles.brandTitle}>
@@ -198,7 +198,7 @@ export const AppTemplate = ({
           ) : (
             <div className={styles.railInner}>
               <div className={styles.brandMark}>
-                <Icon name="bill" size={21} />
+                <Logo variant="icon" size={40} />
               </div>
               <div className={styles.railNav}>
                 {navViews.map((view) => (
