@@ -21,6 +21,7 @@ import {
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_MISC_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
+  ExpandedIncomeInput,
   Transaction,
   XtxTaxpayer,
   buildConsumptionXtx,
@@ -29,10 +30,13 @@ import {
   buildXtxFiling,
   computeConsumptionReturn,
   computeCorrectedFigures,
+  computeExpandedIncomes,
   computeIncomeTax,
   computeSimplifiedConsumptionReturn,
   computeSpecial20ConsumptionReturn,
   depreciationDetailRow,
+  expandedWithholdingTotal,
+  resolveTaxCreditInputs,
   salaryIncomeAmount,
 } from "../src";
 
@@ -401,6 +405,89 @@ function special20Sample(): string {
   });
 }
 
+/** 配当・一時・株式等譲渡あり（第三表＋KOC080 の XSD 検証用、Issue #27） */
+function expandedSample(year: number): string {
+  const transactions: Transaction[] = [
+    { date: `${year}-06-15`, year, description: "事業売上", amount: 12_000_000, account: "普通預金", category: "売上高", income_type: "business", tax_category: "" },
+  ];
+  const figures = computeCorrectedFigures(transactions, year);
+  const expandedIncome: ExpandedIncomeInput = {
+    temp: { revenue: 1_500_000, expenses: 300_000 },
+    dividend: {
+      listedRevenue: 800_000,
+      listedTrustRevenue: 0,
+      listedWithholding: 122_520,
+      listedMode: "separate",
+      generalRevenue: 200_000,
+      generalTrustRevenue: 0,
+      generalWithholding: 40_840,
+      interestExpense: 100_000,
+    },
+    stocks: {
+      general: { revenue: 1_000_000, otherRevenue: 0, acquisitionCost: 600_000, transferFees: 0, otherExpenses: 0 },
+      listed: { revenue: 500_000, otherRevenue: 0, acquisitionCost: 900_000, transferFees: 0, otherExpenses: 0 },
+      listedWithholding: 0,
+      specialAccounts: [
+        { brokerName: "テスト証券", branchName: "本店", withholdingAccount: true, revenue: 2_000_000, cost: 1_900_000, withholding: 15_315 },
+      ],
+    },
+  };
+  const expanded = computeExpandedIncomes(expandedIncome);
+  const tax = computeIncomeTax({
+    year,
+    totalIncome:
+      figures._detail.business_income + figures._detail.real_estate_income + expanded.comprehensiveAddition,
+    deductions: EMPTY_DEDUCTION_INPUTS,
+    taxCredits: resolveTaxCreditInputs({ ...EMPTY_TAX_CREDIT_INPUTS }, expanded),
+    separateTaxation: {
+      stockIncome: expanded.separateStockIncome,
+      dividendIncome: expanded.separateDividendIncome,
+    },
+  });
+  return buildXtxFiling({
+    year,
+    amendment: false,
+    submissionDate: "2026-03-10",
+    taxpayer: TAXPAYER,
+    figures,
+    deductionInputs: EMPTY_DEDUCTION_INPUTS,
+    miscIncome: EMPTY_MISC_INCOME,
+    expandedIncome,
+    tax,
+    categoryTotals: { business: {}, realEstate: {} },
+    withholdingTax: expandedWithholdingTotal(expanded),
+    prepaidTax: 0,
+    originalThirdPeriodTax: null,
+  });
+}
+
+describe("拡張所得ありのXTX構造（Issue #27）", () => {
+  test("第三表と計算明細書が含まれ、分離区分と主要タグが出る", () => {
+    const xml = expandedSample(2025);
+    expect(xml).toContain("<KOA020-3");
+    expect(xml).toContain("<KOC080 ");
+    expect(xml).toContain("<ABA00250><kubun_CD>1</kubun_CD></ABA00250>");
+    // 第一表: 配当（総合分）・一時
+    expect(xml).toContain("<ABB00070>200000</ABB00070>");
+    expect(xml).toContain("<ABB00360>180000</ABB00360>");
+    expect(xml).toContain("<ABB00230>1500000</ABB00230>");
+    expect(xml).toContain("<ABB00400>350000</ABB00400>");
+    // 第三表: 課税株式等（ヲ）40万円・課税配当（ワ）42万円（損失通算後）
+    expect(xml).toContain("<ABL00500>400000</ABL00500>");
+    expect(xml).toContain("<ABL00505>420000</ABL00505>");
+    // 計算明細書: 一般株式等の所得金額・特定口座の明細行
+    expect(xml).toContain("<EHD00160>400000</EHD00160>");
+    expect(xml).toContain("<EHQ00040>テスト証券</EHQ00040>");
+  });
+
+  test("拡張所得がなければ第三表も計算明細書も出ない", () => {
+    const xml = incomeSample(2025);
+    expect(xml).not.toContain("<KOA020-3");
+    expect(xml).not.toContain("<KOC080 ");
+    expect(xml).not.toContain("<ABA00250>");
+  });
+});
+
 describe("公式XMLスキーマ検証", () => {
   maybe("所得税 2023〜2026 と消費税の生成物が公式XSDを通る", () => {
     // 検証は python3 + lxml でサンプル数に応じて数秒かかるため余裕を持たせる
@@ -414,6 +501,9 @@ describe("公式XMLスキーマ検証", () => {
       ["shotokuWhite2025.xtx", whiteSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuSalary2025.xtx", salarySample(2025), "shotoku/RKO0010-250.xsd"],
       ["shotokuDepBs2025.xtx", depBsSample(2025), "shotoku/RKO0010-250.xsd"],
+      ["shotokuExpanded2023.xtx", expandedSample(2023), "shotoku/RKO0010-231.xsd"],
+      ["shotokuExpanded2024.xtx", expandedSample(2024), "shotoku/RKO0010-240.xsd"],
+      ["shotokuExpanded2025.xtx", expandedSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
       ["shohi8.xtx", shohi8Sample(), "shohi/RSH0010-260.xsd"],
       ["shohiSpecial20.xtx", special20Sample(), "shohi/RSH0010-260.xsd"],

@@ -36,6 +36,7 @@
  * 総合分に寄せる決定的ルール）。片方しかなければ全額がそちらに付く。
  */
 import { taxParametersFor } from "./taxParameters";
+import type { TaxCreditInputs } from "./deductions";
 
 /** 金額入力を非負の整数に正規化する（収入・経費などの入力値用）。 */
 function amount(x: number): number {
@@ -129,6 +130,8 @@ export const EMPTY_DIVIDEND_INCOME: DividendIncomeInput = {
 };
 
 export interface DividendIncomeBreakdown {
+  /** 上場配当等の課税方式（入力の選択） */
+  listedMode: ListedDividendMode;
   /** 総合課税分の収入金額（一般＋総合選択した上場） */
   comprehensiveRevenue: number;
   /** 申告分離課税分の収入金額（上場のみ） */
@@ -190,6 +193,7 @@ export function computeDividendIncome(input: DividendIncomeInput): DividendIncom
     amount(input.generalWithholding);
 
   return {
+    listedMode: input.listedMode,
     comprehensiveRevenue,
     separateRevenue,
     interestComprehensive,
@@ -358,6 +362,8 @@ export interface ExpandedIncomeBreakdown {
   temp: TempIncomeBreakdown;
   dividend: DividendIncomeBreakdown;
   stocks: StockTransferBreakdown;
+  /** 配当の入力（収入金額・負債の利子のいずれか）があったか */
+  dividendDeclared: boolean;
   /** 総合課税の総所得金額へ加算する額（配当（総合）＋一時1/2算入額） */
   comprehensiveAddition: number;
   /**
@@ -411,10 +417,19 @@ export function computeExpandedIncomes(input: ExpandedIncomeInput): ExpandedInco
   const hasSeparateTaxation =
     hasStockTransfer || dividend.separateRevenue > 0 || dividend.separateIncome !== 0;
 
+  const dividendDeclared =
+    amount(input.dividend.listedRevenue) +
+      amount(input.dividend.listedTrustRevenue) +
+      amount(input.dividend.generalRevenue) +
+      amount(input.dividend.generalTrustRevenue) +
+      amount(input.dividend.interestExpense) >
+    0;
+
   return {
     temp,
     dividend,
     stocks,
+    dividendDeclared,
     comprehensiveAddition: dividend.comprehensiveIncome + temp.includedAmount,
     listedLossOffsetToDividend: offset,
     separateDividendIncome,
@@ -436,6 +451,29 @@ export function separateTaxAmount(year: number, kind: "stocks" | "listedDividend
   const rate = kind === "stocks" ? params.stockSeparateTaxRate : params.listedDividendSeparateTaxRate;
   const t = amount(taxable);
   return Math.floor(t * rate + 1e-9);
+}
+
+/**
+ * 配当の入力がある場合、税額控除の入力のうち配当控除の対象額
+ * （dividendCorporate / dividendTrust）を配当所得の内訳から導出した額で
+ * 置き換える。配当パネルと税額控除パネルの両方から配当控除が効く
+ * 二重適用を防ぐための単一の情報源。配当の入力がなければ元のまま返す。
+ */
+export function resolveTaxCreditInputs(
+  base: TaxCreditInputs,
+  expanded: ExpandedIncomeBreakdown,
+): TaxCreditInputs {
+  if (!expanded.dividendDeclared) return base;
+  return {
+    ...base,
+    dividendCorporate: expanded.dividend.creditCorporate,
+    dividendTrust: expanded.dividend.creditTrust,
+  };
+}
+
+/** 拡張所得分の源泉徴収税額の合計（申告する配当＋株式等譲渡分）。 */
+export function expandedWithholdingTotal(expanded: ExpandedIncomeBreakdown): number {
+  return expanded.dividend.withholding + expanded.stocks.withholding;
 }
 
 // ---------------------------------------------------------------------------
