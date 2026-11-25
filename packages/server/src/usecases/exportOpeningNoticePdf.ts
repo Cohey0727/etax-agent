@@ -14,10 +14,11 @@ import {
   ExportBusinessStartPdfResponse,
   ExportBusinessStartPdfResponseSchema,
 } from "../schemas/businessStart";
-import { buildOpeningNoticePdf } from "../services/pdf/buildOpeningNoticePdf";
-import { buildOpeningNoticeFormValues } from "../services/pdf/businessStartFormValues";
-import { loadJapaneseFont } from "../services/pdf/loadJapaneseFont";
-import { loadOpeningNoticeFormTemplate } from "../services/pdf/loadOpeningNoticeFormTemplate";
+import {
+  buildOpeningNoticePdfExport,
+  FormPdfExport,
+  PdfFormError,
+} from "../services/pdf/formPdfExports";
 
 export const exportOpeningNoticePdfRoute = createRoute({
   method: "post",
@@ -51,34 +52,13 @@ export const exportOpeningNoticePdfHandler: RouteHandler<
   typeof exportOpeningNoticePdfRoute
 > = async (c) => {
   const body = c.req.valid("json");
-  const [template, font] = await Promise.all([
-    loadOpeningNoticeFormTemplate(),
-    loadJapaneseFont(),
-  ]);
-  if (!template) {
-    throw new HTTPException(503, {
-      message:
-        "開業届の様式 PDF を用意できませんでした。サーバーのデータフォルダ forms へ公式様式を配置するか、ネットワーク接続を確認してください。",
-    });
-  }
-  if (!font) {
-    throw new HTTPException(503, {
-      message:
-        "日本語フォントがサーバーに配置されていないため、印刷用 PDF を生成できません。データフォルダの fonts へ IPAex ゴシック等を配置してください。",
-    });
-  }
-  const values = buildOpeningNoticeFormValues(body.taxpayer, body.inputs, body.submission_date);
-  let pdf: Uint8Array;
+  let result: FormPdfExport;
   try {
-    pdf = await buildOpeningNoticePdf(values, template, font);
+    result = await buildOpeningNoticePdfExport(body.taxpayer, body.inputs, body.submission_date);
   } catch (e) {
-    throw new HTTPException(400, {
-      message: e instanceof Error ? e.message : "印刷用 PDF の生成に失敗しました",
-    });
+    if (e instanceof PdfFormError) throw new HTTPException(e.status, { message: e.message });
+    throw e;
   }
-  const response: ExportBusinessStartPdfResponse = {
-    filename: "kaigyo-todokede.pdf",
-    pdf_base64: Buffer.from(pdf).toString("base64"),
-  };
+  const response: ExportBusinessStartPdfResponse = result;
   return c.json(response, 200);
 };

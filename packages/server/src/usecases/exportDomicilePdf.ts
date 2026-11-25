@@ -13,10 +13,11 @@ import {
   ExportDomicilePdfResponseSchema,
   ExportDomicilePdfRequestSchema,
 } from "../schemas/etax";
-import { buildDomicilePdf } from "../services/pdf/buildDomicilePdf";
-import { buildDomicileFormValues } from "../services/pdf/domicileFormValues";
-import { loadDomicileFormTemplate } from "../services/pdf/loadDomicileFormTemplate";
-import { loadJapaneseFont } from "../services/pdf/loadJapaneseFont";
+import {
+  buildDomicilePdfExport,
+  FormPdfExport,
+  PdfFormError,
+} from "../services/pdf/formPdfExports";
 
 export const exportDomicilePdfRoute = createRoute({
   method: "post",
@@ -48,31 +49,13 @@ export const exportDomicilePdfRoute = createRoute({
 
 export const exportDomicilePdfHandler: RouteHandler<typeof exportDomicilePdfRoute> = async (c) => {
   const body = c.req.valid("json");
-  const [template, font] = await Promise.all([loadDomicileFormTemplate(), loadJapaneseFont()]);
-  if (!template) {
-    throw new HTTPException(503, {
-      message:
-        "異動申出書の様式 PDF を用意できませんでした。サーバーのデータフォルダ forms へ公式様式を配置するか、ネットワーク接続を確認してください。",
-    });
-  }
-  if (!font) {
-    throw new HTTPException(503, {
-      message:
-        "日本語フォントがサーバーに配置されていないため、印刷用 PDF を生成できません。データフォルダの fonts へ IPAex ゴシック等を配置してください。",
-    });
-  }
-  const values = buildDomicileFormValues(body.taxpayer, body.submission_date);
-  let pdf: Uint8Array;
+  let result: FormPdfExport;
   try {
-    pdf = await buildDomicilePdf(values, template, font);
+    result = await buildDomicilePdfExport(body.taxpayer, body.submission_date);
   } catch (e) {
-    throw new HTTPException(400, {
-      message: e instanceof Error ? e.message : "印刷用 PDF の生成に失敗しました",
-    });
+    if (e instanceof PdfFormError) throw new HTTPException(e.status, { message: e.message });
+    throw e;
   }
-  const response: ExportDomicilePdfResponse = {
-    filename: "nozeichi-idou-moshidesho.pdf",
-    pdf_base64: Buffer.from(pdf).toString("base64"),
-  };
+  const response: ExportDomicilePdfResponse = result;
   return c.json(response, 200);
 };

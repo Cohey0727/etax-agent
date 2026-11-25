@@ -13,10 +13,11 @@ import {
   ExportBusinessStartPdfResponse,
   ExportBusinessStartPdfResponseSchema,
 } from "../schemas/businessStart";
-import { buildBlueReturnPdf } from "../services/pdf/buildBlueReturnPdf";
-import { buildBlueReturnFormValues } from "../services/pdf/businessStartFormValues";
-import { loadBlueReturnFormTemplate } from "../services/pdf/loadBlueReturnFormTemplate";
-import { loadJapaneseFont } from "../services/pdf/loadJapaneseFont";
+import {
+  buildBlueReturnPdfExport,
+  FormPdfExport,
+  PdfFormError,
+} from "../services/pdf/formPdfExports";
 
 export const exportBlueReturnPdfRoute = createRoute({
   method: "post",
@@ -50,34 +51,13 @@ export const exportBlueReturnPdfHandler: RouteHandler<
   typeof exportBlueReturnPdfRoute
 > = async (c) => {
   const body = c.req.valid("json");
-  const [template, font] = await Promise.all([
-    loadBlueReturnFormTemplate(),
-    loadJapaneseFont(),
-  ]);
-  if (!template) {
-    throw new HTTPException(503, {
-      message:
-        "青色申告承認申請書の様式 PDF を用意できませんでした。サーバーのデータフォルダ forms へ公式様式を配置するか、ネットワーク接続を確認してください。",
-    });
-  }
-  if (!font) {
-    throw new HTTPException(503, {
-      message:
-        "日本語フォントがサーバーに配置されていないため、印刷用 PDF を生成できません。データフォルダの fonts へ IPAex ゴシック等を配置してください。",
-    });
-  }
-  const values = buildBlueReturnFormValues(body.taxpayer, body.inputs, body.submission_date);
-  let pdf: Uint8Array;
+  let result: FormPdfExport;
   try {
-    pdf = await buildBlueReturnPdf(values, template, font);
+    result = await buildBlueReturnPdfExport(body.taxpayer, body.inputs, body.submission_date);
   } catch (e) {
-    throw new HTTPException(400, {
-      message: e instanceof Error ? e.message : "印刷用 PDF の生成に失敗しました",
-    });
+    if (e instanceof PdfFormError) throw new HTTPException(e.status, { message: e.message });
+    throw e;
   }
-  const response: ExportBusinessStartPdfResponse = {
-    filename: "aoiro-shinkoku-shinsei.pdf",
-    pdf_base64: Buffer.from(pdf).toString("base64"),
-  };
+  const response: ExportBusinessStartPdfResponse = result;
   return c.json(response, 200);
 };
