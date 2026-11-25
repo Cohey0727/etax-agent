@@ -25,6 +25,7 @@ import { ApiKeyItem, ApiKeyStatus, CreatedApiKey } from "@types";
 import { createApiKey, fetchApiKeys, formatApiKeyLastUsed, formatDateTime, maskApiKey, revokeApiKey } from "@utils";
 import { CreateApiKeyModal } from "../CreateApiKeyModal";
 import { RevokeApiKeyModal } from "../RevokeApiKeyModal";
+import styles from "./ApiKeysPanel.css";
 
 type LoadState = "loading" | "anonymous" | "ready";
 
@@ -112,7 +113,7 @@ export const ApiKeysPanel = () => {
   return (
     <Card>
       <Col gap="md">
-        <Row gap="sm">
+        <Row gap="sm" align="center">
           <Text variant="sectionTitle">APIキー</Text>
           {loadState === "ready" ? (
             <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
@@ -139,8 +140,13 @@ export const ApiKeysPanel = () => {
             {createdKey ? (
               <Col gap="sm">
                 <Text variant="statLabel">発行したキー（この画面を離れると二度と表示されません）</Text>
-                <Row gap="sm">
-                  <Input value={createdKey.key} readOnly aria-label="発行したAPIキー" />
+                <Row gap="sm" align="center">
+                  <Input
+                    value={createdKey.key}
+                    readOnly
+                    aria-label="発行したAPIキー"
+                    className={styles.keyInput}
+                  />
                   <Button variant="ghost" size="sm" onClick={handleCopyCreated}>
                     コピー
                   </Button>
