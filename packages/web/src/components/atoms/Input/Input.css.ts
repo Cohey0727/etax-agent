@@ -3,6 +3,10 @@ import { theme } from "@configs";
 
 const styles = {
   root: style({
+    // 固有幅に引きずられない（flex 子要素では min-width:auto が固有幅を下限にしてしまい、
+    // 狭い画面で親をはみ出すため。Select と同じ）。
+    minWidth: 0,
+    maxWidth: "100%",
     // 高さは Select・Button と共通の controlHeight に固定する（縦 padding は持たず、行ボックスで中央に置く）。
     height: theme.component.controlHeight,
     padding: `0 ${theme.component.controlPaddingX}`,
