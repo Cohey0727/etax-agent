@@ -1,22 +1,18 @@
 /**
- * runAgentChat.ts — 対話エージェントユースケース（usecases）。要 AGENT_API_KEY。
+ * runAgentChat.ts — 対話エージェントユースケース（要 AGENT_API_KEY）。
  *
- * ボディ検証はハンドラ側で行う: 設定読込（500）とキー未設定（503）を
- * バリデーションの 400 より先に返す従来順序を保つため
- * （ルート定義にボディは置かない）。
- * 会話の実行自体は services/agent の runAgentTurn が担う。
+ * 処理の本体は services/agent/executeAgentChat（MCP の agent_chat ツールと
+ * 共用）。ボディ検証は本体側で行う: 設定読込（500）とキー未設定（503）を
+ * バリデーションの 400 より先に返す従来順序を保つため（ルート定義に
+ * ボディは置かない）。ここはルート定義と、本体の失敗を HTTP ステータスへ
+ * 変換する薄いハンドラだけを持つ。
  */
-import { normalizeTransactions } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { AgentConfig, ConfigError, loadAgentConfig, pairApiKeyWithBaseUrl } from "../lib/config";
-import { errorMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import { assertSafeUserBaseUrl, UnsafeUrlError } from "../lib/ssrfGuard";
-import { AgentChatRequestSchema, AgentChatResponse, AgentChatResponseSchema } from "../schemas/agentChat";
+import { AgentChatResponseSchema } from "../schemas/agentChat";
 import { ErrorSchema } from "../schemas/common";
-import { singleCsvText, validateChatAttachments } from "../services/agent/agentAttachments";
-import { runAgentTurn } from "../services/agent/runAgentTurn";
+import { AgentChatError, executeAgentChat } from "../services/agent/executeAgentChat";
 
 export const runAgentChatRoute = createRoute({
   method: "post",
@@ -49,87 +45,13 @@ export const runAgentChatRoute = createRoute({
 });
 
 export const runAgentChatHandler: RouteHandler<typeof runAgentChatRoute> = async (c) => {
-  let cfg: AgentConfig;
-  try {
-    cfg = loadAgentConfig();
-  } catch (e) {
-    throw new HTTPException(500, { message: errorMessage(e) });
-  }
   const raw = await readJsonBody(c);
-  // 設定画面（外部接続）から送られた接続情報があれば、環境変数より優先する。
-  // ただし baseUrl がカスタム宛先の場合、サーバー環境変数のキーは送らない
-  // （キー漏洩防止: pairApiKeyWithBaseUrl）。カスタム宛先は SSRF 検証も行う。
-  const override = raw?.agentConfig as
-    | { apiKey?: unknown; baseUrl?: unknown; model?: unknown }
-    | undefined;
-  if (override) {
-    const customBaseUrl =
-      typeof override.baseUrl === "string" && override.baseUrl.trim()
-        ? override.baseUrl.trim()
-        : null;
-    const userKey =
-      typeof override.apiKey === "string" && override.apiKey.trim()
-        ? override.apiKey.trim()
-        : null;
-    if (customBaseUrl) {
-      try {
-        await assertSafeUserBaseUrl(customBaseUrl);
-      } catch (e) {
-        if (e instanceof UnsafeUrlError) {
-          throw new HTTPException(400, { message: e.message });
-        }
-        throw e;
-      }
-    }
-    const paired = pairApiKeyWithBaseUrl({
-      customBaseUrl,
-      serverBaseUrl: cfg.baseUrl,
-      userKey,
-      serverKey: cfg.apiKey,
-    });
-    cfg.baseUrl = paired.baseUrl;
-    cfg.apiKey = paired.apiKey;
-    if (typeof override.model === "string" && override.model.trim()) {
-      cfg.model = override.model.trim();
-    }
-  }
-  if (!cfg.apiKey) {
-    throw new HTTPException(503, {
-      message:
-        "AGENT_API_KEY が未設定のためエージェントは利用できません。サーバーの環境変数に AGENT_API_KEY を設定するか、設定画面の「外部接続」にAPIキーを入力してください（集計・計算・CSV取込はキー不要で使えます）。",
-    });
-  }
-  const parsed = raw === null ? null : AgentChatRequestSchema.safeParse(raw);
-  if (!parsed || !parsed.success) {
-    throw new HTTPException(400, { message: "messages 配列が必要です" });
-  }
-  const body = parsed.data;
-  const history = (body.messages as unknown[])
-    .filter(
-      (m): m is { role: "user" | "assistant"; content: string } =>
-        typeof m === "object" &&
-        m !== null &&
-        ((m as { role?: unknown }).role === "user" || (m as { role?: unknown }).role === "assistant") &&
-        typeof (m as { content?: unknown }).content === "string",
-    )
-    .map((m) => ({ role: m.role, content: m.content }));
-  const transactions = normalizeTransactions(body.transactions ?? []);
-  const attachments = body.attachments ?? [];
   try {
-    validateChatAttachments(attachments);
+    return c.json(await executeAgentChat(raw), 200);
   } catch (e) {
-    throw new HTTPException(400, { message: errorMessage(e) });
-  }
-  // CSV 添付が1件だけなら、従来の csvText 経路（import_csv_info）にも載せる。
-  const csvText = body.csvText ?? singleCsvText(attachments);
-  const deductions = body.deductions;
-  try {
-    const result = await runAgentTurn(cfg, history, { transactions, csvText, deductions }, attachments);
-    const response: AgentChatResponse = result;
-    return c.json(response, 200);
-  } catch (e) {
-    if (e instanceof ConfigError) throw new HTTPException(503, { message: errorMessage(e) });
-    // AI SDK 経由の LLM 呼び出し失敗（HTTPエラー・接続失敗・応答形式異常）は 502。
-    throw new HTTPException(502, { message: errorMessage(e) });
+    if (e instanceof AgentChatError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
+    throw e;
   }
 };
