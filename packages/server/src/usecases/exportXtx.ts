@@ -96,8 +96,10 @@ function depreciationFromWire(
   return { business, realEstate };
 }
 
-/** リクエストの貸借対照表入力を XTX ビルダーの形式へ変換する。 */
-function balanceSheetFromWire(body: ExportXtxRequest): XtxBalanceSheetInput | undefined {
+/** リクエストの貸借対照表入力を XTX ビルダーの形式へ変換する。試算表からも使う。 */
+export function balanceSheetFromWire(
+  body: Pick<ExportXtxRequest, "balance_sheet">,
+): XtxBalanceSheetInput | undefined {
   const bs = body.balance_sheet;
   if (!bs) return undefined;
   return {
