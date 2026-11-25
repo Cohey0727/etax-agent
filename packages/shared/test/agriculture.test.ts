@@ -228,9 +228,12 @@ describe("computeCorrectedFigures への農業の統合", () => {
   const businessTx: Transaction[] = [
     {
       date: "2025-04-01",
+      year: 2025,
       description: "売上",
       amount: 1_000_000,
       category: "売上高",
+      account: "普通預金",
+      tax_category: "",
       income_type: "business",
     },
   ];
