@@ -36,6 +36,8 @@ export const BusinessStartInputsSchema = z
   .object({
     /** 開業日（事業開始等の日、YYYY-MM-DD）。未入力は空文字。 */
     start_date: z.string(),
+    /** 屋号のフリガナ（青色申告承認申請書の K03 欄。プロフィールには無い）。 */
+    shop_name_kana: z.string(),
     /** 事業の概要（開業届）。 */
     business_overview: z.string(),
     /** 所得の種類。 */
