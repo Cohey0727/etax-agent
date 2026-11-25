@@ -1,7 +1,7 @@
 import { Transaction } from "@etax/shared";
 import { clsx } from "clsx";
-import { useEffect, useRef, useState } from "react";
-import { Button, Col, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
+import { DragEvent, useEffect, useRef, useState } from "react";
+import { Button, Col, Icon, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { AgentConnectionConfig, ChatMessage, ChatRole, SendKeyMode } from "@types";
 import {
@@ -11,12 +11,15 @@ import {
   saveCurrentMessages,
 } from "@utils";
 import { MessageBubbles } from "./MessageBubbles";
+import { PendingAttachmentChips } from "./PendingAttachmentChips";
 import {
   type AgentUiAction,
   deriveUiActions,
   formatSessionDate,
   sessionExcerpt,
 } from "./agentChatHelpers";
+import { ATTACH_ACCEPT, toChatAttachmentUpload } from "./chatAttachments";
+import { useChatAttachments } from "./useChatAttachments";
 import styles from "./AgentChatPanel.css";
 
 export type { AgentUiAction } from "./agentChatHelpers";
@@ -68,7 +71,10 @@ export const AgentChatPanel = ({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { pending, addFiles, removeFile, clear: clearFiles } = useChatAttachments(setError);
   const inHistory = historyOpen || viewing !== null;
 
   // 新しいメッセージが来たら会話ログを一番下までスクロールする（履歴閲覧時は先頭から）。
@@ -80,11 +86,21 @@ export const AgentChatPanel = ({
 
   const send = async () => {
     const text = input.trim();
-    if (!text || loading) return;
-    const next: ChatMessage[] = [...messages, { role: ChatRole.User, content: text }];
+    if ((!text && pending.length === 0) || loading) return;
+    // 添付だけの送信もできるよう、本文が空なら定型文を入れる。
+    const sent = pending;
+    const userMessage: ChatMessage = {
+      role: ChatRole.User,
+      content: text || "添付ファイルを確認してください。",
+      ...(sent.length > 0
+        ? { attachments: sent.map(({ name, mimeType }) => ({ name, mimeType })) }
+        : {}),
+    };
+    const next: ChatMessage[] = [...messages, userMessage];
     setMessages(next);
     saveCurrentMessages(next);
     setInput("");
+    clearFiles();
     setLoading(true);
     setError(null);
     try {
@@ -93,6 +109,7 @@ export const AgentChatPanel = ({
         transactions,
         agentConnection,
         getDeductionsSnapshot?.() ?? undefined,
+        sent.map(toChatAttachmentUpload),
       );
       // 使ったツールは発言に添えて表示する（何をしたか分かるように）。
       const answered: ChatMessage[] = [
@@ -142,8 +159,27 @@ export const AgentChatPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, inHistory, loading, onClearReady]);
 
+  // ファイルのドラッグ&ドロップ受け口（履歴閲覧中は無効）。
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!inHistory) setDragging(true);
+  };
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+  };
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragging(false);
+    if (!inHistory) void addFiles(e.dataTransfer.files);
+  };
   return (
-    <div className={styles.root}>
+    <div className={styles.root} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+      {dragging && !inHistory ? (
+        <div className={styles.dropOverlay}>
+          <Text variant="sectionTitle">離してファイルを添付</Text>
+          <Text variant="muted">画像（JPEG/PNG/WebP/GIF）・PDF・CSV に対応しています</Text>
+        </div>
+      ) : null}
 
       {viewing ? (
         <div className={styles.chatLog} ref={logRef}>
@@ -204,7 +240,27 @@ export const AgentChatPanel = ({
             )}
           </div>
           {error && <AlertBox variant="error">{error}</AlertBox>}
+          <PendingAttachmentChips pending={pending} onRemove={removeFile} />
           <Row gap="sm" align="end" className={styles.inputRow}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={ATTACH_ACCEPT}
+              className={styles.hiddenFileInput}
+              onChange={(e) => {
+                void addFiles(e.target.files ?? []);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              aria-label="ファイルを添付"
+            >
+              <Icon name="paperclip" size={16} />
+            </Button>
             <Textarea
               className={styles.inputFlex}
               value={input}
