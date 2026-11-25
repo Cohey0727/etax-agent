@@ -168,14 +168,20 @@ const styles = {
     color: theme.color.muted,
     marginBottom: "4px",
   }),
-  // 耐用年数フィールド：数値入力と候補セレクトをフィールド内の1行に収める。
+  // 耐用年数フィールド：セレクト（または数値入力）と「選択肢にない」チェックを1行に収める。
   lifeInput: style({
     flex: "1 1 auto",
     minWidth: 0,
   }),
-  lifePreset: style({
+  lifeCustomToggle: style({
     flex: "0 0 auto",
-    width: "92px",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "12px",
+    color: theme.color.muted,
+    whiteSpace: "nowrap",
+    cursor: "pointer",
   }),
   hiddenFileInput: style({
     display: "none",

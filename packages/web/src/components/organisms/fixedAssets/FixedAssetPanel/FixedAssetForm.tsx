@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button, Col, Input, Row, Select } from "@components/atoms";
 import { FixedAssetInput } from "@types";
 import styles from "./FixedAssetPanel.css";
@@ -23,6 +24,21 @@ export const FixedAssetForm = ({
 }: FixedAssetFormProps) => {
   const patch = (next: Partial<FixedAssetInput>) => onChange({ ...value, ...next });
   const dateOrNull = (raw: string): string | null => (raw ? raw : null);
+
+  // 耐用年数は既定では候補セレクト。「選択肢にない」にチェックすると数値入力に切り替わる。
+  // 初期値が候補にない年数（編集時）なら、最初から数値入力で開く。
+  const [lifeCustom, setLifeCustom] = useState(
+    () => !USEFUL_LIFE_PRESETS.includes(value.useful_life_years),
+  );
+  const [lastPreset, setLastPreset] = useState(() =>
+    USEFUL_LIFE_PRESETS.includes(value.useful_life_years) ? value.useful_life_years : 5,
+  );
+  const toggleLifeCustom = (checked: boolean) => {
+    setLifeCustom(checked);
+    if (!checked && !USEFUL_LIFE_PRESETS.includes(value.useful_life_years)) {
+      patch({ useful_life_years: lastPreset });
+    }
+  };
 
   return (
     <Col gap="md">
@@ -93,35 +109,47 @@ export const FixedAssetForm = ({
         </div>
         <div>
           <label className={styles.fieldLabel} htmlFor="fa-life">耐用年数（年）</label>
-          <Row gap="sm">
-            <Input
-              id="fa-life"
-              className={styles.lifeInput}
-              type="number"
-              min={1}
-              step={1}
-              value={value.useful_life_years}
-              onChange={(e) => patch({ useful_life_years: Number(e.target.value) })}
-            />
-            <Select
-              aria-label="耐用年数の候補から選ぶ"
-              className={styles.lifePreset}
-              value={
-                USEFUL_LIFE_PRESETS.includes(value.useful_life_years)
-                  ? value.useful_life_years
-                  : ""
-              }
-              onChange={(e) => patch({ useful_life_years: Number(e.target.value) })}
-            >
-              <option value="" disabled>
-                候補
-              </option>
-              {USEFUL_LIFE_PRESETS.map((years) => (
-                <option key={years} value={years}>
-                  {years}年
-                </option>
-              ))}
-            </Select>
+          <Row gap="sm" align="center">
+            {lifeCustom ? (
+              <Input
+                id="fa-life"
+                className={styles.lifeInput}
+                type="number"
+                min={1}
+                step={1}
+                value={value.useful_life_years}
+                onChange={(e) => patch({ useful_life_years: Number(e.target.value) })}
+              />
+            ) : (
+              <Select
+                id="fa-life"
+                className={styles.lifeInput}
+                value={
+                  USEFUL_LIFE_PRESETS.includes(value.useful_life_years)
+                    ? value.useful_life_years
+                    : lastPreset
+                }
+                onChange={(e) => {
+                  const years = Number(e.target.value);
+                  setLastPreset(years);
+                  patch({ useful_life_years: years });
+                }}
+              >
+                {USEFUL_LIFE_PRESETS.map((years) => (
+                  <option key={years} value={years}>
+                    {years}年
+                  </option>
+                ))}
+              </Select>
+            )}
+            <label className={styles.lifeCustomToggle}>
+              <input
+                type="checkbox"
+                checked={lifeCustom}
+                onChange={(e) => toggleLifeCustom(e.target.checked)}
+              />
+              選択肢にない
+            </label>
           </Row>
         </div>
         <div>
