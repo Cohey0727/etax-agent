@@ -238,14 +238,18 @@ const styles = {
   // 画面下部の細いアクションバー（VS Code のステータスバー相当）。
   // fixed ではなくシェルの一部として置く（root が 100dvh のため最下部に残る）。
   // 左右パネルの開閉トグルを置く。
+  // viewport-fit=cover のため、ノッチ付き端末ではホームインジケータに
+  // 被らないようセーフエリア分だけ高さを足す（値は端末側で決まる）。
   actionBar: style({
     flexShrink: 0,
-    height: theme.component.actionBarHeight,
+    height: `calc(${theme.component.actionBarHeight} + env(safe-area-inset-bottom))`,
+    boxSizing: "border-box",
     background: theme.color.surface,
     borderTop: `1px solid ${theme.color.border}`,
     display: "flex",
     alignItems: "center",
     padding: `0 ${theme.space.md}`,
+    paddingBottom: "env(safe-area-inset-bottom)",
   }),
   barInner: style({
     flex: 1,
