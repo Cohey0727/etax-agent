@@ -19,19 +19,19 @@ import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { isAllowedDocumentContentType, normalizeContentType } from "../lib/uploadTypes";
-import {
-  filingSubmissionToApi,
-  getFilingSubmissionRow,
-  getFilingSubmissionRowByFileId,
-  upsertFilingSubmissionRow,
-} from "../repositories/filingSubmissionRepository";
+import { getFilingSubmissionRowByFileId } from "../repositories/filingSubmissionRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
   AttachFilingReceiptRequestSchema,
+  FilingSubmissionResponse,
   FilingSubmissionKindParamSchema,
   SingleFilingSubmissionResponse,
   SingleFilingSubmissionResponseSchema,
 } from "../schemas/filingSubmission";
+import {
+  attachFilingReceiptRecord,
+  FilingSubmissionError,
+} from "../services/filingSubmission/filingSubmissionRecords";
 
 export const attachFilingReceiptRoute = createRoute({
   method: "post",
@@ -78,8 +78,7 @@ export const attachFilingReceiptHandler: RouteHandler<typeof attachFilingReceipt
   }
   const fileId = parsed.data.file_id;
   const storage = createStorageClient(loadStorageConfig());
-  let row;
-  let replacedFileId: string | null = null;
+  let submission: FilingSubmissionResponse;
   try {
     const existing = await getFilingSubmissionRowByFileId(db, fileId);
     if (existing) {
@@ -97,22 +96,16 @@ export const attachFilingReceiptHandler: RouteHandler<typeof attachFilingReceipt
         message: "対応していないファイル形式です（受信通知はPDFのみ添付できます）",
       });
     }
-    const before = await getFilingSubmissionRow(db, year, params.kind);
-    replacedFileId =
-      before?.receiptFileId && before.receiptFileId !== fileId ? before.receiptFileId : null;
-    row = await upsertFilingSubmissionRow(db, year, params.kind, {
-      receiptFileId: fileId,
-      receiptMimeType: mimeType,
-    });
+    // 登録と、差し替え時の旧ファイルの実体削除はサービス側で行う。
+    submission = await attachFilingReceiptRecord(db, year, params.kind, fileId, mimeType);
   } catch (e) {
     if (e instanceof HTTPException) throw e;
+    if (e instanceof FilingSubmissionError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     if (e instanceof StorageError) throw new HTTPException(503, { message: e.message });
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }
-  // 差し替え前の実体は残さない（履歴には付け替えの前後が残る）。
-  if (replacedFileId) {
-    await storage.deleteObject(filingReceiptObjectKey(replacedFileId)).catch(() => undefined);
-  }
-  const response: SingleFilingSubmissionResponse = { submission: filingSubmissionToApi(row) };
+  const response: SingleFilingSubmissionResponse = { submission };
   return c.json(response, 201);
 };

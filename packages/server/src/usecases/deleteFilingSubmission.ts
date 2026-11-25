@@ -8,16 +8,17 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { createStorageClient, filingReceiptObjectKey } from "../gateways/storageGateway";
-import { loadStorageConfig } from "../lib/config";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
-import { deleteFilingSubmissionRow } from "../repositories/filingSubmissionRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
   DeleteFilingSubmissionResponseSchema,
   FilingSubmissionKindParamSchema,
 } from "../schemas/filingSubmission";
+import {
+  deleteFilingSubmissionRecord,
+  FilingSubmissionError,
+} from "../services/filingSubmission/filingSubmissionRecords";
 
 export const deleteFilingSubmissionRoute = createRoute({
   method: "delete",
@@ -56,18 +57,13 @@ export const deleteFilingSubmissionHandler: RouteHandler<
   if (!Number.isInteger(year) || year < 1900 || year > 2200) {
     throw new HTTPException(400, { message: "year が不正です" });
   }
-  let deleted;
   try {
-    deleted = await deleteFilingSubmissionRow(db, year, params.kind);
+    await deleteFilingSubmissionRecord(db, year, params.kind);
   } catch (e) {
+    if (e instanceof FilingSubmissionError) {
+      throw new HTTPException(e.status, { message: e.message });
+    }
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
-  if (!deleted) {
-    throw new HTTPException(404, { message: "対象の提出記録が見つかりません" });
-  }
-  if (deleted.receiptFileId) {
-    const storage = createStorageClient(loadStorageConfig());
-    await storage.deleteObject(filingReceiptObjectKey(deleted.receiptFileId)).catch(() => undefined);
   }
   return c.json({ message: "提出の記録を削除しました" }, 200);
 };

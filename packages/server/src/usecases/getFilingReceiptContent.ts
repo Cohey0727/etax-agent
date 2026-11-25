@@ -8,19 +8,15 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import {
-  createStorageClient,
-  filingReceiptObjectKey,
-  StorageError,
-  StorageObjectNotFoundError,
-} from "../gateways/storageGateway";
-import { loadStorageConfig } from "../lib/config";
+import { StorageError } from "../gateways/storageGateway";
 import { getDb } from "../lib/db";
 import { databaseUnavailableMessage } from "../lib/errors";
-import { servedDocumentContentType } from "../lib/uploadTypes";
-import { getFilingSubmissionRow } from "../repositories/filingSubmissionRepository";
 import { ErrorSchema } from "../schemas/common";
 import { FilingSubmissionKindParamSchema } from "../schemas/filingSubmission";
+import {
+  FilingSubmissionError,
+  getFilingReceiptBytes,
+} from "../services/filingSubmission/filingSubmissionRecords";
 
 export const getFilingReceiptContentRoute = createRoute({
   method: "get",
@@ -52,27 +48,23 @@ export const getFilingReceiptContentHandler: RouteHandler<
   if (!Number.isInteger(year) || year < 1900 || year > 2200) {
     throw new HTTPException(400, { message: "year が不正です" });
   }
-  const row = await getFilingSubmissionRow(db, year, params.kind);
-  if (!row?.receiptFileId) {
-    throw new HTTPException(404, { message: "受信通知が添付されていません" });
-  }
+  let result: { filename: string; mimeType: string; dataBase64: string };
   try {
-    const storage = createStorageClient(loadStorageConfig());
-    const downloaded = await storage.download(filingReceiptObjectKey(row.receiptFileId));
-    const bytes = Buffer.from(downloaded.dataBase64, "base64");
-    return c.body(bytes, 200, {
-      "Content-Type": servedDocumentContentType(row.receiptMimeType),
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-      "Content-Disposition": "inline; filename=\"etax-receipt-notice.pdf\"",
-    });
+    result = await getFilingReceiptBytes(db, year, params.kind);
   } catch (e) {
-    if (e instanceof StorageObjectNotFoundError) {
-      throw new HTTPException(404, { message: e.message });
+    if (e instanceof FilingSubmissionError) {
+      throw new HTTPException(e.status, { message: e.message });
     }
     if (e instanceof StorageError) {
       throw new HTTPException(503, { message: e.message });
     }
     throw e;
   }
+  const bytes = Buffer.from(result.dataBase64, "base64");
+  return c.body(bytes, 200, {
+    "Content-Type": result.mimeType,
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    "Content-Disposition": `inline; filename="${result.filename}"`,
+  });
 };
