@@ -564,7 +564,7 @@ export interface DepreciationRowRecord {
 export interface DepreciationSummary {
   year: number;
   rows: DepreciationRowRecord[];
-  deductible_totals: { business: number; real_estate: number };
+  deductible_totals: { business: number; real_estate: number; agriculture: number };
   small_special: { total: number; cap: number; exceeded: boolean };
 }
 
@@ -616,6 +616,27 @@ export interface ExportXtxRequest {
   balance_sheet?: BalanceSheetWireInput;
   /** 配当・一時・株式等譲渡の入力（ワイヤ形式、Issue #27）。 */
   expanded_income?: ExpandedIncomeWireInput;
+  /** 農業所得の入力（ワイヤ形式、Issue #24）。 */
+  agriculture?: AgricultureWireInput;
+}
+
+/** 農業所得のワイヤ形式（Issue #24）。shared の AgricultureWire と同じ形。 */
+export interface AgricultureWireInput {
+  farm_name: string;
+  sales_amount: number;
+  household_consumption: number;
+  misc_revenue: number;
+  produce_opening_inventory: number;
+  produce_closing_inventory: number;
+  other_opening_inventory: number;
+  other_closing_inventory: number;
+  expense_totals: Record<string, number>;
+  family_worker_salary: number;
+  family_worker_deduction: number;
+  bad_debt_provision_in: number;
+  bad_debt_provision_back: number;
+  cultivation_cost_deduction: number;
+  beef_cattle_exemption_amount: number;
 }
 
 /** 拡張所得のワイヤ形式（Issue #27）。shared の ExpandedIncomeWire と同じ形。 */

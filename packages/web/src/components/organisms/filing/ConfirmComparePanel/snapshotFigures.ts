@@ -1,5 +1,5 @@
 import {
-  BlueDeductionOptions,
+  ComputeCorrectedFiguresOptions,
   EMPTY_MISC_INCOME,
   EMPTY_SALARY_INCOME,
   IncomeTaxResult,
@@ -20,7 +20,7 @@ import { FilingSnapshotFigures } from "@types";
 export const buildSnapshotFigures = (
   transactions: Transaction[],
   year: number,
-  filingOptions: BlueDeductionOptions | undefined,
+  filingOptions: ComputeCorrectedFiguresOptions | undefined,
   miscIncome: MiscIncomeInput | undefined,
   taxResult: IncomeTaxResult | undefined,
   salaryIncome?: SalaryIncomeInput,
@@ -33,7 +33,9 @@ export const buildSnapshotFigures = (
     year,
     salaryIncome ?? EMPTY_SALARY_INCOME,
     miscIncome ?? EMPTY_MISC_INCOME,
-    figures._detail.business_income + figures._detail.real_estate_income,
+    figures._detail.business_income +
+      figures._detail.real_estate_income +
+      figures._detail.agriculture_income,
   );
   return {
     business_income: figures._detail.business_income,

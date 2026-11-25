@@ -1,4 +1,5 @@
 import {
+  AgricultureInput,
   BlueDeductionOptions,
   computeCorrectedFigures,
   computeExpandedIncomes,
@@ -18,6 +19,7 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import { Tabs } from "@components/molecules";
 import {
+  AgriculturePanel,
   BalanceRecords,
   BalanceSheetPanel,
   BalanceSummary,
@@ -106,15 +108,19 @@ export const FilingWorkspace = ({
     filingType: deductionState.filingType,
     realEstateBusinessScale: deductionState.realEstateBusinessScale,
   };
+  // 申告数値の計算には農業所得の入力も渡す（青色申告特別控除の配分と
+  // 農業所得の算入のため）。filingOptions を受ける子コンポーネントには
+  // 従来どおり青色控除の区分だけを渡す。
+  const figuresOptions = { ...filingOptions, agriculture: deductionState.agriculture };
   const computed = useMemo(
-    () => computeCorrectedFigures(yearTransactions, year, filingOptions),
-    [yearTransactions, year, deductionState.filingType, deductionState.realEstateBusinessScale],
+    () => computeCorrectedFigures(yearTransactions, year, figuresOptions),
+    [yearTransactions, year, deductionState.filingType, deductionState.realEstateBusinessScale, deductionState.agriculture],
   );
   // 前年の事業所得（青色申告特別控除前）。貸借対照表の繰越で元入金を
   // 計算するために使う（申告種別は当年の設定で近似する提案値）。
   const previousComputed = useMemo(
-    () => computeCorrectedFigures(filterYear(transactions, year - 1), year - 1, filingOptions),
-    [transactions, year, deductionState.filingType, deductionState.realEstateBusinessScale],
+    () => computeCorrectedFigures(filterYear(transactions, year - 1), year - 1, figuresOptions),
+    [transactions, year, deductionState.filingType, deductionState.realEstateBusinessScale, deductionState.agriculture],
   );
 
   const updateDeductions = (next: DeductionInputs) => {
@@ -139,6 +145,11 @@ export const FilingWorkspace = ({
   };
   const updateExpandedIncome = (next: ExpandedIncomeInput) => {
     const state = { ...deductionState, expandedIncome: next };
+    setDeductionState(state);
+    if (hydrated) saveDeductionState(year, state);
+  };
+  const updateAgriculture = (next: AgricultureInput) => {
+    const state = { ...deductionState, agriculture: next };
     setDeductionState(state);
     if (hydrated) saveDeductionState(year, state);
   };
@@ -171,7 +182,9 @@ export const FilingWorkspace = ({
     year,
     deductionState.salaryIncome,
     deductionState.miscIncome,
-    computed._detail.business_income + computed._detail.real_estate_income,
+    computed._detail.business_income +
+      computed._detail.real_estate_income +
+      computed._detail.agriculture_income,
   );
   // 拡張所得（配当・一時・株式等譲渡）の内訳。総合課税分は合計所得へ加算し、
   // 申告分離分は分離課税として計算する。配当控除の対象額は配当の内訳から
@@ -183,6 +196,7 @@ export const FilingWorkspace = ({
   const totalIncome =
     computed._detail.business_income +
     computed._detail.real_estate_income +
+    computed._detail.agriculture_income +
     manualIncomes.total +
     expandedBreakdown.comprehensiveAddition;
   const taxResult = useMemo(
@@ -208,12 +222,12 @@ export const FilingWorkspace = ({
       buildSnapshotFigures(
         transactions,
         year,
-        filingOptions,
+        figuresOptions,
         deductionState.miscIncome,
         taxResult,
         deductionState.salaryIncome,
       ),
-    [transactions, year, filingOptions, deductionState.miscIncome, taxResult, deductionState.salaryIncome],
+    [transactions, year, figuresOptions, deductionState.miscIncome, taxResult, deductionState.salaryIncome],
   );
   const handleConfirmCalculation = async () => {
     if (!currentFigures) return;
@@ -250,6 +264,7 @@ export const FilingWorkspace = ({
           miscIncome={deductionState.miscIncome}
           salaryIncome={deductionState.salaryIncome}
           expandedIncome={deductionState.expandedIncome}
+          agriculture={deductionState.agriculture}
           filingType={deductionState.filingType}
           realEstateBusinessScale={deductionState.realEstateBusinessScale}
           balanceSheet={deductionState.balanceSheet}
@@ -302,6 +317,11 @@ export const FilingWorkspace = ({
           breakdown={expandedBreakdown}
           taxResult={taxResult}
           onChange={updateExpandedIncome}
+        />
+        <AgriculturePanel
+          agriculture={deductionState.agriculture}
+          filingType={deductionState.filingType}
+          onChange={updateAgriculture}
         />
         <DeductionPanel
           year={year}

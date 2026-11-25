@@ -27,11 +27,13 @@ export const METHOD_OPTIONS: readonly { value: DepreciationMethod; label: string
 export const INCOME_TYPE_OPTIONS: readonly { value: string; label: string }[] = [
   { value: "business", label: "事業" },
   { value: "real_estate", label: "不動産" },
+  { value: "agriculture", label: "農業" },
 ];
 
 export const INCOME_TYPE_LABELS: Record<string, string> = {
   business: "事業",
   real_estate: "不動産",
+  agriculture: "農業",
 };
 
 /** 耐用年数の候補セレクトに出す、よく使う年数。候補に無い年数は数値入力で直接指定する。 */

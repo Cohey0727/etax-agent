@@ -5,6 +5,7 @@ export * from "./BalanceSummary";
 export * from "./ConsumptionTaxPanel";
 export * from "./DeductionPanel";
 export * from "./ExpandedIncomePanel";
+export * from "./AgriculturePanel";
 export * from "./EtaxImportGuide";
 export * from "./FilingPanel";
 export * from "./IncomeSummary";
