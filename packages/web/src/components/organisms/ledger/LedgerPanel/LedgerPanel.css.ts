@@ -114,6 +114,17 @@ const styles = {
     minWidth: "88px",
     textAlign: "right",
   }),
+  // 事業割合（家事按分）の入力。% の単位と並べても潰れない幅にする。
+  ratioInput: style({
+    width: "64px",
+    minWidth: "64px",
+    textAlign: "right",
+  }),
+  // 按分根拠メモの入力（割合が100%未満の行だけ出す）。
+  basisInput: style({
+    width: "100%",
+    minWidth: "120px",
+  }),
   addGrid: style({
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",

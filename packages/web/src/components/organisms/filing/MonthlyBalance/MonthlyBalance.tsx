@@ -1,4 +1,4 @@
-import { Transaction } from "@etax/shared";
+import { Transaction, transactionBusinessAmount } from "@etax/shared";
 import { useMemo } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import { formatYen } from "@utils";
@@ -22,6 +22,7 @@ export interface MonthlyBalanceProps {
  * 月ごとの収入・支出・差引と、差引の累計（累計収支）。
  * 取引のない月も0で並べる。集計は収支カードに合わせ、事業・不動産の
  * 取引だけを対象にする（資金移動などの「その他」区分は含めない）。
+ * 金額は事業分（家事按分後）で集計し、収支カードの見出しと一致させる。
  */
 export const MonthlyBalance = ({ transactions }: MonthlyBalanceProps) => {
   const scoped = useMemo(
@@ -30,11 +31,19 @@ export const MonthlyBalance = ({ transactions }: MonthlyBalanceProps) => {
   );
   const monthly = useMemo(() => sumByMonth(scoped), [scoped]);
   const incomeTotal = useMemo(
-    () => scoped.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
+    () =>
+      scoped.reduce((sum, t) => {
+        const amount = transactionBusinessAmount(t);
+        return amount > 0 ? sum + amount : sum;
+      }, 0),
     [scoped],
   );
   const expenseTotal = useMemo(
-    () => scoped.filter((t) => t.amount < 0).reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
+    () =>
+      scoped.reduce((sum, t) => {
+        const amount = transactionBusinessAmount(t);
+        return amount < 0 ? sum + -amount : sum;
+      }, 0),
     [scoped],
   );
 
@@ -90,8 +99,9 @@ function sumByMonth(transactions: Transaction[]): MonthlyAmount[] {
   for (const t of transactions) {
     const month = Number(t.date.slice(5, 7));
     if (month < 1 || month > 12) continue;
-    if (t.amount > 0) rows[month - 1].income += Math.trunc(t.amount);
-    else rows[month - 1].expense += Math.abs(Math.trunc(t.amount));
+    const amount = transactionBusinessAmount(t);
+    if (amount > 0) rows[month - 1].income += amount;
+    else rows[month - 1].expense += -amount;
   }
   let cumulative = 0;
   for (const row of rows) {

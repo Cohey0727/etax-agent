@@ -7,6 +7,7 @@ import {
   computeCorrectedFigures,
   computeManualIncomes,
   filterYear,
+  transactionBusinessAmount,
   Transaction,
 } from "@etax/shared";
 import { useMemo } from "react";
@@ -57,12 +58,13 @@ export const BalanceSummary = ({ transactions, year, filingOptions, miscIncome, 
     () => yearTransactions.filter((t) => t.income_type !== "other"),
     [yearTransactions],
   );
+  // 内訳も見出し（申告数値）と同じ事業分で集計し、合計が一致するようにする。
   const income = useMemo(
-    () => sumByCategory(scopedTransactions.filter((t) => t.amount > 0), false),
+    () => sumByCategory(scopedTransactions.filter((t) => transactionBusinessAmount(t) > 0), false),
     [scopedTransactions],
   );
   const expenses = useMemo(
-    () => sumByCategory(scopedTransactions.filter((t) => t.amount < 0), true),
+    () => sumByCategory(scopedTransactions.filter((t) => transactionBusinessAmount(t) < 0), true),
     [scopedTransactions],
   );
   const otherFlow = useMemo(() => {
@@ -250,11 +252,12 @@ const CategoryList = ({
   );
 };
 
-/** 科目ごとに合計し、金額の大きい順に並べる（支出は絶対値で）。 */
+/** 科目ごとに事業分を合計し、金額の大きい順に並べる（支出は絶対値で）。 */
 function sumByCategory(transactions: Transaction[], absolute: boolean): CategoryAmount[] {
   const totals = new Map<string, number>();
   for (const t of transactions) {
-    const amount = absolute ? Math.abs(Math.trunc(t.amount)) : Math.trunc(t.amount);
+    const businessAmount = transactionBusinessAmount(t);
+    const amount = absolute ? Math.abs(businessAmount) : businessAmount;
     totals.set(t.category, (totals.get(t.category) ?? 0) + amount);
   }
   return [...totals.entries()]

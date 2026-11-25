@@ -1,7 +1,13 @@
 import { RefObject } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { LedgerTransactionInput } from "@types";
-import { CATEGORY_OPTIONS, INCOME_TYPE_OPTIONS, TAX_CATEGORY_OPTIONS } from "./ledgerOptions";
+import {
+  BUSINESS_RATIO_GUIDE_CATEGORIES,
+  BUSINESS_RATIO_GUIDE_TEXT,
+  CATEGORY_OPTIONS,
+  INCOME_TYPE_OPTIONS,
+  TAX_CATEGORY_OPTIONS,
+} from "./ledgerOptions";
 import styles from "./LedgerPanel.css";
 
 /**
@@ -122,6 +128,36 @@ export const LedgerAddForm = ({
               <Input
                 value={draft.account}
                 onChange={(e) => onDraftChange({ ...draft, account: e.target.value })}
+              />
+            </Col>
+            <Col gap="sm">
+              <Text variant="statLabel">事業割合（%）</Text>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={draft.business_ratio_percent}
+                onChange={(e) =>
+                  onDraftChange({
+                    ...draft,
+                    business_ratio_percent: Number(e.target.value),
+                  })
+                }
+              />
+              {BUSINESS_RATIO_GUIDE_CATEGORIES.has(draft.category) &&
+              draft.business_ratio_percent >= 100 ? (
+                <Text variant="caption">{BUSINESS_RATIO_GUIDE_TEXT}</Text>
+              ) : null}
+            </Col>
+            <Col gap="sm">
+              <Text variant="statLabel">按分根拠（任意）</Text>
+              <Input
+                value={draft.business_ratio_basis}
+                onChange={(e) =>
+                  onDraftChange({ ...draft, business_ratio_basis: e.target.value })
+                }
+                placeholder="例: 面積割合"
               />
             </Col>
           </div>
