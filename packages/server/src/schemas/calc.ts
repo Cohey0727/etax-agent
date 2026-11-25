@@ -367,6 +367,8 @@ export const ExpandedIncomeBreakdownSchema = z
     comprehensiveAddition: z.number(),
     separateStockIncome: z.number(),
     separateDividendIncome: z.number(),
+    separateIncomeTotal: z.number(),
+    withholding: z.number(),
     listedLossOffsetToDividend: z.number(),
     unabsorbedListedLoss: z.number(),
     hasSeparateTaxation: z.boolean(),
