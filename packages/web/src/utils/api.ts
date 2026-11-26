@@ -1,5 +1,4 @@
 import { IncomeType, Transaction } from "@etax/shared";
-import { API_BASE_URL } from "./apiBase";
 import {
   AccountClassification,
   AgentChatResponse,
@@ -59,7 +58,7 @@ import {
   XtxTaxpayerInput,
 } from "@types";
 
-/** サーバーAPIの型つきラッパー。接続先は apiBase の API_BASE_URL（Web は同一オリジン、開発時は Vite プロキシ経由）。 */
+/** サーバーAPIの型つきラッパー。/api は Vite プロキシで localhost:3001 へ。 */
 
 async function parseJson<T>(resp: Response): Promise<T> {
   const data = (await resp.json().catch(() => ({}))) as T & { error?: string };
@@ -72,7 +71,7 @@ async function parseJson<T>(resp: Response): Promise<T> {
 /** CSVファイルを生バイトのまま送る（Shift_JISのデコードはサーバー側）。 */
 export async function importCsvFile(file: File): Promise<ImportCsvResponse> {
   const buf = await file.arrayBuffer();
-  const resp = await fetch(`${API_BASE_URL}/api/import/csv`, {
+  const resp = await fetch("/api/import/csv", {
     method: "POST",
     headers: {
       "Content-Type": "text/csv",
@@ -96,7 +95,7 @@ export async function agentChat(
     ...(connection?.model.trim() ? { model: connection.model.trim() } : {}),
     ...(connection?.apiKey.trim() ? { apiKey: connection.apiKey.trim() } : {}),
   };
-  const resp = await fetch(`${API_BASE_URL}/api/agent/chat`, {
+  const resp = await fetch("/api/agent/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -113,7 +112,7 @@ export async function agentChat(
 
 /** 勘定科目を1件判定する（履歴→SystemOne→ルール）。 */
 export async function classifyAccount(description: string): Promise<AccountClassification> {
-  const resp = await fetch(`${API_BASE_URL}/api/classify/account`, {
+  const resp = await fetch("/api/classify/account", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ description }),
@@ -125,7 +124,7 @@ export async function classifyAccount(description: string): Promise<AccountClass
 export async function classifyAccountsBatch(
   descriptions: string[],
 ): Promise<AccountClassification[]> {
-  const resp = await fetch(`${API_BASE_URL}/api/classify/batch`, {
+  const resp = await fetch("/api/classify/batch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items: descriptions.map((description) => ({ description })) }),
@@ -139,7 +138,7 @@ export async function recordClassificationFeedback(
   description: string,
   account: string,
 ): Promise<void> {
-  await fetch(`${API_BASE_URL}/api/classify/feedback`, {
+  await fetch("/api/classify/feedback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ description, account }),
@@ -148,7 +147,7 @@ export async function recordClassificationFeedback(
 
 /** SystemOne（jev）接続設定を取得する。 */
 export async function fetchSystemOneSettings(): Promise<SystemOneSettings> {
-  const resp = await fetch(`${API_BASE_URL}/api/settings/systemone`);
+  const resp = await fetch("/api/settings/systemone");
   return parseJson<SystemOneSettings>(resp);
 }
 
@@ -159,7 +158,7 @@ export async function updateSystemOneSettings(input: {
   apiKey?: string;
   clearApiKey?: boolean;
 }): Promise<SystemOneSettings> {
-  const resp = await fetch(`${API_BASE_URL}/api/settings/systemone`, {
+  const resp = await fetch("/api/settings/systemone", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -169,13 +168,13 @@ export async function updateSystemOneSettings(input: {
 
 /** 外部エージェント連携（MCP）用 API キーの一覧を取得する。 */
 export async function fetchApiKeys(): Promise<ApiKeyItem[]> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/api-keys`);
+  const resp = await fetch("/api/auth/api-keys");
   return parseJson<ApiKeyItem[]>(resp);
 }
 
 /** API キーを発行する。平文キーはこの応答でしか返らない。expiresAt が null なら無期限。 */
 export async function createApiKey(name: string, expiresAt: string | null): Promise<CreatedApiKey> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/api-keys`, {
+  const resp = await fetch("/api/auth/api-keys", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, expires_at: expiresAt }),
@@ -185,13 +184,13 @@ export async function createApiKey(name: string, expiresAt: string | null): Prom
 
 /** API キーを失効させる（サーバー側では行が残り、認証だけが即座に拒否される）。 */
 export async function revokeApiKey(id: number): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/api-keys/${id}`, { method: "DELETE" });
+  const resp = await fetch(`/api/auth/api-keys/${id}`, { method: "DELETE" });
   await parseJson<{ revoked: boolean }>(resp);
 }
 
 /** MCP の接続情報（エンドポイントと公開ツール一覧）を取得する。 */
 export async function fetchMcpInfo(): Promise<McpInfo> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/mcp-info`);
+  const resp = await fetch("/api/auth/mcp-info");
   return parseJson<McpInfo>(resp);
 }
 
@@ -201,7 +200,7 @@ export async function testAgentSettings(input: {
   model?: string;
   apiKey?: string;
 }): Promise<AgentTestResult> {
-  const resp = await fetch(`${API_BASE_URL}/api/settings/agent/test`, {
+  const resp = await fetch("/api/settings/agent/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -211,13 +210,13 @@ export async function testAgentSettings(input: {
 
 /** 正規表現ルール一式（カスタム／自動生成／実効）を取得する。 */
 export async function fetchRegexRules(): Promise<RegexRulesInfo> {
-  const resp = await fetch(`${API_BASE_URL}/api/classify/regex-rules`);
+  const resp = await fetch("/api/classify/regex-rules");
   return parseJson<RegexRulesInfo>(resp);
 }
 
 /** 正規表現ルールを保存する（空配列でカスタムを消して自動生成に戻る）。 */
 export async function updateRegexRules(rules: RegexRuleItem[]): Promise<RegexRulesInfo> {
-  const resp = await fetch(`${API_BASE_URL}/api/classify/regex-rules`, {
+  const resp = await fetch("/api/classify/regex-rules", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rules }),
@@ -227,13 +226,13 @@ export async function updateRegexRules(rules: RegexRuleItem[]): Promise<RegexRul
 
 /** jev用プロンプト一式（カスタム／自動生成／実効）を取得する。 */
 export async function fetchJevPrompt(): Promise<JevPromptInfo> {
-  const resp = await fetch(`${API_BASE_URL}/api/classify/jev-prompt`);
+  const resp = await fetch("/api/classify/jev-prompt");
   return parseJson<JevPromptInfo>(resp);
 }
 
 /** jev用プロンプトを保存する（空文字でカスタムを消して自動生成に戻る）。 */
 export async function updateJevPrompt(prompt: string): Promise<JevPromptInfo> {
-  const resp = await fetch(`${API_BASE_URL}/api/classify/jev-prompt`, {
+  const resp = await fetch("/api/classify/jev-prompt", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt }),
@@ -247,7 +246,7 @@ export async function testSystemOneSettings(input: {
   model?: string;
   apiKey?: string;
 }): Promise<SystemOneTestResult> {
-  const resp = await fetch(`${API_BASE_URL}/api/settings/systemone/test`, {
+  const resp = await fetch("/api/settings/systemone/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -280,7 +279,7 @@ export async function analyzeReceiptImage(file: File): Promise<AnalyzeReceiptRes
     reader.readAsDataURL(file);
   });
   const base64 = dataUrl.split(",")[1] ?? "";
-  const resp = await fetch(`${API_BASE_URL}/api/receipts/analyze`, {
+  const resp = await fetch("/api/receipts/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
@@ -290,7 +289,7 @@ export async function analyzeReceiptImage(file: File): Promise<AnalyzeReceiptRes
 
 /** 署名付きURLでアップロードし、ファイルIDで解析を依頼する経路。 */
 async function analyzeReceiptViaStorage(file: File): Promise<AnalyzeReceiptResponse> {
-  const presignResp = await fetch(`${API_BASE_URL}/api/files/presign-upload`, {
+  const presignResp = await fetch("/api/files/presign-upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contentType: file.type }),
@@ -304,7 +303,7 @@ async function analyzeReceiptViaStorage(file: File): Promise<AnalyzeReceiptRespo
   if (!uploadResp.ok) {
     throw new Error(`ファイルのアップロードに失敗しました (HTTP ${uploadResp.status})`);
   }
-  const resp = await fetch(`${API_BASE_URL}/api/receipts/analyze`, {
+  const resp = await fetch("/api/receipts/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fileId: presign.fileId }),
@@ -315,7 +314,7 @@ async function analyzeReceiptViaStorage(file: File): Promise<AnalyzeReceiptRespo
 /** 証憑の一覧を取得する。帳簿DBが未接続（503）の場合は null。 */
 export async function fetchReceipts(): Promise<ReceiptRecord[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/receipts`);
+    const resp = await fetch("/api/receipts");
     if (!resp.ok) return null;
     const data = (await resp.json()) as ReceiptListResponse;
     return data.receipts;
@@ -326,7 +325,7 @@ export async function fetchReceipts(): Promise<ReceiptRecord[] | null> {
 
 /** 証憑を取引へ紐付ける。 */
 export async function linkReceipt(fileId: string, transactionId: number): Promise<ReceiptRecord> {
-  const resp = await fetch(`${API_BASE_URL}/api/receipts/${fileId}/link`, {
+  const resp = await fetch(`/api/receipts/${fileId}/link`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ transaction_id: transactionId }),
@@ -338,13 +337,13 @@ export async function linkReceipt(fileId: string, transactionId: number): Promis
 
 /** 証憑と取引の紐付けを外す。 */
 export async function unlinkReceipt(fileId: string): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/receipts/${fileId}/link`, { method: "DELETE" });
+  const resp = await fetch(`/api/receipts/${fileId}/link`, { method: "DELETE" });
   await parseJson<{ receipt: ReceiptRecord | null }>(resp);
 }
 
 /** 証憑画像の表示URL。 */
 export function receiptContentUrl(fileId: string): string {
-  return `${API_BASE_URL}/api/receipts/${fileId}/content`;
+  return `/api/receipts/${fileId}/content`;
 }
 
 /* ---------- 固定資産台帳 ---------- */
@@ -352,7 +351,7 @@ export function receiptContentUrl(fileId: string): string {
 /** 固定資産の一覧を取得する。帳簿DBが未接続（503）の場合は null。 */
 export async function fetchFixedAssets(): Promise<FixedAssetRecord[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/fixed-assets`);
+    const resp = await fetch("/api/fixed-assets");
     if (!resp.ok) return null;
     const data = (await resp.json()) as { assets: FixedAssetRecord[] };
     return data.assets;
@@ -366,7 +365,7 @@ export async function fetchDepreciationSummary(
   year: number,
 ): Promise<DepreciationSummary | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/fixed-assets/depreciation?year=${year}`);
+    const resp = await fetch(`/api/fixed-assets/depreciation?year=${year}`);
     if (!resp.ok) return null;
     return (await resp.json()) as DepreciationSummary;
   } catch {
@@ -376,7 +375,7 @@ export async function fetchDepreciationSummary(
 
 /** 固定資産を1件登録する。 */
 export async function createFixedAsset(input: FixedAssetInput): Promise<FixedAssetRecord> {
-  const resp = await fetch(`${API_BASE_URL}/api/fixed-assets`, {
+  const resp = await fetch("/api/fixed-assets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -391,7 +390,7 @@ export async function updateFixedAsset(
   id: number,
   input: FixedAssetInput,
 ): Promise<FixedAssetRecord> {
-  const resp = await fetch(`${API_BASE_URL}/api/fixed-assets/${id}`, {
+  const resp = await fetch(`/api/fixed-assets/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -403,7 +402,7 @@ export async function updateFixedAsset(
 
 /** 固定資産を1件削除する（添付画像も一緒に消える）。 */
 export async function deleteFixedAsset(id: number): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/fixed-assets/${id}`, { method: "DELETE" });
+  const resp = await fetch(`/api/fixed-assets/${id}`, { method: "DELETE" });
   await parseJson(resp);
 }
 
@@ -411,7 +410,7 @@ export async function deleteFixedAsset(id: number): Promise<void> {
 export async function fetchFixedAssetImages(
   assetId: number,
 ): Promise<FixedAssetImageRecord[]> {
-  const resp = await fetch(`${API_BASE_URL}/api/fixed-assets/${assetId}/images`);
+  const resp = await fetch(`/api/fixed-assets/${assetId}/images`);
   const data = await parseJson<{ images: FixedAssetImageRecord[] }>(resp);
   return data.images;
 }
@@ -427,7 +426,7 @@ export async function uploadFixedAssetImage(
   if (!UPLOADABLE_IMAGE_TYPES.includes(file.type)) {
     throw new Error("対応していないファイル形式です（JPEG / PNG / WebP / GIF のみ）");
   }
-  const presignResp = await fetch(`${API_BASE_URL}/api/files/presign-upload`, {
+  const presignResp = await fetch("/api/files/presign-upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contentType: file.type, purpose: "fixed_asset" }),
@@ -441,7 +440,7 @@ export async function uploadFixedAssetImage(
   if (!uploadResp.ok) {
     throw new Error(`ファイルのアップロードに失敗しました (HTTP ${uploadResp.status})`);
   }
-  const resp = await fetch(`${API_BASE_URL}/api/fixed-assets/${assetId}/images`, {
+  const resp = await fetch(`/api/fixed-assets/${assetId}/images`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_id: presign.fileId }),
@@ -453,7 +452,7 @@ export async function uploadFixedAssetImage(
 
 /** 固定資産の画像を1件取り外す（実体も削除される）。 */
 export async function deleteFixedAssetImage(assetId: number, fileId: string): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/fixed-assets/${assetId}/images/${fileId}`, {
+  const resp = await fetch(`/api/fixed-assets/${assetId}/images/${fileId}`, {
     method: "DELETE",
   });
   await parseJson(resp);
@@ -478,13 +477,13 @@ export async function fetchCashFlowReport(
     params.set("opening_balance", String(request.opening_balance));
   }
   const query = params.toString();
-  const resp = await fetch(query ? `${API_BASE_URL}/api/cash-flow?${query}` : `${API_BASE_URL}/api/cash-flow`);
+  const resp = await fetch(query ? `/api/cash-flow?${query}` : "/api/cash-flow");
   return parseJson<CashFlowReport>(resp);
 }
 
 export async function fetchFreeeTrialBalance(): Promise<FreeeTrialBalance | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/freee/trial-balance`);
+    const resp = await fetch("/api/freee/trial-balance");
     if (!resp.ok) return null;
     return (await resp.json()) as FreeeTrialBalance;
   } catch {
@@ -495,7 +494,7 @@ export async function fetchFreeeTrialBalance(): Promise<FreeeTrialBalance | null
 /** 申告ステータス一覧。DB未接続などで取得できない場合は null。 */
 export async function fetchFilingStatuses(): Promise<FilingStatus[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-status`);
+    const resp = await fetch("/api/filing-status");
     if (!resp.ok) return null;
     const data = (await resp.json()) as { statuses: FilingStatus[] };
     return data.statuses;
@@ -510,7 +509,7 @@ export async function updateFilingStatus(
   patch: { confirmed?: boolean; calculated?: boolean; submitted?: boolean },
 ): Promise<FilingStatus | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-status/${year}`, {
+    const resp = await fetch(`/api/filing-status/${year}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -528,7 +527,7 @@ export async function fetchFilingSubmissions(
   year: number,
 ): Promise<FilingSubmission[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-submissions/${year}`);
+    const resp = await fetch(`/api/filing-submissions/${year}`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as { submissions: FilingSubmission[] };
     return data.submissions;
@@ -544,7 +543,7 @@ export async function saveFilingSubmission(
   input: { acceptance_number: string; submitted_date: string | null },
 ): Promise<FilingSubmission | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-submissions/${year}/${kind}`, {
+    const resp = await fetch(`/api/filing-submissions/${year}/${kind}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -563,7 +562,7 @@ export async function deleteFilingSubmission(
   kind: FilingSubmissionKind,
 ): Promise<boolean> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-submissions/${year}/${kind}`, {
+    const resp = await fetch(`/api/filing-submissions/${year}/${kind}`, {
       method: "DELETE",
     });
     return resp.ok;
@@ -585,7 +584,7 @@ export async function uploadFilingReceiptPdf(
   if (file.type !== "application/pdf") {
     throw new Error("対応していないファイル形式です（PDFのみ添付できます）");
   }
-  const presignResp = await fetch(`${API_BASE_URL}/api/files/presign-upload`, {
+  const presignResp = await fetch("/api/files/presign-upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contentType: file.type, purpose: "filing_receipt" }),
@@ -599,7 +598,7 @@ export async function uploadFilingReceiptPdf(
   if (!uploadResp.ok) {
     throw new Error(`ファイルのアップロードに失敗しました (HTTP ${uploadResp.status})`);
   }
-  const resp = await fetch(`${API_BASE_URL}/api/filing-submissions/${year}/${kind}/receipt`, {
+  const resp = await fetch(`/api/filing-submissions/${year}/${kind}/receipt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_id: presign.fileId }),
@@ -610,7 +609,7 @@ export async function uploadFilingReceiptPdf(
 
 /** 受信通知PDFの配信URL（サーバー経由で両ドライバ共通）。 */
 export function filingReceiptContentPath(year: number, kind: FilingSubmissionKind): string {
-  return `${API_BASE_URL}/api/filing-submissions/${year}/${kind}/receipt/content`;
+  return `/api/filing-submissions/${year}/${kind}/receipt/content`;
 }
 
 /** 対象年の提出の記録の変更履歴（新しい順）。取得できない場合は null。 */
@@ -618,7 +617,7 @@ export async function fetchFilingSubmissionHistory(
   year: number,
 ): Promise<FilingSubmissionHistoryEntry[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-submissions/${year}/history`);
+    const resp = await fetch(`/api/filing-submissions/${year}/history`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as { history: FilingSubmissionHistoryEntry[] };
     return data.history;
@@ -630,7 +629,7 @@ export async function fetchFilingSubmissionHistory(
 /** 対象年の確定スナップショット一覧（確定日時の昇順）。失敗した場合は null。 */
 export async function fetchFilingSnapshots(year: number): Promise<FilingSnapshot[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-snapshots/${year}`);
+    const resp = await fetch(`/api/filing-snapshots/${year}`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as { snapshots: FilingSnapshot[] };
     return data.snapshots;
@@ -645,7 +644,7 @@ export async function createFilingSnapshot(
   figures: FilingSnapshotFigures,
 ): Promise<FilingSnapshot | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-snapshots/${year}`, {
+    const resp = await fetch(`/api/filing-snapshots/${year}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ figures }),
@@ -669,7 +668,7 @@ export async function fetchFilingInputs(
   year: number,
 ): Promise<{ state: unknown } | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-inputs/${year}`);
+    const resp = await fetch(`/api/filing-inputs/${year}`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as { state: unknown };
     return data.state === null || data.state === undefined ? null : { state: data.state };
@@ -681,7 +680,7 @@ export async function fetchFilingInputs(
 /** 対象年の申告入力をDBへ保存する。失敗した場合は false。 */
 export async function saveFilingInputs(year: number, state: unknown): Promise<boolean> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/filing-inputs/${year}`, {
+    const resp = await fetch(`/api/filing-inputs/${year}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ state }),
@@ -696,7 +695,7 @@ export async function fetchTaxpayerProfile(
   year: number,
 ): Promise<TaxpayerProfileResult | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/taxpayer/${year}`);
+    const resp = await fetch(`/api/taxpayer/${year}`);
     if (!resp.ok) return null;
     return (await resp.json()) as TaxpayerProfileResult;
   } catch {
@@ -710,7 +709,7 @@ export async function saveTaxpayerProfile(
   taxpayer: XtxTaxpayerInput,
 ): Promise<boolean> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/taxpayer/${year}`, {
+    const resp = await fetch(`/api/taxpayer/${year}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(taxpayer),
@@ -723,7 +722,7 @@ export async function saveTaxpayerProfile(
 
 /** e-Tax 申告等データ（XTX）を生成する。失敗時はサーバーのエラー文言で例外。 */
 export async function exportXtxFile(request: ExportXtxRequest): Promise<ExportXtxResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/etax/export-xtx`, {
+  const resp = await fetch("/api/etax/export-xtx", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -735,7 +734,7 @@ export async function exportXtxFile(request: ExportXtxRequest): Promise<ExportXt
 export async function exportReturnPdfFile(
   request: ExportXtxRequest,
 ): Promise<ExportReturnPdfResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/etax/export-return-pdf`, {
+  const resp = await fetch("/api/etax/export-return-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -747,7 +746,7 @@ export async function exportReturnPdfFile(
 export async function exportDomicilePdfFile(
   request: ExportDomicilePdfRequest,
 ): Promise<ExportDomicilePdfResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/etax/export-domicile-pdf`, {
+  const resp = await fetch("/api/etax/export-domicile-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -758,7 +757,7 @@ export async function exportDomicilePdfFile(
 /** 開業の専用入力（開業届・青色申告承認申請書）を取得する。失敗時は null。 */
 export async function fetchBusinessStartInputs(): Promise<BusinessStartInputsResponse | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/business-start-inputs`);
+    const resp = await fetch("/api/business-start-inputs");
     if (!resp.ok) return null;
     return (await resp.json()) as BusinessStartInputsResponse;
   } catch {
@@ -771,7 +770,7 @@ export async function saveBusinessStartInputsToServer(
   state: BusinessStartInputs,
 ): Promise<boolean> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/business-start-inputs`, {
+    const resp = await fetch("/api/business-start-inputs", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ state }),
@@ -786,7 +785,7 @@ export async function saveBusinessStartInputsToServer(
 export async function exportOpeningNoticePdfFile(
   request: ExportBusinessStartPdfRequest,
 ): Promise<ExportBusinessStartPdfResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/etax/export-opening-notice-pdf`, {
+  const resp = await fetch("/api/etax/export-opening-notice-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -798,7 +797,7 @@ export async function exportOpeningNoticePdfFile(
 export async function exportBlueReturnPdfFile(
   request: ExportBusinessStartPdfRequest,
 ): Promise<ExportBusinessStartPdfResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/etax/export-blue-return-pdf`, {
+  const resp = await fetch("/api/etax/export-blue-return-pdf", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -810,7 +809,7 @@ export async function exportBlueReturnPdfFile(
 export async function exportConsumptionXtxFile(
   request: ExportConsumptionXtxRequest,
 ): Promise<ExportConsumptionXtxResponse> {
-  const resp = await fetch(`${API_BASE_URL}/api/etax/export-consumption-xtx`, {
+  const resp = await fetch("/api/etax/export-consumption-xtx", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -870,7 +869,7 @@ export async function fetchLedgerTransactions(
 ): Promise<LedgerTransaction[] | null> {
   try {
     const query = year ? `?year=${year}` : "";
-    const resp = await fetch(`${API_BASE_URL}/api/transactions${query}`);
+    const resp = await fetch(`/api/transactions${query}`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as ListLedgerTransactionsResponse;
     return data.transactions;
@@ -881,7 +880,7 @@ export async function fetchLedgerTransactions(
 
 /** 帳簿PDFをダウンロードする（サーバーで生成されたPDFをそのまま保存する）。 */
 export async function downloadLedgerPdf(year: number): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/transactions/pdf?year=${year}`);
+  const resp = await fetch(`/api/transactions/pdf?year=${year}`);
   if (!resp.ok) {
     const data = (await resp.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error ?? `HTTP ${resp.status}`);
@@ -899,7 +898,7 @@ export async function downloadLedgerPdf(year: number): Promise<void> {
 export async function createLedgerTransaction(
   input: LedgerTransactionInput,
 ): Promise<LedgerTransaction> {
-  const resp = await fetch(`${API_BASE_URL}/api/transactions`, {
+  const resp = await fetch("/api/transactions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -914,7 +913,7 @@ export async function updateLedgerTransaction(
   id: number,
   input: LedgerTransactionInput,
 ): Promise<LedgerTransaction> {
-  const resp = await fetch(`${API_BASE_URL}/api/transactions/${id}`, {
+  const resp = await fetch(`/api/transactions/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -926,7 +925,7 @@ export async function updateLedgerTransaction(
 
 /** 帳簿の取引を1件削除する。 */
 export async function deleteLedgerTransaction(id: number): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/transactions/${id}`, { method: "DELETE" });
+  const resp = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
   await parseJson(resp);
 }
 
@@ -935,7 +934,7 @@ export async function fetchTransactionHistory(
   transactionId: number,
 ): Promise<TransactionHistoryEntry[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/transactions/${transactionId}/history`);
+    const resp = await fetch(`/api/transactions/${transactionId}/history`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as { history: TransactionHistoryEntry[] };
     return data.history;
@@ -949,7 +948,7 @@ export async function fetchRecentTransactionHistory(
   limit = 100,
 ): Promise<TransactionHistoryEntry[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/transactions/history?limit=${limit}`);
+    const resp = await fetch(`/api/transactions/history?limit=${limit}`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as { history: TransactionHistoryEntry[] };
     return data.history;
@@ -963,7 +962,7 @@ export async function replaceYearLedgerTransactions(
   year: number,
   inputs: LedgerTransactionInput[],
 ): Promise<LedgerTransaction[]> {
-  const resp = await fetch(`${API_BASE_URL}/api/transactions/replace-year`, {
+  const resp = await fetch("/api/transactions/replace-year", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ year, transactions: inputs }),
@@ -975,7 +974,7 @@ export async function replaceYearLedgerTransactions(
 /* ---------- 認証・課金 ---------- */
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const resp = await fetch(`${API_BASE_URL}${path}`, {
+  const resp = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -985,13 +984,13 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 
 /** 認証の公開設定（必須かどうか・利用可能なログイン方法）。 */
 export async function fetchAuthConfig(): Promise<import("@types").AuthConfig> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/config`);
+  const resp = await fetch("/api/auth/config");
   return parseJson<import("@types").AuthConfig>(resp);
 }
 
 /** ログイン中のユーザー。未ログインなら null。 */
 export async function fetchMe(): Promise<import("@types").AuthUser | null> {
-  const resp = await fetch(`${API_BASE_URL}/api/auth/me`);
+  const resp = await fetch("/api/auth/me");
   if (resp.status === 401) return null;
   const data = await parseJson<{ user: import("@types").AuthUser }>(resp);
   return data.user;
@@ -1018,7 +1017,7 @@ export async function registerAccount(
 }
 
 export async function logoutAccount(): Promise<void> {
-  await fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST" }).catch(() => undefined);
+  await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
 }
 
 /** TOTP の2段階目（ログイン時のコード検証）。 */
@@ -1063,15 +1062,15 @@ export async function disableTotp(code: string): Promise<void> {
 
 /** 課金の状態（未設定なら billing_enabled=false）。 */
 export async function fetchBillingPlan(): Promise<import("@types").BillingPlan> {
-  const resp = await fetch(`${API_BASE_URL}/api/billing/plan`);
+  const resp = await fetch("/api/billing/plan");
   return parseJson<import("@types").BillingPlan>(resp);
 }
 
 /** Stripe Checkout の URL を作る。 */
 export async function createBillingCheckout(): Promise<{ url: string }> {
   return postJson<{ url: string }>("/api/billing/checkout", {
-    success_url: `${API_BASE_URL || window.location.origin}/settings?billing=success`,
-    cancel_url: `${API_BASE_URL || window.location.origin}/settings?billing=cancel`,
+    success_url: `${window.location.origin}/settings?billing=success`,
+    cancel_url: `${window.location.origin}/settings?billing=cancel`,
   });
 }
 
@@ -1088,7 +1087,7 @@ export async function fetchInvoices(
     if (filters.max_total !== undefined) params.set("max_total", String(filters.max_total));
     if (filters.status) params.set("status", filters.status);
     const query = params.toString();
-    const resp = await fetch(query ? `${API_BASE_URL}/api/invoices?${query}` : `${API_BASE_URL}/api/invoices`);
+    const resp = await fetch(query ? `/api/invoices?${query}` : "/api/invoices");
     if (!resp.ok) return null;
     const data = (await resp.json()) as { invoices: InvoiceRecord[] };
     return data.invoices;
@@ -1099,7 +1098,7 @@ export async function fetchInvoices(
 
 /** 請求書（下書き）を作成する。 */
 export async function createInvoice(input: InvoiceInput): Promise<InvoiceRecord> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices`, {
+  const resp = await fetch("/api/invoices", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -1111,7 +1110,7 @@ export async function createInvoice(input: InvoiceInput): Promise<InvoiceRecord>
 
 /** 請求書（下書き）を更新する。発行済みはサーバー側で拒まれる。 */
 export async function updateInvoice(id: number, input: InvoiceInput): Promise<InvoiceRecord> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices/${id}`, {
+  const resp = await fetch(`/api/invoices/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -1123,13 +1122,13 @@ export async function updateInvoice(id: number, input: InvoiceInput): Promise<In
 
 /** 請求書（下書き）を削除する。 */
 export async function deleteInvoice(id: number): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices/${id}`, { method: "DELETE" });
+  const resp = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
   await parseJson(resp);
 }
 
 /** 請求書を発行する（採番され、以後は変更できない）。 */
 export async function issueInvoice(id: number): Promise<InvoiceRecord> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices/${id}/issue`, { method: "POST" });
+  const resp = await fetch(`/api/invoices/${id}/issue`, { method: "POST" });
   const data = await parseJson<{ invoice: InvoiceRecord | null }>(resp);
   if (!data.invoice) throw new Error("請求書の発行に失敗しました");
   return data.invoice;
@@ -1137,7 +1136,7 @@ export async function issueInvoice(id: number): Promise<InvoiceRecord> {
 
 /** 発行済み請求書の修正用下書きを作成する（修正した適格請求書の元）。 */
 export async function createInvoiceCorrection(id: number): Promise<InvoiceRecord> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices/${id}/correct`, { method: "POST" });
+  const resp = await fetch(`/api/invoices/${id}/correct`, { method: "POST" });
   const data = await parseJson<{ invoice: InvoiceRecord | null }>(resp);
   if (!data.invoice) throw new Error("修正用下書きの作成に失敗しました");
   return data.invoice;
@@ -1148,7 +1147,7 @@ export async function fetchInvoicePayments(
   invoiceId: number,
 ): Promise<InvoicePaymentsResult | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/payments`);
+    const resp = await fetch(`/api/invoices/${invoiceId}/payments`);
     if (!resp.ok) return null;
     return (await resp.json()) as InvoicePaymentsResult;
   } catch {
@@ -1161,7 +1160,7 @@ export async function createInvoicePayment(
   invoiceId: number,
   input: CreateInvoicePaymentInput,
 ): Promise<InvoicePaymentsResult> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/payments`, {
+  const resp = await fetch(`/api/invoices/${invoiceId}/payments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -1174,7 +1173,7 @@ export async function deleteInvoicePayment(
   invoiceId: number,
   paymentId: number,
 ): Promise<InvoicePaymentsResult> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/payments/${paymentId}`, {
+  const resp = await fetch(`/api/invoices/${invoiceId}/payments/${paymentId}`, {
     method: "DELETE",
   });
   return parseJson<InvoicePaymentsResult>(resp);
@@ -1185,7 +1184,7 @@ export async function fetchPaymentSuggestions(
   invoiceId: number,
 ): Promise<ReconciliationCandidateRecord[] | null> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/payment-suggestions`);
+    const resp = await fetch(`/api/invoices/${invoiceId}/payment-suggestions`);
     if (!resp.ok) return null;
     const data = (await resp.json()) as { candidates: ReconciliationCandidateRecord[] };
     return data.candidates;
@@ -1196,7 +1195,7 @@ export async function fetchPaymentSuggestions(
 
 /** 発行済み請求書のPDFをダウンロードする。 */
 export async function downloadInvoicePdf(invoice: InvoiceRecord): Promise<void> {
-  const resp = await fetch(`${API_BASE_URL}/api/invoices/${invoice.id}/pdf`);
+  const resp = await fetch(`/api/invoices/${invoice.id}/pdf`);
   if (!resp.ok) {
     const data = (await resp.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error ?? `HTTP ${resp.status}`);
