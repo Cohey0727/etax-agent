@@ -1,0 +1,53 @@
+# eTaxAgent ネイティブアプリ（@etax/native）
+
+React Native + Expo の iOS / Android アプリ。計算は Web・サーバーと同一の
+`@etax/shared`（TypeScript 計算コア）を import して行う。
+
+- アプリ ID：iOS / Android ともに `jp.co.occam.etaxagent`
+- ルーティング：expo-router（`app/` 配下）
+- API 接続先：環境変数 `EXPO_PUBLIC_API_URL` で差し替え可能。既定は本番
+  （`https://mini-etax.spaghetti-monster.com`）
+
+## 開発
+
+リポジトリルートで `bun install` したうえで、このディレクトリで実行する。
+
+```sh
+bun run start     # Expo 開発サーバー
+bun run typecheck # 型チェック
+bun run export    # バンドル生成（動作確認用）
+```
+
+実機・ストア向けビルドは EAS Build を使う（後述）。
+
+## OTA 更新（EAS Update）
+
+JS のみの変更は EAS Update でストア審査なしに配信できる。
+
+- `app.json` の `updates.url` と `extra.eas.projectId` は現在プレースホルダ
+  （全ゼロの UUID）。EAS 初期化時に実プロジェクト ID へ差し替えること。
+- `runtimeVersion` は `appVersion` ポリシー。アプリのバージョンが上がると
+  旧バージョン向けの更新は配信されなくなる。ネイティブコードを変更した
+  場合は OTA では届かないため、バージョンを上げてストアへ提出する。
+- チャネルは eas.json のビルドプロファイルと対応する
+  （development / preview / production）。
+
+### EAS 初期化の手順（Expo アカウントが必要）
+
+1. `bun x eas-cli login` で Expo アカウントにログインする。
+2. このディレクトリで `bun x eas-cli init` を実行し、プロジェクトを作成する。
+   生成されたプロジェクト ID を `app.json` の `extra.eas.projectId` と
+   `updates.url`（`https://u.expo.dev/<プロジェクトID>`）の両方へ反映する。
+3. ビルド：`bun x eas-cli build --profile preview --platform all`
+4. 更新配信：`bun x eas-cli update --channel preview --message "<内容>"`
+
+## マイナンバーカード読み取り
+
+将来のネイティブモジュールとして `modules/mynumber-nfc/` に置き場を用意して
+ある。方針と注意点は同ディレクトリの README を参照。
+
+## 備考
+
+- スプラッシュ画像はアプリアイコンの素材を暫定利用している。
+- ログイン画面は API へ接続する土台までで、セッション保持と
+  認証状態の管理は未実装。
