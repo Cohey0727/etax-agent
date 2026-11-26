@@ -8,6 +8,7 @@ export * from "./Chip";
 export * from "./DateField";
 export * from "./Field";
 export * from "./LabeledValue";
+export * from "./LineIcon";
 export * from "./ScreenContainer";
 export * from "./SelectField";
 export * from "./Sheet";

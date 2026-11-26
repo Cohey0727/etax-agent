@@ -21,6 +21,7 @@ export const colors = {
   accentText: "#4a3aff",
   navy: "#221a63",
   navyDeep: "#18124d",
+  navySoft: "rgba(255, 255, 255, 0.08)",
   onNavy: "#ffffff",
   onNavySubtle: "rgba(255, 255, 255, 0.68)",
   lavender: "#8f84ff",
@@ -60,6 +61,8 @@ export const fontSizes = {
   lg: 17,
   xl: 20,
   xxl: 26,
+  // ログイン画面のブランド見出し専用の特大サイズ（通常画面では使わない）。
+  hero: 40,
 } as const;
 
 /** ウェイト別のフォントファミリ名（フォントファイルはウェイトごとに同梱）。 */
