@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
-import { login } from "@/api";
+import { ApiError, loginAccount } from "@/api";
+import { useAuth } from "@/auth/AuthContext";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { ScreenContainer } from "@/components/ScreenContainer";
 
@@ -48,13 +49,25 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
 
+  const { applyLoginResponse } = useAuth();
+
   const handleSubmit = async () => {
     setState({ kind: "submitting" });
-    const result = await login(email.trim(), password);
-    if (result.ok) {
-      setState({ kind: "success" });
-    } else {
-      setState({ kind: "error", message: result.message });
+    try {
+      const response = await loginAccount(email.trim(), password);
+      const outcome = await applyLoginResponse(response);
+      if (outcome.kind === "signedIn") {
+        setState({ kind: "success" });
+      } else if (outcome.kind === "totp") {
+        setState({ kind: "error", message: "二段階認証が必要です（次画面で対応します）。" });
+      } else {
+        setState({ kind: "error", message: "メール確認が完了していません。" });
+      }
+    } catch (e) {
+      setState({
+        kind: "error",
+        message: e instanceof ApiError ? e.message : "ログインに失敗しました",
+      });
     }
   };
 
