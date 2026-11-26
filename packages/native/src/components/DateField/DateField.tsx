@@ -81,7 +81,12 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
         </AppText>
       ) : null}
       <Sheet onClose={() => setOpen(false)} title={label} visible={open}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearScroll}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.yearScroll}
+          contentOffset={{ x: Math.max(0, (view.year - years[0]) * 68 - 120), y: 0 }}
+        >
           <View style={styles.chipRow}>
             {years.map((year) => (
               <BouncePressable

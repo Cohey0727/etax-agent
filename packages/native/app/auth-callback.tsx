@@ -35,13 +35,17 @@ export default function AuthCallbackScreen() {
     if (params.token) {
       const token = params.token;
       void (async () => {
-        const outcome = await applyLoginResponse({ token });
-        if (outcome.kind === "signedIn") {
-          setDestination("/");
-        } else if (outcome.kind === "totp") {
-          setDestination(`/login?totp_challenge=${encodeURIComponent(outcome.challenge)}`);
-        } else {
-          setDestination("/login");
+        try {
+          const outcome = await applyLoginResponse({ token });
+          if (outcome.kind === "signedIn") {
+            setDestination("/");
+          } else if (outcome.kind === "totp") {
+            setDestination(`/login?totp_challenge=${encodeURIComponent(outcome.challenge)}`);
+          } else {
+            setDestination("/login");
+          }
+        } catch {
+          setDestination("/login?auth_error=1");
         }
       })();
       return;
