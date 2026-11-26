@@ -11,21 +11,25 @@ export interface SheetProps {
   children?: ReactNode;
   /** 中身をスクロール可能にする（長いフォーム用）。 */
   scroll?: boolean;
+  /**
+   * 登場アニメーション。"spring" はバネでせり上がる（既定）。
+   * セレクター系は反応の速さ優先で "slide"（バネなし）にする。
+   */
+  entry?: "spring" | "slide";
 }
 
-/** 下からバネでせり上がるボトムシート。編集フォームや選択肢の受け皿。 */
-export function Sheet({ visible, title, onClose, children, scroll }: SheetProps) {
+/** 下からせり上がるボトムシート。編集フォームや選択肢の受け皿。 */
+export function Sheet({ visible, title, onClose, children, scroll, entry = "spring" }: SheetProps) {
   const body = <View style={styles.body}>{children}</View>;
+  const entering =
+    entry === "slide"
+      ? SlideInDown.duration(180)
+      : SlideInDown.springify().damping(springs.soft.damping).stiffness(springs.soft.stiffness);
   return (
     <Modal animationType="none" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.backdrop}>
         <Pressable accessibilityLabel="閉じる" onPress={onClose} style={styles.backdropTouch} />
-        <Animated.View
-          entering={SlideInDown.springify()
-            .damping(springs.soft.damping)
-            .stiffness(springs.soft.stiffness)}
-          style={styles.panel}
-        >
+        <Animated.View entering={entering} style={styles.panel}>
           <View style={styles.header}>
             <AppText size="lg" weight="bold" numberOfLines={1} style={styles.title}>
               {title}
