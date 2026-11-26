@@ -1,14 +1,15 @@
 import { Transaction } from "@etax/shared";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { AgentConnectionConfig, ChatMessage, agentChat } from "@/api";
 import { AlertBox } from "@/components/AlertBox";
 import { AppButton } from "@/components/AppButton";
 import { AppText } from "@/components/AppText";
 import { BouncePressable } from "@/components/BouncePressable";
 import { Chip } from "@/components/Chip";
-import { Field } from "@/components/Field";
-import { colors, space } from "@/theme";
+import { LineIcon } from "@/components/LineIcon";
+import { SorobanMark } from "@/components/SorobanMark";
+import { colors, radius, space } from "@/theme";
 import { AgentUiAction, deriveUiActions } from "../agentChatHelpers";
 import {
   MAX_CHAT_ATTACHMENTS,
@@ -208,34 +209,30 @@ export function AgentChatPanel({
         </ScrollView>
       ) : (
         <>
-          <ScrollView
-            ref={setScrollView}
-            contentContainerStyle={styles.logContent}
-            onContentSizeChange={() => scrollView?.scrollToEnd({ animated: true })}
-          >
-            {messages.length === 0 && !loading ? (
-              <>
-                <AppText size="sm" tone="muted">
-                  質問や、集計・計算などの処理を頼めます。設定の変更もできます。例:
-                  「2024年の所得を集計して」「2024年の消費税を3方式で比べて」
-                  「ファミリーマートの支出はどのくらい？」「ＣａＳｙの科目を雑費に変えて」
-                  「『よどばし』を消耗品費にする分類ルールを追加して」
-                </AppText>
-                <AppText size="sm" tone="muted">
-                  ※ このAIエージェントは税制の一般的な説明と、帳簿の集計・計算・操作の代行を行います。個別の取引が経費にできるか等の税務判断は行いません。個別の判断が必要な場合は税理士へご相談ください。
-                </AppText>
-              </>
-            ) : null}
-            <MessageBubbles items={messages} />
-            {loading ? (
-              <View style={styles.thinking}>
-                <ActivityIndicator color={colors.accent} />
-                <AppText size="sm" tone="muted">
-                  考え中…
-                </AppText>
-              </View>
-            ) : null}
-          </ScrollView>
+          {messages.length === 0 && !loading ? (
+            <View style={styles.empty}>
+              <SorobanMark width={44} />
+              <AppText size="sm" tone="muted">
+                帳簿のことを、何でも聞いてください
+              </AppText>
+            </View>
+          ) : (
+            <ScrollView
+              ref={setScrollView}
+              contentContainerStyle={styles.logContent}
+              onContentSizeChange={() => scrollView?.scrollToEnd({ animated: true })}
+            >
+              <MessageBubbles items={messages} />
+              {loading ? (
+                <View style={styles.thinking}>
+                  <ActivityIndicator color={colors.accent} />
+                  <AppText size="sm" tone="muted">
+                    考え中…
+                  </AppText>
+                </View>
+              ) : null}
+            </ScrollView>
+          )}
           {error ? <AlertBox tone="error" message={error} /> : null}
           {pending.length > 0 ? (
             <View style={styles.chips}>
@@ -251,35 +248,50 @@ export function AgentChatPanel({
               ))}
             </View>
           ) : null}
-          <View style={styles.attachRow}>
-            <AppButton
-              label="画像を添付"
-              variant="ghost"
-              size="sm"
+          <View style={styles.composer}>
+            <BouncePressable
+              accessibilityRole="button"
+              accessibilityLabel="画像を添付"
               disabled={loading}
               onPress={() => void addAttachments(pickImageAttachments)}
-            />
-            <AppButton
-              label="ファイル（PDF/CSV）"
-              variant="ghost"
-              size="sm"
+              style={styles.attachButton}
+              pressScale={0.9}
+            >
+              <LineIcon name="image" size={20} color={colors.muted} />
+            </BouncePressable>
+            <BouncePressable
+              accessibilityRole="button"
+              accessibilityLabel="ファイル（PDF/CSV）を添付"
               disabled={loading}
               onPress={() => void addAttachments(pickDocumentAttachments)}
+              style={styles.attachButton}
+              pressScale={0.9}
+            >
+              <LineIcon name="file" size={20} color={colors.muted} />
+            </BouncePressable>
+            <TextInput
+              accessibilityLabel="メッセージ"
+              multiline
+              onChangeText={setInput}
+              placeholder="エージェントへの依頼を入力"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+              value={input}
             />
+            <BouncePressable
+              accessibilityRole="button"
+              accessibilityLabel="送信"
+              disabled={input.trim() === "" && pending.length === 0}
+              onPress={() => void send()}
+              style={[
+                styles.sendButton,
+                input.trim() === "" && pending.length === 0 ? styles.sendButtonDisabled : null,
+              ]}
+              pressScale={0.9}
+            >
+              <LineIcon name="send" size={18} color={colors.onAccent} />
+            </BouncePressable>
           </View>
-          <Field
-            label="メッセージ"
-            multiline
-            onChangeText={setInput}
-            placeholder="エージェントへの依頼を入力"
-            value={input}
-          />
-          <AppButton
-            label="送信"
-            loading={loading}
-            disabled={input.trim() === "" && pending.length === 0}
-            onPress={() => void send()}
-          />
         </>
       )}
     </View>
@@ -293,5 +305,41 @@ const styles = StyleSheet.create({
   sessionItem: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: space.sm, gap: 2 },
   thinking: { flexDirection: "row", alignItems: "center", gap: space.sm },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
-  attachRow: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md },
+  composer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: space.xs,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: space.xs,
+    paddingVertical: space.xs,
+  },
+  attachButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  input: {
+    flex: 1,
+    fontFamily: "IBMPlexSansJP-400",
+    fontSize: 16,
+    color: colors.text,
+    maxHeight: 120,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonDisabled: { backgroundColor: colors.lavender },
 });
