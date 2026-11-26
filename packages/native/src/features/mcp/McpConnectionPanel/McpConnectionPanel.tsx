@@ -83,7 +83,7 @@ export function McpConnectionPanel() {
   const snippet = buildSnippetJson(endpoint);
 
   const handleCopy = async (text: string, doneText: string) => {
-    setMessage((await copyText(text)) ? doneText : "共有シートを開けませんでした");
+    setMessage((await copyText(text)) ? doneText : "コピーできませんでした");
   };
 
   return (
@@ -104,7 +104,7 @@ export function McpConnectionPanel() {
         label="エンドポイントをコピー"
         variant="ghost"
         size="sm"
-        onPress={() => void handleCopy(endpoint, "エンドポイントを共有しました")}
+        onPress={() => void handleCopy(endpoint, "エンドポイントをコピーしました")}
       />
       <AppText size="sm" weight="semibold" tone="subtle">
         接続手順
@@ -125,7 +125,7 @@ export function McpConnectionPanel() {
         label="スニペットをコピー"
         variant="ghost"
         size="sm"
-        onPress={() => void handleCopy(snippet, "設定スニペットを共有しました")}
+        onPress={() => void handleCopy(snippet, "設定スニペットをコピーしました")}
       />
       {message ? <AlertBox tone="info" message={message} /> : null}
       <AppText size="sm" weight="semibold" tone="subtle">
