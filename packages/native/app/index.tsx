@@ -6,7 +6,6 @@ import {
   DashboardPanel,
   FilingStatusPanel,
   FreeeTrialBalanceCard,
-  MenuGrid,
   SetupChecklistPanel,
   YearlyTrendPanel,
 } from "@/features/dashboard";
@@ -46,7 +45,6 @@ export default function HomeScreen() {
           <FreeeTrialBalanceCard year={year} />
         </>
       )}
-      <MenuGrid onNavigate={navigate} />
     </ScreenContainer>
   );
 }

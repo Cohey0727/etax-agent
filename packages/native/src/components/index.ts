@@ -1,5 +1,6 @@
 export * from "./AlertBox";
 export * from "./AnimatedSplash";
+export * from "./AppTabBar";
 export * from "./AppButton";
 export * from "./AppText";
 export * from "./BouncePressable";

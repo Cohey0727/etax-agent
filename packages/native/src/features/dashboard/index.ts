@@ -4,6 +4,5 @@ export * from "./DashboardPanel";
 export * from "./FilingStatusPanel";
 export * from "./FreeeTrialBalanceCard";
 export * from "./IncomeSummary";
-export * from "./MenuGrid";
 export * from "./SetupChecklistPanel";
 export * from "./YearlyTrendPanel";

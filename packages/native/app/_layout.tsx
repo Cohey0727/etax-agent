@@ -1,17 +1,18 @@
 import { useFonts } from "expo-font";
-import { Redirect, Stack, useSegments } from "expo-router";
+import { Redirect, Tabs, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { AnimatedSplash } from "@/components/AnimatedSplash";
+import { AppTabBar } from "@/components/AppTabBar";
 import { AppProvider } from "@/state/AppContext";
 import { colors } from "@/theme";
 
 void SplashScreen.preventAutoHideAsync();
 
-function AppStack() {
+function AppTabs() {
   const { ready, user, loginRequired } = useAuth();
   const segments = useSegments();
   const [splashDone, setSplashDone] = useState(false);
@@ -23,29 +24,46 @@ function AppStack() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Stack
+      <Tabs
+        tabBar={({ state, emitter, navigateToTab }) => (
+          <AppTabBar
+            state={state}
+            onNavigate={(name) => {
+              const route = state.routes.find((r) => r.name === name);
+              if (!route) return;
+              const focused = state.routes[state.index]?.key === route.key;
+              const event = emitter.emit({
+                type: "tabPress",
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!focused && !event.defaultPrevented) navigateToTab(route.key);
+            }}
+          />
+        )}
         screenOptions={{
           headerStyle: { backgroundColor: colors.navyDeep },
           headerTintColor: colors.surface,
           headerTitleStyle: { fontWeight: "700" },
         }}
       >
-        <Stack.Screen name="index" options={{ title: "eTaxAgent" }} />
-        <Stack.Screen name="login" options={{ title: "ログイン" }} />
-        <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
-        <Stack.Screen name="ledger" options={{ title: "帳簿" }} />
-        <Stack.Screen name="import" options={{ title: "取引・CSV取込" }} />
-        <Stack.Screen name="receipt" options={{ title: "領収書から帳簿" }} />
-        <Stack.Screen name="reports" options={{ title: "試算表" }} />
-        <Stack.Screen name="cashflow" options={{ title: "資金繰り" }} />
-        <Stack.Screen name="assets" options={{ title: "固定資産" }} />
-        <Stack.Screen name="invoices" options={{ title: "請求書" }} />
-        <Stack.Screen name="filing" options={{ title: "確定申告" }} />
-        <Stack.Screen name="taxpayer" options={{ title: "納税者情報" }} />
-        <Stack.Screen name="mcp-settings" options={{ title: "MCP設定" }} />
-        <Stack.Screen name="settings" options={{ title: "設定" }} />
-        <Stack.Screen name="agent" options={{ title: "AIエージェント" }} />
-      </Stack>
+        <Tabs.Screen name="index" options={{ title: "eTaxAgent", href: null }} />
+        <Tabs.Screen name="ledger" options={{ title: "帳簿" }} />
+        <Tabs.Screen name="filing" options={{ title: "確定申告" }} />
+        <Tabs.Screen name="agent" options={{ title: "チャット" }} />
+        <Tabs.Screen name="more" options={{ title: "その他" }} />
+        <Tabs.Screen name="settings" options={{ title: "設定" }} />
+        <Tabs.Screen name="import" options={{ title: "取引・CSV取込", href: null }} />
+        <Tabs.Screen name="receipt" options={{ title: "領収書から帳簿", href: null }} />
+        <Tabs.Screen name="reports" options={{ title: "試算表", href: null }} />
+        <Tabs.Screen name="cashflow" options={{ title: "資金繰り", href: null }} />
+        <Tabs.Screen name="assets" options={{ title: "固定資産", href: null }} />
+        <Tabs.Screen name="invoices" options={{ title: "請求書", href: null }} />
+        <Tabs.Screen name="taxpayer" options={{ title: "納税者情報", href: null }} />
+        <Tabs.Screen name="mcp-settings" options={{ title: "MCP設定", href: null }} />
+        <Tabs.Screen name="login" options={{ title: "ログイン", href: null }} />
+        <Tabs.Screen name="auth-callback" options={{ headerShown: false, href: null }} />
+      </Tabs>
       {mustLogin ? <Redirect href="/login" /> : null}
       {!splashDone ? <AnimatedSplash ready={ready} onFinish={handleSplashFinish} /> : null}
     </View>
@@ -74,7 +92,7 @@ export default function RootLayout() {
     <AuthProvider>
       <AppProvider>
         <StatusBar style="light" />
-        <AppStack />
+        <AppTabs />
       </AppProvider>
     </AuthProvider>
   );
