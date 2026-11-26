@@ -3,13 +3,13 @@ import { colors, fontFamily, FontWeightName } from "@/theme";
 
 export interface AppTextProps extends TextProps {
   /** 文字の大きさの段階。 */
-  size?: "xs" | "sm" | "md" | "lg" | "xl" | "xxl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "xxl" | "hero";
   weight?: FontWeightName;
   tone?: "text" | "subtle" | "muted" | "accent" | "positive" | "negative" | "onNavy" | "onNavySubtle";
   align?: "left" | "center" | "right";
 }
 
-const sizeMap = { xs: 12, sm: 13, md: 15, lg: 17, xl: 20, xxl: 26 } as const;
+const sizeMap = { xs: 12, sm: 13, md: 15, lg: 17, xl: 20, xxl: 26, hero: 40 } as const;
 const toneMap = {
   text: colors.text,
   subtle: colors.textSubtle,
