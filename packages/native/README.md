@@ -25,7 +25,9 @@ bun run export    # バンドル生成（動作確認用）
 JS のみの変更は EAS Update でストア審査なしに配信できる。
 
 - `app.json` の `updates.url` と `extra.eas.projectId` は現在プレースホルダ
-  （全ゼロの UUID）。EAS 初期化時に実プロジェクト ID へ差し替えること。
+  （全ゼロの UUID）。そのため `updates.enabled` は `false` にしてあり、
+  起動時の更新確認は行われない。EAS 初期化時に実プロジェクト ID へ
+  差し替えたうえで `updates.enabled` を `true` に戻すこと。
 - `runtimeVersion` は `appVersion` ポリシー。アプリのバージョンが上がると
   旧バージョン向けの更新は配信されなくなる。ネイティブコードを変更した
   場合は OTA では届かないため、バージョンを上げてストアへ提出する。

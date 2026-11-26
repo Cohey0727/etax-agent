@@ -22,6 +22,15 @@ import { issueSession } from "./authSession";
  */
 const OAUTH_STATE_COOKIE = "etax_oauth_state";
 
+/**
+ * ネイティブアプリから開始したフローの戻り先。アプリはカスタムスキームで
+ * 結果（セッショントークン / TOTP チャレンジ / エラー）を受け取る。戻り先は
+ * この固定値と完全一致する場合だけ許可し、任意の URL は受け付けない
+ * （オープンリダイレクト防止）。開始時に Cookie へ印を置き、callback で読む。
+ */
+const NATIVE_APP_RETURN_URL = "etaxagent://auth-callback";
+const OAUTH_APP_RETURN_COOKIE = "etax_oauth_app_return";
+
 export type OAuthProvider = "google" | "github";
 
 interface ProviderConfig {
@@ -89,6 +98,16 @@ export async function oauthStartHandler(c: Context): Promise<Response> {
     maxAge: 10 * 60,
     secure: isSecureDeployment(c),
   });
+  // ネイティブアプリからの開始なら、結果の戻り先を Cookie に控える。
+  if (c.req.query("native_return") === NATIVE_APP_RETURN_URL) {
+    setCookie(c, OAUTH_APP_RETURN_COOKIE, "1", {
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/api/auth/oauth",
+      maxAge: 10 * 60,
+      secure: isSecureDeployment(c),
+    });
+  }
   const params = new URLSearchParams({
     client_id: process.env[config.clientIdEnv] as string,
     redirect_uri: uri,
@@ -166,13 +185,21 @@ export async function oauthCallbackHandler(c: Context): Promise<Response> {
   // （ログイン CSRF と state 再利用の防止）。
   const stateCookie = getCookie(c, OAUTH_STATE_COOKIE);
   deleteCookie(c, OAUTH_STATE_COOKIE, { path: "/api/auth/oauth" });
+  // ネイティブアプリからのフローなら、結果はアプリの戻り先へ返す。
+  const appReturn = getCookie(c, OAUTH_APP_RETURN_COOKIE) === "1" ? NATIVE_APP_RETURN_URL : null;
+  deleteCookie(c, OAUTH_APP_RETURN_COOKIE, { path: "/api/auth/oauth" });
+  const finish = (params: Record<string, string>): Response => {
+    const query = new URLSearchParams(params).toString();
+    if (appReturn) return c.redirect(query ? `${appReturn}?${query}` : appReturn);
+    return c.redirect(query ? `/?${query}` : "/");
+  };
   if (
     !code ||
     !state ||
     stateCookie !== state ||
     beginChallengeUse(state, `oauth:${provider}`) === undefined
   ) {
-    return c.redirect("/?auth_error=oauth_state");
+    return finish({ auth_error: "oauth_state" });
   }
   burnChallenge(state, `oauth:${provider}`);
   try {
@@ -183,11 +210,12 @@ export async function oauthCallbackHandler(c: Context): Promise<Response> {
     // セッションは発行せず、チャレンジを画面へ渡してコード入力を求める。
     if (user.totpEnabled) {
       const challenge = issueChallenge(user.id, "totp-login");
-      return c.redirect(`/?totp_challenge=${encodeURIComponent(challenge)}`);
+      return finish({ totp_challenge: challenge });
     }
-    await issueSession(c, db, user.id);
-    return c.redirect("/");
+    const token = await issueSession(c, db, user.id);
+    // アプリへはセッショントークンそのものを渡す（アプリは Bearer で使う）。
+    return appReturn ? finish({ token }) : finish({});
   } catch {
-    return c.redirect("/?auth_error=oauth_failed");
+    return finish({ auth_error: "oauth_failed" });
   }
 }

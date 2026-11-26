@@ -1,99 +1,276 @@
-import { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
-import { login } from "@/api";
-import { PrimaryButton } from "@/components/PrimaryButton";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
+import {
+  ApiError,
+  consumeMagicLink,
+  loginAccount,
+  loginWithTotp,
+  registerAccount,
+  requestMagicLink,
+  verifyEmailAccount,
+} from "@/api";
+import { useAuth } from "@/auth/AuthContext";
+import { AlertBox } from "@/components/AlertBox";
+import { AppButton } from "@/components/AppButton";
+import { Card } from "@/components/Card";
 import { ScreenContainer } from "@/components/ScreenContainer";
+import { SkeletonCard } from "@/components/Skeleton";
+import { Tabs } from "@/components/Tabs";
+import {
+  AuthSentNotice,
+  LoginBrandHeader,
+  MagicLinkForm,
+  OAuthButtons,
+  OAuthOutcome,
+  OAuthProviderKey,
+  PasswordAuthForm,
+  PasswordMode,
+  TotpAuthForm,
+} from "@/features/auth";
+import { space } from "@/theme";
 
-type SubmitState =
-  | { kind: "idle" }
-  | { kind: "submitting" }
-  | { kind: "success" }
-  | { kind: "error"; message: string };
+type Mode = PasswordMode | "totp" | "magic" | "magicSent" | "verifySent";
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e3e1f2",
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
-    padding: 16,
-  },
-  error: {
-    color: "#c22f4d",
-    fontSize: 14,
-  },
-  input: {
-    borderColor: "#e3e1f2",
-    borderRadius: 12,
-    borderWidth: 1,
-    color: "#26224d",
-    fontSize: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  label: {
-    color: "#6f6c8f",
-    fontSize: 13,
-    marginBottom: 6,
-  },
-  success: {
-    color: "#1d7a4f",
-    fontSize: 14,
-  },
-});
+const MODE_TABS = [
+  { id: "login" as const, label: "ログイン" },
+  { id: "register" as const, label: "新規登録" },
+];
+
+function errorMessage(e: unknown, fallback: string): string {
+  return e instanceof ApiError ? e.message : fallback;
+}
 
 export default function LoginScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    magic?: string;
+    verify?: string;
+    totp_challenge?: string;
+    auth_error?: string;
+  }>();
+  const { ready, config, user, applyLoginResponse } = useAuth();
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [state, setState] = useState<SubmitState>({ kind: "idle" });
+  const [code, setCode] = useState("");
+  const [challenge, setChallenge] = useState("");
+  const [magicToken, setMagicToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const consumedRef = useRef(false);
 
-  const handleSubmit = async () => {
-    setState({ kind: "submitting" });
-    const result = await login(email.trim(), password);
-    if (result.ok) {
-      setState({ kind: "success" });
+  // ログイン済みでこの画面に来たらホームへ戻す
+  useEffect(() => {
+    if (ready && user) router.replace("/");
+  }, [ready, user, router]);
+
+  const goHome = () => router.replace("/");
+
+  const acceptLogin = async (response: Parameters<typeof applyLoginResponse>[0]) => {
+    const outcome = await applyLoginResponse(response);
+    if (outcome.kind === "signedIn") {
+      goHome();
+    } else if (outcome.kind === "totp") {
+      setChallenge(outcome.challenge);
+      setMode("totp");
     } else {
-      setState({ kind: "error", message: result.message });
+      setMode("verifySent");
     }
   };
 
+  // ディープリンクのパラメータ（メールリンク・確認リンク・OAuth戻り）を一度だけ処理する
+  useEffect(() => {
+    if (consumedRef.current) return;
+    consumedRef.current = true;
+    if (params.auth_error) {
+      setError("外部ログインに失敗しました。もう一度お試しください。");
+      return;
+    }
+    if (params.totp_challenge) {
+      setChallenge(params.totp_challenge);
+      setMode("totp");
+      return;
+    }
+    if (params.verify) {
+      setBusy(true);
+      verifyEmailAccount(params.verify)
+        .then((res) => acceptLogin(res))
+        .catch(() => setError("確認リンクが無効か期限切れです。お手数ですが、もう一度登録してください。"))
+        .finally(() => setBusy(false));
+      return;
+    }
+    if (params.magic) {
+      setBusy(true);
+      consumeMagicLink(params.magic)
+        .then((res) => acceptLogin(res))
+        .catch(() => {
+          setError("ログインリンクが無効か期限切れです。新しいリンクを送ってください。");
+          setMode("magic");
+        })
+        .finally(() => setBusy(false));
+    }
+    // 初回マウント時のパラメータだけを対象にする
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePasswordSubmit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result =
+        mode === "register"
+          ? await registerAccount(email.trim(), password)
+          : await loginAccount(email.trim(), password);
+      await acceptLogin(result);
+    } catch (e) {
+      setError(errorMessage(e, "ログインに失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleTotpSubmit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await acceptLogin(await loginWithTotp(challenge, code));
+    } catch (e) {
+      setError(errorMessage(e, "コードの確認に失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleMagicRequest = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await requestMagicLink(email.trim());
+      setMode("magicSent");
+    } catch (e) {
+      setError(errorMessage(e, "送信に失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleMagicConsume = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await acceptLogin(await consumeMagicLink(magicToken.trim()));
+    } catch (e) {
+      setError(errorMessage(e, "ログインリンクが無効か期限切れです"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleOAuthOutcome = (outcome: OAuthOutcome) => {
+    if (outcome.kind === "signedIn") {
+      void applyLoginResponse({ token: outcome.token }).then((o) => {
+        if (o.kind === "signedIn") goHome();
+      });
+    } else if (outcome.kind === "totp") {
+      setChallenge(outcome.challenge);
+      setMode("totp");
+    } else if (outcome.kind === "error") {
+      setError(outcome.message);
+    }
+  };
+
+  const methods = config?.methods;
+  const oauthProviders: OAuthProviderKey[] = [
+    ...(methods?.google ? (["google"] as const) : []),
+    ...(methods?.github ? (["github"] as const) : []),
+  ];
+  const isPasswordMode = mode === "login" || mode === "register";
+
   return (
     <ScreenContainer>
-      <View style={styles.card}>
-        <View>
-          <Text style={styles.label}>メールアドレス</Text>
-          <TextInput
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            onChangeText={setEmail}
-            style={styles.input}
-            textContentType="emailAddress"
-            value={email}
-          />
-        </View>
-        <View>
-          <Text style={styles.label}>パスワード</Text>
-          <TextInput
-            autoComplete="password"
-            onChangeText={setPassword}
-            secureTextEntry
-            style={styles.input}
-            textContentType="password"
-            value={password}
-          />
-        </View>
-        {state.kind === "error" ? <Text style={styles.error}>{state.message}</Text> : null}
-        {state.kind === "success" ? (
-          <Text style={styles.success}>ログインできました。</Text>
-        ) : null}
-        <PrimaryButton
-          disabled={state.kind === "submitting" || email === "" || password === ""}
-          label="ログイン"
-          onPress={handleSubmit}
-        />
-      </View>
+      <LoginBrandHeader />
+      {!ready || !methods ? (
+        <SkeletonCard />
+      ) : (
+        <Card noEnter>
+          <View style={{ gap: space.md }}>
+            {error ? <AlertBox tone="error" message={error} /> : null}
+            {isPasswordMode ? (
+              <>
+                {methods.password ? (
+                  <Tabs
+                    items={MODE_TABS}
+                    activeId={mode}
+                    onChange={(id) => {
+                      setMode(id);
+                      setError(null);
+                    }}
+                  />
+                ) : null}
+                {methods.password ? (
+                  <PasswordAuthForm
+                    mode={mode}
+                    email={email}
+                    password={password}
+                    busy={busy}
+                    onEmailChange={setEmail}
+                    onPasswordChange={setPassword}
+                    onSubmit={() => void handlePasswordSubmit()}
+                  />
+                ) : null}
+                <OAuthButtons
+                  providers={oauthProviders}
+                  busy={busy}
+                  onOutcome={handleOAuthOutcome}
+                  onError={setError}
+                />
+                {methods.magic_link ? (
+                  <AppButton
+                    label="メールリンクでログイン"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => setMode("magic")}
+                  />
+                ) : null}
+                {methods.passkey ? (
+                  <AlertBox
+                    tone="info"
+                    message="パスキーはこのアプリでは未対応です。パスワード等でログインしてください。"
+                  />
+                ) : null}
+              </>
+            ) : null}
+            {mode === "totp" ? (
+              <TotpAuthForm
+                code={code}
+                busy={busy}
+                onCodeChange={setCode}
+                onSubmit={() => void handleTotpSubmit()}
+                onRestart={() => setMode("login")}
+              />
+            ) : null}
+            {mode === "magic" ? (
+              <MagicLinkForm
+                email={email}
+                token={magicToken}
+                busy={busy}
+                onEmailChange={setEmail}
+                onTokenChange={setMagicToken}
+                onRequestSubmit={() => void handleMagicRequest()}
+                onConsumeSubmit={() => void handleMagicConsume()}
+                onBack={() => setMode("login")}
+              />
+            ) : null}
+            {mode === "magicSent" ? (
+              <AuthSentNotice variant="magicSent" onBack={() => setMode("magic")} />
+            ) : null}
+            {mode === "verifySent" ? (
+              <AuthSentNotice variant="verifySent" onBack={() => setMode("login")} />
+            ) : null}
+          </View>
+        </Card>
+      )}
     </ScreenContainer>
   );
 }
