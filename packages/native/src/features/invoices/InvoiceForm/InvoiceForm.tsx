@@ -1,7 +1,7 @@
 import { invoiceLineAmount } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { InvoiceInput, InvoiceLineInput } from "@/api";
-import { AppButton, AppText, Field, LabeledValue, MoneyField, SelectField, SwitchRow } from "@/components";
+import { AppButton, AppText, DateField, Field, LabeledValue, MoneyField, SelectField, SwitchRow } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatYen, parseAmount } from "@/utils";
 import { ROUNDING_OPTIONS, TAX_RATE_OPTIONS, emptyLine, previewTotals } from "../invoiceOptions";
@@ -36,18 +36,15 @@ export function InvoiceForm({ submitLabel, value, busy, onChange, onSubmit, onCa
 
   return (
     <View style={styles.form}>
-      <Field
+      <DateField
         label="発行日"
-        hint="YYYY-MM-DD 形式で入力してください"
-        onChangeText={(text) => patch({ issue_date: text })}
-        placeholder="2026-01-01"
+        onChange={(date) => patch({ issue_date: date })}
         value={value.issue_date}
       />
-      <Field
+      <DateField
         label="支払期限（任意）"
-        hint="YYYY-MM-DD 形式で入力してください"
-        onChangeText={(text) => patch({ due_date: text ? text : null })}
-        placeholder="2026-01-31"
+        clearable
+        onChange={(date) => patch({ due_date: date ? date : null })}
         value={value.due_date ?? ""}
       />
       <Field

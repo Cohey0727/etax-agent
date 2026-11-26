@@ -1,6 +1,6 @@
 import { BLUE_BOOK_OPTIONS } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
-import { AppText, Field, SelectField } from "@/components";
+import { AppText, DateField, Field, SelectField } from "@/components";
 import { BusinessStartInputs } from "@/api";
 import { space } from "@/theme";
 import { CheckRow, NullableBoolField, SalaryRowFields } from "./businessStartFields";
@@ -89,12 +89,11 @@ export function OpeningNoticeFields({ inputs, update }: BusinessStartSectionsPro
         value={inputs.withholding_special}
         onChange={(v) => update({ withholding_special: v })}
       />
-      <Field
+      <DateField
         label="給与支払を開始する年月日"
+        clearable
         value={inputs.salary_start_date}
-        onChangeText={(v) => update({ salary_start_date: v })}
-        placeholder="YYYY-MM-DD"
-        hint="YYYY-MM-DD 形式で入力してください"
+        onChange={(v) => update({ salary_start_date: v })}
       />
       <Field
         label="その他参考事項（開業届）"
@@ -152,24 +151,22 @@ export function BlueReturnFields({ inputs, update }: BusinessStartSectionsProps)
         value={inputs.blue_cancellation_has}
         onChange={(v) => update({ blue_cancellation_has: v })}
       />
-      <Field
+      <DateField
         label="取消し・取りやめの日"
+        clearable
         value={inputs.blue_cancellation_date}
-        onChangeText={(v) => update({ blue_cancellation_date: v })}
-        placeholder="YYYY-MM-DD"
-        hint="YYYY-MM-DD 形式で入力してください"
+        onChange={(v) => update({ blue_cancellation_date: v })}
       />
       <NullableBoolField
         label="相続による事業承継がある"
         value={inputs.inheritance_has}
         onChange={(v) => update({ inheritance_has: v })}
       />
-      <Field
+      <DateField
         label="相続開始年月日"
+        clearable
         value={inputs.inheritance_date}
-        onChangeText={(v) => update({ inheritance_date: v })}
-        placeholder="YYYY-MM-DD"
-        hint="YYYY-MM-DD 形式で入力してください"
+        onChange={(v) => update({ inheritance_date: v })}
       />
       <Field
         label="被相続人の氏名"

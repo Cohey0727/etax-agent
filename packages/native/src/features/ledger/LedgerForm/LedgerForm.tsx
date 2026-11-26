@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { classifyAccount, LedgerTransactionInput } from "@/api";
-import { AlertBox, AppButton, AppText, Field, SelectField } from "@/components";
+import { AlertBox, AppButton, AppText, DateField, Field, SelectField } from "@/components";
 import { parseAmount } from "@/utils";
 import {
   BUSINESS_RATIO_GUIDE_CATEGORIES,
@@ -53,7 +53,7 @@ export function LedgerForm({ value, yearOptions, onChange, showClassify = true }
 
   return (
     <View style={{ gap: 12 }}>
-      <Field label="日付" value={value.date} onChangeText={(date) => set({ date })} placeholder="2026-01-01" />
+      <DateField label="日付" value={value.date} onChange={(date) => set({ date })} />
       <SelectField
         label="年度（割り当て）"
         value={String(value.fiscal_year)}

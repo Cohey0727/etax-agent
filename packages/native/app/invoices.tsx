@@ -5,6 +5,7 @@ import {
   AlertBox,
   AppButton,
   AppText,
+  DateField,
   Field,
   ScreenContainer,
   SelectField,
@@ -155,20 +156,8 @@ export default function InvoicesScreen() {
           placeholder="例: 株式会社サンプル"
           value={searchText}
         />
-        <Field
-          label="発行日（から）"
-          hint="YYYY-MM-DD 形式で入力してください"
-          onChangeText={setSearchFrom}
-          placeholder="2026-01-01"
-          value={searchFrom}
-        />
-        <Field
-          label="発行日（まで）"
-          hint="YYYY-MM-DD 形式で入力してください"
-          onChangeText={setSearchTo}
-          placeholder="2026-12-31"
-          value={searchTo}
-        />
+        <DateField label="発行日（から）" clearable onChange={setSearchFrom} value={searchFrom} />
+        <DateField label="発行日（まで）" clearable onChange={setSearchTo} value={searchTo} />
         <SelectField
           label="状態"
           onChange={setSearchStatus}

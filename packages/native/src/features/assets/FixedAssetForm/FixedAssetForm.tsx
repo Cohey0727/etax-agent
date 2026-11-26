@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { FixedAssetInput } from "@/api";
-import { AppButton, Field, MoneyField, SelectField, SwitchRow } from "@/components";
+import { AppButton, DateField, Field, MoneyField, SelectField, SwitchRow } from "@/components";
 import { space } from "@/theme";
 import { parseAmount, parseOptionalNumber } from "@/utils";
 import { INCOME_TYPE_OPTIONS, METHOD_OPTIONS, USEFUL_LIFE_PRESETS } from "../assetOptions";
@@ -62,18 +62,15 @@ export function FixedAssetForm({
         options={INCOME_TYPE_OPTIONS}
         value={value.income_type}
       />
-      <Field
+      <DateField
         label="取得日"
-        hint="YYYY-MM-DD 形式で入力してください"
-        onChangeText={(text) => patch({ acquisition_date: text })}
-        placeholder="2026-01-01"
+        onChange={(date) => patch({ acquisition_date: date })}
         value={value.acquisition_date}
       />
-      <Field
+      <DateField
         label="事業供用日（空欄なら取得日）"
-        hint="YYYY-MM-DD 形式で入力してください"
-        onChangeText={(text) => patch({ service_start_date: dateOrNull(text) })}
-        placeholder="2026-01-01"
+        clearable
+        onChange={(date) => patch({ service_start_date: dateOrNull(date) })}
         value={value.service_start_date ?? ""}
       />
       <MoneyField
@@ -129,11 +126,10 @@ export function FixedAssetForm({
         }
         value={String(value.business_ratio_percent)}
       />
-      <Field
+      <DateField
         label="除却日（除却した場合のみ）"
-        hint="YYYY-MM-DD 形式で入力してください"
-        onChangeText={(text) => patch({ disposed_date: dateOrNull(text) })}
-        placeholder="2026-01-01"
+        clearable
+        onChange={(date) => patch({ disposed_date: dateOrNull(date) })}
         value={value.disposed_date ?? ""}
       />
       <View style={styles.actions}>
