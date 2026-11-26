@@ -12,7 +12,7 @@ import {
 import { space } from "@/theme";
 
 const INFO_ROWS: readonly { label: string; value: string }[] = [
-  { label: "アプリ", value: "eTaxAgent — 確定申告 準備ツール" },
+  { label: "アプリ", value: "eTaxAgent — 確定申告丸投げ" },
   { label: "データの保存先", value: "この端末とサーバー（帳簿・学習履歴）" },
   { label: "申告の提出", value: "e-Tax での最終提出は納税者本人が行います" },
 ];
