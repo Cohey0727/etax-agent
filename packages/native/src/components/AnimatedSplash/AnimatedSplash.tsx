@@ -1,22 +1,22 @@
 /**
  * AnimatedSplash.tsx — アプリ内の起動ビュー。
- * 濃紺グラデーションの上に、そろばんの珠が1つずつスプリングで弾んで
- * 落ち着き、ワードマークとコピーが現れる。準備完了後にフェードして消える。
+ * 濃紺グラデーションの上に、そろばんの珠・ワードマーク・コピーが
+ * フェードで現れる。準備完了後にフェードして消える。
  */
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
+  Easing,
   FadeInDown,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { SorobanBead } from "@/components/SorobanMark";
-import { colors, fontFamily, springs } from "@/theme";
+import { colors, fontFamily } from "@/theme";
 
 const BEAD_WIDTH = 96;
 const MIN_SHOW_MS = 1500;
@@ -62,16 +62,17 @@ const styles = StyleSheet.create({
   },
 });
 
-function BouncingBead({ tone, index }: { tone: "a" | "b"; index: number }) {
-  const translateY = useSharedValue(-72);
-  const scale = useSharedValue(0.4);
+function SplashBead({ tone, index }: { tone: "a" | "b"; index: number }) {
+  const translateY = useSharedValue(-16);
+  const scale = useSharedValue(0.94);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    const delay = 120 + index * 130;
-    translateY.value = withDelay(delay, withSpring(0, springs.bouncy));
-    scale.value = withDelay(delay, withSpring(1, springs.bouncy));
-    opacity.value = withDelay(delay, withTiming(1, { duration: 160 }));
+    const delay = 120 + index * 110;
+    const timing = { duration: 460, easing: Easing.out(Easing.cubic) };
+    translateY.value = withDelay(delay, withTiming(0, timing));
+    scale.value = withDelay(delay, withTiming(1, timing));
+    opacity.value = withDelay(delay, withTiming(1, { duration: 380 }));
   }, [index, opacity, scale, translateY]);
 
   const style = useAnimatedStyle(() => ({
@@ -125,20 +126,20 @@ export function AnimatedSplash({
       />
       <View style={styles.beads}>
         <View style={styles.beadRow}>
-          <BouncingBead tone="a" index={0} />
-          <BouncingBead tone="b" index={1} />
+          <SplashBead tone="a" index={0} />
+          <SplashBead tone="b" index={1} />
         </View>
         <View style={styles.beadRow}>
-          <BouncingBead tone="b" index={2} />
-          <BouncingBead tone="a" index={3} />
+          <SplashBead tone="b" index={2} />
+          <SplashBead tone="a" index={3} />
         </View>
       </View>
-      <Animated.View entering={FadeInDown.delay(620).springify().damping(13)} style={styles.wordmark}>
+      <Animated.View entering={FadeInDown.delay(620).duration(550)} style={styles.wordmark}>
         <Text style={styles.wordmarkAccent}>e</Text>
         <Text style={styles.wordmarkText}>TaxAgent</Text>
       </Animated.View>
       <Animated.Text
-        entering={FadeInDown.delay(820).springify().damping(15)}
+        entering={FadeInDown.delay(800).duration(550)}
         style={styles.tagline}
       >
         AIが、すべてやります。

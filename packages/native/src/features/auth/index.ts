@@ -5,4 +5,3 @@ export * from "./magicToken";
 export * from "./OAuthButtons";
 export * from "./PasswordAuthForm";
 export * from "./TotpAuthForm";
-export * from "./WorkflowSteps";
