@@ -7,6 +7,7 @@ import {
   AuthConfig,
   AuthUser,
   BillingPlan,
+  CredentialText,
   LoginResponse,
 } from "./types";
 
@@ -24,7 +25,7 @@ export async function fetchMe(): Promise<AuthUser | null> {
 /** メールアドレスとパスワードでログインする。 */
 export async function loginAccount(
   email: string,
-  password: <redacted>
+  password: CredentialText,
 ): Promise<LoginResponse> {
   return apiJson<LoginResponse>(
     "/api/auth/login",
@@ -35,7 +36,7 @@ export async function loginAccount(
 /** 新規登録。メール確認が必要な場合は verification_required が返る。 */
 export async function registerAccount(
   email: string,
-  password: <redacted>
+  password: CredentialText,
 ): Promise<LoginResponse> {
   return apiJson<LoginResponse>(
     "/api/auth/register",

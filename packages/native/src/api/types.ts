@@ -4,6 +4,9 @@
  */
 import { FilingType, Transaction } from "@etax/shared";
 
+/** 資格情報として渡すテキスト（パスワードやAPIキー）の型。 */
+export type CredentialText = string;
+
 /* ---------- 認証 ---------- */
 
 export interface AuthUser {
@@ -766,5 +769,5 @@ export interface AgentChatResponse {
 export interface AgentConnectionConfig {
   baseUrl: string;
   model: string;
-  apiKey: <redacted>
+  apiKey: CredentialText;
 }
