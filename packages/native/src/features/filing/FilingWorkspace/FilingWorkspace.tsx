@@ -198,7 +198,7 @@ export function FilingWorkspace() {
   // 総合タブのセクションリンク。納税者情報だけはタブではなく独立画面へ遷移する。
   const openSection = (section: FilingSection) => {
     if (section === "taxpayer") {
-      router.push("/taxpayer");
+      router.navigate("/taxpayer");
     } else {
       setTab(section);
     }

@@ -34,7 +34,7 @@ export default function AgentScreen() {
       if (action.type === "setYear") {
         setYear(action.year);
       } else if (action.type === "navigate") {
-        router.push(action.route);
+        router.navigate(action.route);
       } else if (action.type === "reloadTransactions" || action.type === "reloadView") {
         void reloadLedger();
       } else if (action.type === "applyDeductions") {

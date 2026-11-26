@@ -15,8 +15,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const { year, years, setYear, transactions, ledgerLoading } = useAppState();
 
-  const navigate = useCallback((href: Href) => router.push(href), [router]);
-  const openFiling = useCallback(() => router.push("/filing"), [router]);
+  const navigate = useCallback((href: Href) => router.navigate(href), [router]);
+  const openFiling = useCallback(() => router.navigate("/filing"), [router]);
 
   return (
     <ScreenContainer>
