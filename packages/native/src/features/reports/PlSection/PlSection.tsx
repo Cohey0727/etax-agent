@@ -1,6 +1,7 @@
+import { IncomeType } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { TrialBalanceLine, TrialBalancePl } from "@/api";
-import { AppText, Card } from "@/components";
+import { AppText, BouncePressable, Card } from "@/components";
 import { formatYen } from "@/utils";
 import { tableStyles } from "../tableStyles";
 
@@ -9,6 +10,10 @@ export interface PlSectionProps {
   year: number;
   current: TrialBalancePl;
   previous: TrialBalancePl;
+  /** この表の所得区分。科目ドリルダウンの絞り込みに使う。 */
+  incomeType: IncomeType;
+  /** 科目タップで、その科目に絞った帳簿へ遷移する。 */
+  onDrillDown?: (incomeType: IncomeType, categories: string[]) => void;
 }
 
 type PlRowKind = "line" | "subtotal" | "total";
@@ -18,10 +23,12 @@ interface PlRow {
   current: number;
   previous: number;
   kind: PlRowKind;
+  /** ドリルダウン先の帳簿で絞り込む勘定科目。無い行は遷移できない。 */
+  categories?: string[];
 }
 
 /** 損益計算書（1区分分）。前年との比較（増減）も並べる。 */
-export function PlSection({ title, year, current, previous }: PlSectionProps) {
+export function PlSection({ title, year, current, previous, incomeType, onDrillDown }: PlSectionProps) {
   const rows = buildRows(current, previous);
   const isEmpty =
     current.revenue === 0 &&
@@ -56,13 +63,27 @@ export function PlSection({ title, year, current, previous }: PlSectionProps) {
                 row.kind === "subtotal" ? tableStyles.subtotalRow : null,
               ]}
             >
-              <AppText
-                size="sm"
-                weight={row.kind === "line" ? "regular" : "semibold"}
-                style={tableStyles.label}
-              >
-                {row.label}
-              </AppText>
+              {row.categories && onDrillDown ? (
+                <BouncePressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${row.label}の帳簿を開く`}
+                  onPress={() => onDrillDown(incomeType, row.categories ?? [])}
+                  pressScale={0.97}
+                  style={tableStyles.label}
+                >
+                  <AppText size="sm" tone="accent">
+                    {row.label}
+                  </AppText>
+                </BouncePressable>
+              ) : (
+                <AppText
+                  size="sm"
+                  weight={row.kind === "line" ? "regular" : "semibold"}
+                  style={tableStyles.label}
+                >
+                  {row.label}
+                </AppText>
+              )}
               <AppText size="sm" weight={row.kind === "total" ? "bold" : "regular"} style={styles.cell}>
                 {formatYen(row.current)}
               </AppText>
@@ -85,10 +106,17 @@ function buildRows(current: TrialBalancePl, previous: TrialBalancePl): PlRow[] {
       current: line.amount,
       previous: previousAmount(previous.revenue_lines, line.category),
       kind: "line",
+      categories: line.categories,
     });
   }
   if (current.purchases > 0 || previous.purchases > 0) {
-    rows.push({ label: "仕入高", current: current.purchases, previous: previous.purchases, kind: "line" });
+    rows.push({
+      label: "仕入高",
+      current: current.purchases,
+      previous: previous.purchases,
+      kind: "line",
+      categories: ["仕入高"],
+    });
     rows.push({
       label: "差引金額（売上総利益）",
       current: current.revenue - current.purchases,
@@ -102,6 +130,7 @@ function buildRows(current: TrialBalancePl, previous: TrialBalancePl): PlRow[] {
       current: line.amount,
       previous: previousAmount(previous.expense_lines, line.category),
       kind: "line",
+      categories: line.categories,
     });
   }
   rows.push({ label: "経費計", current: current.expenses, previous: previous.expenses, kind: "subtotal" });

@@ -6,7 +6,7 @@ import {
   AnalyzeReceiptResponse, analyzeReceiptImage, createLedgerTransaction, fetchReceipts,
   linkReceipt, ReceiptRecord, recordClassificationFeedback, transactionToLedgerInput, unlinkReceipt,
 } from "@/api";
-import { AlertBox, AppButton, AppText, Card, Field, ScreenContainer, SelectField, SkeletonCard } from "@/components";
+import { AlertBox, AppButton, AppText, Card, DateField, Field, ScreenContainer, SelectField, SkeletonCard } from "@/components";
 import { useAppState } from "@/state/AppContext";
 import { parseAmount } from "@/utils";
 import { ReceiptLibrary } from "../ReceiptLibrary";
@@ -166,7 +166,7 @@ export function ReceiptScreen() {
       {draft ? (
         <Card>
           <AppText size="lg" weight="bold">読み取り結果（帳簿ドラフト）</AppText>
-          <Field label="日付" value={draft.date} onChangeText={(date) => setDraft({ ...draft, date })} placeholder="2026-01-01" />
+          <DateField label="日付" value={draft.date} onChange={(date) => setDraft({ ...draft, date })} />
           <Field label="金額（税込・円）" value={draft.amount} onChangeText={(amount) => setDraft({ ...draft, amount })} keyboardType="number-pad" inputMode="numeric" />
           <Field label="摘要" value={draft.description} onChangeText={(description) => setDraft({ ...draft, description })} />
           <SelectField

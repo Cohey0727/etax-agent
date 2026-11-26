@@ -1,13 +1,9 @@
-import { Share } from "react-native";
+import * as Clipboard from "expo-clipboard";
 
-/**
- * テキストのコピー導線。クリップボード専用モジュールが未導入のため、
- * OS の共有シート（コピー先を含む）で渡す。
- */
+/** テキストをクリップボードへコピーする。成功したら true。 */
 export async function copyText(text: string): Promise<boolean> {
   try {
-    await Share.share({ message: text });
-    return true;
+    return await Clipboard.setStringAsync(text);
   } catch {
     return false;
   }

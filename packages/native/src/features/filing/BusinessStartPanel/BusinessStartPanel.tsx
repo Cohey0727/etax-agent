@@ -6,6 +6,7 @@ import {
   AppButton,
   AppText,
   Card,
+  DateField,
   Field,
   SkeletonBar,
 } from "@/components";
@@ -175,12 +176,11 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
           ここでは様式ごとの項目だけを入力します。入力は自動で保存されます（年度には属しません）。
         </AppText>
 
-        <Field
+        <DateField
           label="開業日"
+          clearable
           value={inputs.start_date}
-          onChangeText={(v) => update({ start_date: v })}
-          placeholder="YYYY-MM-DD"
-          hint="YYYY-MM-DD 形式で入力してください"
+          onChange={(v) => update({ start_date: v })}
         />
         <Field
           label="屋号のフリガナ"

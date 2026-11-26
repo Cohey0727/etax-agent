@@ -1,47 +1,42 @@
-import { normalizeSearchText } from "@etax/shared";
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import {
   createLedgerTransaction,
   deleteLedgerTransaction,
+  downloadApiFile,
   LedgerTransaction,
   LedgerTransactionInput,
   recordClassificationFeedback,
+  saveTextToCacheFile,
+  shareFile,
   updateLedgerTransaction,
 } from "@/api";
 import {
-  AlertBox, AppButton, AppText, BouncePressable, Card, Field, LabeledValue,
+  AlertBox, AppButton, AppText, Card, LabeledValue,
   ScreenContainer, SelectField, Sheet, SkeletonCard,
 } from "@/components";
 import { useAppState } from "@/state/AppContext";
-import { colors, radius, space } from "@/theme";
+import { space } from "@/theme";
 import { formatYen } from "@/utils";
+import { LedgerFilters } from "../LedgerFilters";
 import { LedgerForm } from "../LedgerForm";
 import { LedgerRow } from "../LedgerRow";
 import { TransactionHistory } from "../TransactionHistory";
-import { emptyDraft, INCOME_TYPE_OPTIONS, toInput } from "../options";
+import { buildLedgerCsv } from "../ledgerCsv";
+import { emptyDraft, toInput } from "../options";
+import { applyLedgerFilters, useLedgerFilters } from "./useLedgerFilters";
 
-function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <BouncePressable
-      onPress={onPress}
-      pressScale={0.94}
-      style={[styles.filterChip, active ? styles.filterChipActive : styles.filterChipIdle]}
-    >
-      <AppText numberOfLines={1} size="sm" weight="bold" style={{ color: active ? colors.onAccent : colors.textSubtle }}>
-        {label}
-      </AppText>
-    </BouncePressable>
-  );
+export interface LedgerScreenProps {
+  /** 初期表示で絞り込む勘定科目（試算表からのドリルダウンで渡る）。空なら絞らない。 */
+  initialCategories?: string[];
+  /** 初期表示で絞り込む所得区分（試算表からのドリルダウンで渡る）。 */
+  initialIncomeType?: string;
 }
 
 /** 帳簿画面。選択年度の取引を検索・絞り込みし、追加・編集・削除・履歴確認ができる。 */
-export function LedgerScreen() {
+export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScreenProps) {
   const { year, years, setYear, ledgerRows, ledgerLoading, reloadLedger } = useAppState();
-  const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("すべて");
-  const [typeFilter, setTypeFilter] = useState<string>("すべて");
-  const [signFilter, setSignFilter] = useState<string>("すべて");
+  const { filters, patchFilters } = useLedgerFilters(initialCategories, initialIncomeType);
   const [selected, setSelected] = useState<LedgerTransaction | null>(null);
   const [edit, setEdit] = useState<LedgerTransactionInput | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -49,31 +44,56 @@ export function LedgerScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
+  const [exporting, setExporting] = useState<"pdf" | "csv" | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const yearRows = useMemo(
     () => (ledgerRows ?? []).filter((r) => r.fiscal_year === year).sort((a, b) => a.date.localeCompare(b.date)),
     [ledgerRows, year],
   );
   const categories = useMemo(
-    () => ["すべて", ...[...new Set(yearRows.map((r) => r.category))].sort()],
+    () => [...new Set(yearRows.map((r) => r.category))].sort(),
     [yearRows],
   );
-  const visible = useMemo(() => {
-    const q = normalizeSearchText(query.trim());
-    return yearRows.filter((row) => {
-      if (categoryFilter !== "すべて" && row.category !== categoryFilter) return false;
-      if (typeFilter !== "すべて" && row.income_type !== typeFilter) return false;
-      if (signFilter === "収入" && row.amount <= 0) return false;
-      if (signFilter === "支出" && row.amount >= 0) return false;
-      if (!q) return true;
-      return [row.description, row.category, row.account, row.tax_category].some((v) =>
-        normalizeSearchText(v).includes(q),
-      );
-    });
-  }, [yearRows, query, categoryFilter, typeFilter, signFilter]);
+  const taxCategories = useMemo(
+    () => [...new Set(yearRows.map((r) => r.tax_category))].sort(),
+    [yearRows],
+  );
+  const visible = useMemo(
+    () => applyLedgerFilters(yearRows, filters),
+    [yearRows, filters],
+  );
 
   const incomeTotal = visible.reduce((s, r) => (r.amount > 0 ? s + r.amount : s), 0);
   const expenseTotal = visible.reduce((s, r) => (r.amount < 0 ? s - r.amount : s), 0);
+
+  const handleExportPdf = async () => {
+    if (exporting) return;
+    setExporting("pdf");
+    setError(null);
+    try {
+      const file = await downloadApiFile(`/api/transactions/pdf?year=${year}`, `帳簿_${year}.pdf`);
+      await shareFile(file, "application/pdf");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "PDFの出力に失敗しました");
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    if (exporting) return;
+    setExporting("csv");
+    setError(null);
+    try {
+      const file = saveTextToCacheFile(`ledger-${year}.csv`, buildLedgerCsv(visible));
+      await shareFile(file, "text/csv");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "CSVの出力に失敗しました");
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const openRow = (row: LedgerTransaction) => {
     setSelected(row);
@@ -157,32 +177,35 @@ export function LedgerScreen() {
         <LabeledValue label="収入" value={formatYen(incomeTotal)} />
         <LabeledValue label="支出" value={formatYen(expenseTotal)} />
         <LabeledValue label="差引" value={formatYen(incomeTotal - expenseTotal)} strong />
+        <View style={styles.exportRow}>
+          <AppButton
+            label={exporting === "pdf" ? "出力中…" : "PDFで出す"}
+            variant="ghost"
+            size="sm"
+            loading={exporting === "pdf"}
+            onPress={() => void handleExportPdf()}
+          />
+          <AppButton
+            label={exporting === "csv" ? "出力中…" : "CSVで出す"}
+            variant="ghost"
+            size="sm"
+            loading={exporting === "csv"}
+            onPress={() => void handleExportCsv()}
+          />
+          <AppButton
+            label="訂正・削除履歴"
+            variant="ghost"
+            size="sm"
+            onPress={() => setHistoryOpen(true)}
+          />
+        </View>
       </Card>
-      <Field label="検索" value={query} onChangeText={setQuery} placeholder="摘要・勘定科目・出所・税区分で検索" />
-      <View style={{ gap: 6 }}>
-        <AppText size="sm" weight="semibold" tone="subtle">勘定科目</AppText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.chipRow}>
-            {categories.map((c) => (
-              <FilterChip key={c} label={c} active={categoryFilter === c} onPress={() => setCategoryFilter(c)} />
-            ))}
-          </View>
-        </ScrollView>
-      </View>
-      <View style={{ gap: 6 }}>
-        <AppText size="sm" weight="semibold" tone="subtle">区分・収支</AppText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.chipRow}>
-            <FilterChip label="すべての区分" active={typeFilter === "すべて"} onPress={() => setTypeFilter("すべて")} />
-            {INCOME_TYPE_OPTIONS.map((o) => (
-              <FilterChip key={o.value} label={o.label} active={typeFilter === o.value} onPress={() => setTypeFilter(o.value)} />
-            ))}
-            {["すべて", "収入", "支出"].map((s) => (
-              <FilterChip key={s} label={s === "すべて" ? "収支すべて" : s} active={signFilter === s} onPress={() => setSignFilter(s)} />
-            ))}
-          </View>
-        </ScrollView>
-      </View>
+      <LedgerFilters
+        filters={filters}
+        onPatch={patchFilters}
+        categories={categories}
+        taxCategories={taxCategories}
+      />
       {error && !selected && !addOpen ? <AlertBox tone="error" message={error} /> : null}
       {yearRows.length === 0 ? (
         <AppText tone="muted">まだ取引がありません。「取引を追加」から追加するか、CSV取込・領収書から取り込むと自動で帳簿に保存されます。</AppText>
@@ -211,6 +234,10 @@ export function LedgerScreen() {
         ) : null}
       </Sheet>
 
+      <Sheet visible={historyOpen} title="訂正・削除履歴" onClose={() => setHistoryOpen(false)} scroll>
+        {historyOpen ? <TransactionHistory /> : null}
+      </Sheet>
+
       <Sheet visible={addOpen} title="取引を追加（手動）" onClose={() => setAddOpen(false)} scroll>
         <View style={{ gap: space.md }}>
           {error ? <AlertBox tone="error" message={error} /> : null}
@@ -225,8 +252,5 @@ export function LedgerScreen() {
 
 const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  chipRow: { flexDirection: "row", gap: 6 },
-  filterChip: { borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1 },
-  filterChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  filterChipIdle: { backgroundColor: colors.surface, borderColor: colors.borderStrong },
+  exportRow: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
 });

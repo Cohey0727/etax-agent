@@ -7,7 +7,7 @@ import {
 } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { AlertBox, AppButton, AppText, Card, Field, LabeledValue, SelectField } from "@/components";
+import { AlertBox, AppButton, AppText, Card, DateField, LabeledValue, SelectField } from "@/components";
 import {
   ExportConsumptionXtxRequest,
   XtxTaxpayerInput,
@@ -169,13 +169,7 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
           options={FILING_KIND_OPTIONS}
           onChange={(v) => setFilingKind(Number(v) === 3 ? 3 : 1)}
         />
-        <Field
-          label="提出日"
-          value={submissionDate}
-          onChangeText={setSubmissionDate}
-          placeholder="YYYY-MM-DD"
-          hint="YYYY-MM-DD 形式で入力してください"
-        />
+        <DateField label="提出日" value={submissionDate} onChange={setSubmissionDate} />
 
         <SectionHead title="帳簿からの集計（自動）" />
         <View>

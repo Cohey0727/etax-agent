@@ -17,12 +17,6 @@ function AppStack() {
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
 
-  useEffect(() => {
-    if (ready) {
-      void SplashScreen.hideAsync().catch(() => undefined);
-    }
-  }, [ready]);
-
   // 認証ガード: ログイン必須の構成で未ログインなら、ログイン画面以外へは進ませない。
   const onLoginScreen = segments[0] === "login";
   const mustLogin = ready && loginRequired && !user && !onLoginScreen;
@@ -38,6 +32,7 @@ function AppStack() {
       >
         <Stack.Screen name="index" options={{ title: "eTaxAgent" }} />
         <Stack.Screen name="login" options={{ title: "ログイン" }} />
+        <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
         <Stack.Screen name="ledger" options={{ title: "帳簿" }} />
         <Stack.Screen name="import" options={{ title: "取引・CSV取込" }} />
         <Stack.Screen name="receipt" options={{ title: "領収書から帳簿" }} />
@@ -64,6 +59,14 @@ export default function RootLayout() {
     "IBMPlexSansJP-600": require("../assets/fonts/IBMPlexSansJP-600.ttf"),
     "IBMPlexSansJP-700": require("../assets/fonts/IBMPlexSansJP-700.ttf"),
   });
+
+  // ネイティブスプラッシュは無地（背景色のみ）で、フォントが読めた時点で
+  // すぐ消す。起動画面として見えるのはアプリ側の AnimatedSplash だけにする。
+  useEffect(() => {
+    if (fontsLoaded) {
+      void SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [fontsLoaded]);
 
   if (!fontsLoaded) return null;
 

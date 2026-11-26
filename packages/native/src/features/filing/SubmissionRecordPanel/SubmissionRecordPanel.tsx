@@ -1,7 +1,7 @@
 import * as DocumentPicker from "expo-document-picker";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { AlertBox, AppButton, AppText, Card, Field, SkeletonCard } from "@/components";
+import { AlertBox, AppButton, AppText, Card, DateField, Field, SkeletonCard } from "@/components";
 import {
   FilingSubmission,
   FilingSubmissionKind,
@@ -181,12 +181,11 @@ export function SubmissionRecordPanel({ year, kind }: SubmissionRecordPanelProps
               onChangeText={setAcceptanceNumber}
               placeholder="受信通知に表示される番号"
             />
-            <Field
+            <DateField
               label="提出日"
+              clearable
               value={submittedDate}
-              onChangeText={setSubmittedDate}
-              placeholder="YYYY-MM-DD"
-              hint="YYYY-MM-DD 形式で入力してください"
+              onChange={setSubmittedDate}
             />
             <View style={styles.actions}>
               <AppButton

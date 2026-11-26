@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { AppText, Card, Field, SkeletonBar } from "@/components";
+import { AppText, Card, DateField, Field, SkeletonBar } from "@/components";
 import { XtxTaxpayerInput } from "@/api";
 import { space } from "@/theme";
 import { LoadedTaxpayer, emptyTaxpayer, loadTaxpayer, saveTaxpayer } from "../taxpayerData";
@@ -142,12 +142,11 @@ export function TaxpayerProfilePanel({ year }: TaxpayerProfilePanelProps) {
             onChangeText={(v) => update(field.key, v)}
           />
         ))}
-        <Field
+        <DateField
           label="生年月日"
-          placeholder="YYYY-MM-DD"
-          hint="YYYY-MM-DD 形式で入力してください"
+          clearable
           value={taxpayer.birth_date}
-          onChangeText={(v) => update("birth_date", v)}
+          onChange={(v) => update("birth_date", v)}
         />
 
         <AppText size="sm" tone="muted">

@@ -1,5 +1,5 @@
 /** API の接続先オリジン。EXPO_PUBLIC_API_URL で差し替えでき、既定は本番。 */
-const DEFAULT_API_URL = "https://mini-etax.spaghetti-monster.com";
+const DEFAULT_API_URL = "https://mini-etaxapi.spaghetti-monster.com";
 
 export function resolveApiUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;

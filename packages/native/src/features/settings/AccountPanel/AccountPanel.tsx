@@ -25,6 +25,16 @@ import { copyText } from "../copyText";
 
 type BusyKind = "totpSetup" | "totpEnable" | "totpDisable" | "checkout" | "signOut" | null;
 
+const BILLING_STATUS_LABELS: Record<string, string> = {
+  none: "未契約",
+  active: "契約中",
+  trialing: "トライアル中",
+  past_due: "支払い確認中",
+  canceled: "解約済み",
+  incomplete: "手続き未完了",
+  unpaid: "未払い",
+};
+
 interface TotpSetupState {
   secret: string;
   otpauthUrl: string;
@@ -203,22 +213,30 @@ export function AccountPanel() {
           <AppText size="lg" weight="bold">
             課金プラン
           </AppText>
+          <AppText size="sm" tone="muted">
+            eTaxAgent は月額490円（税込）です。税務シーズンだけの利用もでき、月単位で解約できます。
+          </AppText>
           {!billing || !billing.billing_enabled ? (
             <AppText size="sm" tone="muted">
               課金は現在準備中です。
             </AppText>
           ) : (
             <>
-              <LabeledValue label="現在のプラン" value={billing.status} />
+              <LabeledValue
+                label="現在のプラン"
+                value={BILLING_STATUS_LABELS[billing.status] ?? billing.status}
+              />
               {billing.current_period_end ? (
                 <LabeledValue label="次回更新日" value={formatDate(billing.current_period_end)} />
               ) : null}
-              <AppButton
-                label="プランを変更・申し込む"
-                size="sm"
-                loading={busy === "checkout"}
-                onPress={() => void handleCheckout()}
-              />
+              {billing.status === "active" || billing.status === "trialing" ? null : (
+                <AppButton
+                  label="月額490円で始める"
+                  size="sm"
+                  loading={busy === "checkout"}
+                  onPress={() => void handleCheckout()}
+                />
+              )}
             </>
           )}
         </Card>

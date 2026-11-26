@@ -21,7 +21,7 @@ import {
 import * as Linking from "expo-linking";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { AlertBox, AppButton, AppText, Card, Field, LabeledValue } from "@/components";
+import { AlertBox, AppButton, AppText, Card, DateField, LabeledValue } from "@/components";
 import {
   ExportXtxRequest,
   XtxTaxpayerInput,
@@ -290,13 +290,7 @@ export function TaxpayerPanel({
           出力の条件
         </AppText>
         <LabeledValue label="申告の種類" value={amendment ? "修正申告" : "確定申告"} />
-        <Field
-          label="提出日"
-          value={submissionDate}
-          onChangeText={setSubmissionDate}
-          placeholder="YYYY-MM-DD"
-          hint="YYYY-MM-DD 形式で入力してください"
-        />
+        <DateField label="提出日" value={submissionDate} onChange={setSubmissionDate} />
         <AmountField label="源泉徴収税額" value={withholdingTax} onChange={setWithholdingTax} />
         {expandedIncome && !isExpandedIncomeEmpty(expandedIncome) ? (
           <AppText size="sm" tone="muted">
