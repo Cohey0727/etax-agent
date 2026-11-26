@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import Svg, { Circle, Path, Rect } from "react-native-svg";
+import Svg, { Circle, Path, Polyline, Rect } from "react-native-svg";
 
 export type LineIconName =
   | "agent"
@@ -9,8 +9,10 @@ export type LineIconName =
   | "chart"
   | "check"
   | "chevronRight"
+  | "file"
   | "fileCheck"
   | "grid"
+  | "image"
   | "import"
   | "receipt"
   | "send"
@@ -62,6 +64,12 @@ const ICON_PATHS: Record<LineIconName, ReactNode> = {
   ),
   check: <Path d="M20 6 9 17l-5-5" />,
   chevronRight: <Path d="m9 6 6 6-6 6" />,
+  file: (
+    <>
+      <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <Polyline points="14 2 14 8 20 8" />
+    </>
+  ),
   fileCheck: (
     <>
       <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
@@ -75,6 +83,13 @@ const ICON_PATHS: Record<LineIconName, ReactNode> = {
       <Rect x="14" y="3" width="7" height="7" rx="1.5" />
       <Rect x="3" y="14" width="7" height="7" rx="1.5" />
       <Rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  image: (
+    <>
+      <Rect x="3" y="3" width="18" height="18" rx="2" />
+      <Circle cx="8.5" cy="8.5" r="1.5" />
+      <Polyline points="21 15 16 10 5 21" />
     </>
   ),
   import: (
