@@ -3,6 +3,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#18124d",
+        "backgroundImage": "./assets/adaptive-background.png",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "package": "jp.co.occam.etaxagent"
@@ -38,7 +39,14 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-sharing",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "領収書や書類を撮影するためにカメラを使用します。",
+          "photosPermission": "領収書や書類の画像を選ぶために写真へのアクセスを使用します。"
+        }
+      ]
     ],
     "scheme": "etaxagent",
     "slug": "etaxagent",
@@ -47,7 +55,7 @@
     },
     "updates": {
       "checkAutomatically": "ON_LOAD",
-      "enabled": true,
+      "enabled": false,
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/00000000-0000-0000-0000-000000000000"
     },
