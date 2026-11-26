@@ -199,7 +199,7 @@ export default function LoginScreen() {
         {!ready || !methods ? (
           <SkeletonCard />
         ) : (
-          <Card fadeEnter enterDelay={700}>
+          <Card fadeEnter enterDelay={260}>
             <View style={{ gap: space.md }}>
               {error ? <AlertBox tone="error" message={error} /> : null}
               {isPasswordMode ? (
