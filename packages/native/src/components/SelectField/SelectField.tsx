@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { colors, radius } from "@/theme";
 import { AppText } from "../AppText";
-import { BouncePressable } from "../BouncePressable";
 import { Sheet } from "../Sheet";
 
 export interface SelectOption<T extends string> {
@@ -18,7 +17,10 @@ export interface SelectFieldProps<T extends string> {
   hint?: string;
 }
 
-/** タップでボトムシートの選択肢を開くセレクト欄。 */
+/**
+ * タップでボトムシートの選択肢を開くセレクト欄。
+ * セレクターは反応速度優先でバウンスアニメーションを使わない。
+ */
 export function SelectField<T extends string>({
   label,
   value,
@@ -33,12 +35,11 @@ export function SelectField<T extends string>({
       <AppText size="sm" weight="semibold" tone="subtle">
         {label}
       </AppText>
-      <BouncePressable
+      <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${current?.label ?? value}`}
         onPress={() => setOpen(true)}
-        style={styles.box}
-        pressScale={0.98}
+        style={({ pressed }) => [styles.box, pressed ? styles.pressed : null]}
       >
         <AppText size="md" numberOfLines={1} style={styles.value}>
           {current?.label ?? value}
@@ -46,26 +47,29 @@ export function SelectField<T extends string>({
         <AppText size="md" tone="muted">
           ▾
         </AppText>
-      </BouncePressable>
+      </Pressable>
       {hint ? (
         <AppText size="xs" tone="muted">
           {hint}
         </AppText>
       ) : null}
-      <Sheet onClose={() => setOpen(false)} title={label} visible={open}>
+      <Sheet entry="slide" onClose={() => setOpen(false)} title={label} visible={open}>
         <FlatList
           data={[...options]}
           keyExtractor={(item) => item.value}
           style={styles.list}
           renderItem={({ item }) => (
-            <BouncePressable
+            <Pressable
               accessibilityRole="button"
               onPress={() => {
                 onChange(item.value);
                 setOpen(false);
               }}
-              pressScale={0.98}
-              style={[styles.option, item.value === value ? styles.optionActive : null]}
+              style={({ pressed }) => [
+                styles.option,
+                item.value === value ? styles.optionActive : null,
+                pressed ? styles.pressed : null,
+              ]}
             >
               <AppText
                 numberOfLines={1}
@@ -74,7 +78,7 @@ export function SelectField<T extends string>({
               >
                 {item.label}
               </AppText>
-            </BouncePressable>
+            </Pressable>
           )}
         />
       </Sheet>
@@ -100,4 +104,5 @@ const styles = StyleSheet.create({
   list: { maxHeight: 380 },
   option: { paddingVertical: 12, paddingHorizontal: 10, borderRadius: radius.sm },
   optionActive: { backgroundColor: colors.accentSoft },
+  pressed: { backgroundColor: colors.hover },
 });

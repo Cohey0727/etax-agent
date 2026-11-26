@@ -1,9 +1,6 @@
-import { StyleSheet, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import { useEffect } from "react";
-import { colors, radius, springs } from "@/theme";
+import { Pressable, StyleSheet, View } from "react-native";
+import { colors, radius } from "@/theme";
 import { AppText } from "../AppText";
-import { BouncePressable } from "../BouncePressable";
 
 export interface TabItem<T extends string> {
   id: T;
@@ -16,58 +13,36 @@ export interface TabsProps<T extends string> {
   onChange: (id: T) => void;
 }
 
-/** 選択中のピルがバネで弾むタブ。ラベルは折り返さない。 */
+/** セグメント型のタブ。セレクター系なのでバウンスアニメーションは使わない。ラベルは折り返さない。 */
 export function Tabs<T extends string>({ items, activeId, onChange }: TabsProps<T>) {
   return (
     <View style={styles.row}>
-      {items.map((item) => (
-        <TabButton
-          key={item.id}
-          active={item.id === activeId}
-          label={item.label}
-          onPress={() => onChange(item.id)}
-        />
-      ))}
+      {items.map((item) => {
+        const active = item.id === activeId;
+        return (
+          <Pressable
+            key={item.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            onPress={() => onChange(item.id)}
+            style={({ pressed }) => [
+              styles.tab,
+              active ? styles.tabActive : styles.tabIdle,
+              pressed && !active ? styles.tabPressed : null,
+            ]}
+          >
+            <AppText
+              numberOfLines={1}
+              size="sm"
+              weight="bold"
+              style={{ color: active ? colors.onAccent : colors.textSubtle }}
+            >
+              {item.label}
+            </AppText>
+          </Pressable>
+        );
+      })}
     </View>
-  );
-}
-
-function TabButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const pop = useSharedValue(1);
-  useEffect(() => {
-    if (active) {
-      pop.value = 1.12;
-      pop.value = withSpring(1, springs.bouncy);
-    }
-  }, [active, pop]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
-  return (
-    <BouncePressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      pressScale={0.94}
-      style={[styles.tab, active ? styles.tabActive : styles.tabIdle]}
-    >
-      <Animated.View style={style}>
-        <AppText
-          numberOfLines={1}
-          size="sm"
-          weight="bold"
-          style={{ color: active ? colors.onAccent : colors.textSubtle }}
-        >
-          {label}
-        </AppText>
-      </Animated.View>
-    </BouncePressable>
   );
 }
 
@@ -90,4 +65,5 @@ const styles = StyleSheet.create({
   },
   tabActive: { backgroundColor: colors.accent },
   tabIdle: { backgroundColor: "transparent" },
+  tabPressed: { backgroundColor: colors.hover },
 });

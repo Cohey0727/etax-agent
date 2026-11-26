@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { colors, radius, space } from "@/theme";
 import { AppButton } from "../AppButton";
 import { AppText } from "../AppText";
-import { BouncePressable } from "../BouncePressable";
 import { Sheet } from "../Sheet";
 import {
   dateDisplayLabel, daysInMonth, firstWeekday, formatDateValue,
@@ -61,12 +60,11 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
       <AppText size="sm" weight="semibold" tone="subtle">
         {label}
       </AppText>
-      <BouncePressable
+      <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected ? dateDisplayLabel(selected) : "未選択"}`}
         onPress={openPicker}
         style={styles.box}
-        pressScale={0.98}
       >
         <AppText size="md" numberOfLines={1} style={styles.value} tone={selected ? "text" : "muted"}>
           {selected ? dateDisplayLabel(selected) : "日付を選ぶ"}
@@ -74,13 +72,13 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
         <AppText size="md" tone="muted">
           ▾
         </AppText>
-      </BouncePressable>
+      </Pressable>
       {hint ? (
         <AppText size="xs" tone="muted">
           {hint}
         </AppText>
       ) : null}
-      <Sheet onClose={() => setOpen(false)} title={label} visible={open}>
+      <Sheet entry="slide" onClose={() => setOpen(false)} title={label} visible={open}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -89,42 +87,39 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
         >
           <View style={styles.chipRow}>
             {years.map((year) => (
-              <BouncePressable
+              <Pressable
                 key={year}
                 accessibilityRole="button"
                 onPress={() => setView({ year, month: view.month })}
-                pressScale={0.94}
                 style={[styles.chip, year === view.year ? styles.chipActive : null]}
               >
                 <AppText size="sm" weight={year === view.year ? "bold" : "regular"} tone={year === view.year ? "accent" : "text"}>
                   {year}年
                 </AppText>
-              </BouncePressable>
+              </Pressable>
             ))}
           </View>
         </ScrollView>
         <View style={styles.monthNav}>
-          <BouncePressable
+          <Pressable
             accessibilityRole="button"
             accessibilityLabel="前の月"
             onPress={() => setView(shiftMonth(view.year, view.month, -1))}
-            pressScale={0.9}
             style={styles.navButton}
           >
             <AppText size="lg" tone="accent">‹</AppText>
-          </BouncePressable>
+          </Pressable>
           <AppText size="md" weight="bold">
             {view.year}年{view.month}月
           </AppText>
-          <BouncePressable
+          <Pressable
             accessibilityRole="button"
             accessibilityLabel="次の月"
             onPress={() => setView(shiftMonth(view.year, view.month, 1))}
-            pressScale={0.9}
             style={styles.navButton}
           >
             <AppText size="lg" tone="accent">›</AppText>
-          </BouncePressable>
+          </Pressable>
         </View>
         <View style={styles.weekRow}>
           {WEEKDAY_LABELS.map((weekday) => (
@@ -139,10 +134,9 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
           {cells.map((day, index) => (
             <View key={index} style={styles.cell}>
               {day === null ? null : (
-                <BouncePressable
+                <Pressable
                   accessibilityRole="button"
                   onPress={() => pickDay(day)}
-                  pressScale={0.88}
                   style={[
                     styles.dayButton,
                     selected?.year === view.year && selected?.month === view.month && selected?.day === day
@@ -168,7 +162,7 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
                   >
                     {day}
                   </AppText>
-                </BouncePressable>
+                </Pressable>
               )}
             </View>
           ))}
