@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { fetchTransactionHistory, TransactionHistoryEntry } from "@/api";
+import {
+  fetchRecentTransactionHistory,
+  fetchTransactionHistory,
+  TransactionHistoryEntry,
+} from "@/api";
 import { AppText, Chip } from "@/components";
 import { formatDate, formatYen } from "@/utils";
 import { incomeTypeLabel } from "../options";
@@ -11,14 +15,21 @@ const ACTION_LABELS: Record<string, string> = {
   delete: "削除",
 };
 
-/** 取引1件の変更履歴（電子帳簿保存法の訂正・削除履歴）。シート内で使う。 */
-export function TransactionHistory({ transactionId }: { transactionId: number }) {
+/**
+ * 変更履歴（電子帳簿保存法の訂正・削除履歴）。シート内で使う。
+ * transactionId を渡すとその取引だけ、未指定なら全取引の履歴を新しい順に表示する。
+ */
+export function TransactionHistory({ transactionId }: { transactionId?: number }) {
   const [entries, setEntries] = useState<TransactionHistoryEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchTransactionHistory(transactionId).then((result) => {
+    const load =
+      transactionId !== undefined
+        ? fetchTransactionHistory(transactionId)
+        : fetchRecentTransactionHistory();
+    void load.then((result) => {
       if (cancelled) return;
       if (result === null) setFailed(true);
       else setEntries(result);
