@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
   ApiError,
   consumeMagicLink,
@@ -14,13 +14,12 @@ import { useAuth } from "@/auth/AuthContext";
 import { AlertBox } from "@/components/AlertBox";
 import { AppButton } from "@/components/AppButton";
 import { Card } from "@/components/Card";
-import { ScreenContainer } from "@/components/ScreenContainer";
 import { SkeletonCard } from "@/components/Skeleton";
 import { Tabs } from "@/components/Tabs";
 import {
   AuthSentNotice,
   extractMagicToken,
-  LoginBrandHeader,
+  LoginBrandPanel,
   MagicLinkForm,
   OAuthButtons,
   OAuthOutcome,
@@ -29,7 +28,7 @@ import {
   PasswordMode,
   TotpAuthForm,
 } from "@/features/auth";
-import { space } from "@/theme";
+import { colors, space } from "@/theme";
 
 type Mode = PasswordMode | "totp" | "magic" | "magicSent" | "verifySent";
 
@@ -190,83 +189,95 @@ export default function LoginScreen() {
   const isPasswordMode = mode === "login" || mode === "register";
 
   return (
-    <ScreenContainer>
-      <LoginBrandHeader />
-      {!ready || !methods ? (
-        <SkeletonCard />
-      ) : (
-        <Card noEnter>
-          <View style={{ gap: space.md }}>
-            {error ? <AlertBox tone="error" message={error} /> : null}
-            {isPasswordMode ? (
-              <>
-                {methods.password ? (
-                  <Tabs
-                    items={MODE_TABS}
-                    activeId={mode}
-                    onChange={(id) => {
-                      setMode(id);
-                      setError(null);
-                    }}
-                  />
-                ) : null}
-                {methods.password ? (
-                  <PasswordAuthForm
-                    mode={mode}
-                    email={email}
-                    password={password}
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      <LoginBrandPanel />
+      <View style={styles.formArea}>
+        {!ready || !methods ? (
+          <SkeletonCard />
+        ) : (
+          <Card fadeEnter enterDelay={700}>
+            <View style={{ gap: space.md }}>
+              {error ? <AlertBox tone="error" message={error} /> : null}
+              {isPasswordMode ? (
+                <>
+                  {methods.password ? (
+                    <Tabs
+                      items={MODE_TABS}
+                      activeId={mode}
+                      onChange={(id) => {
+                        setMode(id);
+                        setError(null);
+                      }}
+                    />
+                  ) : null}
+                  {methods.password ? (
+                    <PasswordAuthForm
+                      mode={mode}
+                      email={email}
+                      password={password}
+                      busy={busy}
+                      onEmailChange={setEmail}
+                      onPasswordChange={setPassword}
+                      onSubmit={() => void handlePasswordSubmit()}
+                    />
+                  ) : null}
+                  <OAuthButtons
+                    providers={oauthProviders}
                     busy={busy}
-                    onEmailChange={setEmail}
-                    onPasswordChange={setPassword}
-                    onSubmit={() => void handlePasswordSubmit()}
+                    onOutcome={handleOAuthOutcome}
+                    onError={setError}
                   />
-                ) : null}
-                <OAuthButtons
-                  providers={oauthProviders}
+                  {methods.magic_link ? (
+                    <AppButton
+                      label="メールリンクでログイン"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => setMode("magic")}
+                    />
+                  ) : null}
+                </>
+              ) : null}
+              {mode === "totp" ? (
+                <TotpAuthForm
+                  code={code}
                   busy={busy}
-                  onOutcome={handleOAuthOutcome}
-                  onError={setError}
+                  onCodeChange={setCode}
+                  onSubmit={() => void handleTotpSubmit()}
+                  onRestart={() => setMode("login")}
                 />
-                {methods.magic_link ? (
-                  <AppButton
-                    label="メールリンクでログイン"
-                    variant="ghost"
-                    size="sm"
-                    onPress={() => setMode("magic")}
-                  />
-                ) : null}
-              </>
-            ) : null}
-            {mode === "totp" ? (
-              <TotpAuthForm
-                code={code}
-                busy={busy}
-                onCodeChange={setCode}
-                onSubmit={() => void handleTotpSubmit()}
-                onRestart={() => setMode("login")}
-              />
-            ) : null}
-            {mode === "magic" ? (
-              <MagicLinkForm
-                email={email}
-                token={magicToken}
-                busy={busy}
-                onEmailChange={setEmail}
-                onTokenChange={setMagicToken}
-                onRequestSubmit={() => void handleMagicRequest()}
-                onConsumeSubmit={() => void handleMagicConsume()}
-                onBack={() => setMode("login")}
-              />
-            ) : null}
-            {mode === "magicSent" ? (
-              <AuthSentNotice variant="magicSent" onBack={() => setMode("magic")} />
-            ) : null}
-            {mode === "verifySent" ? (
-              <AuthSentNotice variant="verifySent" onBack={() => setMode("login")} />
-            ) : null}
-          </View>
-        </Card>
-      )}
-    </ScreenContainer>
+              ) : null}
+              {mode === "magic" ? (
+                <MagicLinkForm
+                  email={email}
+                  token={magicToken}
+                  busy={busy}
+                  onEmailChange={setEmail}
+                  onTokenChange={setMagicToken}
+                  onRequestSubmit={() => void handleMagicRequest()}
+                  onConsumeSubmit={() => void handleMagicConsume()}
+                  onBack={() => setMode("login")}
+                />
+              ) : null}
+              {mode === "magicSent" ? (
+                <AuthSentNotice variant="magicSent" onBack={() => setMode("magic")} />
+              ) : null}
+              {mode === "verifySent" ? (
+                <AuthSentNotice variant="verifySent" onBack={() => setMode("login")} />
+              ) : null}
+            </View>
+          </Card>
+        )}
+      </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  scroll: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: space.xl },
+  formArea: { padding: space.md },
+});
