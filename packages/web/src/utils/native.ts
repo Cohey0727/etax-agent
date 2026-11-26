@@ -1,5 +1,6 @@
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
+import { CapacitorUpdater } from "@capgo/capacitor-updater";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { API_BASE_URL } from "./apiBase";
@@ -12,6 +13,10 @@ import { API_BASE_URL } from "./apiBase";
  */
 export function initNativePlatform(): void {
   if (!Capacitor.isNativePlatform()) return;
+
+  // OTA 更新の適用確定。これを呼ばないと、更新が失敗したとみなされ
+  // 前のバンドルへ自動でロールバックされる。
+  void CapacitorUpdater.notifyAppReady().catch(() => undefined);
 
   void StatusBar.setStyle({ style: Style.Default }).catch(() => undefined);
   if (Capacitor.getPlatform() === "android") {
