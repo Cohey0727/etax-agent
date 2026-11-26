@@ -32,6 +32,7 @@ function AppStack() {
       >
         <Stack.Screen name="index" options={{ title: "eTaxAgent" }} />
         <Stack.Screen name="login" options={{ title: "ログイン" }} />
+        <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
         <Stack.Screen name="ledger" options={{ title: "帳簿" }} />
         <Stack.Screen name="import" options={{ title: "取引・CSV取込" }} />
         <Stack.Screen name="receipt" options={{ title: "領収書から帳簿" }} />

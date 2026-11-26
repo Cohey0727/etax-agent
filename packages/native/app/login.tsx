@@ -19,6 +19,7 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { Tabs } from "@/components/Tabs";
 import {
   AuthSentNotice,
+  extractMagicToken,
   LoginBrandHeader,
   MagicLinkForm,
   OAuthButtons,
@@ -159,7 +160,8 @@ export default function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      await acceptLogin(await consumeMagicLink(magicToken.trim()));
+      // トークンそのものでも、メール内リンクの URL 全文でも受け付ける。
+      await acceptLogin(await consumeMagicLink(extractMagicToken(magicToken)));
     } catch (e) {
       setError(errorMessage(e, "ログインリンクが無効か期限切れです"));
     } finally {
@@ -231,12 +233,6 @@ export default function LoginScreen() {
                     variant="ghost"
                     size="sm"
                     onPress={() => setMode("magic")}
-                  />
-                ) : null}
-                {methods.passkey ? (
-                  <AlertBox
-                    tone="info"
-                    message="パスキーはこのアプリでは未対応です。パスワード等でログインしてください。"
                   />
                 ) : null}
               </>
