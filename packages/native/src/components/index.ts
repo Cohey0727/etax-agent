@@ -5,6 +5,7 @@ export * from "./AppText";
 export * from "./BouncePressable";
 export * from "./Card";
 export * from "./Chip";
+export * from "./DateField";
 export * from "./Field";
 export * from "./LabeledValue";
 export * from "./ScreenContainer";
