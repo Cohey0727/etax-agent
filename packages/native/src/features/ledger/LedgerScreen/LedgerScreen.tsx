@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import {
@@ -35,6 +36,7 @@ export interface LedgerScreenProps {
 
 /** 帳簿画面。選択年度の取引を検索・絞り込みし、追加・編集・削除・履歴確認ができる。 */
 export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScreenProps) {
+  const router = useRouter();
   const { year, years, setYear, ledgerRows, ledgerLoading, reloadLedger } = useAppState();
   const { filters, patchFilters } = useLedgerFilters(initialCategories, initialIncomeType);
   const [selected, setSelected] = useState<LedgerTransaction | null>(null);
@@ -165,6 +167,10 @@ export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScr
       <View style={styles.headerRow}>
         <AppText size="xl" weight="bold">帳簿</AppText>
         <AppButton label="＋ 取引を追加" size="sm" onPress={() => { setDraft(emptyDraft(year)); setError(null); setAddOpen(true); }} />
+      </View>
+      <View style={styles.exportRow}>
+        <AppButton label="取引・CSV取込" variant="ghost" size="sm" onPress={() => router.push("/import")} />
+        <AppButton label="領収書から帳簿" variant="ghost" size="sm" onPress={() => router.push("/receipt")} />
       </View>
       <SelectField
         label="年度"
