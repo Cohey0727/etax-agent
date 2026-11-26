@@ -18,7 +18,7 @@ export default function ReportsScreen() {
   // 科目タップで、その科目（表示名に集約される前の勘定科目すべて）に
   // 絞った帳簿へ遷移する。
   const handleDrillDown = (incomeType: IncomeType, categories: string[]) => {
-    router.push({
+    router.navigate({
       pathname: "/ledger",
       params: { year: String(year), cat: categories, itype: incomeType },
     });

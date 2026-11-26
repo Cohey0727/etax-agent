@@ -15,7 +15,7 @@ export function LabeledValue({ label, value, strong }: LabeledValueProps) {
       <AppText size="sm" tone="subtle" style={styles.label}>
         {label}
       </AppText>
-      <AppText size={strong ? "lg" : "md"} weight={strong ? "bold" : "medium"}>
+      <AppText size={strong ? "lg" : "md"} weight={strong ? "bold" : "medium"} style={styles.value}>
         {value}
       </AppText>
     </View>
@@ -30,5 +30,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 2,
   },
-  label: { flex: 1 },
+  // ラベルは潰さない。長い値は値側が折り返して収める。
+  label: { flexShrink: 0 },
+  value: { flex: 1, flexShrink: 1, textAlign: "right" },
 });

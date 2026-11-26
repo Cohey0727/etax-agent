@@ -24,7 +24,7 @@ export function MoreMenu() {
           key={item.label}
           accessibilityRole="button"
           accessibilityLabel={item.label}
-          onPress={() => router.push(item.href)}
+          onPress={() => router.navigate(item.href)}
           style={[styles.row, index < MORE_ITEMS.length - 1 && styles.rowDivider]}
         >
           <View style={styles.iconTile}>

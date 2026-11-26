@@ -169,8 +169,8 @@ export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScr
         <AppButton label="＋ 取引を追加" size="sm" onPress={() => { setDraft(emptyDraft(year)); setError(null); setAddOpen(true); }} />
       </View>
       <View style={styles.exportRow}>
-        <AppButton label="取引・CSV取込" variant="ghost" size="sm" onPress={() => router.push("/import")} />
-        <AppButton label="領収書から帳簿" variant="ghost" size="sm" onPress={() => router.push("/receipt")} />
+        <AppButton label="取引・CSV取込" variant="ghost" size="sm" onPress={() => router.navigate("/import")} />
+        <AppButton label="領収書から帳簿" variant="ghost" size="sm" onPress={() => router.navigate("/receipt")} />
       </View>
       <SelectField
         label="年度"
