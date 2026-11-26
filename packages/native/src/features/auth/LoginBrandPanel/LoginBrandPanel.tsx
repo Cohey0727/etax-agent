@@ -94,7 +94,7 @@ export function LoginBrandPanel() {
           eTaxAgent
         </AppText>
         <AppText size="xs" tone="onNavySubtle">
-          確定申告 準備ツール
+          確定申告丸投げ
         </AppText>
       </Animated.View>
     </LinearGradient>

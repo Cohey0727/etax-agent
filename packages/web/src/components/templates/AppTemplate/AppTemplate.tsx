@@ -115,7 +115,7 @@ export const AppTemplate = ({
                     eTaxAgent
                   </Text>
                   <Text variant="caption" className={styles.brandCaption}>
-                    確定申告 準備ツール
+                    確定申告丸投げ
                   </Text>
                 </Col>
               </Row>
