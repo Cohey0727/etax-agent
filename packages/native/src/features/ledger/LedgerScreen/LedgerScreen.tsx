@@ -35,12 +35,25 @@ function FilterChip({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
+export interface LedgerScreenProps {
+  /** 初期表示で絞り込む勘定科目（試算表からのドリルダウンで渡る）。空なら絞らない。 */
+  initialCategories?: string[];
+  /** 初期表示で絞り込む所得区分（試算表からのドリルダウンで渡る）。 */
+  initialIncomeType?: string;
+}
+
+const VALID_INCOME_TYPES: readonly string[] = INCOME_TYPE_OPTIONS.map((o) => o.value);
+
 /** 帳簿画面。選択年度の取引を検索・絞り込みし、追加・編集・削除・履歴確認ができる。 */
-export function LedgerScreen() {
+export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScreenProps) {
   const { year, years, setYear, ledgerRows, ledgerLoading, reloadLedger } = useAppState();
   const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("すべて");
-  const [typeFilter, setTypeFilter] = useState<string>("すべて");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>(() =>
+    (initialCategories ?? []).filter((c) => c !== ""),
+  );
+  const [typeFilter, setTypeFilter] = useState<string>(() =>
+    initialIncomeType && VALID_INCOME_TYPES.includes(initialIncomeType) ? initialIncomeType : "すべて",
+  );
   const [signFilter, setSignFilter] = useState<string>("すべて");
   const [selected, setSelected] = useState<LedgerTransaction | null>(null);
   const [edit, setEdit] = useState<LedgerTransactionInput | null>(null);
@@ -55,13 +68,13 @@ export function LedgerScreen() {
     [ledgerRows, year],
   );
   const categories = useMemo(
-    () => ["すべて", ...[...new Set(yearRows.map((r) => r.category))].sort()],
+    () => [...new Set(yearRows.map((r) => r.category))].sort(),
     [yearRows],
   );
   const visible = useMemo(() => {
     const q = normalizeSearchText(query.trim());
     return yearRows.filter((row) => {
-      if (categoryFilter !== "すべて" && row.category !== categoryFilter) return false;
+      if (categoryFilter.length > 0 && !categoryFilter.includes(row.category)) return false;
       if (typeFilter !== "すべて" && row.income_type !== typeFilter) return false;
       if (signFilter === "収入" && row.amount <= 0) return false;
       if (signFilter === "支出" && row.amount >= 0) return false;
@@ -163,8 +176,22 @@ export function LedgerScreen() {
         <AppText size="sm" weight="semibold" tone="subtle">勘定科目</AppText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.chipRow}>
+            <FilterChip
+              label="すべて"
+              active={categoryFilter.length === 0}
+              onPress={() => setCategoryFilter([])}
+            />
             {categories.map((c) => (
-              <FilterChip key={c} label={c} active={categoryFilter === c} onPress={() => setCategoryFilter(c)} />
+              <FilterChip
+                key={c}
+                label={c}
+                active={categoryFilter.includes(c)}
+                onPress={() =>
+                  setCategoryFilter((prev) =>
+                    prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+                  )
+                }
+              />
             ))}
           </View>
         </ScrollView>

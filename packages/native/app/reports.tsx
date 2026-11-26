@@ -1,4 +1,5 @@
-import { balanceSheetToWire, isBalanceSheetEmpty } from "@etax/shared";
+import { balanceSheetToWire, IncomeType, isBalanceSheetEmpty } from "@etax/shared";
+import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { TrialBalanceResponse, fetchTrialBalance } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
@@ -11,7 +12,17 @@ import { useAppState } from "@/state/AppContext";
 export default function ReportsScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const router = useRouter();
   const { year, transactions } = useAppState();
+
+  // 科目タップで、その科目（表示名に集約される前の勘定科目すべて）に
+  // 絞った帳簿へ遷移する。
+  const handleDrillDown = (incomeType: IncomeType, categories: string[]) => {
+    router.push({
+      pathname: "/ledger",
+      params: { year: String(year), cat: categories, itype: incomeType },
+    });
+  };
   const [report, setReport] = useState<TrialBalanceResponse | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -89,14 +100,18 @@ export default function ReportsScreen() {
         year={year}
         current={report.business}
         previous={report.previous.business}
+        incomeType="business"
+        onDrillDown={handleDrillDown}
       />
       <PlSection
         title="不動産所得（損益計算書）"
         year={year}
         current={report.real_estate}
         previous={report.previous.real_estate}
+        incomeType="real_estate"
+        onDrillDown={handleDrillDown}
       />
-      <OtherSection current={report.other} previous={report.previous.other} />
+      <OtherSection current={report.other} previous={report.previous.other} onDrillDown={handleDrillDown} />
       <MonthlySection year={year} current={report.monthly} previous={report.previous.monthly} />
       {report.balance_sheet ? <BalanceSheetSection balanceSheet={report.balance_sheet} /> : null}
       <FreeeTrialBalanceCard year={year} />
