@@ -14,6 +14,7 @@ export type LineIconName =
   | "grid"
   | "image"
   | "import"
+  | "menu"
   | "receipt"
   | "send"
   | "settings"
@@ -97,6 +98,13 @@ const ICON_PATHS: Record<LineIconName, ReactNode> = {
       <Path d="M12 3v10" />
       <Path d="m8 9 4 4 4-4" />
       <Path d="M4 17v1.5A2.5 2.5 0 0 0 6.5 21h11A2.5 2.5 0 0 0 20 18.5V17" />
+    </>
+  ),
+  menu: (
+    <>
+      <Path d="M4 6h16" />
+      <Path d="M4 12h16" />
+      <Path d="M4 18h16" />
     </>
   ),
   receipt: (
