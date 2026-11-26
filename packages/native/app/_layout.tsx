@@ -17,12 +17,6 @@ function AppStack() {
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
 
-  useEffect(() => {
-    if (ready) {
-      void SplashScreen.hideAsync().catch(() => undefined);
-    }
-  }, [ready]);
-
   // 認証ガード: ログイン必須の構成で未ログインなら、ログイン画面以外へは進ませない。
   const onLoginScreen = segments[0] === "login";
   const mustLogin = ready && loginRequired && !user && !onLoginScreen;
@@ -64,6 +58,14 @@ export default function RootLayout() {
     "IBMPlexSansJP-600": require("../assets/fonts/IBMPlexSansJP-600.ttf"),
     "IBMPlexSansJP-700": require("../assets/fonts/IBMPlexSansJP-700.ttf"),
   });
+
+  // ネイティブスプラッシュは無地（背景色のみ）で、フォントが読めた時点で
+  // すぐ消す。起動画面として見えるのはアプリ側の AnimatedSplash だけにする。
+  useEffect(() => {
+    if (fontsLoaded) {
+      void SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [fontsLoaded]);
 
   if (!fontsLoaded) return null;
 
