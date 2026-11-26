@@ -1,5 +1,9 @@
 {
   "dependencies": {
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.6.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "@etax/shared": "workspace:*",
     "@vanilla-extract/css": "^1.21.3",
     "clsx": "^2.1.1",

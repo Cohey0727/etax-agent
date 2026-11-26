@@ -21,6 +21,7 @@ import {
 } from "@components/organisms/auth";
 import { AuthConfig, LoginMode } from "@types";
 import {
+  API_BASE_URL,
   consumeMagicLink,
   loginAccount,
   loginWithTotp,
@@ -168,7 +169,7 @@ export const LoginPage = ({
   };
 
   const handleOAuthSelect = (key: OAuthProviderKey) => {
-    window.location.href = `/api/auth/oauth/${key}/start`;
+    window.location.href = `${API_BASE_URL}/api/auth/oauth/${key}/start`;
   };
 
   const oauthProviders: readonly { key: "google" | "github"; label: string }[] = [
