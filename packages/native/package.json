@@ -34,9 +34,11 @@
   "name": "@etax/native",
   "private": true,
   "scripts": {
-    "android": "expo start --android",
+    "android": "expo run:android --variant release",
+    "android:debug": "expo run:android --variant debug",
     "export": "expo export",
-    "ios": "expo start --ios",
+    "ios": "expo run:ios --configuration Release",
+    "ios:debug": "expo run:ios --configuration Debug",
     "start": "expo start",
     "typecheck": "tsc --noEmit"
   },
