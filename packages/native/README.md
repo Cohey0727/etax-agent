@@ -6,7 +6,7 @@ React Native + Expo の iOS / Android アプリ。計算は Web・サーバー�
 - アプリ ID：iOS / Android ともに `jp.co.occam.etaxagent`
 - ルーティング：expo-router（`app/` 配下）
 - API 接続先：環境変数 `EXPO_PUBLIC_API_URL` で差し替え可能。既定は本番
-  （`https://mini-etax.spaghetti-monster.com`）
+  （`https://mini-etaxapi.spaghetti-monster.com`）
 
 ## 開発
 
@@ -16,7 +16,12 @@ React Native + Expo の iOS / Android アプリ。計算は Web・サーバー�
 bun run start     # Expo 開発サーバー
 bun run typecheck # 型チェック
 bun run export    # バンドル生成（動作確認用）
+bun run android   # 実機・エミュレータへ release ビルドでインストール
+bun run ios       # 実機・シミュレータへ Release 構成でインストール
 ```
+
+`android` / `ios` は release ビルドが既定。debug ビルドで動かす場合は
+`bun run android:debug` / `bun run ios:debug` を使う。
 
 実機・ストア向けビルドは EAS Build を使う（後述）。
 
@@ -50,6 +55,9 @@ JS のみの変更は EAS Update でストア審査なしに配信できる。
 
 ## 備考
 
-- スプラッシュ画像はアプリアイコンの素材を暫定利用している。
-- ログイン画面は API へ接続する土台までで、セッション保持と
-  認証状態の管理は未実装。
+- 起動画面はアプリ側のアニメーションスプラッシュのみ。ネイティブ
+  スプラッシュは背景色だけの無地にしてあり、フォント読み込み完了時点で
+  すぐ消える。
+- ログインはパスワード / TOTP / マジックリンク / Google・GitHub OAuth に
+  対応し、セッションは SecureStore に保持される。OAuth の戻りは
+  `etaxagent://auth-callback` で受け取る。
