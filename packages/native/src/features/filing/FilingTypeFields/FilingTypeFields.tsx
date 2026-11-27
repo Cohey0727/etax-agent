@@ -22,7 +22,7 @@ const filingTypeOptions: readonly { value: FilingType; label: string }[] = (
 ).map((type) => ({ value: type, label: filingTypeLabels[type] }));
 
 const scaleOptions: readonly { value: "non-scale" | "scale"; label: string }[] = [
-  { value: "non-scale", label: "事業的規模でない（不動産分は10万円まで）" },
+  { value: "non-scale", label: "事業的規模でない（事業所得が無ければ10万円まで）" },
   { value: "scale", label: "事業的規模（不動産も事業と同じ上限）" },
 ];
 
