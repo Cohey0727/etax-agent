@@ -1,4 +1,5 @@
 import {
+  ConsumptionFilingInputs,
   ConsumptionReturn,
   ConsumptionTaxSummary,
   Transaction,
@@ -41,6 +42,9 @@ export interface ConsumptionTaxPanelProps {
    * kind: "mismatch" = 税区分と符号の不一致、"taxUnset" = 税区分が未設定。
    */
   onOpenLedger?: (kind: "mismatch" | "taxUnset") => void;
+  /** 申告の種類と帳簿の外にある数字の手入力（申告入力に保存されたもの）。 */
+  consumptionFiling: ConsumptionFilingInputs;
+  onConsumptionFilingChange: (next: ConsumptionFilingInputs) => void;
 }
 
 /**
@@ -50,7 +54,13 @@ export interface ConsumptionTaxPanelProps {
  * 基準期間・中間納付・既確定税額など、帳簿の外にある数字だけ。
  * 課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算される。
  */
-export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: ConsumptionTaxPanelProps) => {
+export const ConsumptionTaxPanel = ({
+  transactions,
+  year,
+  onOpenLedger,
+  consumptionFiling,
+  onConsumptionFilingChange,
+}: ConsumptionTaxPanelProps) => {
   const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
 
   // 納税者プロフィール（DB保存）を読み込む。出力するXTXの見出しに使う。
@@ -65,14 +75,19 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
   }, [year]);
 
   const summary = useMemo(() => summarizeConsumptionTax(transactions, year), [transactions, year]);
-  const [form, setForm] = useState<EditableForm>(() => ({
-    basePeriodSalesThousands: deriveBasePeriodSalesThousands(transactions, year),
-    interimNational: 0,
-    interimLocal: 0,
-    originalNational: 0,
-    originalLocal: 0,
-  }));
-  const [filingKind, setFilingKind] = useState<1 | 3>(1);
+  const derivedBasePeriodSales = useMemo(
+    () => deriveBasePeriodSalesThousands(transactions, year),
+    [transactions, year],
+  );
+  // 基準期間の課税売上高は、手で直すまでは帳簿（2年前）から求めた値を使う。
+  const form: EditableForm = {
+    basePeriodSalesThousands: consumptionFiling.basePeriodSalesThousands ?? derivedBasePeriodSales,
+    interimNational: consumptionFiling.interimNational,
+    interimLocal: consumptionFiling.interimLocal,
+    originalNational: consumptionFiling.originalNational,
+    originalLocal: consumptionFiling.originalLocal,
+  };
+  const filingKind = consumptionFiling.filingKind;
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -90,17 +105,17 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
         exemptSales: summary.exemptSales,
         purchasesIncl10: summary.purchasesIncl10,
         purchasesIncl8: summary.purchasesIncl8,
-        interimNational: form.interimNational,
-        interimLocal: form.interimLocal,
+        interimNational: consumptionFiling.interimNational,
+        interimLocal: consumptionFiling.interimLocal,
       }),
-    [summary, form],
+    [summary, consumptionFiling.interimNational, consumptionFiling.interimLocal],
   );
 
   // 計算結果の各項目と、その裏付け（どう計算したか）を直下に並べる。
   const resultRows = buildResultRows(preview, form);
 
   const update = (key: EditableKey, value: number) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    onConsumptionFilingChange({ ...consumptionFiling, [key]: value });
   };
 
   const handleExport = async () => {
@@ -167,7 +182,12 @@ export const ConsumptionTaxPanel = ({ transactions, year, onOpenLedger }: Consum
           <Select
             className={styles.fieldInput}
             value={filingKind}
-            onChange={(e) => setFilingKind(Number(e.target.value) === 3 ? 3 : 1)}
+            onChange={(e) =>
+              onConsumptionFilingChange({
+                ...consumptionFiling,
+                filingKind: Number(e.target.value) === 3 ? 3 : 1,
+              })
+            }
             aria-label="申告の種類"
           >
             <option value={1}>確定（期限後申告を含む）</option>

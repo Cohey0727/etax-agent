@@ -1,5 +1,4 @@
 import { Card, Col, Row, Text } from "@components/atoms";
-import { useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
 import { FilingSnapshot, FilingSnapshotFigures } from "@types";
 import { formatDate, formatYen } from "@utils";
 import styles from "./ConfirmComparePanel.css";
@@ -15,8 +14,8 @@ const COMPARE_ROWS: readonly { key: keyof FilingSnapshotFigures; label: string }
 ];
 
 export interface ConfirmComparePanelProps {
-  /** 左上の年度切替で選ばれている年 */
-  year: number;
+  /** 「控除・計算」が確定済みか（申告ステータス）。 */
+  calculated: boolean;
   /** 確定スナップショットの一覧（昇順）。未読込・未接続時は null。 */
   snapshots: FilingSnapshot[] | null;
   /** いま画面に出ている計算結果（確定スナップショットと同じ形）。 */
@@ -32,11 +31,10 @@ export interface ConfirmComparePanelProps {
  * 初回の確定（前回が無い）では何も出さない。
  */
 export const ConfirmComparePanel = ({
-  year,
+  calculated,
   snapshots,
   currentFigures,
 }: ConfirmComparePanelProps) => {
-  const { status } = useFilingStatus(year);
   if (!snapshots || snapshots.length === 0 || !currentFigures) return null;
 
   const last = snapshots[snapshots.length - 1];
@@ -46,7 +44,7 @@ export const ConfirmComparePanel = ({
   let base: FilingSnapshotFigures;
   let target: FilingSnapshotFigures;
   let targetLabel: string;
-  if (!status.calculated) {
+  if (!calculated) {
     title = `前回確定（${formatDate(last.confirmed_at)}）との差分`;
     base = last.figures;
     target = currentFigures;

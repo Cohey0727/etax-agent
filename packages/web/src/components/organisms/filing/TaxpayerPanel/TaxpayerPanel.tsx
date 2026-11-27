@@ -3,6 +3,7 @@ import {
   DeductionInputs,
   ExpandedIncomeInput,
   FilingType,
+  IncomeTaxPaymentInputs,
   MiscIncomeInput,
   SalaryIncomeInput,
   TaxCreditInputs,
@@ -55,6 +56,9 @@ export interface TaxpayerPanelProps {
    * 比較する修正申告として出力する。null なら確定申告として出力する。
    */
   originalIncomeTax: number | null;
+  /** 源泉徴収税額・予定納税額（申告入力に保存されたもの）。 */
+  incomeTaxPayments: IncomeTaxPaymentInputs;
+  onIncomeTaxPaymentsChange: (next: IncomeTaxPaymentInputs) => void;
   /** 納税者情報タブへの遷移（確定申告画面の総合でのみ渡される）。 */
   onOpenSection?: (section: FilingSection) => void;
 }
@@ -77,12 +81,13 @@ export const TaxpayerPanel = ({
   realEstateBusinessScale,
   balanceSheet,
   originalIncomeTax,
+  incomeTaxPayments,
+  onIncomeTaxPaymentsChange,
   onOpenSection,
 }: TaxpayerPanelProps) => {
   const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
-  const [withholdingTax, setWithholdingTax] = useState(0);
-  const [prepaidTax, setPrepaidTax] = useState(0);
+  const { withholdingTax, prepaidTax } = incomeTaxPayments;
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingDomicile, setExportingDomicile] = useState(false);
@@ -298,7 +303,12 @@ export const TaxpayerPanel = ({
             className={styles.fieldNumber}
             type="number"
             value={withholdingTax}
-            onChange={(e) => setWithholdingTax(toAmount(e.target.value))}
+            onChange={(e) =>
+              onIncomeTaxPaymentsChange({
+                ...incomeTaxPayments,
+                withholdingTax: toAmount(e.target.value),
+              })
+            }
             aria-label="源泉徴収税額"
           />
         </Row>
@@ -315,7 +325,9 @@ export const TaxpayerPanel = ({
             className={styles.fieldNumber}
             type="number"
             value={prepaidTax}
-            onChange={(e) => setPrepaidTax(toAmount(e.target.value))}
+            onChange={(e) =>
+              onIncomeTaxPaymentsChange({ ...incomeTaxPayments, prepaidTax: toAmount(e.target.value) })
+            }
             aria-label="予定納税額"
           />
         </Row>

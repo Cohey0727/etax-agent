@@ -1,71 +1,63 @@
-import { Badge, Button, Card, Col, Row, Text } from "@components/atoms";
+import { ReactNode } from "react";
+import { Badge, Button, Col, Row, Text } from "@components/atoms";
 import { formatDate } from "@utils";
-import { FilingStatusKey, useFilingStatus } from "./useFilingStatus";
+import { FilingStatusKey, UseFilingStatusResult } from "./useFilingStatus";
 import styles from "./FilingStatusToggle.css";
 
 export interface FilingStatusToggleProps {
-  year: number;
-  /** 対象のステータス項目（帳簿 = confirmed、控除・計算 = calculated）。 */
+  /** 対象のステータス項目（収支 = confirmed、控除・計算 = calculated）。 */
   statusKey: FilingStatusKey;
   label: string;
   description: string;
-  /** 未確定→確定に切り替えた直後に呼ばれる（確定スナップショットの保存など）。 */
-  onConfirm?: () => Promise<void>;
-  /** true のときはカードで囲まず、既存のカードの中にそのまま置ける形で出す。 */
-  bare?: boolean;
+  /** 確定申告画面が持つ申告ステータス。 */
+  filingStatus: UseFilingStatusResult;
+  /** 「確定する／確定解除」を押したとき。 */
+  onToggle: (key: FilingStatusKey) => void;
+  /** 確定ボタンの手前に並べる操作（そのタブを開くボタンなど）。 */
+  children?: ReactNode;
 }
 
 /**
  * 「確定する／確定解除」のバー。そのタブの作業を終えたらその場で
  * 確定でき、総合タブ・ダッシュボードと状態を共有する。
- * 既定では独立したカードとして出し、bare のときは他のカードの中に置く。
+ * カードで包むかどうかは置く側が決める。
  */
 export const FilingStatusToggle = ({
-  year,
   statusKey,
   label,
   description,
-  onConfirm,
-  bare = false,
+  filingStatus,
+  onToggle,
+  children,
 }: FilingStatusToggleProps) => {
-  const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
+  const { status, available, savingKey } = filingStatus;
   const done = status[statusKey];
   const doneAt = status[`${statusKey}_at`];
 
-  const handleClick = async () => {
-    const turningOn = !done;
-    await toggle(statusKey);
-    if (turningOn && onConfirm) await onConfirm();
-  };
-
-  const content = (
-      <Row gap="md" align="center" justify="spaceBetween">
-        <Col gap="sm" className={styles.itemMain}>
-          <Text className={styles.itemLabel}>
-            {label}
-            <Badge tone={done ? "accent" : "muted"}>
-              {done ? `確定${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未確定"}
-            </Badge>
-          </Text>
-          <Text variant="muted">{description}</Text>
-          {loaded && !available ? (
-            <Text variant="muted">
-              ステータスを保存するサーバーに接続できていません。「確定する」は接続時に使えます。
-            </Text>
-          ) : null}
-        </Col>
+  return (
+    <Row gap="md" align="center" justify="spaceBetween" wrap>
+      <Col gap="sm" className={styles.itemMain}>
+        <Text className={styles.itemLabel}>
+          {label}
+          <Badge tone={done ? "accent" : "muted"}>
+            {done ? `確定${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未確定"}
+          </Badge>
+        </Text>
+        <Text variant="muted">{description}</Text>
+      </Col>
+      <Row gap="sm" align="center">
+        {children}
         <Button
           variant={done ? "ghost" : "primary"}
           disabled={!available || savingKey === statusKey}
           disabledReason={
             savingKey === statusKey ? "保存中です" : "ステータス保存サーバーに接続できていません"
           }
-          onClick={() => void handleClick()}
+          onClick={() => onToggle(statusKey)}
         >
           {done ? "確定解除" : "確定する"}
         </Button>
       </Row>
+    </Row>
   );
-
-  return bare ? content : <Card>{content}</Card>;
 };

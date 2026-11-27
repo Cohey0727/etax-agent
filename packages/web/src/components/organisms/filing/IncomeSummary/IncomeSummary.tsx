@@ -1,103 +1,49 @@
-import {
-  BlueDeductionOptions,
-  EMPTY_MISC_INCOME,
-  EMPTY_SALARY_INCOME,
-  MiscIncomeInput,
-  SalaryIncomeInput,
-  Transaction,
-  computeCorrectedFigures,
-  computeManualIncomes,
-  filterYear,
-} from "@etax/shared";
-import { useMemo } from "react";
+import { FilingFigures, FilingType } from "@etax/shared";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
+import { incomeBridgeRows, incomeStatCards, totalIncomeLabel } from "./IncomeSummary.utils";
 import styles from "./IncomeSummary.css";
 
 export interface IncomeSummaryProps {
-  transactions: Transaction[];
-  /** 左上の年度切替で選ばれている年 */
-  year: number;
-  /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
-  filingOptions?: BlueDeductionOptions;
-  /** 雑所得。帳簿に載らない所得として合計に含める。 */
-  miscIncome?: MiscIncomeInput;
-  /** 給与所得。帳簿に載らない所得として合計に含める。 */
-  salaryIncome?: SalaryIncomeInput;
+  /** 帳簿と申告入力から求めた所得と税額（確定申告画面が計算したもの） */
+  figures: FilingFigures;
+  /** 申告の種類（白色は青色申告特別控除の行の表記を変える） */
+  filingType: FilingType;
+  /** 対象年の帳簿の取引件数（0 件なら取り込みを促す） */
+  ledgerTransactionCount: number;
 }
 
 /**
  * 「収支」行の直下に置く収支の要約。収支（収入・支出・差引）を見直したら、
  * その結果である所得の数字を真下で確認して、そのまま「確定」にできるようにする。
  */
-export const IncomeSummary = ({ transactions, year, filingOptions, miscIncome, salaryIncome }: IncomeSummaryProps) => {
-  const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const figures = useMemo(
-    () => computeCorrectedFigures(yearTransactions, year, filingOptions),
-    [yearTransactions, year, filingOptions?.filingType, filingOptions?.realEstateBusinessScale],
-  );
-  // 収入・支出の見出しは事業＋不動産だけを数える（収支タブの
-  // BalanceSummary と同じ）。口座の生の出入り（チャージ・振替・投資・
-  // カード決済などの「その他」区分）まで合計すると実態とかけ離れる。
-  const incomeTotal = figures.business_revenue + figures.real_estate_revenue;
-  const expenseTotal = figures.business_expenses + figures.real_estate_expenses;
-
-  if (yearTransactions.length === 0) {
-    return (
-      <Text variant="muted">この年の取引はまだありません。先に帳簿へ取り込んでください。</Text>
-    );
-  }
-
-  const isWhite = filingOptions?.filingType === "white";
-  const suffix = isWhite ? "" : "（青色控除後）";
-  const manual = computeManualIncomes(
-    year,
-    salaryIncome ?? EMPTY_SALARY_INCOME,
-    miscIncome ?? EMPTY_MISC_INCOME,
-    figures._detail.business_income + figures._detail.real_estate_income,
-  );
-  const totalIncome = figures._detail.business_income + figures._detail.real_estate_income + manual.total;
-  const statCards: readonly { label: string; value: string }[] = [
-    { label: "収入合計", value: formatYen(incomeTotal) },
-    { label: "支出合計", value: formatYen(expenseTotal) },
-    { label: "収支（差引）", value: formatYen(incomeTotal - expenseTotal) },
-    { label: `所得合計${suffix}`, value: formatYen(totalIncome) },
-  ];
-  const bridgeRows: readonly { label: string; amount: number }[] = [
-    { label: "事業の差引", amount: figures.business_revenue - figures.business_expenses },
-    { label: "不動産の差引", amount: figures.real_estate_revenue - figures.real_estate_expenses },
-    {
-      label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
-      amount: -figures.blue_deduction,
-    },
-    ...(manual.salary > 0 ? [{ label: "給与所得", amount: manual.salary }] : []),
-    ...(manual.pension > 0 ? [{ label: "雑所得（公的年金等）", amount: manual.pension }] : []),
-    ...(manual.miscBusiness > 0 ? [{ label: "雑所得（業務）", amount: manual.miscBusiness }] : []),
-    ...(manual.miscOther > 0 ? [{ label: "雑所得（その他）", amount: manual.miscOther }] : []),
-  ];
-
+export const IncomeSummary = ({ figures, filingType, ledgerTransactionCount }: IncomeSummaryProps) => {
+  const isWhite = filingType === "white";
   return (
     <Col gap="md">
+      {ledgerTransactionCount === 0 ? (
+        <Text variant="muted">この年の取引はまだありません。先に帳簿へ取り込んでください。</Text>
+      ) : null}
       <div className={styles.statGrid}>
-        {statCards.map((card) => (
+        {incomeStatCards(figures, isWhite).map((card) => (
           <Card key={card.label}>
             <Col gap="none">
               <Text variant="statLabel">{card.label}</Text>
-              <Text variant="statValue">{card.value}</Text>
+              <Text variant="statValue">{formatYen(card.amount)}</Text>
             </Col>
           </Card>
         ))}
       </div>
       <Col gap="sm">
-        {bridgeRows.map((row) => (
+        {incomeBridgeRows(figures, isWhite).map((row) => (
           <Row key={row.label} align="center" justify="spaceBetween">
             <Text variant="muted">{row.label}</Text>
             <Text className={styles.amount}>{formatYen(row.amount)}</Text>
           </Row>
         ))}
         <Row align="center" justify="spaceBetween" className={styles.totalRow}>
-          <Text>所得合計{suffix}</Text>
-          <Text className={styles.amount}>{formatYen(totalIncome)}</Text>
+          <Text>{totalIncomeLabel(isWhite)}</Text>
+          <Text className={styles.amount}>{formatYen(figures.totalIncome)}</Text>
         </Row>
       </Col>
     </Col>

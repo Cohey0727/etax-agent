@@ -1,13 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FilingStatus } from "@types";
 import { fetchFilingStatuses, updateFilingStatus } from "@utils/api";
-
-/**
- * ステータスがどこかで切り替わったら、開いている全インスタンスに
- * 読み直しを伝えるためのイベント名。総合タブ・各タブ・比較パネルが
- * それぞれ自分のインスタンスを持つため、切り替えを相互に知らせる。
- */
-const STATUS_CHANGED_EVENT = "etax:filing-status-changed";
 
 /** 手動で「確定」を付けられる申告ステータスの項目。 */
 export type FilingStatusKey = "confirmed" | "calculated" | "submitted";
@@ -31,14 +24,18 @@ export interface UseFilingStatusResult {
   available: boolean;
   /** 保存中の項目。保存していない間は null。 */
   savingKey: FilingStatusKey | null;
-  /** 項目の済/未を反転してサーバーへ保存する。 */
-  toggle: (key: FilingStatusKey) => Promise<void>;
+  /**
+   * 項目の済/未を反転してサーバーへ保存する。保存できたら保存後の
+   * ステータスを、できなかったら null を返す。
+   */
+  toggle: (key: FilingStatusKey) => Promise<FilingStatus | null>;
 }
 
 /**
- * 申告ステータス（確定印）の読み書きを共有するフック。
- * 総合タブの一覧と、各タブの「確定する」が同じ保存先を見るために使う。
+ * 申告ステータス（確定印）の読み書きをするフック。確定申告画面が1つだけ
+ * 持ち、総合タブ・各タブの「確定する」と前回確定との比較へ渡す。
  * ステータスはダッシュボードの表示ともサーバー保存を共有する。
+ * 年度ごとに作り直す（key={year}）前提で、year は変わらない。
  */
 export const useFilingStatus = (year: number): UseFilingStatusResult => {
   const [status, setStatus] = useState<FilingStatus>(EMPTY_STATUS);
@@ -46,24 +43,19 @@ export const useFilingStatus = (year: number): UseFilingStatusResult => {
   const [available, setAvailable] = useState(false);
   const [savingKey, setSavingKey] = useState<FilingStatusKey | null>(null);
 
-  const load = useCallback(async () => {
-    const result = await fetchFilingStatuses();
-    setLoaded(true);
-    if (result === null) {
-      setAvailable(false);
-      return;
-    }
-    setStatus(result.find((s) => s.year === year) ?? EMPTY_STATUS);
-    setAvailable(true);
-  }, [year]);
-
   useEffect(() => {
-    void load();
-    // 他のインスタンス（別タブ・別パネル）での切り替えに追従する。
-    const onChanged = () => void load();
-    window.addEventListener(STATUS_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(STATUS_CHANGED_EVENT, onChanged);
-  }, [load]);
+    let cancelled = false;
+    void fetchFilingStatuses().then((result) => {
+      if (cancelled) return;
+      setLoaded(true);
+      if (result === null) return;
+      setStatus(result.find((s) => s.year === year) ?? EMPTY_STATUS);
+      setAvailable(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [year]);
 
   const toggle = async (key: FilingStatusKey) => {
     setSavingKey(key);
@@ -71,10 +63,8 @@ export const useFilingStatus = (year: number): UseFilingStatusResult => {
     patch[key] = !status[key];
     const updated = await updateFilingStatus(year, patch);
     setSavingKey(null);
-    if (updated) {
-      setStatus(updated);
-      window.dispatchEvent(new Event(STATUS_CHANGED_EVENT));
-    }
+    if (updated) setStatus(updated);
+    return updated;
   };
 
   return { status, loaded, available, savingKey, toggle };
