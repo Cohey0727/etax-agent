@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import { Alert, Image, StyleSheet, View } from "react-native";
-import { FixedAssetImageRecord } from "@/api";
+import { FixedAssetImageRecord, imageSource } from "@/api";
 import { AppButton, AppText, BouncePressable, Sheet, SkeletonBar } from "@/components";
 import { radius, space } from "@/theme";
 
@@ -73,7 +73,7 @@ export function FixedAssetImages({ images, busy, onUpload, onDelete }: FixedAsse
                 accessibilityLabel="画像を拡大"
                 onPress={() => setLightboxUrl(image.url)}
               >
-                <Image source={{ uri: image.url }} style={styles.image} />
+                <Image source={imageSource(image.url)} style={styles.image} />
               </BouncePressable>
               <AppButton
                 label="削除"
@@ -87,7 +87,7 @@ export function FixedAssetImages({ images, busy, onUpload, onDelete }: FixedAsse
         </View>
       )}
       <Sheet onClose={() => setLightboxUrl(null)} title="画像" visible={lightboxUrl !== null}>
-        {lightboxUrl ? <Image source={{ uri: lightboxUrl }} style={styles.lightbox} /> : null}
+        {lightboxUrl ? <Image source={imageSource(lightboxUrl)} style={styles.lightbox} /> : null}
       </Sheet>
     </View>
   );

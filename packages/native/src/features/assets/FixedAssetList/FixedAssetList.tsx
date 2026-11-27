@@ -1,5 +1,5 @@
 import { Image, StyleSheet, View } from "react-native";
-import { FixedAssetImageRecord, FixedAssetRecord } from "@/api";
+import { FixedAssetImageRecord, FixedAssetRecord, imageSource } from "@/api";
 import { AppText, BouncePressable, Card, Chip, LabeledValue } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatDate, formatYen } from "@/utils";
@@ -37,7 +37,7 @@ export function FixedAssetList({ assets, year, images, onSelect }: FixedAssetLis
             <Card index={index + 1}>
               <View style={styles.header}>
                 {firstImage ? (
-                  <Image source={{ uri: firstImage.url }} style={styles.thumb} />
+                  <Image source={imageSource(firstImage.url)} style={styles.thumb} />
                 ) : (
                   <View style={styles.thumbPlaceholder}>
                     <AppText size="xl" tone="muted">
