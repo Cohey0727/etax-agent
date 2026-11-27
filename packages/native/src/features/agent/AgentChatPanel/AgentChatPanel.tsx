@@ -58,11 +58,18 @@ export function AgentChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [scrollView, setScrollView] = useState<{ scrollToEnd: (options?: { animated?: boolean }) => void } | null>(null);
 
+  // シートは起動時からマウントされ、ログインでユーザーが切り替わるので、古いユーザーの読み込み結果は捨てる
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
-      setMessages(await loadCurrentMessages(userId));
-      setSessions(await loadSessions(userId));
+      const [current, saved] = await Promise.all([loadCurrentMessages(userId), loadSessions(userId)]);
+      if (cancelled) return;
+      setMessages(current);
+      setSessions(saved);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   const addAttachments = async (picker: () => Promise<PendingAttachment[]>) => {
