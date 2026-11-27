@@ -1238,3 +1238,26 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
     finalTax,
   };
 }
+
+/** 申告納税額と第3期分の税額。 */
+export interface IncomeTaxSettlement {
+  /** 申告納税額。100円未満切捨て。源泉徴収税額の方が多い（還付になる）ときは切り捨てず負のまま */
+  declaredTax: number;
+  /** 第3期分の税額（申告納税額 − 予定納税額）。正は納める税金、負は還付される税金 */
+  thirdPeriodTax: number;
+}
+
+/**
+ * 所得税及び復興特別所得税の額（外国税額控除後）から源泉徴収税額・予定納税額を
+ * 精算する（国税通則法119条の100円未満切捨て）。withholdingTax には配当・株式等の
+ * 源泉徴収税額も含めて渡す。
+ */
+export function incomeTaxSettlementOf(
+  tax: IncomeTaxResult,
+  withholdingTax: number,
+  prepaidTax: number,
+): IncomeTaxSettlement {
+  const raw = tax.incomeTaxAfterForeignCredit + tax.reconstructionTax - withholdingTax;
+  const declaredTax = raw > 0 ? Math.floor(raw / 100) * 100 : raw;
+  return { declaredTax, thirdPeriodTax: declaredTax - prepaidTax };
+}

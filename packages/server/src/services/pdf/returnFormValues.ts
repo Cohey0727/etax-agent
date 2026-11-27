@@ -16,6 +16,7 @@ import {
   MiscIncomeInput,
   SalaryIncomeInput,
   XtxTaxpayer,
+  incomeTaxSettlementOf,
 } from "@etax/shared";
 
 /** 紙イメージの金額セル識別子。buildReturnPdf のレイアウト表と対応する。 */
@@ -132,9 +133,11 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
   // 上回ることがある）。これで「計 − 外国税額控除等」が確定税額の元と一致する。
   const foreignCredit =
     Math.min(c.foreignTaxIncomePart, standardTax) + c.foreignTaxReconstructionPart;
-  const declaredRaw = taxTotal - foreignCredit - source.withholdingTax;
-  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : declaredRaw;
-  const thirdPeriod = declaredTax - source.prepaidTax;
+  const { declaredTax, thirdPeriodTax: thirdPeriod } = incomeTaxSettlementOf(
+    tax,
+    source.withholdingTax,
+    source.prepaidTax,
+  );
   const increase =
     source.amendment && source.originalThirdPeriodTax !== null
       ? Math.max(thirdPeriod - source.originalThirdPeriodTax, 0)

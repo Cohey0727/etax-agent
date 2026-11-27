@@ -821,6 +821,9 @@ describe("第一表の区分・欠落タグ・税額チェーン", () => {
         foreignTaxReconstructionPart: reconstructionPart,
         foreignTax: base + 5_000 + reconstructionPart,
       },
+      // エンジンと同じく、所得税分を引いた所得税額は0で止まり、復興税分は復興特別所得税から引く
+      incomeTaxAfterForeignCredit: 0,
+      reconstructionTax: computed.reconstructionTaxGross - reconstructionPart,
       finalTax: Math.floor((computed.reconstructionTaxGross - reconstructionPart) / 100) * 100,
     };
     expect(base).toBeGreaterThan(0);

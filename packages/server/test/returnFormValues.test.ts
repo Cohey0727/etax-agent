@@ -100,6 +100,8 @@ describe("buildReturnFormValues の税金の計算", () => {
           foreignTaxIncomePart: t.taxAfterOtherCredits + 50_000,
           foreignTax: t.taxAfterOtherCredits + 50_000 + t.taxCredits.foreignTaxReconstructionPart,
         },
+        // エンジンと同じく、所得税分を引いた所得税額は0で止まる
+        incomeTaxAfterForeignCredit: 0,
       }),
     });
     const a = values.amounts;

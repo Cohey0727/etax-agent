@@ -32,6 +32,7 @@ import {
   spouseSpecialDeduction,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_TAX_CREDIT_INPUTS,
+  incomeTaxSettlementOf,
 } from "../src/index";
 
 describe("基礎控除", () => {
@@ -547,5 +548,31 @@ describe("寡婦・ひとり親・勤労学生の所得要件と排他", () => {
       isWorkingStudent: true,
     });
     expect(over.workingStudent).toBe(0);
+  });
+});
+
+describe("incomeTaxSettlementOf", () => {
+  const base = () =>
+    computeIncomeTax({
+      year: 2025,
+      totalIncome: 5_000_000,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+
+  test("納付: 申告納税額は100円未満切捨て、第3期分は予定納税額を引く", () => {
+    const tax = base();
+    const result = incomeTaxSettlementOf(tax, 12_345, 100_000);
+    const raw = tax.incomeTaxAfterForeignCredit + tax.reconstructionTax - 12_345;
+    expect(result.declaredTax).toBe(Math.floor(raw / 100) * 100);
+    expect(result.thirdPeriodTax).toBe(result.declaredTax - 100_000);
+  });
+
+  test("還付: 源泉徴収税額の方が多ければ切り捨てず負のまま", () => {
+    const tax = base();
+    const withholding = tax.finalTax + 12_345;
+    const result = incomeTaxSettlementOf(tax, withholding, 0);
+    expect(result.declaredTax).toBe(tax.incomeTaxAfterForeignCredit + tax.reconstructionTax - withholding);
+    expect(result.declaredTax).toBeLessThan(0);
   });
 });

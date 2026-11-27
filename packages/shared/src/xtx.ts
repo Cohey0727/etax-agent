@@ -26,7 +26,14 @@
  * CATALOG（管理用部分）の RDF は CATALOG.xsd が lax のため骨格のみとし、
  * FORM_SEC には様式IDを列挙する。帳票の中身は CONTENTS 側が正。
  */
-import { DeductionInputs, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, computeManualIncomes } from "./deductions";
+import {
+  DeductionInputs,
+  IncomeTaxResult,
+  MiscIncomeInput,
+  SalaryIncomeInput,
+  computeManualIncomes,
+  incomeTaxSettlementOf,
+} from "./deductions";
 import {
   ExpandedIncomeBreakdown,
   ExpandedIncomeInput,
@@ -753,13 +760,15 @@ function buildKoa020Face1(data: XtxFilingData): string {
   taxCalc.push(amountAlways("ABB01030", taxTotal));
   taxCalc.push(amount("ABB01040", foreignTaxCredit));
   taxCalc.push(amount("ABB00710", data.withholdingTax));
-  // 申告納税額は100円未満切捨て（国税通則法119条）。還付になる場合は切り捨てず負のまま出す。
-  const declaredRaw = taxTotal - foreignTaxCredit - data.withholdingTax;
-  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : declaredRaw;
+  // 申告納税額（＝計 − 外国税額控除等 − 源泉徴収税額）は100円未満切捨て、還付は負のまま。
+  // 第3期分: 納付は申告納税額−予定納税額、還付は過払い全額
+  const { declaredTax, thirdPeriodTax: thirdPeriod } = incomeTaxSettlementOf(
+    tax,
+    data.withholdingTax,
+    data.prepaidTax,
+  );
   taxCalc.push(amountAlways("ABB00720", declaredTax));
   taxCalc.push(amount("ABB00730", data.prepaidTax));
-  // 第3期分: 納付は申告納税額−予定納税額、還付は過払い全額
-  const thirdPeriod = declaredTax - data.prepaidTax;
   if (thirdPeriod > 0) taxCalc.push(`<ABB00740>${amountAlways("ABB00750", thirdPeriod)}</ABB00740>`);
   else if (thirdPeriod < 0) taxCalc.push(`<ABB00740>${amountAlways("ABB00760", -thirdPeriod)}</ABB00740>`);
   body.push(`<ABB00570>${taxCalc.join("")}</ABB00570>`);
