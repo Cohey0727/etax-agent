@@ -532,7 +532,8 @@ abi.push(
 `<ABI00140>${amountAlways("ABI00150", data.originalNational)}${amountAlways("ABI00160", amendmentNational)}</ABI00140>`,
 );
 }
-abi.push(amount("ABI00170", r.salesExcl));
+// この課税期間の課税売上高は、課税売上（税抜）に輸出などの免税売上を加えた額
+abi.push(amount("ABI00170", r.salesExcl + Math.trunc(data.input.exemptSales || 0)));
 abi.push(amount("ABI00180", Math.trunc(data.basePeriodSales || 0)));
 
 const abj: string[] = [];

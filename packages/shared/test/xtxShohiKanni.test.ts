@@ -326,6 +326,27 @@ describe("buildSimplifiedConsumptionXtx", () => {
     expect(xtx).toContain("<ABJ00130>115400</ABJ00130>"); // 90,000 + 25,400
   });
 
+  test("この課税期間の課税売上高（ABI00170）には免税売上を含める", () => {
+    const input: SimplifiedConsumptionInput = {
+      ...EMPTY_INPUT,
+      salesByCategory: { 5: { incl10: 11_000_000, incl8: 0 } },
+      exemptSales: 1_000_000,
+    };
+    const xtx = buildSimplifiedConsumptionXtx({
+      taxpayer: TAXPAYER,
+      periodFrom: "2027-01-01",
+      periodTo: "2027-12-31",
+      submissionDate: "2028-02-15",
+      filingKind: 1,
+      basePeriodSales: 0,
+      input,
+      result: computeSimplifiedConsumptionReturn(input),
+      originalNational: null,
+      originalLocal: null,
+    });
+    expect(xtx).toContain("<ABI00170>11000000</ABI00170>"); // 10,000,000 + 1,000,000
+  });
+
   test("修正前・修正後とも還付なら、差引納付税額は還付の減少額になる", () => {
     const input: SimplifiedConsumptionInput = {
       ...EMPTY_INPUT,
