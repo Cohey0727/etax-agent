@@ -34,10 +34,10 @@ export function useLedgerSync(options: {
     void (async () => {
       const rows = await fetchLedgerTransactions();
       if (cancelled) return;
-      if (rows && rows.length > 0) {
-        setTransactions(rows.map(ledgerRowToTransaction));
-        setDataSource("帳簿");
-      }
+      // 読めなかったとき（未ログイン・DB未接続）は空にする。ログイン切れのあとに別の
+      // アカウントでログインしても、前のユーザーの取引を画面に残さない。
+      setTransactions(rows ? rows.map(ledgerRowToTransaction) : []);
+      setDataSource("帳簿");
       setLedgerLoading(false);
     })();
     return () => {

@@ -75,9 +75,21 @@ export class ApiError extends Error {
   }
 }
 
-/** API を呼ぶ。サーバーの API へのリクエストはすべてここを通す。 */
+let unauthorizedHandler: (() => void) | null = null;
+
+/**
+ * API が 401（ログインしていない・ログインが切れた）を返したときに呼ぶ処理を登録する。
+ * 取得系は失敗を null で返すため、呼び出し元だけでは「DB 未接続」と区別できない。
+ */
+export const setUnauthorizedHandler = (handler: (() => void) | null): void => {
+  unauthorizedHandler = handler;
+};
+
+/** API を呼ぶ。サーバーの API へのリクエストはすべてここを通し、401 を登録した処理へ知らせる。 */
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(path, init);
+  const resp = await fetch(path, init);
+  if (resp.status === 401) unauthorizedHandler?.();
+  return resp;
 }
 
 const jsonBody = (method: "POST" | "PUT", body: unknown): RequestInit => ({
