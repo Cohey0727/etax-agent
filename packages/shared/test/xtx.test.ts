@@ -11,6 +11,7 @@ import {
   computeIncomeTax,
   computeManualIncomes,
   depreciationDetailRow,
+  statementCategoryTotals,
   toEraDate,
   xtxSupportedYears,
 } from "../src";
@@ -838,6 +839,64 @@ describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", (
     expect(raw).toBeLessThan(0);
     expect(tagValue(xtx, "ABB00720")).toBe(raw);
     expect(tagValue(xtx, "ABB00760")).toBe(-raw);
+  });
+
+  test("科目内に返品・返金があっても、決算書の収入・経費は科目ごとの純額で、経費計は経費の行の合計", () => {
+    const txs = [
+      tx({ date: "2025-06-15", year: 2025, amount: 1_000_000, category: "売上高" }),
+      tx({ date: "2025-06-15", year: 2025, amount: -50_000, category: "売上高" }),
+      tx({ date: "2025-06-15", year: 2025, amount: -100_000, category: "通信費" }),
+      tx({ date: "2025-06-15", year: 2025, amount: 10_000, category: "通信費" }),
+      tx({ date: "2025-06-15", year: 2025, amount: 1_200_000, category: "家賃収入", income_type: "real_estate" }),
+      tx({ date: "2025-06-15", year: 2025, amount: -200_000, category: "修繕費", income_type: "real_estate" }),
+      tx({ date: "2025-06-15", year: 2025, amount: 20_000, category: "修繕費", income_type: "real_estate" }),
+    ];
+    for (const filingType of ["blue65", "white"] as const) {
+      const figures = computeCorrectedFigures(txs, 2025, { filingType });
+      const tax = computeIncomeTax({
+        year: 2025,
+        totalIncome: figures._detail.business_income + figures._detail.real_estate_income,
+        deductions: EMPTY_DEDUCTION_INPUTS,
+        taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+      });
+      const xtx = buildXtxFiling({
+        year: 2025,
+        amendment: false,
+        submissionDate: "2026-03-10",
+        taxpayer: TAXPAYER,
+        figures,
+        filingType,
+        deductionInputs: EMPTY_DEDUCTION_INPUTS,
+        miscIncome: EMPTY_MISC_INCOME,
+        tax,
+        categoryTotals: {
+          business: statementCategoryTotals(txs, "business"),
+          realEstate: statementCategoryTotals(txs, "real_estate"),
+        },
+        withholdingTax: 0,
+        prepaidTax: 0,
+        originalThirdPeriodTax: null,
+      });
+      // 第一表の収入金額は決算書の売上（収入）金額と同じ純額
+      expect(tagValue(xtx, "ABB00030")).toBe(950_000);
+      expect(tagValue(xtx, "ABB00050")).toBe(1_200_000);
+      if (filingType === "blue65") {
+        expect(tagValue(xtx, "AMF00100")).toBe(950_000);
+        expect(tagValue(xtx, "AMF00230")).toBe(90_000);
+        expect(tagValue(xtx, "AMF00380")).toBe(90_000);
+        expect(tagValue(xtx, "AMF00390")).toBe(860_000);
+        expect(tagValue(xtx, "ANF00110")).toBe(1_200_000);
+        expect(xtx).not.toContain("<ANF00050>");
+        expect(tagValue(xtx, "ANF00150")).toBe(180_000);
+        expect(tagValue(xtx, "ANF00220")).toBe(180_000);
+      } else {
+        expect(tagValue(xtx, "AIG00060")).toBe(950_000);
+        expect(tagValue(xtx, "AIG00260")).toBe(90_000);
+        expect(tagValue(xtx, "AIG00360")).toBe(90_000);
+        expect(tagValue(xtx, "AKG00080")).toBe(1_200_000);
+        expect(tagValue(xtx, "AKG00220")).toBe(180_000);
+      }
+    }
   });
 
   test("分類カテゴリ「外注工賃」は固定行「外注費」AMF00320 に合算される", () => {

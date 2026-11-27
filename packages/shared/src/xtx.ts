@@ -385,6 +385,53 @@ function buildIt(data: XtxFilingData): string {
 }
 
 // ---------------------------------------------------------------------------
+// 決算書・収支内訳書の収入と経費（科目ごとの純額）
+// ---------------------------------------------------------------------------
+
+/** 一般用の決算書・収支内訳書で、経費の行に載せない科目（売上・原価として別の行に出す）。 */
+const BUSINESS_NON_EXPENSE_ACCOUNTS = new Set(["仕入高", "売上高", "家賃収入"]);
+
+interface StatementAmounts {
+  /** 経費の行に振り分ける科目別合計（外注工賃は外注費に合算済み） */
+  totals: Record<string, number>;
+  /** 売上原価（仕入高）。不動産所得用では 0 */
+  purchases: number;
+  /** 経費計（経費の各行の合計。仕入高は含めない） */
+  expenseTotal: number;
+  /**
+   * 売上（収入）金額。所得（青色申告特別控除前）+ 売上原価 + 経費計で、
+   * 科目ごとの純額で見た収入の合計になる（返品・返金は同じ科目の中で相殺）。
+   */
+  revenue: number;
+}
+
+/** 一般用（KOA210・KOA110）の収入と経費。 */
+function businessStatementAmounts(data: XtxFilingData): StatementAmounts {
+  const totals = { ...data.categoryTotals.business };
+  // 分類カテゴリの「外注工賃」は決算書の固定行「外注費」に合算する
+  if (totals["外注工賃"]) {
+    totals["外注費"] = (totals["外注費"] ?? 0) + totals["外注工賃"];
+    totals["外注工賃"] = 0;
+  }
+  const purchases = totals["仕入高"] ?? 0;
+  const expenseTotal = Object.entries(totals)
+    .filter(([account]) => !BUSINESS_NON_EXPENSE_ACCOUNTS.has(account))
+    .reduce((sum, [, value]) => sum + value, 0);
+  const revenue = data.figures._detail.business_income_before_deduction + purchases + expenseTotal;
+  return { totals, purchases, expenseTotal, revenue };
+}
+
+/** 不動産所得用（KOA220・KOA130）の収入と経費。 */
+function realEstateStatementAmounts(data: XtxFilingData): StatementAmounts {
+  const totals = data.categoryTotals.realEstate;
+  const expenseTotal = Object.entries(totals)
+    .filter(([account]) => account !== "家賃収入")
+    .reduce((sum, [, value]) => sum + value, 0);
+  const revenue = data.figures._detail.real_estate_income_before_deduction + expenseTotal;
+  return { totals, purchases: 0, expenseTotal, revenue };
+}
+
+// ---------------------------------------------------------------------------
 // KOA020 第一表
 // ---------------------------------------------------------------------------
 
@@ -449,12 +496,13 @@ function buildKoa020Face1(data: XtxFilingData): string {
     f._detail.business_income + f._detail.real_estate_income + f._detail.agriculture_income,
   );
 
-  // 収入金額等
+  // 収入金額等（事業・不動産は決算書の売上（収入）金額と同じ値）
   const revenues: string[] = [];
-  if (f.business_revenue || f.agriculture_revenue) {
+  const businessRevenue = businessStatementAmounts(data).revenue;
+  if (businessRevenue || f.agriculture_revenue) {
     const businessRevenueParts: string[] = [];
-    if (f.business_revenue) {
-      businessRevenueParts.push(amount("ABB00030", f.business_revenue));
+    if (businessRevenue) {
+      businessRevenueParts.push(amount("ABB00030", businessRevenue));
     }
     // 農業の収入金額は決算書（農業所得用）の「収入金額の計」を出す
     if (f.agriculture_revenue) {
@@ -462,7 +510,7 @@ function buildKoa020Face1(data: XtxFilingData): string {
     }
     revenues.push(`<ABB00020>${businessRevenueParts.join("")}</ABB00020>`);
   }
-  revenues.push(amount("ABB00050", f.real_estate_revenue));
+  revenues.push(amount("ABB00050", realEstateStatementAmounts(data).revenue));
   // 配当（総合課税分のみ。申告分離分は第三表、申告不要分は記載しない）
   if (expanded) revenues.push(amount("ABB00070", expanded.dividend.comprehensiveRevenue));
   if (data.salaryIncome && data.salaryIncome.revenue > 0) {
@@ -914,13 +962,7 @@ export const KOA210_EXPENSE_LINES: [string, string][] = [
 function buildKoa210(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = { ...data.categoryTotals.business };
-  // 分類カテゴリの「外注工賃」は決算書の固定行「外注費」に合算する
-  if (totals["外注工賃"]) {
-    totals["外注費"] = (totals["外注費"] ?? 0) + (totals["外注工賃"] ?? 0);
-    totals["外注工賃"] = 0;
-  }
-  const purchases = totals["仕入高"] ?? 0;
+  const { totals, purchases, expenseTotal, revenue } = businessStatementAmounts(data);
 
   const parts: string[] = [];
   parts.push(ref("AMA00000", "NENBUN"));
@@ -938,13 +980,13 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
   const pl: string[] = [];
   pl.push(`<AMF00020><AMF00030><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AMF00030><AMF00040><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AMF00040></AMF00020>`);
   const amounts: string[] = [];
-  amounts.push(amountAlways("AMF00100", f.business_revenue));
+  amounts.push(amountAlways("AMF00100", revenue));
   if (purchases > 0) {
     amounts.push(
       `<AMF00110>${amountAlways("AMF00130", purchases)}${amountAlways("AMF00140", purchases)}${amountAlways("AMF00160", purchases)}</AMF00110>`,
     );
   }
-  amounts.push(amountAlways("AMF00170", f.business_revenue - purchases));
+  amounts.push(amountAlways("AMF00170", revenue - purchases));
 
   const expenseLines: string[] = [];
   const fixedAccounts = new Set(KOA210_EXPENSE_LINES.map(([account]) => account));
@@ -954,7 +996,7 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
   }
   const extras = Object.entries(totals).filter(
     ([account, value]) =>
-      value > 0 && !fixedAccounts.has(account) && account !== "仕入高" && account !== "売上高",
+      value > 0 && !fixedAccounts.has(account) && !BUSINESS_NON_EXPENSE_ACCOUNTS.has(account),
   );
   // 追加科目は様式の上限（AMF00355 の maxOccurs = 6）まで。超過分は雑費に合算する
   for (const [account, value] of extras.slice(0, 6)) {
@@ -964,7 +1006,6 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
   }
   const extrasOverflow = extras.slice(6).reduce((sum, [, value]) => sum + value, 0);
   expenseLines.push(amount("AMF00370", (totals["雑費"] ?? 0) + extrasOverflow));
-  const expenseTotal = f.business_expenses - purchases;
   expenseLines.push(amountAlways("AMF00380", expenseTotal));
   amounts.push(`<AMF00180>${expenseLines.join("")}</AMF00180>`);
 
@@ -1000,7 +1041,7 @@ export const KOA220_EXPENSE_LINES: [string, string][] = [
 function buildKoa220(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = data.categoryTotals.realEstate;
+  const { totals, expenseTotal, revenue } = realEstateStatementAmounts(data);
   const rent = totals["家賃収入"] ?? 0;
 
   const parts: string[] = [];
@@ -1017,12 +1058,12 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
 
   const pl: string[] = [];
   pl.push(`<ANF00020><ANF00030><gen:mm>1</gen:mm><gen:dd>1</gen:dd></ANF00030><ANF00040><gen:mm>12</gen:mm><gen:dd>31</gen:dd></ANF00040></ANF00020>`);
-  const extraRevenue = Math.max(f.real_estate_revenue - rent, 0);
+  const extraRevenue = Math.max(revenue - rent, 0);
   if (extraRevenue > 0) pl.push(`<ANF00050>その他収入</ANF00050>`);
   const revenueParts: string[] = [];
   revenueParts.push(amount("ANF00080", rent));
   revenueParts.push(amount("ANF00100", extraRevenue));
-  revenueParts.push(amountAlways("ANF00110", f.real_estate_revenue));
+  revenueParts.push(amountAlways("ANF00110", revenue));
   pl.push(`<ANF00070>${revenueParts.join("")}</ANF00070>`);
 
   const fixedAccounts = new Set(KOA220_EXPENSE_LINES.map(([account]) => account));
@@ -1042,7 +1083,7 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
   }
   const extrasOverflow = extras.slice(5).reduce((sum, [, value]) => sum + value, 0);
   expenseLines.push(amount("ANF00210", (totals["雑費"] ?? 0) + extrasOverflow));
-  expenseLines.push(amountAlways("ANF00220", f.real_estate_expenses));
+  expenseLines.push(amountAlways("ANF00220", expenseTotal));
   pl.push(`<ANF00120>${expenseLines.join("")}</ANF00120>`);
 
   const beforeBlue = f._detail.real_estate_income_before_deduction;
@@ -1083,13 +1124,8 @@ const KOA110_OTHER_EXPENSE_LINES: [string, string][] = [
 function buildKoa110(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = { ...data.categoryTotals.business };
-  // 分類カテゴリの「外注工賃」は収支内訳書の固定行「外注費」に合算する
-  if (totals["外注工賃"]) {
-    totals["外注費"] = (totals["外注費"] ?? 0) + (totals["外注工賃"] ?? 0);
-    totals["外注工賃"] = 0;
-  }
-  const purchases = totals["仕入高"] ?? 0;
+  const statement = businessStatementAmounts(data);
+  const { totals, purchases, expenseTotal } = statement;
 
   const parts: string[] = [];
   parts.push(ref("AIA00000", "NENBUN"));
@@ -1111,15 +1147,15 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
 
   const pl: string[] = [];
   const revenue: string[] = [];
-  revenue.push(amountAlways("AIG00030", f.business_revenue));
-  revenue.push(amountAlways("AIG00060", f.business_revenue));
+  revenue.push(amountAlways("AIG00030", statement.revenue));
+  revenue.push(amountAlways("AIG00060", statement.revenue));
   pl.push(`<AIG00020>${revenue.join("")}</AIG00020>`);
   if (purchases > 0) {
     pl.push(
       `<AIG00070>${amountAlways("AIG00090", purchases)}${amountAlways("AIG00100", purchases)}${amountAlways("AIG00120", purchases)}</AIG00070>`,
     );
   }
-  pl.push(amountAlways("AIG00130", f.business_revenue - purchases));
+  pl.push(amountAlways("AIG00130", statement.revenue - purchases));
 
   const mainExpenses: string[] = [];
   mainExpenses.push(amount("AIG00150", totals["給料賃金"] ?? 0));
@@ -1142,7 +1178,7 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
   }
   const extras = Object.entries(totals).filter(
     ([account, value]) =>
-      value > 0 && !fixedAccounts.has(account) && account !== "仕入高" && account !== "売上高" && account !== "雑費",
+      value > 0 && !fixedAccounts.has(account) && !BUSINESS_NON_EXPENSE_ACCOUNTS.has(account) && account !== "雑費",
   );
   // 追加科目は様式の上限（AIG00325 の maxOccurs = 5）まで。超過分は雑費に合算する
   for (const [account, value] of extras.slice(0, 5)) {
@@ -1158,7 +1194,6 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
   otherLines.push(amountAlways("AIG00350", otherSubtotal));
   mainExpenses.push(`<AIG00210>${otherLines.join("")}</AIG00210>`);
 
-  const expenseTotal = f.business_expenses - purchases;
   mainExpenses.push(amountAlways("AIG00360", expenseTotal));
   pl.push(`<AIG00140>${mainExpenses.join("")}</AIG00140>`);
   pl.push(amountAlways("AIG00370", f._detail.business_income_before_deduction));
@@ -1181,9 +1216,10 @@ const KOA130_OTHER_EXPENSE_LINES: [string, string][] = [
 function buildKoa130(data: XtxFilingData, vr: string): string {
   const t = data.taxpayer;
   const f = data.figures;
-  const totals = data.categoryTotals.realEstate;
+  const statement = realEstateStatementAmounts(data);
+  const totals = statement.totals;
   const rent = totals["家賃収入"] ?? 0;
-  const otherIncome = Math.max(0, f.real_estate_revenue - rent);
+  const otherIncome = Math.max(0, statement.revenue - rent);
 
   // 追加科目は様式上1件だけ（科目名 AKG00010 は様式先頭に1つ）。
   // 固定科目に当たらない経費の1件目を追加科目にし、2件目以降は雑費に合算する
@@ -1223,7 +1259,7 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
   if (otherIncome > 0) other.push(amountAlways("AKG00060", otherIncome));
   other.push(amountAlways("AKG00070", otherIncome));
   revenue.push(`<AKG00040>${other.join("")}</AKG00040>`);
-  revenue.push(amountAlways("AKG00080", f.real_estate_revenue));
+  revenue.push(amountAlways("AKG00080", statement.revenue));
   pl.push(`<AKG00020>${revenue.join("")}</AKG00020>`);
 
   const expenses: string[] = [];
@@ -1248,7 +1284,7 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
   otherLines.push(amount("AKG00200", misc));
   otherLines.push(amountAlways("AKG00210", otherSubtotal));
   expenses.push(`<AKG00150>${otherLines.join("")}</AKG00150>`);
-  expenses.push(amountAlways("AKG00220", f.real_estate_expenses));
+  expenses.push(amountAlways("AKG00220", statement.expenseTotal));
   pl.push(`<AKG00090>${expenses.join("")}</AKG00090>`);
   pl.push(amountAlways("AKG00230", f._detail.real_estate_income_before_deduction));
   pl.push(amountAlways("AKG00250", f._detail.real_estate_income));
