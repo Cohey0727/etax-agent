@@ -233,12 +233,40 @@ export function xtxSupportedYears(): number[] {
 // 小物
 // ---------------------------------------------------------------------------
 
-export function esc(value: string): string {
-  return value
+/**
+ * e-Tax の文字列型（gen:str）は半角カナと制御文字を受け付けず、制御文字・
+ * 対になっていないサロゲートは XML 1.0 としても書けない。NFKC で寄せたうえで除く。
+ */
+function xmlSafeText(value: string): string {
+  return value.normalize("NFKC").replace(/\p{Cc}|\p{Cs}|[￾￿]/gu, "");
+}
+
+function escapeXml(text: string): string {
+  return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** XML に書く文字列（要素の内容・属性値）。 */
+export function esc(value: string): string {
+  return escapeXml(xmlSafeText(value));
+}
+
+/**
+ * 様式に桁数の上限がある自由記述。上限を超えたら、どの項目を直せばよいかが
+ * 分かるよう項目名つきの例外にする（XSD 検証のエラーはタグ名しか出ない）。
+ */
+export function limitedText(value: string, maxLength: number, label: string): string {
+  const text = xmlSafeText(value);
+  const length = [...text].length;
+  if (length > maxLength) {
+    throw new Error(
+      `XTX出力の文字数が様式の上限を超えています: ${label}「${text}」（${length}文字）は${maxLength}文字以内にしてください`,
+    );
+  }
+  return escapeXml(text);
 }
 
 /** 金額要素。0以下なら出力しない（任意項目のため）。負の所得はそのまま出す。 */
@@ -370,12 +398,12 @@ function buildIt(data: XtxFilingData): string {
   if (t.jan1Address) {
     items.push(`<ICHIGATSUIPPI_ADR ID="ICHIGATSUIPPI_ADR">${esc(t.jan1Address)}</ICHIGATSUIPPI_ADR>`);
   }
-  if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${esc(t.shopName)}</NOZEISHA_YAGO>`);
+  if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${limitedText(t.shopName, 30, "屋号")}</NOZEISHA_YAGO>`);
   const tel = phoneXml(t.phone);
   if (tel) items.push(`<NOZEISHA_TEL ID="NOZEISHA_TEL">${tel}</NOZEISHA_TEL>`);
   const birth = yymmddXml(t.birthDate);
   if (birth) items.push(`<BIRTHDAY ID="BIRTHDAY">${birth}</BIRTHDAY>`);
-  if (t.occupation) items.push(`<SHOKUGYO ID="SHOKUGYO">${esc(t.occupation)}</SHOKUGYO>`);
+  if (t.occupation) items.push(`<SHOKUGYO ID="SHOKUGYO">${limitedText(t.occupation, 20, "職業")}</SHOKUGYO>`);
   items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>RKO0010</procedure_CD></TETSUZUKI>`);
   items.push(`<NENBUN ID="NENBUN">${eraYearXml(data.year)}</NENBUN>`);
   items.push(
@@ -390,6 +418,9 @@ function buildIt(data: XtxFilingData): string {
 
 /** 一般用の決算書・収支内訳書で、経費の行に載せない科目（売上・原価として別の行に出す）。 */
 const BUSINESS_NON_EXPENSE_ACCOUNTS = new Set(["仕入高", "売上高", "家賃収入"]);
+
+/** 決算書・収支内訳書の追加科目名（様式の上限 10 文字）を超えたときの項目名。 */
+const EXTRA_ACCOUNT_LABEL = "決算書・収支内訳書の追加科目（勘定科目）";
 
 interface StatementAmounts {
   /** 経費の行に振り分ける科目別合計（外注工賃は外注費に合算済み） */
@@ -908,8 +939,8 @@ function buildKoc080(data: XtxFilingData, vr: string): string {
     const rows = accounts.slice(0, 5).map((a) => {
       const parts: string[] = [];
       const broker: string[] = [];
-      if (a.brokerName) broker.push(`<EHQ00040>${esc(a.brokerName)}</EHQ00040>`);
-      if (a.branchName) broker.push(`<EHQ00070>${esc(a.branchName)}</EHQ00070>`);
+      if (a.brokerName) broker.push(`<EHQ00040>${limitedText(a.brokerName, 40, "金融商品取引業者等の名称")}</EHQ00040>`);
+      if (a.branchName) broker.push(`<EHQ00070>${limitedText(a.branchName, 40, "支店名")}</EHQ00070>`);
       if (broker.length > 0) parts.push(`<EHQ00030>${broker.join("")}</EHQ00030>`);
       parts.push(amountAlways("EHQ00100", a.revenue));
       parts.push(amountAlways("EHQ00110", a.cost));
@@ -1001,7 +1032,7 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
   // 追加科目は様式の上限（AMF00355 の maxOccurs = 6）まで。超過分は雑費に合算する
   for (const [account, value] of extras.slice(0, 6)) {
     expenseLines.push(
-      `<AMF00355><AMF00060>${esc(account)}</AMF00060>${amountAlways("AMF00360", value)}</AMF00355>`,
+      `<AMF00355><AMF00060>${limitedText(account, 10, EXTRA_ACCOUNT_LABEL)}</AMF00060>${amountAlways("AMF00360", value)}</AMF00355>`,
     );
   }
   const extrasOverflow = extras.slice(6).reduce((sum, [, value]) => sum + value, 0);
@@ -1078,7 +1109,7 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
   // 追加科目は様式の上限（ANF00195 の maxOccurs = 5）まで。超過分は雑費に合算する
   for (const [account, value] of extras.slice(0, 5)) {
     expenseLines.push(
-      `<ANF00195><ANF00060>${esc(account)}</ANF00060>${amountAlways("ANF00200", value)}</ANF00195>`,
+      `<ANF00195><ANF00060>${limitedText(account, 10, EXTRA_ACCOUNT_LABEL)}</ANF00060>${amountAlways("ANF00200", value)}</ANF00195>`,
     );
   }
   const extrasOverflow = extras.slice(5).reduce((sum, [, value]) => sum + value, 0);
@@ -1184,7 +1215,7 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
   for (const [account, value] of extras.slice(0, 5)) {
     otherSubtotal += value;
     otherLines.push(
-      `<AIG00325><AIG00010>${esc(account)}</AIG00010>${amountAlways("AIG00330", value)}</AIG00325>`,
+      `<AIG00325><AIG00010>${limitedText(account, 10, EXTRA_ACCOUNT_LABEL)}</AIG00010>${amountAlways("AIG00330", value)}</AIG00325>`,
     );
   }
   const extrasOverflow = extras.slice(5).reduce((sum, [, value]) => sum + value, 0);
@@ -1252,7 +1283,7 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
   );
 
   const pl: string[] = [];
-  if (extraName) pl.push(`<AKG00010>${esc(extraName)}</AKG00010>`);
+  if (extraName) pl.push(`<AKG00010>${limitedText(extraName, 10, EXTRA_ACCOUNT_LABEL)}</AKG00010>`);
   const revenue: string[] = [];
   revenue.push(amountAlways("AKG00030", rent));
   const other: string[] = [];
@@ -1332,7 +1363,7 @@ function buildKoa240(data: XtxFilingData, vr: string): string {
   if (t.name) nameParts.push(ref("APB00040", "NOZEISHA_NM"));
   if (nameParts.length > 0) taxpayer.push(`<APB00020>${nameParts.join("")}</APB00020>`);
   if (t.occupation) taxpayer.push(ref("APB00050", "SHOKUGYO"));
-  if (stmt.farmName) taxpayer.push(`<APB00060>${esc(stmt.farmName)}</APB00060>`);
+  if (stmt.farmName) taxpayer.push(`<APB00060>${limitedText(stmt.farmName, 30, "農園名")}</APB00060>`);
   if (phoneXml(t.phone)) taxpayer.push(ref("APB00070", "NOZEISHA_TEL"));
   if (taxpayer.length > 0) parts.push(`<APB00000>${taxpayer.join("")}</APB00000>`);
   if (toEraDate(data.submissionDate)) parts.push(ref("APE00000", "TEISYUTSU_DAY"));
@@ -1358,7 +1389,7 @@ function buildKoa240(data: XtxFilingData, vr: string): string {
   }
   for (const extra of stmt.blueExtraExpenses) {
     expense.push(
-      `<APF00375><APF00060>${esc(extra.category)}</APF00060>${amountAlways("APF00380", extra.amount)}</APF00375>`,
+      `<APF00375><APF00060>${limitedText(extra.category, 10, EXTRA_ACCOUNT_LABEL)}</APF00060>${amountAlways("APF00380", extra.amount)}</APF00375>`,
     );
   }
   expense.push(amount("APF00390", stmt.blueMiscExpense));
@@ -1440,7 +1471,7 @@ function buildKoa120(data: XtxFilingData, vr: string): string {
   if (t.name) nameParts.push(ref("AJB00040", "NOZEISHA_NM"));
   if (nameParts.length > 0) taxpayer.push(`<AJB00020>${nameParts.join("")}</AJB00020>`);
   if (t.occupation) taxpayer.push(ref("AJB00050", "SHOKUGYO"));
-  if (stmt.farmName) taxpayer.push(`<AJB00060>${esc(stmt.farmName)}</AJB00060>`);
+  if (stmt.farmName) taxpayer.push(`<AJB00060>${limitedText(stmt.farmName, 30, "農園名")}</AJB00060>`);
   if (phoneXml(t.phone)) taxpayer.push(ref("AJB00070", "NOZEISHA_TEL"));
   if (taxpayer.length > 0) parts.push(`<AJB00000>${taxpayer.join("")}</AJB00000>`);
   if (toEraDate(data.submissionDate)) parts.push(ref("AJE00000", "TEISYUTSU_DAY"));
@@ -1476,7 +1507,7 @@ function buildKoa120(data: XtxFilingData, vr: string): string {
   }
   for (const extra of stmt.whiteExtraExpenses) {
     other.push(
-      `<AJG00315><AJG00010>${esc(extra.category)}</AJG00010>${amountAlways("AJG00320", extra.amount)}</AJG00315>`,
+      `<AJG00315><AJG00010>${limitedText(extra.category, 10, EXTRA_ACCOUNT_LABEL)}</AJG00010>${amountAlways("AJG00320", extra.amount)}</AJG00315>`,
     );
   }
   other.push(amount("AJG00330", stmt.whiteMiscExpense));
@@ -1512,6 +1543,8 @@ function buildKoa120(data: XtxFilingData, vr: string): string {
 interface DepDetailTags {
   /** 明細行の maxOccurs（同梱 XSD）。超過分は様式に載せられないため例外にする */
   maxRows: number;
+  /** 「面積又は数量」の上限文字数（青色申告決算書は13、収支内訳書は20） */
+  quantityMaxLength: number;
   group: string;
   row: string;
   name: string;
@@ -1541,6 +1574,7 @@ interface DepDetailTags {
 
 const DEP_TAGS_KOA210: DepDetailTags = {
   maxRows: 7,
+  quantityMaxLength: 13,
   group: "AMF01590", row: "AMF01600", name: "AMF01610", quantity: "AMF01620",
   acquisition: "AMF01630", cost: "AMF01640", guarantee: "AMF01645", basis: "AMF01650",
   method: "AMF01660", life: "AMF01670", rateWrap: "AMF01680", rate: "AMF01690",
@@ -1552,6 +1586,7 @@ const DEP_TAGS_KOA210: DepDetailTags = {
 
 const DEP_TAGS_KOA220: DepDetailTags = {
   maxRows: 13,
+  quantityMaxLength: 13,
   group: "ANF00880", row: "ANF00890", name: "ANF00900", quantity: "ANF00910",
   acquisition: "ANF00920", cost: "ANF00930", guarantee: "ANF00935", basis: "ANF00940",
   method: "ANF00950", life: "ANF00960", rateWrap: "ANF00970", rate: "ANF00980",
@@ -1563,6 +1598,7 @@ const DEP_TAGS_KOA220: DepDetailTags = {
 
 const DEP_TAGS_KOA110: DepDetailTags = {
   maxRows: 6,
+  quantityMaxLength: 20,
   group: "AIM00000", row: "AIM00010", name: "AIM00020", quantity: "AIM00030",
   acquisition: "AIM00050", cost: "AIM00060", guarantee: "AIM00065", basis: "AIM00070",
   method: "AIM00080", life: "AIM00090", rateWrap: "AIM00100", rate: "AIM00110",
@@ -1574,6 +1610,7 @@ const DEP_TAGS_KOA110: DepDetailTags = {
 
 const DEP_TAGS_KOA130: DepDetailTags = {
   maxRows: 8,
+  quantityMaxLength: 20,
   group: "AKK00000", row: "AKK00010", name: "AKK00020", quantity: "AKK00030",
   acquisition: "AKK00050", cost: "AKK00060", guarantee: "AKK00065", basis: "AKK00070",
   method: "AKK00080", life: "AKK00090", rateWrap: "AKK00100", rate: "AKK00110",
@@ -1585,6 +1622,7 @@ const DEP_TAGS_KOA130: DepDetailTags = {
 
 const DEP_TAGS_KOA240: DepDetailTags = {
   maxRows: 12,
+  quantityMaxLength: 13,
   group: "APF02030", row: "APF02040", name: "APF02050", quantity: "APF02060",
   acquisition: "APF02070", cost: "APF02080", guarantee: "APF02085", basis: "APF02090",
   method: "APF02100", life: "APF02110", rateWrap: "APF02120", rate: "APF02130",
@@ -1596,6 +1634,7 @@ const DEP_TAGS_KOA240: DepDetailTags = {
 
 const DEP_TAGS_KOA120: DepDetailTags = {
   maxRows: 7,
+  quantityMaxLength: 20,
   group: "AJL00000", row: "AJL00010", name: "AJL00020", quantity: "AJL00030",
   acquisition: "AJL00050", cost: "AJL00060", guarantee: "AJL00065", basis: "AJL00070",
   method: "AJL00080", life: "AJL00090", rateWrap: "AJL00100", rate: "AJL00110",
@@ -1623,8 +1662,10 @@ function buildDepreciationDetail(rows: DepreciationDetailRow[], tags: DepDetailT
   const body: string[] = [];
   for (const row of rows) {
     const cells: string[] = [];
-    cells.push(`<${tags.name}>${esc(row.name)}</${tags.name}>`);
-    if (row.quantity) cells.push(`<${tags.quantity}>${esc(row.quantity)}</${tags.quantity}>`);
+    cells.push(`<${tags.name}>${limitedText(row.name, 16, "資産の名称")}</${tags.name}>`);
+    if (row.quantity) {
+      cells.push(`<${tags.quantity}>${limitedText(row.quantity, tags.quantityMaxLength, "数量")}</${tags.quantity}>`);
+    }
     cells.push(eraYearMonthTag(tags.acquisition, row.acquisitionYearMonth));
     cells.push(amountAlways(tags.cost, row.cost));
     if (row.guaranteeAmount !== null) cells.push(amountAlways(tags.guarantee, row.guaranteeAmount));
@@ -1744,7 +1785,7 @@ function buildBalanceSheetPage(data: XtxFilingData): string {
   const assetSide: string[] = [];
   if (bs.extraAsset) {
     assetSide.push(
-      `<AMG00025><AMG00030>${esc(bs.extraAsset.name)}</AMG00030>` +
+      `<AMG00025><AMG00030>${limitedText(bs.extraAsset.name, 10, "貸借対照表のその他の資産の科目名")}</AMG00030>` +
         amountAlways("AMG00220", bs.extraAsset.opening) +
         amountAlways("AMG00420", bs.extraAsset.closing) +
         `</AMG00025>`,
@@ -1765,7 +1806,7 @@ function buildBalanceSheetPage(data: XtxFilingData): string {
   const extras: string[] = [];
   if (bs.extraLiability1) {
     extras.push(
-      `<AMG00465><AMG00470>${esc(bs.extraLiability1.name)}</AMG00470>` +
+      `<AMG00465><AMG00470>${limitedText(bs.extraLiability1.name, 10, "貸借対照表のその他の負債（1）の科目名")}</AMG00470>` +
         amountAlways("AMG00570", bs.extraLiability1.opening) +
         amountAlways("AMG00700", bs.extraLiability1.closing) +
         `</AMG00465>`,
@@ -1773,7 +1814,7 @@ function buildBalanceSheetPage(data: XtxFilingData): string {
   }
   if (bs.extraLiability2) {
     extras.push(
-      `<AMG00475><AMG00480>${esc(bs.extraLiability2.name)}</AMG00480>` +
+      `<AMG00475><AMG00480>${limitedText(bs.extraLiability2.name, 10, "貸借対照表のその他の負債（2）の科目名")}</AMG00480>` +
         amountAlways("AMG00590", bs.extraLiability2.opening) +
         amountAlways("AMG00720", bs.extraLiability2.closing) +
         `</AMG00475>`,

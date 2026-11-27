@@ -277,7 +277,8 @@ function depBsSample(year: number): string {
     year,
     amendment: false,
     submissionDate: "2026-03-10",
-    taxpayer: TAXPAYER,
+    // 半角カナは e-Tax の文字列型で使えないため、生成時に全角へ寄せる
+    taxpayer: { ...TAXPAYER, address: `${TAXPAYER.address} ｺｰﾎﾟ尾道101`, shopName: "ﾃｽﾄ商店" },
     figures,
     deductionInputs: EMPTY_DEDUCTION_INPUTS,
     miscIncome: EMPTY_MISC_INCOME,

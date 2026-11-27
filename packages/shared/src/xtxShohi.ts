@@ -22,6 +22,7 @@ amount,
 amountAlways,
 esc,
 kubun,
+limitedText,
 nozeishaIdXml,
 phoneXml,
 ref,
@@ -436,7 +437,7 @@ if (t.name) items.push(`<NOZEISHA_NM ID="NOZEISHA_NM">${esc(t.name)}</NOZEISHA_N
 const zip = zipXml(t.zipCode);
 if (zip) items.push(`<NOZEISHA_ZIP ID="NOZEISHA_ZIP">${zip}</NOZEISHA_ZIP>`);
 if (t.address) items.push(`<NOZEISHA_ADR ID="NOZEISHA_ADR">${esc(t.address)}</NOZEISHA_ADR>`);
-if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${esc(t.shopName)}</NOZEISHA_YAGO>`);
+if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${limitedText(t.shopName, 30, "屋号")}</NOZEISHA_YAGO>`);
 const tel = phoneXml(t.phone);
 if (tel) items.push(`<NOZEISHA_TEL ID="NOZEISHA_TEL">${tel}</NOZEISHA_TEL>`);
 items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>${procedureCd}</procedure_CD></TETSUZUKI>`);

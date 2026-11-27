@@ -1023,3 +1023,71 @@ describe("toEraDate の元号境界 (#3-4)", () => {
     expect(toEraDate("1868-10-22")).toBeNull();
   });
 });
+
+describe("自由記述の正規化と様式の桁数", () => {
+  const TAXPAYER = {
+    name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+    address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+    phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+    myNumber: "", userId: "1234567890123456", occupation: "システムエンジニア",
+    shopName: "", jan1Address: "",
+  };
+
+  function build(opts: {
+    taxpayer?: Partial<typeof TAXPAYER>;
+    business?: Record<string, number>;
+    depreciationName?: string;
+  }) {
+    const txs = [tx({ date: "2025-06-15", year: 2025, amount: 3_000_000, category: "売上高" })];
+    const figures = computeCorrectedFigures(txs, 2025);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: figures._detail.business_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const row = opts.depreciationName
+      ? depreciationDetailRow(
+          opts.depreciationName,
+          { acquisitionDate: "2025-04-01", cost: 600_000, usefulLifeYears: 4, method: "straight_line", businessRatioPercent: 100 },
+          2025,
+        )
+      : null;
+    return buildXtxFiling({
+      year: 2025,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: { ...TAXPAYER, ...opts.taxpayer },
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: opts.business ?? {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+      depreciation: row ? { business: [row], realEstate: [] } : undefined,
+    });
+  }
+
+  test("半角カナ・全角英数は NFKC で寄せて出す", () => {
+    const xtx = build({ taxpayer: { address: "広島県尾道市向東町３５６７－１ ｺｰﾎﾟ尾道101", shopName: "ﾃｽﾄ商店" } });
+    expect(xtx).toContain('<NOZEISHA_ADR ID="NOZEISHA_ADR">広島県尾道市向東町3567-1 コーポ尾道101</NOZEISHA_ADR>');
+    expect(xtx).toContain('<NOZEISHA_YAGO ID="NOZEISHA_YAGO">テスト商店</NOZEISHA_YAGO>');
+  });
+
+  test("XML に書けない制御文字は出力しない", () => {
+    const xtx = build({ business: { "会議\u0001費": 10_000 } });
+    expect(xtx).not.toContain("\u0001");
+    expect(xtx).toContain("<AMF00060>会議費</AMF00060>");
+  });
+
+  test("様式の上限桁を超える自由記述は項目名つきの例外にする", () => {
+    expect(() => build({ depreciationName: "MacBook Pro 14インチ M3 Max" })).toThrow(/資産の名称.*16文字/);
+    expect(() => build({ business: { クラウドサービス利用料: 10_000 } })).toThrow(/勘定科目.*10文字/);
+    expect(() => build({ taxpayer: { shopName: "あ".repeat(31) } })).toThrow(/屋号.*30文字/);
+    expect(() => build({ taxpayer: { occupation: "い".repeat(21) } })).toThrow(/職業.*20文字/);
+    // 上限ちょうどは出力できる
+    expect(build({ depreciationName: "あ".repeat(16) })).toContain(`<AMF01610>${"あ".repeat(16)}</AMF01610>`);
+  });
+});
