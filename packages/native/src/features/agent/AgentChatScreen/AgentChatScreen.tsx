@@ -11,6 +11,7 @@ import {
   loadAgentConnection,
 } from "@/features/settings/agentConnectionStorage";
 import { useAppState } from "@/state/AppContext";
+import { useChatSheet } from "@/state/ChatSheetContext";
 
 export interface AgentChatScreenProps {
   /** 別画面へ遷移するUIアクションの直前に呼ばれる（シートを閉じるため）。 */
@@ -22,11 +23,21 @@ export function AgentChatScreen({ onBeforeNavigate }: AgentChatScreenProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { year, transactions, setYear, reloadLedger } = useAppState();
+  const { chatOpen } = useChatSheet();
   const [connection, setConnection] = useState<AgentConnectionConfig>(EMPTY_AGENT_CONNECTION);
+  const userId = user?.id ?? null;
 
+  // シートは常にマウントされているので、設定画面での変更を開くたびに読み直す
   useEffect(() => {
-    void loadAgentConnection().then(setConnection);
-  }, []);
+    if (!chatOpen) return;
+    let cancelled = false;
+    void loadAgentConnection(userId).then((loaded) => {
+      if (!cancelled) setConnection(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chatOpen, userId]);
 
   const getDeductionsSnapshot = useCallback(async () => {
     const state = await loadDeductionState(user?.id ?? null, year);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AgentConnectionConfig, testAgentSettings, testSystemOneSettings } from "@/api";
+import { useAuth } from "@/auth/AuthContext";
 import { AlertBox } from "@/components/AlertBox";
 import { AppButton } from "@/components/AppButton";
 import { AppText } from "@/components/AppText";
@@ -11,20 +12,22 @@ type TestKind = "agent" | "systemone" | null;
 
 /** 外部接続（AI）の上書き設定と接続テスト。値は端末に保存し、エージェント送信時に使う。 */
 export function AgentConnectionPanel() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [config, setConfig] = useState<AgentConnectionConfig>(EMPTY_AGENT_CONNECTION);
   const [loaded, setLoaded] = useState(false);
   const [testing, setTesting] = useState<TestKind>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    loadAgentConnection()
+    loadAgentConnection(userId)
       .then(setConfig)
       .finally(() => setLoaded(true));
-  }, []);
+  }, [userId]);
 
   const update = (next: AgentConnectionConfig) => {
     setConfig(next);
-    void saveAgentConnection(next);
+    void saveAgentConnection(userId, next);
   };
 
   const testInput = {

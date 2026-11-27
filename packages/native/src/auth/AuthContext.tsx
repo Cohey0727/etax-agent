@@ -21,6 +21,7 @@ import {
   logoutAccount,
   saveSessionToken,
 } from "@/api";
+import { clearAgentConnection } from "@/features/settings/agentConnectionStorage";
 import { bootstrapAuth } from "./bootstrapAuth";
 
 export type LoginOutcome =
@@ -94,8 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await logoutAccount().catch(() => undefined);
     await clearSessionToken();
+    await clearAgentConnection(user?.id ?? null);
     setUser(null);
-  }, []);
+  }, [user?.id]);
 
   const refreshUser = useCallback(async () => {
     const me = await fetchMe().catch(() => null);
