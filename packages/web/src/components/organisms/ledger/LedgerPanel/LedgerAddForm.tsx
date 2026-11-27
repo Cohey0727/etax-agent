@@ -1,11 +1,12 @@
 import { RefObject } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
-import { LedgerTransactionInput } from "@types";
 import {
   BUSINESS_RATIO_GUIDE_CATEGORIES,
   BUSINESS_RATIO_GUIDE_TEXT,
   CATEGORY_OPTIONS,
   INCOME_TYPE_OPTIONS,
+  inputNumberOrNull,
+  LedgerRowDraft,
   TAX_CATEGORY_OPTIONS,
 } from "./ledgerOptions";
 import styles from "./LedgerPanel.css";
@@ -23,11 +24,11 @@ export const LedgerAddForm = ({
   onAdd,
   onClose,
 }: {
-  draft: LedgerTransactionInput;
+  draft: LedgerRowDraft;
   yearOptions: readonly number[];
   busy: boolean;
   formRef: RefObject<HTMLDivElement | null>;
-  onDraftChange: (next: LedgerTransactionInput) => void;
+  onDraftChange: (next: LedgerRowDraft) => void;
   onAdd: () => void;
   onClose: () => void;
 }) => {
@@ -80,8 +81,10 @@ export const LedgerAddForm = ({
               <Text variant="statLabel">金額（支出はマイナス）</Text>
               <Input
                 type="number"
-                value={draft.amount}
-                onChange={(e) => onDraftChange({ ...draft, amount: Number(e.target.value) })}
+                value={draft.amount ?? ""}
+                onChange={(e) =>
+                  onDraftChange({ ...draft, amount: inputNumberOrNull(e.target.valueAsNumber) })
+                }
               />
             </Col>
             <Col gap="sm">
@@ -137,16 +140,16 @@ export const LedgerAddForm = ({
                 min={0}
                 max={100}
                 step={1}
-                value={draft.business_ratio_percent}
+                value={draft.business_ratio_percent ?? ""}
                 onChange={(e) =>
                   onDraftChange({
                     ...draft,
-                    business_ratio_percent: Number(e.target.value),
+                    business_ratio_percent: inputNumberOrNull(e.target.valueAsNumber),
                   })
                 }
               />
               {BUSINESS_RATIO_GUIDE_CATEGORIES.has(draft.category) &&
-              draft.business_ratio_percent >= 100 ? (
+              (draft.business_ratio_percent ?? 100) >= 100 ? (
                 <Text variant="caption">{BUSINESS_RATIO_GUIDE_TEXT}</Text>
               ) : null}
             </Col>

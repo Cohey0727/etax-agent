@@ -1,6 +1,6 @@
 import { Transaction } from "@etax/shared";
 import { useEffect, useRef, useState } from "react";
-import { LedgerTransaction, LedgerTransactionInput } from "@types";
+import { LedgerTransaction } from "@types";
 import {
   createLedgerTransaction,
   deleteLedgerTransaction,
@@ -9,7 +9,7 @@ import {
   recordClassificationFeedback,
   updateLedgerTransaction,
 } from "@utils/api";
-import { emptyDraft } from "./ledgerOptions";
+import { emptyDraft, ledgerDraftToInput, LedgerRowDraft } from "./ledgerOptions";
 import {
   editLedgerRow,
   isLedgerRowDirty,
@@ -39,7 +39,7 @@ export function useLedgerData(
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [rowsState, setRowsState] = useState<LedgerRowsState>(() => ledgerRowsLoaded([]));
   const stateRef = useRef(rowsState);
-  const [draft, setDraft] = useState<LedgerTransactionInput>(() =>
+  const [draft, setDraft] = useState<LedgerRowDraft>(() =>
     emptyDraft(new Date().getFullYear()),
   );
   const [deleteArmedId, setDeleteArmedId] = useState<number | null>(null);
@@ -106,7 +106,7 @@ export function useLedgerData(
     };
   }, []);
 
-  const handleEdit = (row: LedgerTransaction, patch: Partial<LedgerTransactionInput>) => {
+  const handleEdit = (row: LedgerTransaction, patch: Partial<LedgerRowDraft>) => {
     commit(editLedgerRow(stateRef.current, row, patch));
   };
 
@@ -115,10 +115,15 @@ export function useLedgerData(
   const handleSave = async (row: LedgerTransaction) => {
     const edit = stateRef.current.edits[row.id];
     if (!edit || busy) return;
+    const converted = ledgerDraftToInput(edit);
+    if ("error" in converted) {
+      setError(converted.error);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const updated = await updateLedgerTransaction(row.id, edit);
+      const updated = await updateLedgerTransaction(row.id, converted.input);
       commitRows(ledgerRowSaved(stateRef.current, updated));
       // 科目を直したら学習履歴にも記録し、次回から同じ摘要は直した科目で判定されるようにする。
       if (updated.category !== row.category && updated.category !== "未分類") {
@@ -160,22 +165,15 @@ export function useLedgerData(
 
   const handleAdd = async () => {
     if (busy) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) {
-      setError("日付を入力してください");
-      return;
-    }
-    if (!draft.description.trim()) {
-      setError("摘要を入力してください");
-      return;
-    }
-    if (draft.amount === 0) {
-      setError("金額を入力してください（支出はマイナス）");
+    const converted = ledgerDraftToInput(draft);
+    if ("error" in converted) {
+      setError(converted.error);
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const created = await createLedgerTransaction(draft);
+      const created = await createLedgerTransaction(converted.input);
       commitRows(ledgerRowAdded(stateRef.current, created));
       setDraft(emptyDraft(created.fiscal_year));
       // 手入力で科目を選んだ行も学習履歴に記録する（次回の判定で優先される）。

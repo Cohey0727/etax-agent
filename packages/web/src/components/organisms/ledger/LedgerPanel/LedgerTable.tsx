@@ -12,7 +12,7 @@ import {
   TableHeaderCell,
   Text,
 } from "@components/atoms";
-import { LedgerTransaction, LedgerTransactionInput } from "@types";
+import { LedgerTransaction } from "@types";
 import {
   BUSINESS_RATIO_GUIDE_CATEGORIES,
   BUSINESS_RATIO_GUIDE_TEXT,
@@ -20,8 +20,10 @@ import {
   INCOME_TYPE_OPTIONS,
   PAGE_SIZE,
   TAX_CATEGORY_OPTIONS,
+  inputNumberOrNull,
+  LedgerRowDraft,
   pageList,
-  toInput,
+  toDraft,
 } from "./ledgerOptions";
 import styles from "./LedgerPanel.css";
 
@@ -47,7 +49,7 @@ export const LedgerTable = ({
   onPageChange,
 }: {
   displayedRows: readonly LedgerTransaction[];
-  edits: Record<number, LedgerTransactionInput>;
+  edits: Record<number, LedgerRowDraft>;
   yearOptions: readonly number[];
   busy: boolean;
   deleteArmedId: number | null;
@@ -56,7 +58,7 @@ export const LedgerTable = ({
   currentPage: number;
   totalPages: number;
   isDirty: (row: LedgerTransaction) => boolean;
-  onEdit: (row: LedgerTransaction, patch: Partial<LedgerTransactionInput>) => void;
+  onEdit: (row: LedgerTransaction, patch: Partial<LedgerRowDraft>) => void;
   onSave: (row: LedgerTransaction) => void;
   onDelete: (row: LedgerTransaction) => void;
   onHistory: (row: LedgerTransaction) => void;
@@ -64,9 +66,10 @@ export const LedgerTable = ({
 }) => {
   // 按分候補科目で割合が未設定（100%）の行があれば、軽いガイドを出す。
   const showRatioGuide = displayedRows.some((row) => {
-    const edit = edits[row.id] ?? toInput(row);
+    const edit = edits[row.id] ?? toDraft(row);
     return (
-      BUSINESS_RATIO_GUIDE_CATEGORIES.has(edit.category) && edit.business_ratio_percent >= 100
+      BUSINESS_RATIO_GUIDE_CATEGORIES.has(edit.category) &&
+      (edit.business_ratio_percent ?? 100) >= 100
     );
   });
   return (
@@ -97,7 +100,7 @@ export const LedgerTable = ({
           </thead>
           <tbody>
             {displayedRows.map((row) => {
-              const edit = edits[row.id] ?? toInput(row);
+              const edit = edits[row.id] ?? toDraft(row);
               const dirty = isDirty(row);
               return (
                 <tr
@@ -148,9 +151,9 @@ export const LedgerTable = ({
                     <Input
                       type="number"
                       className={`${styles.amountInput} ${styles.cellControl}`}
-                      value={edit.amount}
+                      value={edit.amount ?? ""}
                       onChange={(e) =>
-                        onEdit(row, { amount: Number(e.target.value) })
+                        onEdit(row, { amount: inputNumberOrNull(e.target.valueAsNumber) })
                       }
                       aria-label="金額"
                     />
@@ -209,10 +212,10 @@ export const LedgerTable = ({
                           max={100}
                           step={1}
                           className={`${styles.ratioInput} ${styles.cellControl}`}
-                          value={edit.business_ratio_percent}
+                          value={edit.business_ratio_percent ?? ""}
                           onChange={(e) =>
                             onEdit(row, {
-                              business_ratio_percent: Number(e.target.value),
+                              business_ratio_percent: inputNumberOrNull(e.target.valueAsNumber),
                             })
                           }
                           aria-label="事業割合（%）"
@@ -220,11 +223,11 @@ export const LedgerTable = ({
                         <Text variant="muted" className={styles.ratioUnit}>
                           %
                         </Text>
-                        {edit.business_ratio_percent < 100 ? (
+                        {edit.business_ratio_percent !== null && edit.business_ratio_percent < 100 ? (
                           <Badge>按分 {edit.business_ratio_percent}%</Badge>
                         ) : null}
                       </Row>
-                      {edit.business_ratio_percent < 100 ? (
+                      {edit.business_ratio_percent !== null && edit.business_ratio_percent < 100 ? (
                         <Input
                           className={`${styles.basisInput} ${styles.cellControl}`}
                           value={edit.business_ratio_basis}

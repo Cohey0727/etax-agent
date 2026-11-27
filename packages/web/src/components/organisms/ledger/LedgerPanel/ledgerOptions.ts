@@ -22,7 +22,16 @@ export const TAX_CATEGORY_OPTIONS: readonly { value: string; label: string }[] =
 // 1ページこの件数だけ描画するページネーションにする（集計は全件のまま）。
 export const PAGE_SIZE = 100;
 
-export const toInput = (row: LedgerTransaction): LedgerTransactionInput => ({
+/**
+ * 入力中の取引。金額・事業割合の欄は空欄（入力途中の「-」を含む）を null で持ち、
+ * 保存するときに ledgerDraftToInput で取引入力へ変換する。
+ */
+export type LedgerRowDraft = Omit<LedgerTransactionInput, "amount" | "business_ratio_percent"> & {
+  amount: number | null;
+  business_ratio_percent: number | null;
+};
+
+export const toDraft = (row: LedgerTransaction): LedgerRowDraft => ({
   date: row.date,
   fiscal_year: row.fiscal_year,
   description: row.description,
@@ -35,11 +44,11 @@ export const toInput = (row: LedgerTransaction): LedgerTransactionInput => ({
   business_ratio_basis: row.business_ratio_basis ?? "",
 });
 
-export const emptyDraft = (fiscalYear: number): LedgerTransactionInput => ({
+export const emptyDraft = (fiscalYear: number): LedgerRowDraft => ({
   date: `${fiscalYear}-01-01`,
   fiscal_year: fiscalYear,
   description: "",
-  amount: 0,
+  amount: null,
   account: "手入力",
   category: "未分類",
   income_type: "business",
@@ -47,6 +56,26 @@ export const emptyDraft = (fiscalYear: number): LedgerTransactionInput => ({
   business_ratio_percent: 100,
   business_ratio_basis: "",
 });
+
+/** 数値の入力欄の値（valueAsNumber）。数として読めない入力は空欄（null）にする。 */
+export const inputNumberOrNull = (valueAsNumber: number): number | null =>
+  Number.isNaN(valueAsNumber) ? null : valueAsNumber;
+
+/** 入力中の取引を保存する取引入力にする。足りない項目があればその案内を返す。 */
+export function ledgerDraftToInput(
+  draft: LedgerRowDraft,
+): { input: LedgerTransactionInput } | { error: string } {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) return { error: "日付を入力してください" };
+  if (!draft.description.trim()) return { error: "摘要を入力してください" };
+  const { amount, business_ratio_percent: ratio } = draft;
+  if (amount === null || amount === 0) {
+    return { error: "金額を入力してください（支出はマイナス）" };
+  }
+  if (ratio === null || !Number.isInteger(ratio) || ratio < 0 || ratio > 100) {
+    return { error: "事業割合は0〜100の整数で入力してください" };
+  }
+  return { input: { ...draft, amount, business_ratio_percent: ratio } };
+}
 
 /**
  * 家事按分を設定しやすい科目（自宅家賃・光熱費・通信費など）。

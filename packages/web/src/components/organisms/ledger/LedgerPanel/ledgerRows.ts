@@ -1,5 +1,5 @@
-import { LedgerTransaction, LedgerTransactionInput } from "@types";
-import { toInput } from "./ledgerOptions";
+import { LedgerTransaction } from "@types";
+import { LedgerRowDraft, toDraft } from "./ledgerOptions";
 
 /**
  * ledgerRows.ts — 帳簿画面の行一覧と、行ごとの編集中の値。
@@ -10,7 +10,7 @@ import { toInput } from "./ledgerOptions";
 export interface LedgerRowsState {
   rows: LedgerTransaction[];
   /** 手を入れた行の入力中の値（行 ID ごと）。保存したら外す。 */
-  edits: Record<number, LedgerTransactionInput>;
+  edits: Record<number, LedgerRowDraft>;
 }
 
 export const ledgerRowsLoaded = (rows: LedgerTransaction[]): LedgerRowsState => ({
@@ -22,12 +22,12 @@ export const ledgerRowsLoaded = (rows: LedgerTransaction[]): LedgerRowsState => 
 export const ledgerRowInput = (
   state: LedgerRowsState,
   row: LedgerTransaction,
-): LedgerTransactionInput => state.edits[row.id] ?? toInput(row);
+): LedgerRowDraft => state.edits[row.id] ?? toDraft(row);
 
 export const editLedgerRow = (
   state: LedgerRowsState,
   row: LedgerTransaction,
-  patch: Partial<LedgerTransactionInput>,
+  patch: Partial<LedgerRowDraft>,
 ): LedgerRowsState => ({
   ...state,
   edits: { ...state.edits, [row.id]: { ...ledgerRowInput(state, row), ...patch } },
@@ -58,16 +58,16 @@ export const ledgerRowDeleted = (state: LedgerRowsState, id: number): LedgerRows
 export function isLedgerRowDirty(state: LedgerRowsState, row: LedgerTransaction): boolean {
   const edit = state.edits[row.id];
   if (!edit) return false;
-  const original = toInput(row);
-  return (Object.keys(original) as (keyof LedgerTransactionInput)[]).some(
+  const original = toDraft(row);
+  return (Object.keys(original) as (keyof LedgerRowDraft)[]).some(
     (key) => edit[key] !== original[key],
   );
 }
 
 function withoutEdit(
-  edits: Record<number, LedgerTransactionInput>,
+  edits: Record<number, LedgerRowDraft>,
   id: number,
-): Record<number, LedgerTransactionInput> {
+): Record<number, LedgerRowDraft> {
   const next = { ...edits };
   delete next[id];
   return next;

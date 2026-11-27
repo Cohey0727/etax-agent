@@ -118,8 +118,10 @@ export const FixedAssetForm = ({
                 type="number"
                 min={1}
                 step={1}
-                value={value.useful_life_years}
-                onChange={(e) => patch({ useful_life_years: Number(e.target.value) })}
+                value={value.useful_life_years === 0 ? "" : value.useful_life_years}
+                onChange={(e) =>
+                  patch({ useful_life_years: e.target.value === "" ? 0 : Number(e.target.value) })
+                }
               />
             ) : (
               <Select
