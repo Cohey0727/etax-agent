@@ -6,7 +6,7 @@
  * 典型ケース（転居）を前提に、様式の区分は「住所地」「住所」に○を付ける。
  */
 import { TaxpayerProfile } from "../../schemas/taxpayer";
-import { eraOf, parseIsoDate, splitZip } from "./formDates";
+import { eraDateOf, parseIsoDate, splitZip } from "./formDates";
 
 export interface DomicileFormValues {
   /** 提出先の税務署名（「税務署」は付けない）。 */
@@ -41,7 +41,6 @@ export function buildDomicileFormValues(
   const zip = splitZip(taxpayer.zip_code);
   const previousZip = splitZip(taxpayer.previous_zip_code);
   const submissionParsed = parseIsoDate(submissionDate);
-  const birthParsed = parseIsoDate(taxpayer.birth_date);
   const phoneParts = taxpayer.phone.split("-");
   return {
     taxOfficeName: taxpayer.tax_office_name,
@@ -58,9 +57,7 @@ export function buildDomicileFormValues(
     phoneParts: phoneParts.length === 3 ? phoneParts : [taxpayer.phone],
     nameKana: taxpayer.name_kana,
     name: taxpayer.name,
-    birth: birthParsed
-      ? { ...eraOf(birthParsed.year), month: birthParsed.month, day: birthParsed.day }
-      : null,
+    birth: eraDateOf(taxpayer.birth_date),
     occupation: taxpayer.occupation,
     shopName: taxpayer.shop_name,
     previousZipFirst: previousZip.first,

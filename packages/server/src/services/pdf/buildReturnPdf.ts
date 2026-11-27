@@ -9,6 +9,7 @@
  */
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFPage, PDFFont, rgb } from "pdf-lib";
+import { eraDateOf } from "./formDates";
 import { ReturnAmountKey, ReturnFormValues } from "./returnFormValues";
 
 const INK = rgb(0.05, 0.05, 0.25);
@@ -196,13 +197,6 @@ function parseIsoDate(iso: string): { year: number; month: number; day: number }
   return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
 }
 
-/** 生年月日の元号（1文字）と令和換算でない元号内の年を返す。 */
-function eraOf(year: number): { era: string; eraYear: number } {
-  if (year >= 2019) return { era: "令", eraYear: year - 2018 };
-  if (year >= 1989) return { era: "平", eraYear: year - 1988 };
-  if (year >= 1926) return { era: "昭", eraYear: year - 1925 };
-  return { era: "大", eraYear: year - 1911 };
-}
 
 /** 枠の幅に収まるよう、必要ならフォントを縮めて左寄せで描く。 */
 function drawTextFitted(
@@ -236,12 +230,11 @@ function drawHeader(ctx: DrawContext, values: ReturnFormValues): void {
   // 提出先（税務署コード・税務署名）
   drawText(ctx, t.taxOfficeCode, 0.545, 0.1016, 9);
   drawText(ctx, t.taxOfficeName, 0.598, 0.1016, 12);
-  // 生年月日
-  const birth = parseIsoDate(t.birthDate);
+  // 生年月日（元号は頭の1文字: 明・大・昭・平・令）
+  const birth = eraDateOf(t.birthDate);
   if (birth) {
-    const { era, eraYear } = eraOf(birth.year);
-    drawTextCentered(ctx, era, 0.833, 0.1217, 10.5);
-    drawTextCentered(ctx, String(eraYear), 0.87, 0.1217, 10.5);
+    drawTextCentered(ctx, birth.eraName.slice(0, 1), 0.833, 0.1217, 10.5);
+    drawTextCentered(ctx, String(birth.eraYear), 0.87, 0.1217, 10.5);
     drawTextCentered(ctx, String(birth.month), 0.907, 0.1217, 10.5);
     drawTextCentered(ctx, String(birth.day), 0.944, 0.1217, 10.5);
   }

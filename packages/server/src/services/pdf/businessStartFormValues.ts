@@ -14,7 +14,7 @@ import {
   SalarySituationRow,
 } from "../../schemas/businessStart";
 import { TaxpayerProfile } from "../../schemas/taxpayer";
-import { eraDateOf, parseIsoDate, splitPhone, splitZip } from "./formDates";
+import { eraDateOf, eraOf, parseIsoDate, splitPhone, splitZip } from "./formDates";
 
 /** 元号表記の日付（元号名・元号年・月・日）。 */
 export interface EraDateParts {
@@ -177,12 +177,7 @@ export function buildBlueReturnFormValues(
     (startParsed.month > 1 || (startParsed.month === 1 && startParsed.day >= 16))
       ? eraDateOf(inputs.start_date)
       : null;
-  const startYearEra = startYear > 0
-    ? (() => {
-        const era = eraDateOf(`${startYear}-01-01`);
-        return era ? { eraName: era.eraName, eraYear: era.eraYear } : null;
-      })()
-    : null;
+  const startYearEra = startYear > 0 ? eraOf(startYear) : null;
   return {
     taxOfficeName: taxpayer.tax_office_name,
     submission: eraDateOf(submissionDate),
