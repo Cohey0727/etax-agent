@@ -32,17 +32,10 @@ import {
   SaveFilingSubmissionRequest,
 } from "../../schemas/filingSubmission";
 import { servedDocumentContentType } from "../../lib/uploadTypes";
+import { BusinessError } from "../../lib/errors";
 
 /** 提出記録まわりの業務エラー。status は REST 側の HTTP ステータスに対応する。 */
-export class FilingSubmissionError extends Error {
-  readonly status: 400 | 404 | 409;
-
-  constructor(status: 400 | 404 | 409, message: string) {
-    super(message);
-    this.name = "FilingSubmissionError";
-    this.status = status;
-  }
-}
+export class FilingSubmissionError extends BusinessError {}
 
 /**
  * 提出記録を保存する。受付番号が記録されたら、申告ステータスの

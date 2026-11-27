@@ -21,17 +21,10 @@ import { loadBlueReturnFormTemplate } from "./loadBlueReturnFormTemplate";
 import { loadDomicileFormTemplate } from "./loadDomicileFormTemplate";
 import { loadJapaneseFont } from "./loadJapaneseFont";
 import { loadOpeningNoticeFormTemplate } from "./loadOpeningNoticeFormTemplate";
+import { BusinessError } from "../../lib/errors";
 
 /** 様式 PDF 生成まわりの業務エラー。status は REST 側の HTTP ステータスに対応する。 */
-export class PdfFormError extends Error {
-  readonly status: 400 | 503;
-
-  constructor(status: 400 | 503, message: string) {
-    super(message);
-    this.name = "PdfFormError";
-    this.status = status;
-  }
-}
+export class PdfFormError extends BusinessError {}
 
 export interface FormPdfExport {
   filename: string;

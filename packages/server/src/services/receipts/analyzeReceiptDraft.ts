@@ -34,17 +34,10 @@ import { upsertReceiptExtraction } from "../../repositories/receiptRepository";
 import { AnalyzeReceiptResponse } from "../../schemas/receipt";
 import { classifyAccount } from "../classification/classifyAccount";
 import { extractReceipt, ReceiptImage } from "./extractReceipt";
+import { BusinessError } from "../../lib/errors";
 
 /** 領収書解析まわりの業務エラー。status は REST 側の HTTP ステータスに対応する。 */
-export class ReceiptAnalysisError extends Error {
-  readonly status: 400 | 404 | 503;
-
-  constructor(status: 400 | 404 | 503, message: string) {
-    super(message);
-    this.name = "ReceiptAnalysisError";
-    this.status = status;
-  }
-}
+export class ReceiptAnalysisError extends BusinessError {}
 
 export interface AnalyzeReceiptDraftInput {
   fileId?: string;

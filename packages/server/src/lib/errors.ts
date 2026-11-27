@@ -21,6 +21,24 @@ export const databaseFailureMessage =
 /** 入力値が DB の型・範囲・制約に合わなかったときの文言（400）。 */
 export const databaseInputErrorMessage = "入力値が保存できる範囲・形式ではありません";
 
+/** 業務エラーが対応する HTTP ステータス。 */
+export type BusinessErrorStatus = 400 | 404 | 409 | 500 | 502 | 503;
+
+/**
+ * HTTP ステータスに対応する業務エラー。ユースケースは個別に HTTP へ変換せずに投げ、
+ * app.onError がこの status と文言で応答する（MCP では名前と文言をそのまま返す）。
+ * サービスごとの業務エラーはこれを継承し、名前でどの処理の失敗かを区別する。
+ */
+export class BusinessError extends Error {
+  constructor(
+    readonly status: BusinessErrorStatus,
+    message: string,
+  ) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
 /** 未知の例外から表示用メッセージを取り出す。 */
 export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);

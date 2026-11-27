@@ -15,21 +15,14 @@ import {
   loadAgentConfig,
   pairApiKeyWithBaseUrl,
 } from "../../lib/config";
-import { errorMessage } from "../../lib/errors";
+import { BusinessError, errorMessage } from "../../lib/errors";
 import { assertSafeUserBaseUrl, UnsafeUrlError } from "../../lib/ssrfGuard";
 import { AgentChatRequestSchema, AgentChatResponse } from "../../schemas/agentChat";
 import { singleCsvText, validateChatAttachments } from "./agentAttachments";
 import { runAgentTurn } from "./runAgentTurn";
 
 /** エージェント実行の失敗。status は REST 側の HTTP ステータスに対応する。 */
-export class AgentChatError extends Error {
-  constructor(
-    readonly status: 400 | 500 | 502 | 503,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export class AgentChatError extends BusinessError {}
 
 interface AgentConfigOverride {
   apiKey?: unknown;

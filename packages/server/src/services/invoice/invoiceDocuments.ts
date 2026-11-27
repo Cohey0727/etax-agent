@@ -30,29 +30,11 @@ import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import { toInvoiceDrafts } from "./invoiceDraft";
 import { resolveIssuerProfile } from "./resolveIssuerProfile";
 import { buildIssuerSnapshot, validateInvoiceIssue } from "./validateInvoiceIssue";
+import { BusinessError } from "../../lib/errors";
+import { todayInTokyo } from "../../lib/todayInTokyo";
 
 /** 請求書まわりの業務エラー。status は REST 側の HTTP ステータスに対応する。 */
-export class InvoiceDocumentError extends Error {
-  readonly status: 400 | 404 | 503;
-
-  constructor(status: 400 | 404 | 503, message: string) {
-    super(message);
-    this.name = "InvoiceDocumentError";
-    this.status = status;
-  }
-}
-
-/** JST の今日（YYYY-MM-DD）。サーバーのタイムゾーンに依存しない。 */
-function todayInTokyo(): string {
-  const parts = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
+export class InvoiceDocumentError extends BusinessError {}
 
 /** 請求書（下書き）を作成する。 */
 export async function createInvoiceDocument(

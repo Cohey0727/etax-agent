@@ -8,7 +8,7 @@
  * - 入金予定: 発行済み請求書のうち未消込残額があるもの（消込サマリは
  *   消込リポジトリの集計を使い、残額の定義を請求書画面と揃える）。
  *   「修正した適格請求書」が発行済みの当初分は、修正分に置き換わるため除く
- * 基準日は Asia/Tokyo の今日（MCP の todayInTokyo と同じ決め方）。
+ * 基準日は日本時間の今日（lib/todayInTokyo）。
  */
 import {
   buildCashFlowReport,
@@ -25,6 +25,7 @@ import {
   CashFlowReportResponse,
   CashFlowScheduledReceiptResponse,
 } from "../../schemas/cashFlow";
+import { todayInTokyo } from "../../lib/todayInTokyo";
 
 export interface CashFlowReportParams {
   /** 表示窓の開始月（YYYY-MM）。省略時は既定窓（当月の5か月前） */
@@ -33,11 +34,6 @@ export interface CashFlowReportParams {
   monthCount?: number;
   /** 窓の開始月初時点の残高。省略時は 0 */
   openingBalance?: number;
-}
-
-/** Asia/Tokyo の今日（YYYY-MM-DD）。 */
-function todayInTokyo(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
 }
 
 function receiptToApi(receipt: CashFlowReceiptInput): CashFlowReceiptResponse {

@@ -317,10 +317,7 @@ export function taxpayerArg(value: unknown): XtxTaxpayerRequest {
   return { ...emptyTaxpayerProfile(), ...parsed.data };
 }
 
-/** 今日の日付（日本時間、YYYY-MM-DD）。 */
-export function todayInTokyo(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
-}
+export { todayInTokyo } from "../../lib/todayInTokyo";
 
 /** 値を JSON テキスト1件のツール結果にする。 */
 export function textResult(value: unknown): McpToolResult {

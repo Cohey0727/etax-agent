@@ -52,6 +52,7 @@ import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { ensureTables, getDb, isDatabaseConfigured, tablesReady } from "./lib/db";
 import { encryptionEnabled } from "./lib/encryption";
 import {
+  BusinessError,
   databaseErrorKind,
   databaseFailureMessage,
   databaseInputErrorMessage,
@@ -69,12 +70,6 @@ import {
   createOpenApiDocumentHandler,
 } from "./usecases/getOpenApiDocument";
 import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
-import { AgentChatError } from "./services/agent/executeAgentChat";
-import { FilingSubmissionError } from "./services/filingSubmission/filingSubmissionRecords";
-import { InvoiceDocumentError } from "./services/invoice/invoiceDocuments";
-import { PdfFormError } from "./services/pdf/formPdfExports";
-import { ReceiptAnalysisError } from "./services/receipts/analyzeReceiptDraft";
-import { ReconciliationError } from "./services/reconciliation/reconcileInvoice";
 import { deleteExpiredAuthRows } from "./repositories/userRepository";
 import { createSystemOneClient } from "./gateways/systemOneGateway";
 import { loadSystemOneConfig } from "./lib/config";
@@ -280,16 +275,7 @@ app.onError((err, c) => {
     const message = err.message === "Malformed JSON in request body" ? "JSONボディが必要です" : err.message;
     return c.json({ error: message }, err.status);
   }
-  if (
-    err instanceof InvoiceDocumentError ||
-    err instanceof ReconciliationError ||
-    err instanceof FilingSubmissionError ||
-    err instanceof PdfFormError ||
-    err instanceof ReceiptAnalysisError ||
-    err instanceof AgentChatError
-  ) {
-    return c.json({ error: err.message }, err.status);
-  }
+  if (err instanceof BusinessError) return c.json({ error: err.message }, err.status);
   if (err instanceof StorageObjectNotFoundError) return c.json({ error: err.message }, 404);
   if (err instanceof StorageError) return c.json({ error: err.message }, 503);
   const dbErrorKind = databaseErrorKind(err);

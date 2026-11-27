@@ -27,17 +27,10 @@ import {
   InvoicePaymentsResponse,
   ReconciliationCandidateResponse,
 } from "../../schemas/reconciliation";
+import { BusinessError } from "../../lib/errors";
 
 /** 消込の業務エラー。status は REST 側の HTTP ステータスに対応する。 */
-export class ReconciliationError extends Error {
-  readonly status: 400 | 404;
-
-  constructor(status: 400 | 404, message: string) {
-    super(message);
-    this.name = "ReconciliationError";
-    this.status = status;
-  }
-}
+export class ReconciliationError extends BusinessError {}
 
 export interface ApplyInvoicePaymentInput extends CreateInvoicePaymentRequest {
   invoiceId: number;
