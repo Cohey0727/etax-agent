@@ -534,14 +534,18 @@ function buildKoa020Face1(data: XtxFilingData): string {
   // 所得から差し引かれる金額
   const ded: string[] = [];
   ded.push(amount("ABB00430", d.casualtyLoss));
-  if (d.medical > 0) ded.push(kubunValue("ABB00435", 1) + amountAlways("ABB00440", d.medical));
+  // 医療費控除の区分1はセルフメディケーション税制を選んだ印。通常の医療費控除では書かない
+  if (d.medical > 0) ded.push(amountAlways("ABB00440", d.medical));
   ded.push(amount("ABB00450", d.socialInsurance));
   ded.push(amount("ABB00460", d.smallBusinessMutualAid));
   ded.push(amount("ABB00470", d.lifeInsurance));
   ded.push(amount("ABB00480", d.earthquakeInsurance));
   ded.push(amount("ABB00490", d.donations));
   const widowSingle = d.widow + d.singleParent;
-  if (widowSingle > 0) ded.push(kubunValue("ABB00495", 1) + amountAlways("ABB00500", widowSingle));
+  // 寡婦・ひとり親控除の区分1はひとり親控除の印。寡婦控除では書かない
+  if (widowSingle > 0) {
+    ded.push((d.singleParent > 0 ? kubunValue("ABB00495", 1) : "") + amountAlways("ABB00500", widowSingle));
+  }
   ded.push(amount("ABB00510", d.workingStudent + d.disability));
   const spouseTotal = d.spouse + d.spouseSpecial;
   if (spouseTotal > 0) {

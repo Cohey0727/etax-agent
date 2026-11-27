@@ -307,7 +307,7 @@ describe("buildXtxFiling", () => {
     expect(xtx).toContain('<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>1</kubun_CD></SHINKOKU_KBN>');
   });
 
-  test("医療費控除の区分（ABB00435）は単純型として内容に直接書く", () => {
+  test("通常の医療費控除では区分（ABB00435）を書かない（区分1はセルフメディケーション税制の印）", () => {
     const transactions: Transaction[] = [
       tx({ date: "2025-06-15", year: 2025, description: "事業売上", amount: 12_000_000, category: "売上高", income_type: "business" }),
     ];
@@ -338,8 +338,7 @@ describe("buildXtxFiling", () => {
       prepaidTax: 0,
       originalThirdPeriodTax: 1_000_000,
     });
-    expect(xtx).toContain("<ABB00435>1</ABB00435>");
-    expect(xtx).not.toContain("<ABB00435><kubun_CD>");
+    expect(xtx).not.toContain("<ABB00435>");
     expect(xtx).toContain("<ABB00440>428000</ABB00440>");
   });
 
@@ -702,6 +701,18 @@ describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", (
 
   const tagValue = (xml: string, tag: string) =>
     Number(xml.match(new RegExp(`<${tag}>(-?\\d+)</${tag}>`))?.[1]);
+
+  test("寡婦・ひとり親控除の区分（ABB00495）は、ひとり親控除のときだけ1を書く", () => {
+    const txs = [tx({ date: "2025-06-15", year: 2025, amount: 3_000_000, category: "売上高" })];
+    const widow = buildCustom({ year: 2025, txs, deductions: { isWidow: true } });
+    expect(widow.tax.deductions.widow).toBe(270_000);
+    expect(widow.xtx).not.toContain("<ABB00495>");
+    expect(tagValue(widow.xtx, "ABB00500")).toBe(270_000);
+    const single = buildCustom({ year: 2025, txs, deductions: { isSingleParent: true } });
+    expect(single.tax.deductions.singleParent).toBe(350_000);
+    expect(single.xtx).toContain("<ABB00495>1</ABB00495>");
+    expect(tagValue(single.xtx, "ABB00500")).toBe(350_000);
+  });
 
   test("白色申告は申告区分 ABA00240 = 2", () => {
     const { xtx } = buildCustom({ year: 2025, filingType: "white" });
