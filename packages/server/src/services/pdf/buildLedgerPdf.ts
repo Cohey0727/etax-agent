@@ -8,7 +8,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
 import { TransactionResponse } from "../../schemas/transaction";
-import { toSingleLine } from "./pdfText";
+import { fitText, formatAmount } from "./pdfText";
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -45,28 +45,8 @@ const COLUMNS: readonly Column[] = [
   { label: "出所", x: MARGIN + 434, width: CONTENT_WIDTH - 434, align: "left" },
 ];
 
-/** 金額をカンマ区切りにする（負数は - を前置）。 */
-function formatAmount(value: number): string {
-  const digits = Math.abs(value)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return value < 0 ? `-${digits}` : digits;
-}
-
-/** 1行にして、列幅に収まるよう末尾を … で詰める。 */
-function fitText(font: PDFFont, text: string, maxWidth: number): string {
-  const line = toSingleLine(text);
-  if (font.widthOfTextAtSize(line, FONT_SIZE) <= maxWidth) return line;
-  const ellipsis = "…";
-  let trimmed = line;
-  while (trimmed.length > 0 && font.widthOfTextAtSize(trimmed + ellipsis, FONT_SIZE) > maxWidth) {
-    trimmed = trimmed.slice(0, -1);
-  }
-  return trimmed + ellipsis;
-}
-
 function drawCell(page: PDFPage, font: PDFFont, column: Column, baseline: number, text: string) {
-  const fitted = fitText(font, text, column.width - 4);
+  const fitted = fitText(font, text, column.width - 4, FONT_SIZE);
   const x =
     column.align === "right"
       ? column.x + column.width - 2 - font.widthOfTextAtSize(fitted, FONT_SIZE)

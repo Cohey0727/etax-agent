@@ -15,7 +15,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
 import { InvoiceResponse } from "../../schemas/invoice";
-import { toSingleLine } from "./pdfText";
+import { fitText, formatAmount, toSingleLine } from "./pdfText";
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -29,14 +29,6 @@ const TEXT_COLOR = rgb(0.13, 0.13, 0.18);
 const MUTED_COLOR = rgb(0.45, 0.45, 0.52);
 const LINE_COLOR = rgb(0.82, 0.82, 0.88);
 const BAND_COLOR = rgb(0.94, 0.94, 0.97);
-
-/** 金額をカンマ区切りにする（負数は - を前置）。 */
-function formatAmount(value: number): string {
-  const digits = Math.abs(value)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return value < 0 ? `-${digits}` : digits;
-}
 
 /** YYYY-MM-DD を「2026年11月26日」形式にする。形式が違う場合はそのまま返す。 */
 function formatDate(iso: string): string {
@@ -54,18 +46,6 @@ function formatQuantity(value: number): string {
 function fitSize(font: PDFFont, text: string, size: number, maxWidth: number, minSize = 6): number {
   const width = font.widthOfTextAtSize(toSingleLine(text), size);
   return width > maxWidth ? Math.max((size * maxWidth) / width, minSize) : size;
-}
-
-/** 1行にして、列幅に収まるよう末尾を … で詰める。 */
-function fitText(font: PDFFont, text: string, maxWidth: number, size: number): string {
-  const line = toSingleLine(text);
-  if (font.widthOfTextAtSize(line, size) <= maxWidth) return line;
-  const ellipsis = "…";
-  let trimmed = line;
-  while (trimmed.length > 0 && font.widthOfTextAtSize(trimmed + ellipsis, size) > maxWidth) {
-    trimmed = trimmed.slice(0, -1);
-  }
-  return trimmed + ellipsis;
 }
 
 function drawLeft(page: PDFPage, font: PDFFont, x: number, y: number, text: string, size: number, color = TEXT_COLOR): void {
