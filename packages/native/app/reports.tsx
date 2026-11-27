@@ -13,11 +13,12 @@ export default function ReportsScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const router = useRouter();
-  const { year, transactions } = useAppState();
+  const { year, setYear, transactions } = useAppState();
 
   // 科目タップで、その科目（表示名に集約される前の勘定科目すべて）に
-  // 絞った帳簿へ遷移する。
+  // 絞った帳簿へ遷移する。帳簿はアプリ全体の年度で絞るので、先に年度を合わせる。
   const handleDrillDown = (incomeType: IncomeType, categories: string[]) => {
+    setYear(year);
     router.navigate({
       pathname: "/ledger",
       params: { year: String(year), cat: categories, itype: incomeType },
