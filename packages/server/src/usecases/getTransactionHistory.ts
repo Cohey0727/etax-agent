@@ -47,8 +47,7 @@ export const getTransactionHistoryHandler: RouteHandler<
 > = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.valid("param").id);
-  if (!Number.isInteger(id)) throw new HTTPException(400, { message: "id が不正です" });
+  const { id } = c.req.valid("param");
   let rows;
   try {
     rows = await listTransactionHistoryRows(db, id);

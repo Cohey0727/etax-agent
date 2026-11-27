@@ -74,7 +74,10 @@ export const replaceYearTransactionsHandler: RouteHandler<
       // 割り当て年度は各取引の指定があればそれ、無ければ置き換え対象の年。
       // 日付が対象年と違ってもよい（年末のカード利用など）。
       fiscalYear:
-        typeof body.fiscal_year === "number" && Number.isInteger(body.fiscal_year)
+        typeof body.fiscal_year === "number" &&
+        Number.isInteger(body.fiscal_year) &&
+        body.fiscal_year >= 1900 &&
+        body.fiscal_year <= 2100
           ? body.fiscal_year
           : year,
       description: body.description ?? "",

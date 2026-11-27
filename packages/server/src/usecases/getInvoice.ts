@@ -42,10 +42,10 @@ export const getInvoiceRoute = createRoute({
 export const getInvoiceHandler: RouteHandler<typeof getInvoiceRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.valid("param").id);
+  const { id } = c.req.valid("param");
   let response: SingleInvoiceResponse;
   try {
-    const row = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
+    const row = await getInvoiceRow(db, id);
     if (!row) throw new HTTPException(404, { message: "請求書が見つかりません" });
     response = { invoice: await fetchInvoiceResponse(db, row) };
   } catch (e) {

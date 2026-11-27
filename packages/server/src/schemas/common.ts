@@ -20,3 +20,12 @@ export const TaxYearSchema = z
   .number()
   .int()
   .refine((year) => Object.hasOwn(TAX_PARAMETERS, year));
+
+/** PostgreSQL の integer 列の上限。ID をこの範囲で受け、範囲外を DB エラーにしない。 */
+const maxInt4 = 2_147_483_647;
+
+/** パスで受ける数値 ID（文字列で届くので受け取り時に数値にする）。 */
+export const IdSchema = z.coerce.number().int().positive().max(maxInt4);
+
+/** パスで受ける対象年（西暦）。申告ステータス・提出の記録・納税者情報などの年度別の保存に使う。 */
+export const YearSchema = z.coerce.number().int().min(1900).max(2200);

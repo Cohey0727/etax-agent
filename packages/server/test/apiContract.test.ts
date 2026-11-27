@@ -249,3 +249,44 @@ describe("更新系リクエストの送信元検査", () => {
     expect(await ledgerCount()).toBe(1);
   });
 });
+
+describe("数値パラメータの不正は DB に渡さず 400 で返す", () => {
+  test("取引一覧: year が数値でない", async () => {
+    const r = await req("/api/transactions?year=abc");
+    expect(r.status).toBe(400);
+    expect(r.body["error"]).toBe("year が不正です");
+  });
+
+  test("取引の更新: id が integer の範囲外", async () => {
+    const r = await req("/api/transactions/99999999999", { method: "PUT", json: { description: "x" } });
+    expect(r.status).toBe(400);
+    expect(r.body["error"]).toBe("id が不正です");
+  });
+
+  test("請求書の取得: id が integer の範囲外", async () => {
+    const r = await req("/api/invoices/99999999999");
+    expect(r.status).toBe(400);
+  });
+
+  test("年度置換: 取引ごとの fiscal_year が範囲外なら置換対象の年にする", async () => {
+    await createTestDb();
+    const r = await req("/api/transactions/replace-year", {
+      method: "POST",
+      json: { year: 2025, transactions: [{ date: "2025-01-01", amount: 1, fiscal_year: 3_000_000_000 }] },
+    });
+    expect(r.status).toBe(200);
+    const rows = r.body["transactions"] as { fiscal_year: number }[];
+    expect(rows[0]?.fiscal_year).toBe(2025);
+  });
+
+  test("確定スナップショット: ボディ無しの POST", async () => {
+    const r = await req("/api/filing-snapshots/2025", { method: "POST" });
+    expect(r.status).toBe(400);
+  });
+
+  test("資金繰り: months は固有の文言で返す", async () => {
+    const r = await req("/api/cash-flow?months=abc");
+    expect(r.status).toBe(400);
+    expect(r.body["error"]).toBe("months は1〜24の整数で指定してください");
+  });
+});

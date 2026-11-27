@@ -46,7 +46,7 @@ export const linkReceiptRoute = createRoute({
 export const linkReceiptHandler: RouteHandler<typeof linkReceiptRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const fileId = c.req.param("fileId");
+  const { fileId } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = LinkReceiptRequestSchema.safeParse(raw);

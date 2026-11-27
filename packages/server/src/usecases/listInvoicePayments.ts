@@ -42,10 +42,10 @@ export const listInvoicePaymentsHandler: RouteHandler<typeof listInvoicePayments
 ) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.valid("param").id);
+  const { id } = c.req.valid("param");
   let response: InvoicePaymentsResponse;
   try {
-    const row = Number.isInteger(id) ? await getInvoiceRow(db, id) : null;
+    const row = await getInvoiceRow(db, id);
     if (!row) throw new HTTPException(404, { message: "請求書が見つかりません" });
     response = await fetchPaymentsResponse(db, row);
   } catch (e) {

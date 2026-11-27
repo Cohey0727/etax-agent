@@ -9,15 +9,17 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { defaultValidationMessage } from "../lib/validationHook";
 import { ErrorSchema } from "../schemas/common";
 import {
+  CASH_FLOW_MAX_MONTHS,
   CashFlowReportResponse,
   CashFlowReportResponseSchema,
   GetCashFlowReportQuerySchema,
 } from "../schemas/cashFlow";
 import {
+  CashFlowReportParams,
   fetchCashFlowReport,
-  type CashFlowReportParams,
 } from "../services/cashFlow/getCashFlowReportData";
 
 export const getCashFlowReportRoute = createRoute({
@@ -43,27 +45,15 @@ export const getCashFlowReportRoute = createRoute({
   },
 });
 
-/** 表示月数の上限（2年分まで）。 */
-export const CASH_FLOW_MAX_MONTHS = 24;
-
-function parseMonths(raw: string | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 1 || value > CASH_FLOW_MAX_MONTHS) {
-    throw new HTTPException(400, {
-      message: `months は1〜${CASH_FLOW_MAX_MONTHS}の整数で指定してください`,
-    });
+/** クエリの検証に失敗したときの文言。月数・期首残高は受け付ける値の範囲を示す。 */
+export function getCashFlowReportValidationMessage(issuePaths: string[]): string {
+  if (issuePaths.includes("months")) {
+    return `months は1〜${CASH_FLOW_MAX_MONTHS}の整数で指定してください`;
   }
-  return value;
-}
-
-function parseOpeningBalance(raw: string | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const value = Number(raw);
-  if (!Number.isInteger(value)) {
-    throw new HTTPException(400, { message: "opening_balance は整数で指定してください" });
+  if (issuePaths.includes("opening_balance")) {
+    return "opening_balance は整数で指定してください";
   }
-  return value;
+  return defaultValidationMessage(issuePaths);
 }
 
 export const getCashFlowReportHandler: RouteHandler<typeof getCashFlowReportRoute> = async (c) => {
@@ -72,8 +62,8 @@ export const getCashFlowReportHandler: RouteHandler<typeof getCashFlowReportRout
   const query = c.req.valid("query");
   const params: CashFlowReportParams = {
     fromMonth: query.from,
-    monthCount: parseMonths(query.months),
-    openingBalance: parseOpeningBalance(query.opening_balance),
+    monthCount: query.months,
+    openingBalance: query.opening_balance,
   };
   let response: CashFlowReportResponse;
   try {

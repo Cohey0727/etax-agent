@@ -51,10 +51,7 @@ export const updateFilingStatusHandler: RouteHandler<typeof updateFilingStatusRo
 ) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const year = Number(c.req.valid("param").year);
-  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
-    throw new HTTPException(400, { message: "year が不正です" });
-  }
+  const { year } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = UpdateFilingStatusRequestSchema.safeParse(raw);

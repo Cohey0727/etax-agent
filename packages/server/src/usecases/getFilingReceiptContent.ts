@@ -44,10 +44,7 @@ export const getFilingReceiptContentHandler: RouteHandler<
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
   const params = c.req.valid("param");
-  const year = Number(params.year);
-  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
-    throw new HTTPException(400, { message: "year が不正です" });
-  }
+  const { year } = params;
   let result: { filename: string; mimeType: string; dataBase64: string };
   try {
     result = await getFilingReceiptBytes(db, year, params.kind);

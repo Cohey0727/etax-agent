@@ -6,6 +6,7 @@
  * 受付番号が記録されると申告ステータスの「提出済み」と連動する。
  */
 import { z } from "@hono/zod-openapi";
+import { YearSchema } from "./common";
 
 /** 税目。income = 所得税、consumption = 消費税。 */
 export const FilingSubmissionKindSchema = z.enum(["income", "consumption"]);
@@ -53,13 +54,13 @@ export type SingleFilingSubmissionResponse = z.infer<
 
 export const FilingSubmissionYearParamSchema = z
   .object({
-    year: z.string(),
+    year: YearSchema,
   })
   .openapi("FilingSubmissionYearParam");
 
 export const FilingSubmissionKindParamSchema = z
   .object({
-    year: z.string(),
+    year: YearSchema,
     kind: FilingSubmissionKindSchema,
   })
   .openapi("FilingSubmissionKindParam");

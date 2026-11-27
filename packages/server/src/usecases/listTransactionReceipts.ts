@@ -23,6 +23,10 @@ export const listTransactionReceiptsRoute = createRoute({
       content: { "application/json": { schema: ReceiptListResponseSchema } },
       description: "証憑の一覧",
     },
+    400: {
+      content: { "application/json": { schema: ErrorSchema } },
+      description: "id が不正",
+    },
     503: {
       content: { "application/json": { schema: ErrorSchema } },
       description: "DB未設定または接続不可",
@@ -35,11 +39,7 @@ export const listTransactionReceiptsHandler: RouteHandler<
 > = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id <= 0) {
-    const response: ReceiptListResponse = { receipts: [] };
-    return c.json(response, 200);
-  }
+  const { id } = c.req.valid("param");
   let rows;
   try {
     rows = await listReceiptRowsForTransaction(db, id);

@@ -7,6 +7,7 @@
  * 承認操作でのみ行う。
  */
 import { z } from "@hono/zod-openapi";
+import { IdSchema } from "./common";
 import { TransactionSchema } from "./transaction";
 
 export const InvoicePaymentKindSchema = z.enum(["payment", "fee", "discount", "overpayment"]);
@@ -73,7 +74,7 @@ export const CreateInvoicePaymentRequestSchema = z
 export type CreateInvoicePaymentRequest = z.infer<typeof CreateInvoicePaymentRequestSchema>;
 
 export const InvoicePaymentIdParamSchema = z
-  .object({ id: z.string(), paymentId: z.string() })
+  .object({ id: IdSchema, paymentId: IdSchema })
   .openapi("InvoicePaymentIdParam");
 
 export const ReconciliationCandidateSchema = z

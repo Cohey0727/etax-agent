@@ -5,7 +5,6 @@
  * 資産ごとの行と所得区分ごとの算入額合計、少額特例の上限使用状況を返す。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { z } from "@hono/zod-openapi";
 import { depreciationForYear, smallSpecialUsage } from "@etax/shared";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
@@ -16,9 +15,11 @@ import {
   listFixedAssetRows,
 } from "../repositories/fixedAssetRepository";
 import { ErrorSchema } from "../schemas/common";
-import { DepreciationScheduleResponse, DepreciationScheduleResponseSchema } from "../schemas/fixedAsset";
-
-const YearQuerySchema = z.object({ year: z.string() }).openapi("DepreciationYearQuery");
+import {
+  DepreciationScheduleResponse,
+  DepreciationScheduleResponseSchema,
+  DepreciationYearQuerySchema,
+} from "../schemas/fixedAsset";
 
 export const getDepreciationScheduleRoute = createRoute({
   method: "get",
@@ -26,7 +27,7 @@ export const getDepreciationScheduleRoute = createRoute({
   operationId: "getDepreciationSchedule",
   tags: ["FixedAssets"],
   summary: "指定年の減価償却スケジュール（DB必須）",
-  request: { query: YearQuerySchema },
+  request: { query: DepreciationYearQuerySchema },
   responses: {
     200: {
       content: { "application/json": { schema: DepreciationScheduleResponseSchema } },
@@ -48,10 +49,7 @@ export const getDepreciationScheduleHandler: RouteHandler<
 > = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const year = Number(c.req.query("year"));
-  if (!Number.isInteger(year) || year < 1900 || year > 2100) {
-    throw new HTTPException(400, { message: "year は西暦で指定してください" });
-  }
+  const { year } = c.req.valid("query");
   let rows;
   try {
     rows = await listFixedAssetRows(db);

@@ -6,6 +6,7 @@
  * プロフィールとしては保持する）。
  */
 import { z } from "@hono/zod-openapi";
+import { YearSchema } from "./common";
 
 export const TaxpayerProfileSchema = z
   .object({
@@ -60,6 +61,6 @@ export type SaveTaxpayerProfileResponse = z.infer<typeof SaveTaxpayerProfileResp
 
 export const TaxpayerYearParamSchema = z
   .object({
-    year: z.string(),
+    year: YearSchema,
   })
   .openapi("TaxpayerYearParam");

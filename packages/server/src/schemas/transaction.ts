@@ -7,6 +7,7 @@
  * undefined へ落とす。date / amount の不正は従来どおり 400 にする。
  */
 import { z } from "@hono/zod-openapi";
+import { IdSchema, YearSchema } from "./common";
 
 export const TransactionSchema = z
   .object({
@@ -36,7 +37,7 @@ export type TransactionResponse = z.infer<typeof TransactionSchema>;
 
 export const TransactionIdParamSchema = z
   .object({
-    id: z.string(),
+    id: IdSchema,
   })
   .openapi("TransactionIdParam");
 
@@ -44,7 +45,7 @@ export type TransactionIdParam = z.infer<typeof TransactionIdParamSchema>;
 
 export const ListTransactionsQuerySchema = z
   .object({
-    year: z.string().optional(),
+    year: YearSchema.optional(),
     income_type: z.string().optional(),
   })
   .openapi("ListTransactionsQuery");
@@ -54,7 +55,8 @@ export type ListTransactionsQuery = z.infer<typeof ListTransactionsQuerySchema>;
 /** 全取引の変更履歴一覧のクエリ（件数の上限だけを受ける）。 */
 export const ListRecentTransactionHistoryQuerySchema = z
   .object({
-    limit: z.string().optional(),
+    /** 不正な値は未指定として扱う（既定件数で返す）。 */
+    limit: z.coerce.number().int().positive().optional().catch(undefined).openapi({ type: "integer" }),
   })
   .openapi("ListRecentTransactionHistoryQuery");
 
@@ -64,7 +66,7 @@ export type ListRecentTransactionHistoryQuery = z.infer<
 
 export const LedgerPdfQuerySchema = z
   .object({
-    year: z.string().optional(),
+    year: z.coerce.number().int().min(2000).max(2100),
   })
   .openapi("LedgerPdfQuery");
 

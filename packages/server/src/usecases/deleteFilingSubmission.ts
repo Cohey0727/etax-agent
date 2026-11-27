@@ -53,10 +53,7 @@ export const deleteFilingSubmissionHandler: RouteHandler<
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
   const params = c.req.valid("param");
-  const year = Number(params.year);
-  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
-    throw new HTTPException(400, { message: "year が不正です" });
-  }
+  const { year } = params;
   try {
     await deleteFilingSubmissionRecord(db, year, params.kind);
   } catch (e) {

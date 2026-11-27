@@ -45,11 +45,7 @@ export const exportLedgerPdfRoute = createRoute({
 export const exportLedgerPdfHandler: RouteHandler<typeof exportLedgerPdfRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const { year: yearRaw } = c.req.valid("query");
-  const year = Number(yearRaw);
-  if (!yearRaw || !Number.isInteger(year) || year < 2000 || year > 2100) {
-    throw new HTTPException(400, { message: "year には対象年（西暦）を指定してください" });
-  }
+  const { year } = c.req.valid("query");
   let rows;
   try {
     rows = await listTransactionRows(db);

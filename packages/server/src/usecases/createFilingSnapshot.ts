@@ -28,6 +28,7 @@ export const createFilingSnapshotRoute = createRoute({
   request: {
     params: FilingSnapshotYearParamSchema,
     body: {
+      required: true,
       content: { "application/json": { schema: CreateFilingSnapshotRequestSchema } },
     },
   },
@@ -52,10 +53,7 @@ export const createFilingSnapshotHandler: RouteHandler<
 > = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const year = Number(c.req.valid("param").year);
-  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
-    throw new HTTPException(400, { message: "year が不正です" });
-  }
+  const { year } = c.req.valid("param");
   const body = c.req.valid("json");
   let row;
   try {

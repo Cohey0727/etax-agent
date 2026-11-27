@@ -39,10 +39,7 @@ export const deleteFixedAssetRoute = createRoute({
 export const deleteFixedAssetHandler: RouteHandler<typeof deleteFixedAssetRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new HTTPException(404, { message: "固定資産が見つかりません" });
-  }
+  const { id } = c.req.valid("param");
   let imageFileIds: string[];
   let deleted: boolean;
   try {

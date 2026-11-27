@@ -48,11 +48,8 @@ export const listTransactionHistoryHandler: RouteHandler<
 > = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const rawLimit = Number(c.req.valid("query").limit);
-  const limit =
-    Number.isInteger(rawLimit) && rawLimit > 0
-      ? Math.min(rawLimit, MAX_LIMIT)
-      : DEFAULT_LIMIT;
+  const requested = c.req.valid("query").limit;
+  const limit = requested === undefined ? DEFAULT_LIMIT : Math.min(requested, MAX_LIMIT);
   let rows;
   try {
     rows = await listRecentTransactionHistoryRows(db, limit);

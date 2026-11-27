@@ -45,7 +45,7 @@ export const getFixedAssetImageContentRoute = createRoute({
 export const getFixedAssetImageContentHandler: RouteHandler<
   typeof getFixedAssetImageContentRoute
 > = async (c) => {
-  const fileId = c.req.param("fileId");
+  const { fileId } = c.req.valid("param");
   // テナント文脈がある場合は、台帳で所有者を確認できたファイルだけを
   // 配信する（画像の IDOR を塞ぐ）。文脈が無いローカル運用では従来どおり。
   if (currentUserId() !== undefined) {

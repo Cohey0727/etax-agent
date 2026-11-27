@@ -55,10 +55,7 @@ export const listFixedAssetImagesHandler: RouteHandler<typeof listFixedAssetImag
 ) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new HTTPException(400, { message: "固定資産IDが不正です" });
-  }
+  const { id } = c.req.valid("param");
   const storage = createStorageClient(loadStorageConfig());
   let response: FixedAssetImageListResponse;
   try {

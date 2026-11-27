@@ -5,6 +5,7 @@
  * 各状態は済ませた日時（ISO文字列）とセットで返す。未了は null。
  */
 import { z } from "@hono/zod-openapi";
+import { YearSchema } from "./common";
 
 export const FilingStatusSchema = z
   .object({
@@ -38,7 +39,7 @@ export type SingleFilingStatusResponse = z.infer<typeof SingleFilingStatusRespon
 
 export const FilingStatusYearParamSchema = z
   .object({
-    year: z.string(),
+    year: YearSchema,
   })
   .openapi("FilingStatusYearParam");
 

@@ -6,6 +6,7 @@
  * 数字はすべて円単位の数値（文字列にしない）。
  */
 import { z } from "@hono/zod-openapi";
+import { YearSchema } from "./common";
 
 export const FilingSnapshotFiguresSchema = z
   .object({
@@ -51,6 +52,6 @@ export type CreateFilingSnapshotRequest = z.infer<typeof CreateFilingSnapshotReq
 
 export const FilingSnapshotYearParamSchema = z
   .object({
-    year: z.string(),
+    year: YearSchema,
   })
   .openapi("FilingSnapshotYearParam");

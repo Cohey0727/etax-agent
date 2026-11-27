@@ -2,6 +2,7 @@
  * fixedAsset.ts — 固定資産台帳エンドポイントのスキーマ（schemas）。
  */
 import { z } from "@hono/zod-openapi";
+import { IdSchema } from "./common";
 
 export const DepreciationMethodSchema = z.enum([
   "straight_line",
@@ -31,7 +32,7 @@ export const FixedAssetSchema = z
 export type FixedAssetResponse = z.infer<typeof FixedAssetSchema>;
 
 export const FixedAssetIdParamSchema = z
-  .object({ id: z.string() })
+  .object({ id: IdSchema })
   .openapi("FixedAssetIdParam");
 
 export const MessageResponseSchema = z
@@ -115,8 +116,12 @@ export const FixedAssetImageFileIdParamSchema = z
   .openapi("FixedAssetImageFileIdParam");
 
 export const FixedAssetImageParamsSchema = z
-  .object({ id: z.string(), fileId: z.string() })
+  .object({ id: IdSchema, fileId: z.string() })
   .openapi("FixedAssetImageParams");
+
+export const DepreciationYearQuerySchema = z
+  .object({ year: z.coerce.number().int().min(1900).max(2100) })
+  .openapi("DepreciationYearQuery");
 
 export const DepreciationRowSchema = z
   .object({

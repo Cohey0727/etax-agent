@@ -2,6 +2,7 @@
  * invoice.ts — 請求書（帳票）エンドポイントのスキーマ（schemas）。
  */
 import { z } from "@hono/zod-openapi";
+import { IdSchema } from "./common";
 
 export const InvoiceTaxRoundingSchema = z.enum(["floor", "round", "ceil"]);
 
@@ -85,7 +86,7 @@ export const InvoiceSchema = z
 
 export type InvoiceResponse = z.infer<typeof InvoiceSchema>;
 
-export const InvoiceIdParamSchema = z.object({ id: z.string() }).openapi("InvoiceIdParam");
+export const InvoiceIdParamSchema = z.object({ id: IdSchema }).openapi("InvoiceIdParam");
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -140,8 +141,9 @@ export const ListInvoicesQuerySchema = z
     q: z.string().optional(),
     from: z.string().regex(datePattern).optional(),
     to: z.string().regex(datePattern).optional(),
-    min_total: z.string().optional(),
-    max_total: z.string().optional(),
+    /** 整数でない値は条件なしとして扱う。 */
+    min_total: z.coerce.number().int().optional().catch(undefined).openapi({ type: "integer" }),
+    max_total: z.coerce.number().int().optional().catch(undefined).openapi({ type: "integer" }),
     status: z.enum(["draft", "issued"]).optional(),
   })
   .openapi("ListInvoicesQuery");

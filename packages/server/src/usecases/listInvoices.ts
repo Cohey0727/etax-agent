@@ -38,12 +38,6 @@ export const listInvoicesRoute = createRoute({
   },
 });
 
-function parseAmount(raw: string | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const value = Number(raw);
-  return Number.isInteger(value) ? value : undefined;
-}
-
 export const listInvoicesHandler: RouteHandler<typeof listInvoicesRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
@@ -52,8 +46,8 @@ export const listInvoicesHandler: RouteHandler<typeof listInvoicesRoute> = async
     q: query.q,
     from: query.from,
     to: query.to,
-    minTotal: parseAmount(query.min_total),
-    maxTotal: parseAmount(query.max_total),
+    minTotal: query.min_total,
+    maxTotal: query.max_total,
     status: query.status,
   };
   let response: InvoiceListResponse;

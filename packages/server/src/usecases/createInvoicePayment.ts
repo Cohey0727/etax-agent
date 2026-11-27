@@ -60,8 +60,7 @@ export const createInvoicePaymentHandler: RouteHandler<typeof createInvoicePayme
   if (!parsed.success) {
     throw new HTTPException(400, { message: "消込の入力が不正です" });
   }
-  const id = Number(c.req.valid("param").id);
-  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
+  const { id } = c.req.valid("param");
   let response: InvoicePaymentsResponse;
   try {
     response = await applyInvoicePayment(db, { invoiceId: id, ...parsed.data });

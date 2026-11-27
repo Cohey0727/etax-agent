@@ -51,14 +51,13 @@ export const updateInvoiceRoute = createRoute({
 export const updateInvoiceHandler: RouteHandler<typeof updateInvoiceRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.valid("param").id);
+  const { id } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = UpdateInvoiceRequestSchema.safeParse(raw);
   if (!parsed.success) {
     throw new HTTPException(400, { message: "請求書の入力が不正です" });
   }
-  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
   let response: SingleInvoiceResponse;
   try {
     response = { invoice: await updateInvoiceDocument(db, id, parsed.data) };

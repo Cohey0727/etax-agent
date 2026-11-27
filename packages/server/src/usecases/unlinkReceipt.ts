@@ -39,7 +39,7 @@ export const unlinkReceiptRoute = createRoute({
 export const unlinkReceiptHandler: RouteHandler<typeof unlinkReceiptRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const fileId = c.req.param("fileId");
+  const { fileId } = c.req.valid("param");
   let row;
   try {
     row = await unlinkReceiptRow(db, fileId);

@@ -50,11 +50,7 @@ export const detachFixedAssetImageHandler: RouteHandler<typeof detachFixedAssetI
 ) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new HTTPException(400, { message: "固定資産IDが不正です" });
-  }
-  const fileId = c.req.param("fileId");
+  const { id, fileId } = c.req.valid("param");
   try {
     const asset = await getFixedAssetRow(db, id);
     if (!asset) {

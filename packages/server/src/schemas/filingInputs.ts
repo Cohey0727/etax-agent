@@ -3,6 +3,7 @@
  * state は画面側の DeductionState をそのまま運ぶ（形はクライアントが所有）。
  */
 import { z } from "@hono/zod-openapi";
+import { YearSchema } from "./common";
 
 export const FilingInputsResponseSchema = z
   .object({
@@ -12,6 +13,10 @@ export const FilingInputsResponseSchema = z
     updated_at: z.string().nullable(),
   })
   .openapi("FilingInputsResponse");
+
+export const FilingInputsYearParamSchema = z
+  .object({ year: YearSchema })
+  .openapi("FilingInputsYearParam");
 
 export const SaveFilingInputsRequestSchema = z
   .object({

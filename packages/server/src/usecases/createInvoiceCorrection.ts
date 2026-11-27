@@ -53,8 +53,7 @@ export const createInvoiceCorrectionHandler: RouteHandler<
 > = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.valid("param").id);
-  if (!Number.isInteger(id)) throw new HTTPException(404, { message: "請求書が見つかりません" });
+  const { id } = c.req.valid("param");
   let response: SingleInvoiceResponse;
   try {
     response = { invoice: await createInvoiceCorrectionDraft(db, id) };

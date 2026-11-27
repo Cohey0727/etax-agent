@@ -42,7 +42,7 @@ export const listTransactionsHandler: RouteHandler<typeof listTransactionsRoute>
   let rows;
   try {
     // 対象年の絞り込みは割り当て年度で、SQL 側で行う（日付の年とは限らない）
-    rows = await listTransactionRows(db, incomeType, year ? Number(year) : undefined);
+    rows = await listTransactionRows(db, incomeType, year);
   } catch (e) {
     throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
   }

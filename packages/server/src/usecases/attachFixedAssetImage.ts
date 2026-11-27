@@ -64,10 +64,7 @@ export const attachFixedAssetImageHandler: RouteHandler<typeof attachFixedAssetI
 ) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new HTTPException(400, { message: "固定資産IDが不正です" });
-  }
+  const { id } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = AttachFixedAssetImageRequestSchema.safeParse(raw);

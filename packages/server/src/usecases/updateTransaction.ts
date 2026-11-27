@@ -51,8 +51,7 @@ export const updateTransactionRoute = createRoute({
 export const updateTransactionHandler: RouteHandler<typeof updateTransactionRoute> = async (c) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const id = Number(c.req.valid("param").id);
-  if (!Number.isInteger(id)) throw new HTTPException(400, { message: "id が不正です" });
+  const { id } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = UpdateTransactionRequestSchema.safeParse(raw);

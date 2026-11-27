@@ -49,10 +49,7 @@ export const getTaxpayerProfileHandler: RouteHandler<typeof getTaxpayerProfileRo
 ) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const year = Number(c.req.valid("param").year);
-  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
-    throw new HTTPException(400, { message: "year が不正です" });
-  }
+  const { year } = c.req.valid("param");
   let response: GetTaxpayerProfileResponse;
   try {
     const own = await getTaxpayerProfileRow(db, year);

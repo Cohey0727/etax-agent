@@ -47,12 +47,7 @@ export const deleteInvoicePaymentHandler: RouteHandler<typeof deleteInvoicePayme
 ) => {
   const db = getDb();
   if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  const params = c.req.valid("param");
-  const id = Number(params.id);
-  const paymentId = Number(params.paymentId);
-  if (!Number.isInteger(id) || !Number.isInteger(paymentId)) {
-    throw new HTTPException(404, { message: "消込が見つかりません" });
-  }
+  const { id, paymentId } = c.req.valid("param");
   let response: InvoicePaymentsResponse;
   try {
     response = await releaseInvoicePayment(db, id, paymentId);

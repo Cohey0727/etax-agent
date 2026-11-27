@@ -2,6 +2,7 @@
  * transactions.ts — 取引ルートの登録（routes: 登録のみ、ロジックは持たない）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { validationHook } from "../lib/validationHook";
 import {
   createTransactionHandler,
   createTransactionRoute,
@@ -34,7 +35,11 @@ import {
 
 const app = new OpenAPIHono();
 app.openapi(listTransactionsRoute, listTransactionsHandler);
-app.openapi(exportLedgerPdfRoute, exportLedgerPdfHandler);
+app.openapi(
+  exportLedgerPdfRoute,
+  exportLedgerPdfHandler,
+  validationHook(() => "year には対象年（西暦）を指定してください"),
+);
 app.openapi(createTransactionRoute, createTransactionHandler);
 app.openapi(replaceYearTransactionsRoute, replaceYearTransactionsHandler);
 app.openapi(updateTransactionRoute, updateTransactionHandler);

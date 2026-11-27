@@ -39,7 +39,7 @@ export const getReceiptContentRoute = createRoute({
 });
 
 export const getReceiptContentHandler: RouteHandler<typeof getReceiptContentRoute> = async (c) => {
-  const fileId = c.req.param("fileId");
+  const { fileId } = c.req.valid("param");
   // テナント文脈がある場合（SaaS）は、証憑台帳で所有者を確認できた
   // ファイルだけを配信する。他テナントの証憑・台帳に無いファイルは
   // 存在しないものとして 404 にする（画像の IDOR を塞ぐ）。
