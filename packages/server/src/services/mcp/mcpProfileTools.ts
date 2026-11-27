@@ -13,7 +13,6 @@ import {
 import {
   filingStatusToApi,
   listFilingStatusRows,
-  upsertFilingStatusRow,
 } from "../../repositories/filingStatusRepository";
 import {
   filingSnapshotToApi,
@@ -32,6 +31,7 @@ import {
   SaveTaxpayerProfileRequestSchema,
   TaxpayerProfile,
 } from "../../schemas/taxpayer";
+import { saveFilingStatus } from "../filingStatus/saveFilingStatus";
 import {
   McpToolModule,
   requireDb,
@@ -227,13 +227,12 @@ export const mcpProfileTools: McpToolModule = {
     set_filing_status: async (args) => {
       const db = requireDb();
       const year = yearArg(args);
-      const row = await upsertFilingStatusRow(db, year, {
+      const status = await saveFilingStatus(db, year, {
         confirmed: typeof args["confirmed"] === "boolean" ? args["confirmed"] : undefined,
         calculated: typeof args["calculated"] === "boolean" ? args["calculated"] : undefined,
         submitted: typeof args["submitted"] === "boolean" ? args["submitted"] : undefined,
       });
-      if (!row) throw new Error("申告ステータスの更新に失敗しました");
-      return textResult({ status: filingStatusToApi(row) });
+      return textResult({ status });
     },
   },
 };

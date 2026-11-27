@@ -6,7 +6,6 @@
  * REST の署名付きURLフローと違い、実体を Base64 で受けてサーバー側の
  * ストレージへ直接保存する（形式が画像でない場合は弾く）。
  */
-import { depreciationForYear, smallSpecialUsage } from "@etax/shared";
 import {
   createStorageClient,
   fixedAssetObjectKey,
@@ -17,10 +16,8 @@ import { isAllowedUploadContentType, normalizeContentType } from "../../lib/uplo
 import {
   deleteFixedAssetRow,
   fixedAssetToApi,
-  fixedAssetToInput,
   getFixedAssetRow,
   insertFixedAssetRow,
-  isActiveInYear,
   listFixedAssetRows,
   updateFixedAssetRow,
 } from "../../repositories/fixedAssetRepository";
@@ -35,6 +32,7 @@ import {
   CreateFixedAssetRequestSchema,
   UpdateFixedAssetRequestSchema,
 } from "../../schemas/fixedAsset";
+import { buildDepreciationSchedule } from "../fixedAssets/buildDepreciationSchedule";
 import {
   McpToolModule,
   idArg,
@@ -316,36 +314,7 @@ export const mcpAssetTools: McpToolModule = {
     },
     get_depreciation: async (args) => {
       const db = requireDb();
-      const year = yearArg(args);
-      const rows = (await listFixedAssetRows(db)).filter((row) => isActiveInYear(row, year));
-      const detail = [];
-      const totals = { business: 0, real_estate: 0, agriculture: 0 };
-      for (const row of rows) {
-        const dep = depreciationForYear(fixedAssetToInput(row), year);
-        if (!dep) continue;
-        detail.push({
-          asset_id: row.id,
-          name: row.name,
-          income_type: row.incomeType,
-          months: dep.months,
-          opening_book_value: dep.openingBookValue,
-          basis_amount: dep.basisAmount,
-          rate: dep.rate,
-          guarantee_amount: dep.guaranteeAmount,
-          ordinary: dep.ordinary,
-          deductible: dep.deductible,
-          closing_book_value: dep.closingBookValue,
-        });
-        if (row.incomeType === "business") totals.business += dep.deductible;
-        if (row.incomeType === "real_estate") totals.real_estate += dep.deductible;
-        if (row.incomeType === "agriculture") totals.agriculture += dep.deductible;
-      }
-      return textResult({
-        year,
-        rows: detail,
-        deductible_totals: totals,
-        small_special: smallSpecialUsage(rows.map(fixedAssetToInput), year),
-      });
+      return textResult(buildDepreciationSchedule(await listFixedAssetRows(db), yearArg(args)));
     },
   },
 };

@@ -11,7 +11,6 @@ import { loadSystemOneConfig } from "../../lib/config";
 import {
   filingStatusToApi,
   listFilingStatusRows,
-  upsertFilingStatusRow,
 } from "../../repositories/filingStatusRepository";
 import { saveJevPromptOverride } from "../../repositories/jevPromptRepository";
 import { saveRegexRulesOverride } from "../../repositories/regexRulesRepository";
@@ -28,6 +27,7 @@ import { buildJevPromptView } from "../classification/jevPromptView";
 import { buildRegexRulesView } from "../classification/regexRulesView";
 import { RegexRule } from "../classification/generateRules";
 import { updateSystemOneSettings } from "../classification/updateSystemOneSettings";
+import { saveFilingStatus } from "../filingStatus/saveFilingStatus";
 import { validateJevPrompt } from "../classification/validateJevPrompt";
 import { validateRegexRules } from "../classification/validateRegexRules";
 import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsView";
@@ -107,9 +107,7 @@ export async function setFilingStatusForAgent(
   year: number,
   patch: { confirmed?: boolean; calculated?: boolean; submitted?: boolean },
 ) {
-  const db = requireDb();
-  const row = await upsertFilingStatusRow(db, year, patch);
-  return row ? filingStatusToApi(row) : { ok: false, error: "申告ステータスを更新できませんでした" };
+  return saveFilingStatus(requireDb(), year, patch);
 }
 
 /**
