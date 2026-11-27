@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { SlideInDown } from "react-native-reanimated";
-import { colors, radius, space, springs } from "@/theme";
+import { colors, radius, space } from "@/theme";
 import { AppText } from "../AppText";
 
 export interface SheetProps {
@@ -11,20 +11,12 @@ export interface SheetProps {
   children?: ReactNode;
   /** 中身をスクロール可能にする（長いフォーム用）。 */
   scroll?: boolean;
-  /**
-   * 登場アニメーション。"spring" はバネでせり上がる（既定）。
-   * セレクター系は反応の速さ優先で "slide"（バネなし）にする。
-   */
-  entry?: "spring" | "slide";
 }
 
-/** 下からせり上がるボトムシート。編集フォームや選択肢の受け皿。 */
-export function Sheet({ visible, title, onClose, children, scroll, entry = "spring" }: SheetProps) {
+/** 下からせり上がるボトムシート。編集フォームや選択肢の受け皿。登場はバネなしのスライドで統一する。 */
+export function Sheet({ visible, title, onClose, children, scroll }: SheetProps) {
   const body = <View style={styles.body}>{children}</View>;
-  const entering =
-    entry === "slide"
-      ? SlideInDown.duration(180)
-      : SlideInDown.springify().damping(springs.soft.damping).stiffness(springs.soft.stiffness);
+  const entering = SlideInDown.duration(180);
   return (
     <Modal animationType="none" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.backdrop}>
