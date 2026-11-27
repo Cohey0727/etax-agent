@@ -2,9 +2,11 @@
  * returnFormValues.ts — 申告書第一表・第二表の紙イメージに載せる値の組み立て（services/pdf）。
  *
  * 計算エンジン（@etax/shared）の結果を、様式のセル単位の値へ変換する。
- * 金額の意味と端数処理は XTX ビルダー（buildXtxFiling）と揃えてある:
- * 差引所得税額は外国税額控除を除いた税額控除で引き、申告納税額は
- * 100円未満切捨て（還付側は切捨てなし）、第3期分は予定納税との精算。
+ * 欄の意味は確定申告の手引きの記載方法に従う: 差引所得税額は外国税額控除を
+ * 除いた税額控除で引き、基準所得税額（再差引所得税額）は外国税額控除の前の
+ * 額、外国税額控除等は「所得税及び復興特別所得税の額」から引く。申告納税額は
+ * 100円未満切捨てで、赤字（還付）は切り捨てずにそのまま。第3期分は予定納税
+ * との精算。
  */
 import {
   CorrectedFigures,
@@ -122,12 +124,12 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
   const { figures, tax, deductionInputs } = source;
   const d = tax.deductions;
   const c = tax.taxCredits;
-  const nonForeignCredits = c.total - c.foreignTax;
-  const afterCredits = Math.max(tax.incomeTaxBase - nonForeignCredits, 0);
-  const taxTotal = afterCredits + tax.reconstructionTax;
+  // 災害減免額は扱わないため、基準所得税額は差引所得税額と同額になる。
+  const standardTax = tax.taxAfterOtherCredits;
+  const taxTotal = standardTax + tax.reconstructionTaxGross;
   const declaredRaw = taxTotal - c.foreignTax - source.withholdingTax;
-  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : 0;
-  const thirdPeriod = declaredTax - source.prepaidTax + Math.min(declaredRaw, 0);
+  const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : declaredRaw;
+  const thirdPeriod = declaredTax - source.prepaidTax;
   const increase =
     source.amendment && source.originalThirdPeriodTax !== null
       ? Math.max(thirdPeriod - source.originalThirdPeriodTax, 0)
@@ -165,16 +167,16 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
     dedMedical: d.medical,
     dedDonations: d.donations,
     dedTotal: d.total,
-    taxTaxable: tax.taxableIncome,
+    taxTaxable: tax.taxableIncome + tax.taxableSeparateStocks + tax.taxableSeparateDividends,
     taxBase: tax.incomeTaxBase,
     creditDividend: c.dividend,
     creditOther: c.flatReduction,
     creditHousing: c.housingLoan,
     creditPolitical: c.politicalDonations + c.certifiedNpoDonations,
     creditSeismic: c.seismicRetrofit,
-    taxAfterCredits: afterCredits,
-    taxAfterCredits2: afterCredits,
-    taxReconstruction: tax.reconstructionTax,
+    taxAfterCredits: standardTax,
+    taxAfterCredits2: standardTax,
+    taxReconstruction: tax.reconstructionTaxGross,
     taxTotal,
     creditForeign: c.foreignTax,
     withholding: source.withholdingTax,
