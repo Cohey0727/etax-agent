@@ -1,8 +1,8 @@
 import {
   AgricultureInput,
-  BlueDeductionOptions,
   BreakdownEntriesKey,
   BreakdownEntry,
+  ComputeCorrectedFiguresOptions,
   DeductionInputs,
   DeductionState,
   ExpandedIncomeInput,
@@ -46,6 +46,7 @@ import { SubmissionRecordPanel } from "../SubmissionRecordPanel";
 import { TaxCreditPanel } from "../TaxCreditPanel";
 import { TaxpayerPanel } from "../TaxpayerPanel";
 import { useFilingSnapshots } from "../useFilingSnapshots";
+import { summarizeIncome } from "../incomeSummaryFigures";
 import { useYearInput } from "../useYearInput";
 
 export type FilingTab = "overview" | "balance" | "deductions" | "consumption";
@@ -116,25 +117,22 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const [tab, setTab] = useState<FilingTab>(initialTab);
 
-  const filingOptions: BlueDeductionOptions = {
-    filingType: deductionState.filingType,
-    realEstateBusinessScale: deductionState.realEstateBusinessScale,
-  };
-  // 申告数値の計算には農業所得の入力も渡す（青色申告特別控除の配分と
-  // 農業所得の算入のため）。filingOptions を受ける子コンポーネントには
-  // 従来どおり青色控除の区分だけを渡す。
-  const figuresOptions = { ...filingOptions, agriculture: deductionState.agriculture };
+  // 申告数値の計算には農業所得の入力も渡す（青色申告特別控除の上限・配分と
+  // 農業所得の算入が変わるため）。所得の要約・確定スナップショットも同じ値を使う。
+  const { filingType, realEstateBusinessScale, agriculture } = deductionState;
+  const figuresOptions: ComputeCorrectedFiguresOptions = useMemo(
+    () => ({ filingType, realEstateBusinessScale, agriculture }),
+    [filingType, realEstateBusinessScale, agriculture],
+  );
   const computed = useMemo(
     () => computeCorrectedFigures(yearTransactions, year, figuresOptions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [yearTransactions, year, deductionState.filingType, deductionState.realEstateBusinessScale, deductionState.agriculture],
+    [yearTransactions, year, figuresOptions],
   );
   // 前年の事業所得（青色申告特別控除前）。貸借対照表の繰越で元入金を
   // 計算するために使う（申告種別は当年の設定で近似する提案値）。
   const previousComputed = useMemo(
     () => computeCorrectedFigures(filterYear(transactions, year - 1), year - 1, figuresOptions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [transactions, year, deductionState.filingType, deductionState.realEstateBusinessScale, deductionState.agriculture],
+    [transactions, year, figuresOptions],
   );
 
   const updateDeductions = (next: DeductionInputs) => update((s) => ({ ...s, deductions: next }));
@@ -150,13 +148,17 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
   const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) =>
     update((s) => applyBreakdownEntries(s, key, entries));
 
-  const manualIncomes = computeManualIncomes(
-    year,
-    deductionState.salaryIncome,
-    deductionState.miscIncome,
-    computed._detail.business_income +
-      computed._detail.real_estate_income +
-      computed._detail.agriculture_income,
+  const manualIncomes = useMemo(
+    () =>
+      computeManualIncomes(
+        year,
+        deductionState.salaryIncome,
+        deductionState.miscIncome,
+        computed._detail.business_income +
+          computed._detail.real_estate_income +
+          computed._detail.agriculture_income,
+      ),
+    [year, deductionState.salaryIncome, deductionState.miscIncome, computed],
   );
   // 拡張所得（配当・一時・株式等譲渡）の内訳。総合課税分は合計所得へ加算し、
   // 申告分離分は分離課税として計算する。配当控除の対象額は配当の内訳から
@@ -165,12 +167,12 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
     () => computeExpandedIncomes(deductionState.expandedIncome),
     [deductionState.expandedIncome],
   );
-  const totalIncome =
-    computed._detail.business_income +
-    computed._detail.real_estate_income +
-    computed._detail.agriculture_income +
-    manualIncomes.total +
-    expandedBreakdown.comprehensiveAddition;
+  const incomeSummary = useMemo(
+    () =>
+      summarizeIncome(computed, manualIncomes, expandedBreakdown.comprehensiveAddition, filingType),
+    [computed, manualIncomes, expandedBreakdown, filingType],
+  );
+  const totalIncome = incomeSummary.totalIncome;
   const taxResult = useMemo(
     () =>
       computeIncomeTax({
@@ -187,19 +189,19 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
   );
 
   // 確定スナップショット（前回確定との比較用）。確定は総合タブと控除タブの
-  // どちらからでも行えるため、保存処理はここに寄せて両方から使う。
+  // どちらからでも行えるため、一覧と保存処理はここだけに置いて両方へ渡す。
   const { snapshots, refresh: refreshSnapshots } = useFilingSnapshots(year);
   const currentFigures = useMemo(
     () =>
       buildSnapshotFigures(
-        transactions,
+        yearTransactions,
         year,
         figuresOptions,
         deductionState.miscIncome,
         taxResult,
         deductionState.salaryIncome,
       ),
-    [transactions, year, figuresOptions, deductionState.miscIncome, taxResult, deductionState.salaryIncome],
+    [yearTransactions, year, figuresOptions, deductionState.miscIncome, taxResult, deductionState.salaryIncome],
   );
   const handleConfirmCalculation = async () => {
     if (!currentFigures) return true;
@@ -221,12 +223,14 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
     overview: (
       <>
         <FilingPanel
-          transactions={transactions}
           year={year}
+          incomeSummary={incomeSummary}
+          filingType={filingType}
+          hasTransactions={yearTransactions.length > 0}
           taxResult={taxResult}
-          filingOptions={filingOptions}
-          miscIncome={deductionState.miscIncome}
-          salaryIncome={deductionState.salaryIncome}
+          snapshots={snapshots}
+          currentFigures={currentFigures}
+          onConfirmCalculation={handleConfirmCalculation}
           onOpenSection={openSection}
         />
         <TaxpayerPanel
@@ -253,11 +257,10 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
           <View style={styles.balanceCard}>
             <SectionHead title="収支" />
             <BalanceSummary
-              transactions={transactions}
-              year={year}
-              filingOptions={filingOptions}
-              miscIncome={deductionState.miscIncome}
-              salaryIncome={deductionState.salaryIncome}
+              transactions={yearTransactions}
+              figures={computed}
+              summary={incomeSummary}
+              filingType={filingType}
             />
             <FilingStatusToggle
               bare

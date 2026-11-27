@@ -1,22 +1,15 @@
-import {
-  BlueDeductionOptions,
-  IncomeTaxResult,
-  MiscIncomeInput,
-  SalaryIncomeInput,
-  Transaction,
-  buildSnapshotFigures,
-} from "@etax/shared";
-import { Fragment, useMemo } from "react";
+import { FilingType, IncomeTaxResult } from "@etax/shared";
+import { ComponentType } from "react";
 import { StyleSheet, View } from "react-native";
-import { AppButton, AppText, Card, Chip } from "@/components";
-import { createFilingSnapshot } from "@/api";
+import { AppButton, AppText, Card } from "@/components";
+import { FilingSnapshot, FilingSnapshotFigures } from "@/api";
 import { space } from "@/theme";
-import { formatDate } from "@/utils";
 import { ConfirmComparePanel } from "../ConfirmComparePanel";
+import { FilingStatusToggle } from "../FilingStatusToggle";
 import { IncomeSummary } from "../IncomeSummary";
+import { IncomeSummaryFigures } from "../incomeSummaryFigures";
 import { TaxSummary } from "../TaxSummary";
-import { FilingStatusKey, useFilingStatus } from "../useFilingStatus";
-import { useFilingSnapshots } from "../useFilingSnapshots";
+import { FilingStatusKey } from "../useFilingStatus";
 
 /**
  * 総合から遷移できる先。収支・控除・消費税は確定申告画面のタブ、
@@ -31,12 +24,35 @@ const SECTION_OPEN_LABELS: Record<FilingSection, string> = {
   taxpayer: "納税者情報を開く",
 };
 
-interface ManualItem {
-  key: FilingStatusKey;
-  label: string;
-  description: string;
-  /** その項目の作業をするタブ。 */
-  section: FilingSection;
+/** 各項目の下に出す、その項目の結果の数字。 */
+interface ManualItemSummaryProps {
+  year: number;
+  incomeSummary: IncomeSummaryFigures;
+  filingType: FilingType;
+  hasTransactions: boolean;
+  taxResult: IncomeTaxResult;
+  snapshots: FilingSnapshot[] | null;
+  currentFigures: FilingSnapshotFigures | null;
+}
+
+function BalanceItemSummary({ incomeSummary, filingType, hasTransactions }: ManualItemSummaryProps) {
+  return (
+    <IncomeSummary summary={incomeSummary} filingType={filingType} hasTransactions={hasTransactions} />
+  );
+}
+
+function CalculationItemSummary({
+  year,
+  taxResult,
+  snapshots,
+  currentFigures,
+}: ManualItemSummaryProps) {
+  return (
+    <>
+      <TaxSummary taxResult={taxResult} />
+      <ConfirmComparePanel bare year={year} snapshots={snapshots} currentFigures={currentFigures} />
+    </>
+  );
 }
 
 /**
@@ -47,13 +63,15 @@ interface ManualItem {
  * 項目には含めない。提出の動線（XTX出力と e-Tax へのリンク）は下の
  * 提出パネル（TaxpayerPanel）のカードにだけ置く（重複させない）。
  */
-const MANUAL_ITEMS: readonly ManualItem[] = [
+const MANUAL_ITEMS = [
   {
     key: "confirmed",
     label: "収支",
     description:
       "収支の金額・科目・区分に誤りがないか見直したら確定します。見直しは収支タブで行います。",
     section: "balance",
+    confirmsCalculation: false,
+    Summary: BalanceItemSummary,
   },
   {
     key: "calculated",
@@ -61,23 +79,25 @@ const MANUAL_ITEMS: readonly ManualItem[] = [
     description:
       "所得控除・税額控除を入力すると所得税額が自動計算されます。入力は控除タブで行います。確定するとその時点の計算結果が控えられ、確定解除して直してから再確定すると、前回確定との差分が下に出ます。",
     section: "deductions",
+    confirmsCalculation: true,
+    Summary: CalculationItemSummary,
   },
-];
+] as const satisfies readonly {
+  key: FilingStatusKey;
+  label: string;
+  description: string;
+  /** その項目の作業をするタブ。 */
+  section: FilingSection;
+  /** 確定したときに計算結果の控え（確定スナップショット）を作るか。 */
+  confirmsCalculation: boolean;
+  Summary: ComponentType<ManualItemSummaryProps>;
+}[];
 
-export interface FilingPanelProps {
-  transactions: Transaction[];
-  /** 選択中の年度 */
-  year: number;
-  /** 所得税の計算結果。「控除・計算」の行の下に税額の要約を表示するために使う。 */
-  taxResult?: IncomeTaxResult;
-  /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
-  filingOptions?: BlueDeductionOptions;
-  /** 雑所得。所得の要約で合計に含める。 */
-  miscIncome?: MiscIncomeInput;
-  /** 給与所得。所得の要約で合計に含める。 */
-  salaryIncome?: SalaryIncomeInput;
+export interface FilingPanelProps extends ManualItemSummaryProps {
+  /** 「控除・計算」を確定した直後に計算結果を控える。控えられたか。 */
+  onConfirmCalculation: () => Promise<boolean>;
   /** 総合タブから各タブへ遷移する（確定申告画面内のタブ切替）。 */
-  onOpenSection?: (section: FilingSection) => void;
+  onOpenSection: (section: FilingSection) => void;
 }
 
 /**
@@ -85,40 +105,13 @@ export interface FilingPanelProps {
  * 行ったり来たりできる（ステッパーは置かない）。
  * ステータスはダッシュボードの表示とサーバー保存を共有する。
  */
-export function FilingPanel({
-  transactions,
-  year,
-  taxResult,
-  filingOptions,
-  miscIncome,
-  salaryIncome,
-  onOpenSection,
-}: FilingPanelProps) {
-  const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
-  const { snapshots, refresh: refreshSnapshots } = useFilingSnapshots(year);
-  const currentFigures = useMemo(
-    () =>
-      buildSnapshotFigures(transactions, year, filingOptions, miscIncome, taxResult, salaryIncome),
-    [transactions, year, filingOptions, miscIncome, taxResult, salaryIncome],
-  );
-
-  // 「控除・計算」を確定するときは、その時点の計算結果をスナップショットとして
-  // サーバーに控える（差し戻して再確定したときに前回確定と比べるため）。
-  const handleToggle = async (item: ManualItem) => {
-    const turningOn = !status[item.key];
-    await toggle(item.key);
-    if (item.key === "calculated" && turningOn && currentFigures) {
-      await createFilingSnapshot(year, currentFigures);
-      await refreshSnapshots();
-    }
-  };
-
+export function FilingPanel({ onConfirmCalculation, onOpenSection, ...summaryProps }: FilingPanelProps) {
   return (
     <Card>
       <View style={styles.wrap}>
         <View style={styles.head}>
           <AppText size="xl" weight="bold">
-            {year}年分の確定申告
+            {summaryProps.year}年分の確定申告
           </AppText>
           <AppText size="sm" tone="muted">
             収支と控除・計算はそれぞれ独立した項目です。どの順番でも入力でき、
@@ -127,63 +120,27 @@ export function FilingPanel({
           </AppText>
         </View>
 
-        {MANUAL_ITEMS.map((item) => {
-          const done = status[item.key];
-          const doneAt = status[`${item.key}_at`];
-          return (
-            <Fragment key={item.key}>
-              <View style={styles.item}>
-                <View style={styles.itemHead}>
-                  <AppText size="lg" weight="bold">
-                    {item.label}
-                  </AppText>
-                  <Chip
-                    label={done ? `確定${doneAt ? `（${formatDate(doneAt)}）` : ""}` : "未確定"}
-                    tone={done ? "accent" : "muted"}
-                  />
-                </View>
-                <AppText size="sm" tone="muted">
-                  {item.description}
-                </AppText>
-                <View style={styles.actions}>
-                  <AppButton
-                    label={SECTION_OPEN_LABELS[item.section]}
-                    variant="ghost"
-                    size="sm"
-                    disabled={!onOpenSection}
-                    onPress={() => onOpenSection?.(item.section)}
-                  />
-                  <AppButton
-                    label={done ? "確定解除" : "確定する"}
-                    variant={done ? "ghost" : "primary"}
-                    size="sm"
-                    disabled={savingKey === item.key || !available}
-                    loading={savingKey === item.key}
-                    onPress={() => void handleToggle(item)}
-                  />
-                </View>
-              </View>
-              {item.key === "confirmed" ? (
-                <IncomeSummary
-                  transactions={transactions}
-                  year={year}
-                  filingOptions={filingOptions}
-                  miscIncome={miscIncome}
-                  salaryIncome={salaryIncome}
-                />
-              ) : null}
-              {item.key === "calculated" && taxResult ? <TaxSummary taxResult={taxResult} /> : null}
-              {item.key === "calculated" ? (
-                <ConfirmComparePanel
-                  bare
-                  year={year}
-                  snapshots={snapshots}
-                  currentFigures={currentFigures}
-                />
-              ) : null}
-            </Fragment>
-          );
-        })}
+        {MANUAL_ITEMS.map(({ key, label, description, section, confirmsCalculation, Summary }) => (
+          <View key={key} style={styles.item}>
+            <FilingStatusToggle
+              bare
+              year={summaryProps.year}
+              statusKey={key}
+              label={label}
+              description={description}
+              onConfirm={confirmsCalculation ? onConfirmCalculation : undefined}
+            />
+            <View style={styles.actions}>
+              <AppButton
+                label={SECTION_OPEN_LABELS[section]}
+                variant="ghost"
+                size="sm"
+                onPress={() => onOpenSection(section)}
+              />
+            </View>
+            <Summary {...summaryProps} />
+          </View>
+        ))}
 
         <View style={styles.item}>
           <AppText size="lg" weight="bold">
@@ -198,17 +155,10 @@ export function FilingPanel({
               label={SECTION_OPEN_LABELS.consumption}
               variant="ghost"
               size="sm"
-              disabled={!onOpenSection}
-              onPress={() => onOpenSection?.("consumption")}
+              onPress={() => onOpenSection("consumption")}
             />
           </View>
         </View>
-
-        {loaded && !available ? (
-          <AppText size="sm" tone="muted">
-            ステータスを保存するサーバーに接続できていません。「確定する」は接続時に使えます。
-          </AppText>
-        ) : null}
       </View>
     </Card>
   );
@@ -218,6 +168,5 @@ const styles = StyleSheet.create({
   wrap: { gap: space.md },
   head: { gap: space.sm },
   item: { gap: space.sm },
-  itemHead: { flexDirection: "row", alignItems: "center", gap: space.sm, flexWrap: "wrap" },
   actions: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
 });

@@ -1,21 +1,11 @@
-import {
-  BlueDeductionOptions,
-  EMPTY_MISC_INCOME,
-  EMPTY_SALARY_INCOME,
-  MiscIncomeInput,
-  SalaryIncomeInput,
-  Transaction,
-  computeCorrectedFigures,
-  computeManualIncomes,
-  filterYear,
-  transactionBusinessAmount,
-} from "@etax/shared";
+import { CorrectedFigures, FilingType, Transaction, transactionBusinessAmount } from "@etax/shared";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { AlertBox, AppText } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatYen } from "@/utils";
 import { ResultRow, SectionHead, StatBlock } from "../fields";
+import { IncomeSummaryFigures } from "../incomeSummaryFigures";
 
 interface CategoryAmount {
   category: string;
@@ -23,15 +13,14 @@ interface CategoryAmount {
 }
 
 export interface BalanceSummaryProps {
+  /** 対象年の取引（割り当て年度で絞り込み済み） */
   transactions: Transaction[];
-  /** 選択中の年度 */
-  year: number;
-  /** 青色申告特別控除の計算条件（申告の種類・不動産の規模） */
-  filingOptions?: BlueDeductionOptions;
-  /** 雑所得。帳簿に載らない所得として合計に含める。 */
-  miscIncome?: MiscIncomeInput;
-  /** 給与所得。帳簿に載らない所得として合計に含める。 */
-  salaryIncome?: SalaryIncomeInput;
+  /** 対象年の申告数値（事業・不動産ごとの収入と経費） */
+  figures: CorrectedFigures;
+  /** 所得の要約（確定申告画面で税額と同じ入力から求めたもの） */
+  summary: IncomeSummaryFigures;
+  /** 申告の種類（白色申告では所得合計に「青色控除後」を付けない） */
+  filingType: FilingType;
 }
 
 /**
@@ -42,27 +31,10 @@ export interface BalanceSummaryProps {
  * MonthlyBalance と BalanceRecords がそれぞれ別カードで並べる。
  * 未分類が残っていれば注意も出す。
  */
-export function BalanceSummary({
-  transactions,
-  year,
-  filingOptions,
-  miscIncome,
-  salaryIncome,
-}: BalanceSummaryProps) {
-  const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const figures = useMemo(
-    () => computeCorrectedFigures(yearTransactions, year, filingOptions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [yearTransactions, year, filingOptions?.filingType, filingOptions?.realEstateBusinessScale],
-  );
-  // 収入・支出の見出しは事業＋不動産だけを数える。口座の生の出入り
-  // （チャージ・振替・投資・カード決済などの「その他」区分）を収入に
-  // 混ぜると、実態とかけ離れた金額になるため。
-  const incomeTotal = figures.business_revenue + figures.real_estate_revenue;
-  const expenseTotal = figures.business_expenses + figures.real_estate_expenses;
+export function BalanceSummary({ transactions, figures, summary, filingType }: BalanceSummaryProps) {
   const scopedTransactions = useMemo(
-    () => yearTransactions.filter((t) => t.income_type !== "other"),
-    [yearTransactions],
+    () => transactions.filter((t) => t.income_type !== "other"),
+    [transactions],
   );
   // 内訳も見出し（申告数値）と同じ事業分で集計し、合計が一致するようにする。
   const income = useMemo(
@@ -74,7 +46,7 @@ export function BalanceSummary({
     [scopedTransactions],
   );
   const otherFlow = useMemo(() => {
-    const others = yearTransactions.filter((t) => t.income_type === "other");
+    const others = transactions.filter((t) => t.income_type === "other");
     return {
       count: others.length,
       income: others.filter((t) => t.amount > 0).reduce((sum, t) => sum + Math.trunc(t.amount), 0),
@@ -82,20 +54,10 @@ export function BalanceSummary({
         .filter((t) => t.amount < 0)
         .reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
     };
-  }, [yearTransactions]);
-  const unclassifiedCount = yearTransactions.filter((t) => t.category === "未分類").length;
-  const manual = computeManualIncomes(
-    year,
-    salaryIncome ?? EMPTY_SALARY_INCOME,
-    miscIncome ?? EMPTY_MISC_INCOME,
-    figures._detail.business_income + figures._detail.real_estate_income,
-  );
-  const totalIncome =
-    figures._detail.business_income + figures._detail.real_estate_income + manual.total;
-  const businessBalance = figures.business_revenue - figures.business_expenses;
-  const realEstateBalance = figures.real_estate_revenue - figures.real_estate_expenses;
+  }, [transactions]);
+  const unclassifiedCount = transactions.filter((t) => t.category === "未分類").length;
 
-  if (yearTransactions.length === 0) {
+  if (transactions.length === 0) {
     return (
       <AppText size="sm" tone="muted">
         この年の取引はまだありません。先に帳簿へ取り込んでください。
@@ -103,26 +65,12 @@ export function BalanceSummary({
     );
   }
 
-  const isWhite = filingOptions?.filingType === "white";
-  const suffix = isWhite ? "" : "（青色控除後）";
+  const suffix = filingType === "white" ? "" : "（青色控除後）";
   const statCards: readonly { label: string; value: string }[] = [
-    { label: "収入合計", value: formatYen(incomeTotal) },
-    { label: "支出合計", value: formatYen(expenseTotal) },
-    { label: "収支（差引）", value: formatYen(incomeTotal - expenseTotal) },
-    { label: `所得合計${suffix}`, value: formatYen(totalIncome) },
-  ];
-
-  const bridgeRows: readonly { label: string; amount: number }[] = [
-    { label: "事業の差引", amount: businessBalance },
-    { label: "不動産の差引", amount: realEstateBalance },
-    {
-      label: isWhite ? "青色申告特別控除（白色申告のためなし）" : "青色申告特別控除",
-      amount: -figures.blue_deduction,
-    },
-    ...(manual.salary > 0 ? [{ label: "給与所得", amount: manual.salary }] : []),
-    ...(manual.pension > 0 ? [{ label: "雑所得（公的年金等）", amount: manual.pension }] : []),
-    ...(manual.miscBusiness > 0 ? [{ label: "雑所得（業務）", amount: manual.miscBusiness }] : []),
-    ...(manual.miscOther > 0 ? [{ label: "雑所得（その他）", amount: manual.miscOther }] : []),
+    { label: "収入合計", value: formatYen(summary.incomeTotal) },
+    { label: "支出合計", value: formatYen(summary.expenseTotal) },
+    { label: "収支（差引）", value: formatYen(summary.incomeTotal - summary.expenseTotal) },
+    { label: `所得合計${suffix}`, value: formatYen(summary.totalIncome) },
   ];
 
   return (
@@ -146,10 +94,10 @@ export function BalanceSummary({
 
       <View>
         <SectionHead title="所得の内訳" />
-        {bridgeRows.map((row) => (
+        {summary.bridgeRows.map((row) => (
           <ResultRow key={row.label} label={row.label} value={row.amount} />
         ))}
-        <ResultRow label={`所得合計${suffix}`} value={totalIncome} strong />
+        <ResultRow label={`所得合計${suffix}`} value={summary.totalIncome} strong />
       </View>
 
       <CategoryList title="収入の内訳" rows={income} tone="income" />
