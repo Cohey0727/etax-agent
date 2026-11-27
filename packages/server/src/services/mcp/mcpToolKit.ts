@@ -267,7 +267,7 @@ export function expandedIncomeArg(args: Record<string, unknown>): ExpandedIncome
 }
 
 /**
- * 農業所得（Issue #24）の引数を入力形式に変換する。内側は camelCase 形式。
+ * 農業所得の引数を入力形式に変換する。内側は camelCase 形式。
  * 未指定なら undefined、指定があれば欠けた項目は正規化で補う。
  * 農業所得は帳簿の取引とは混ぜず、申告入力として独立に扱う。
  */

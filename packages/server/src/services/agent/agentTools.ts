@@ -145,7 +145,7 @@ export function dispatchTool(
           .filter((t) => {
             // 年度は割り当て年度（Transaction.year）で判定する。DB 読み込み
             // 時は fiscal_year が入り、日付の年とは限らない（書き込み側の
-            // update_transactions と基準を揃える。Issue #11）。
+            // update_transactions と基準を揃える）。
             if (year !== null && t.year !== year) return false;
             if (direction === "expense" && t.amount >= 0) return false;
             if (direction === "income" && t.amount <= 0) return false;

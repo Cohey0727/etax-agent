@@ -151,7 +151,7 @@ describe("MCP エンドポイント", () => {
     expect(parsedAgg["business_revenue"]).toBe(100000);
   });
 
-  test("add_transaction / update_transaction で事業割合と按分根拠を扱える（Issue #26）", async () => {
+  test("add_transaction / update_transaction で事業割合と按分根拠を扱える", async () => {
     const db = await createTestDb();
     const user = await createUser(db, "ratio-mcp@example.com", "password-123");
     const { key } = await createApiKey(db, user.id, "ratio");

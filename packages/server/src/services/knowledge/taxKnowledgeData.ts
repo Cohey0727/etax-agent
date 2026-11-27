@@ -3,7 +3,7 @@
  *
  * 出典は国税庁タックスアンサー（https://www.nta.go.jp/taxes/shiraberu/taxanswer/）。
  * 個人事業主の確定申告・消費税まわりを中心に選定し、本文テキストを収録した。
- * 再収集は ~/workspace/tax-knowledge-harvest/harvest.ts で行う（手で編集しない）。
+ * 再収集はリポジトリ外の収集スクリプトで行う（手で編集しない）。
  * 収集日: 2026-11-15 / 86件
  */
 export interface TaxKnowledgeDoc {

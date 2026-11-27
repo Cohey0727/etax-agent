@@ -115,7 +115,7 @@ const STORE_LIKE_KEYS_NORMALIZED: readonly string[] = STORE_LIKE_KEYS.map((k) =>
 
 export function isStoreLikeDescription(description: string): boolean {
   // 銀行明細の半角カタカナ（例: ｾﾌﾞﾝ-ｲﾚﾌﾞﾝ）を正規化してから照合する。
-  // 生文字列の includes では半角表記が素通りしてしまう（Issue #11）。
+  // 生文字列の includes では半角表記が素通りしてしまう。
   const normalized = normalizeSearchText(description);
   return STORE_LIKE_KEYS_NORMALIZED.some((k) => normalized.includes(k));
 }

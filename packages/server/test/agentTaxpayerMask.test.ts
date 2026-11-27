@@ -1,7 +1,7 @@
 /**
  * agentTaxpayerMask.test.ts — エージェント向け納税者プロフィールの
- * マイナンバーマスク検証（Issue #7）。外部 LLM とツールログへ
- * マイナンバーの値が渡らないことを確認する。
+ * マイナンバー・利用者識別番号のマスク検証。外部 LLM とツールログへ
+ * これらの値が渡らないことを確認する。
  */
 import { describe, expect, test } from "bun:test";
 import { taxpayerProfileForAgent } from "../src/services/agent/agentSettingsTools";

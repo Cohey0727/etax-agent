@@ -79,7 +79,7 @@ function candidatePatterns(description: string): string[] {
 /**
  * 生成結果のメモ化。履歴は読み込み単位のスナップショットとして扱い、
  * 同じ配列参照の間は生成し直さない（一括判定で全行ぶん再生成・再集計
- * する無駄を避ける。Issue #11）。履歴が更新されれば新しい配列になる。
+ * する無駄を避ける）。履歴が更新されれば新しい配列になる。
  */
 const generatedRulesCache = new WeakMap<
   ClassificationHistoryRecord[],

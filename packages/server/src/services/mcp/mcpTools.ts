@@ -512,7 +512,7 @@ const PLAN_GATED_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * プランゲート（REST 側 planGateMiddleware と同じ条件、Issue #8）。
+ * プランゲート（REST 側 planGateMiddleware と同じ条件）。
  * SaaS モード（認証必須＋課金有効）のときだけ、/api/etax/* に対応する
  * 出力系ツールは有効なプランを必須にする。ローカル運用・課金未設定では
  * 制限しない。
@@ -677,8 +677,7 @@ export async function dispatchMcpTool(
         const category = typeof args["category"] === "string" && args["category"] !== ""
           ? args["category"]
           : "未分類";
-        // 引数の検証（Issue #11: 未検証の String()/Number() 変換で
-        // "undefined" や NaN がそのまま保存されるのを防ぐ）。
+        // String()/Number() で変換すると "undefined" や NaN がそのまま保存されるため、型を確かめてから使う。
         const date = args["date"];
         if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           throw new Error("date は YYYY-MM-DD 形式で渡してください");

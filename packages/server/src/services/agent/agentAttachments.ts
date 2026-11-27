@@ -5,7 +5,7 @@
  *   - 画像（JPEG/PNG/WebP/GIF）: 領収書解析と同じ許可値。マルチモーダルの image パートで渡す。
  *   - PDF: file パートで渡す（Anthropic / OpenAI 系はどちらも対応）。
  *   - CSV（text/csv）: テキストとしてメッセージに同梱する。1件だけなら
- *     従来の csvText 経路（import_csv_info ツール）にも載せる。
+ *     csvText（import_csv_info ツールが読む）にも載せる。
  * 検証（件数・サイズ・形式）はここに集約し、usecases 側は呼ぶだけにする。
  */
 import { FilePart, ImagePart, ModelMessage, TextPart } from "ai";

@@ -3,8 +3,8 @@
  *
  * REST（usecases/runAgentChat）と MCP（agent_chat ツール）が共用する。
  * 設定読込 → 接続情報の上書き → キー確認 → 入力検証 → runAgentTurn の
- * 順序と、失敗の切り分けは従来の REST ハンドラと同じ（検証より先に
- * 設定・キーのゲートを通す）。失敗は AgentChatError（REST の HTTP
+ * 順で処理する（入力検証より先に設定・キーのゲートを通し、未設定は
+ * 503 を返す）。失敗は AgentChatError（REST の HTTP
  * ステータス相当つき）で表し、呼び出し側が表現に合わせて変換する。
  * 会話の実行自体は runAgentTurn が担う。
  */
@@ -115,7 +115,7 @@ export async function executeAgentChat(raw: unknown): Promise<AgentChatResponse>
   } catch (e) {
     throw new AgentChatError(400, errorMessage(e));
   }
-  // CSV 添付が1件だけなら、従来の csvText 経路（import_csv_info）にも載せる。
+  // CSV 添付が1件だけなら、csvText（import_csv_info が読む）にも載せる。
   const csvText = data.csvText ?? singleCsvText(attachments);
   const deductions = data.deductions;
   try {

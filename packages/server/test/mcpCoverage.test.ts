@@ -1,6 +1,6 @@
 /**
- * mcpCoverage.test.ts — MCP 対応の棚卸し（2026-11-25）で追加したツールの
- * HTTP 結合テスト。
+ * mcpCoverage.test.ts — 請求書・提出記録・開業・試算表・接続テスト・
+ * エージェントなど、REST の各機能に対応する MCP ツールの HTTP 結合テスト。
  *
  * mcpReconciliation.test.ts と同じ方式（テスト DB を指してアプリを import
  * し、JSON-RPC を直接投げる）で、次を担保する:
@@ -11,7 +11,6 @@
  *   - 提出記録の保存で申告ステータスが「提出済み」に連動すること
  *   - 開業の専用入力の保存→取得の往復と、様式 PDF の生成
  *   - 試算表・取引履歴一覧・課金プランの取得
- * 全面カバレッジ（2026-11-25 追補）では次も担保する:
  *   - 接続テスト2件（SystemOne / 外部接続）と agent_chat が tools/list に
  *     含まれ、REST と同じ本体で応答すること（未設定環境では ok=false /
  *     AGENT_API_KEY 未設定エラー）
@@ -182,7 +181,7 @@ const INVOICE_BODY = {
   ],
 };
 
-describe("MCP 棚卸しで追加したツール", () => {
+describe("MCP の請求書・提出記録・開業・試算表ツール", () => {
   test("tools/list に追加ツールがすべて含まれる", async () => {
     const [key] = await makeUsers("mcp-coverage-list@example.com");
     const list = await mcp("tools/list", {}, key);
@@ -491,7 +490,7 @@ describe("MCP 棚卸しで追加したツール", () => {
   });
 });
 
-describe("MCP 全面カバレッジ（接続テスト・エージェント・OpenAPI）", () => {
+describe("MCP の接続テスト・エージェントと OpenAPI", () => {
   test("tools/list に接続テストと agent_chat が含まれ、mcp-info の件数と一致する", async () => {
     const [key] = await makeUsers("mcp-full-coverage@example.com");
     const list = await mcp("tools/list", {}, key);
@@ -555,7 +554,7 @@ describe("MCP 全面カバレッジ（接続テスト・エージェント・Ope
       paths: Record<string, Record<string, unknown>>;
     };
     expect(doc.openapi).toBe("3.0.0");
-    // 2026-11-25 の棚卸し時点の全オペレーション数（ルートを足したら更新する）
+    // 全オペレーション数（ルートを足したら更新する）
     let operations = 0;
     for (const methods of Object.values(doc.paths)) {
       operations += Object.keys(methods).length;
