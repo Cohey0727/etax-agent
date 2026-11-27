@@ -1,4 +1,5 @@
 import { SendKeyMode, ThemeMode } from "@types";
+import { userScopedKey } from "@utils";
 
 /**
  * appPageStorage.ts — AppPage が端末保存（localStorage）から読む
@@ -48,7 +49,7 @@ export const YEAR_STORAGE_KEY = "etax-selected-year";
 
 export const readStoredYear = (): number => {
   try {
-    const saved = Number(localStorage.getItem(YEAR_STORAGE_KEY));
+    const saved = Number(localStorage.getItem(userScopedKey(YEAR_STORAGE_KEY)));
     return Number.isInteger(saved) && saved > 0 ? saved : 0;
   } catch {
     return 0;
@@ -57,7 +58,7 @@ export const readStoredYear = (): number => {
 
 export const saveStoredYear = (year: number) => {
   try {
-    localStorage.setItem(YEAR_STORAGE_KEY, String(year));
+    localStorage.setItem(userScopedKey(YEAR_STORAGE_KEY), String(year));
   } catch {
     // 保存できなくても切替自体は有効にする
   }
@@ -68,7 +69,9 @@ export const EXTRA_YEARS_STORAGE_KEY = "etax-extra-years";
 
 export const readExtraYears = (): number[] => {
   try {
-    const parsed = JSON.parse(localStorage.getItem(EXTRA_YEARS_STORAGE_KEY) ?? "[]") as unknown;
+    const parsed = JSON.parse(
+      localStorage.getItem(userScopedKey(EXTRA_YEARS_STORAGE_KEY)) ?? "[]",
+    ) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (y): y is number => typeof y === "number" && Number.isInteger(y) && y >= 1900 && y <= 2100,
@@ -80,7 +83,7 @@ export const readExtraYears = (): number[] => {
 
 export const saveExtraYears = (years: number[]) => {
   try {
-    localStorage.setItem(EXTRA_YEARS_STORAGE_KEY, JSON.stringify(years));
+    localStorage.setItem(userScopedKey(EXTRA_YEARS_STORAGE_KEY), JSON.stringify(years));
   } catch {
     // 保存できなくても追加自体は有効にする
   }

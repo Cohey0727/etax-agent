@@ -7,6 +7,7 @@
  * 保持する。従来 localStorage に入っていたキーは読み込み時に移行して消す。
  */
 import { AgentConnectionConfig } from "@types";
+import { userScopedKey } from "./userStorage";
 
 const CONNECTION_STORAGE_KEY = "etax-agent-connection";
 const CONNECTION_KEY_STORAGE_KEY = "etax-agent-connection-key";
@@ -17,7 +18,7 @@ export const loadAgentConnection = (): AgentConnectionConfig => {
   let model = "";
   let apiKey = "";
   try {
-    const raw = localStorage.getItem(CONNECTION_STORAGE_KEY);
+    const raw = localStorage.getItem(userScopedKey(CONNECTION_STORAGE_KEY));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AgentConnectionConfig>;
       baseUrl = typeof parsed.baseUrl === "string" ? parsed.baseUrl : "";
@@ -33,7 +34,7 @@ export const loadAgentConnection = (): AgentConnectionConfig => {
   }
   if (!apiKey) {
     try {
-      apiKey = sessionStorage.getItem(CONNECTION_KEY_STORAGE_KEY) ?? "";
+      apiKey = sessionStorage.getItem(userScopedKey(CONNECTION_KEY_STORAGE_KEY)) ?? "";
     } catch {
       apiKey = "";
     }
@@ -45,15 +46,16 @@ export const loadAgentConnection = (): AgentConnectionConfig => {
 export const saveAgentConnection = (config: AgentConnectionConfig): void => {
   try {
     localStorage.setItem(
-      CONNECTION_STORAGE_KEY,
+      userScopedKey(CONNECTION_STORAGE_KEY),
       JSON.stringify({ baseUrl: config.baseUrl, model: config.model }),
     );
   } catch {
     // 保存できなくてもこのセッションでは有効にする
   }
   try {
-    if (config.apiKey) sessionStorage.setItem(CONNECTION_KEY_STORAGE_KEY, config.apiKey);
-    else sessionStorage.removeItem(CONNECTION_KEY_STORAGE_KEY);
+    const keyStorageKey = userScopedKey(CONNECTION_KEY_STORAGE_KEY);
+    if (config.apiKey) sessionStorage.setItem(keyStorageKey, config.apiKey);
+    else sessionStorage.removeItem(keyStorageKey);
   } catch {
     // 同上
   }
@@ -62,7 +64,7 @@ export const saveAgentConnection = (config: AgentConnectionConfig): void => {
 /** セッション保存の APIキーを消す（ログアウト時）。 */
 export const clearStoredAgentApiKey = (): void => {
   try {
-    sessionStorage.removeItem(CONNECTION_KEY_STORAGE_KEY);
+    sessionStorage.removeItem(userScopedKey(CONNECTION_KEY_STORAGE_KEY));
   } catch {
     // 消せない環境ではそのまま
   }

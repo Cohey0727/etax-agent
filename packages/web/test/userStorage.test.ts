@@ -38,6 +38,9 @@ const { loadAgentConnection, saveAgentConnection, clearStoredAgentApiKey } = awa
   "../src/utils/agentConnection"
 );
 const { loadCurrentMessages, saveCurrentMessages } = await import("../src/utils/chatStorage");
+const { readExtraYears, readStoredYear, saveExtraYears, saveStoredYear } = await import(
+  "../src/components/pages/AppPage/appPageStorage"
+);
 const { ChatRole } = await import("../src/types");
 
 beforeEach(() => {
@@ -100,5 +103,32 @@ describe("APIキーの保存先", () => {
     expect(loadAgentConnection().apiKey).toBe("sk-old");
     expect(local.getItem("etax-agent-connection") ?? "").not.toContain("sk-old");
     expect(session.getItem("etax-agent-connection-key")).toBe("sk-old");
+  });
+});
+
+describe("アカウントごとの表示設定", () => {
+  test("外部接続の設定と年度は別のアカウントへ引き継がず、ログアウトで消える", () => {
+    setStorageUserId(3);
+    saveAgentConnection({ baseUrl: "https://a.example", model: "model-a", apiKey: "sk-a" });
+    saveStoredYear(2024);
+    saveExtraYears([2023]);
+
+    setStorageUserId(4);
+    expect(loadAgentConnection()).toEqual({ baseUrl: "", model: "", apiKey: "" });
+    expect(readStoredYear()).toBe(0);
+    expect(readExtraYears()).toEqual([]);
+
+    setStorageUserId(3);
+    expect(loadAgentConnection()).toEqual({
+      baseUrl: "https://a.example",
+      model: "model-a",
+      apiKey: "sk-a",
+    });
+    expect(readStoredYear()).toBe(2024);
+    clearCurrentUserStorage();
+    clearStoredAgentApiKey();
+    expect(loadAgentConnection()).toEqual({ baseUrl: "", model: "", apiKey: "" });
+    expect(readStoredYear()).toBe(0);
+    expect(readExtraYears()).toEqual([]);
   });
 });

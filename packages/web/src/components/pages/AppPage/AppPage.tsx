@@ -47,8 +47,13 @@ export const AppPage = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
   // 認証ゲート: 設定（必須かどうか）とログイン状態を確認するまで待つ。
   // 必須でないローカル運用では従来どおりそのまま使う。
+  // 確認が終わったら、そのアカウントの端末保存（会話履歴・外部接続・年度）を読み直す。
   const { authConfig, authUser, authChecked, authQueryRef, refreshAuth, loginRequired } =
-    useAuthGate(() => setChatSessions(loadChatSessions()));
+    useAuthGate(() => {
+      setChatSessions(loadChatSessions());
+      setAgentConnection(loadAgentConnection());
+      reloadStoredYears();
+    });
   // 起動時のURL（/<画面>/<年度>）があれば、保存値より優先して初期状態にする。
   const initialRoute = useMemo(() => parsePath(window.location.pathname), []);
   const initialView =
@@ -75,7 +80,7 @@ export const AppPage = () => {
     sample,
     setActiveView,
   });
-  const { years, year, handleYearChange, handleAddYear } = useYearSelection(
+  const { years, year, handleYearChange, handleAddYear, reloadStoredYears } = useYearSelection(
     transactions,
     initialRoute?.year ?? undefined,
   );

@@ -40,8 +40,18 @@ export function useYearSelection(transactions: Transaction[], initialYear: numbe
     [extraYears, handleYearChange],
   );
 
+  /**
+   * ログインしたアカウントの保存値を読み直す（保存値はアカウントごとに分かれており、
+   * ログインの確認が終わるまでどのアカウントの値かが決まらない）。起動時の URL に
+   * 年度があれば、その年度を選んだままにする。
+   */
+  const reloadStoredYears = useCallback(() => {
+    if (initialYear === undefined) setSelectedYear(readStoredYear());
+    setExtraYears(readExtraYears());
+  }, [initialYear]);
+
   // 選択中の年がデータに無い場合は、描画時点で最新の年に詰める
   const year = years.includes(selectedYear) ? selectedYear : (years[0] ?? new Date().getFullYear());
 
-  return { years, year, selectedYear, handleYearChange, handleAddYear };
+  return { years, year, selectedYear, handleYearChange, handleAddYear, reloadStoredYears };
 }
