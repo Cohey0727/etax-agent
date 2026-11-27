@@ -1,0 +1,3 @@
+[test]
+# ルートから全パッケージのテストを流すときも server のデータフォルダを一時フォルダへ向ける。
+preload = ["./packages/server/test/preload.ts"]
