@@ -1,64 +1,41 @@
-import {
-  AgricultureInput,
-  BreakdownEntriesKey,
-  BreakdownEntry,
-  ComputeCorrectedFiguresOptions,
-  DeductionInputs,
-  DeductionState,
-  ExpandedIncomeInput,
-  MiscIncomeInput,
-  SalaryIncomeInput,
-  TAX_PARAMETERS,
-  TaxCreditInputs,
-  XtxBalanceSheetInput,
-  applyBreakdownEntries,
-  buildSnapshotFigures,
-  computeCorrectedFigures,
-  computeExpandedIncomes,
-  computeIncomeTax,
-  computeManualIncomes,
-  expandedWithholdingTotal,
-  filterYear,
-  resolveTaxCreditInputs,
-} from "@etax/shared";
+import { DeductionState, TAX_PARAMETERS } from "@etax/shared";
 import { useRouter } from "expo-router";
-import { ReactNode, useMemo, useState } from "react";
+import { ComponentType, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText, Card, SkeletonCard, Tabs } from "@/components";
-import { createFilingSnapshot } from "@/api";
 import { useAppState } from "@/state/AppContext";
 import { space } from "@/theme";
 import { filingInputsStore } from "../deductionState";
-import { AgriculturePanel } from "../AgriculturePanel";
-import { BalanceRecords } from "../BalanceRecords";
-import { BalanceSheetPanel } from "../BalanceSheetPanel";
-import { BalanceSummary } from "../BalanceSummary";
-import { ConfirmComparePanel } from "../ConfirmComparePanel";
-import { ConsumptionTaxPanel } from "../ConsumptionTaxPanel";
-import { DeductionPanel } from "../DeductionPanel";
-import { ExpandedIncomePanel } from "../ExpandedIncomePanel";
-import { FilingPanel, FilingSection } from "../FilingPanel";
-import { FilingStatusToggle } from "../FilingStatusToggle";
-import { MiscIncomePanel } from "../MiscIncomePanel";
-import { MonthlyBalance } from "../MonthlyBalance";
-import { SalaryPanel } from "../SalaryPanel";
-import { LoadFailedNotice, SectionHead } from "../fields";
-import { SubmissionRecordPanel } from "../SubmissionRecordPanel";
-import { TaxCreditPanel } from "../TaxCreditPanel";
-import { TaxpayerPanel } from "../TaxpayerPanel";
-import { useFilingSnapshots } from "../useFilingSnapshots";
-import { summarizeIncome } from "../incomeSummaryFigures";
+import { FilingSection } from "../FilingPanel";
+import { LoadFailedNotice } from "../fields";
 import { useYearInput } from "../useYearInput";
-
-export type FilingTab = "overview" | "balance" | "deductions" | "consumption";
+import {
+  FilingBalanceTab,
+  FilingConsumptionTab,
+  FilingDeductionsTab,
+  FilingOverviewTab,
+  FilingTabProps,
+} from "./FilingTabs";
+import { useFilingModel } from "./useFilingModel";
 
 /** タブの並び。総合が起点で、収支・控除・消費税はそれぞれ独立した作業場。納税者情報は独立画面。 */
-const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
-  { id: "overview", label: "総合" },
-  { id: "balance", label: "収支" },
-  { id: "deductions", label: "控除" },
-  { id: "consumption", label: "消費税" },
-];
+const filingTabs = [
+  { id: "overview", label: "総合", Component: FilingOverviewTab },
+  { id: "balance", label: "収支", Component: FilingBalanceTab },
+  { id: "deductions", label: "控除", Component: FilingDeductionsTab },
+  { id: "consumption", label: "消費税", Component: FilingConsumptionTab },
+] as const satisfies readonly { id: string; label: string; Component: ComponentType<FilingTabProps> }[];
+
+export type FilingTab = (typeof filingTabs)[number]["id"];
+
+const filingTabById: Partial<Record<string, FilingTab>> = Object.fromEntries(
+  filingTabs.map((tab) => [tab.id, tab.id]),
+);
+
+/** URL の tab パラメータを確定申告画面のタブにする（知らない値は総合）。 */
+export function filingTabFromParam(param: string | string[] | undefined): FilingTab {
+  return (typeof param === "string" ? filingTabById[param] : undefined) ?? "overview";
+}
 
 /**
  * 確定申告の作業領域。申告入力（年度別）は納税者情報画面・エージェントと
@@ -107,109 +84,14 @@ interface FilingWorkspaceContentProps {
 }
 
 /**
- * 控除入力の状態を使う作業領域の本体。
+ * 申告入力が読めたあとの作業領域。タブを切り替えても数字は同じ model から出す。
  * 「控除・計算」を確定すると計算結果がスナップショットとして控えられ、
  * 差し戻して再確定するときに前回確定との比較に使う。
  */
 function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWorkspaceContentProps) {
   const router = useRouter();
-  const { year, transactions } = useAppState();
-
-  const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
+  const model = useFilingModel(deductionState);
   const [tab, setTab] = useState<FilingTab>(initialTab);
-
-  // 申告数値の計算には農業所得の入力も渡す（青色申告特別控除の上限・配分と
-  // 農業所得の算入が変わるため）。所得の要約・確定スナップショットも同じ値を使う。
-  const { filingType, realEstateBusinessScale, agriculture } = deductionState;
-  const figuresOptions: ComputeCorrectedFiguresOptions = useMemo(
-    () => ({ filingType, realEstateBusinessScale, agriculture }),
-    [filingType, realEstateBusinessScale, agriculture],
-  );
-  const computed = useMemo(
-    () => computeCorrectedFigures(yearTransactions, year, figuresOptions),
-    [yearTransactions, year, figuresOptions],
-  );
-  // 前年の事業所得（青色申告特別控除前）。貸借対照表の繰越で元入金を
-  // 計算するために使う（申告種別は当年の設定で近似する提案値）。
-  const previousComputed = useMemo(
-    () => computeCorrectedFigures(filterYear(transactions, year - 1), year - 1, figuresOptions),
-    [transactions, year, figuresOptions],
-  );
-
-  const updateDeductions = (next: DeductionInputs) => update((s) => ({ ...s, deductions: next }));
-  const updateTaxCredits = (next: TaxCreditInputs) => update((s) => ({ ...s, taxCredits: next }));
-  const updateMiscIncome = (next: MiscIncomeInput) => update((s) => ({ ...s, miscIncome: next }));
-  const updateSalaryIncome = (next: SalaryIncomeInput) =>
-    update((s) => ({ ...s, salaryIncome: next }));
-  const updateExpandedIncome = (next: ExpandedIncomeInput) =>
-    update((s) => ({ ...s, expandedIncome: next }));
-  const updateAgriculture = (next: AgricultureInput) => update((s) => ({ ...s, agriculture: next }));
-  const updateBalanceSheet = (next: XtxBalanceSheetInput | null) =>
-    update((s) => ({ ...s, balanceSheet: next }));
-  const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) =>
-    update((s) => applyBreakdownEntries(s, key, entries));
-
-  const manualIncomes = useMemo(
-    () =>
-      computeManualIncomes(
-        year,
-        deductionState.salaryIncome,
-        deductionState.miscIncome,
-        computed._detail.business_income +
-          computed._detail.real_estate_income +
-          computed._detail.agriculture_income,
-      ),
-    [year, deductionState.salaryIncome, deductionState.miscIncome, computed],
-  );
-  // 拡張所得（配当・一時・株式等譲渡）の内訳。総合課税分は合計所得へ加算し、
-  // 申告分離分は分離課税として計算する。配当控除の対象額は配当の内訳から
-  // 導出した額を優先する（税額控除パネルの手入力との二重適用を防ぐ）。
-  const expandedBreakdown = useMemo(
-    () => computeExpandedIncomes(deductionState.expandedIncome),
-    [deductionState.expandedIncome],
-  );
-  const incomeSummary = useMemo(
-    () =>
-      summarizeIncome(computed, manualIncomes, expandedBreakdown.comprehensiveAddition, filingType),
-    [computed, manualIncomes, expandedBreakdown, filingType],
-  );
-  const totalIncome = incomeSummary.totalIncome;
-  const taxResult = useMemo(
-    () =>
-      computeIncomeTax({
-        year,
-        totalIncome,
-        deductions: deductionState.deductions,
-        taxCredits: resolveTaxCreditInputs(deductionState.taxCredits, expandedBreakdown),
-        separateTaxation: {
-          stockIncome: expandedBreakdown.separateStockIncome,
-          dividendIncome: expandedBreakdown.separateDividendIncome,
-        },
-      }),
-    [year, totalIncome, deductionState, expandedBreakdown],
-  );
-
-  // 確定スナップショット（前回確定との比較用）。確定は総合タブと控除タブの
-  // どちらからでも行えるため、一覧と保存処理はここだけに置いて両方へ渡す。
-  const { snapshots, refresh: refreshSnapshots } = useFilingSnapshots(year);
-  const currentFigures = useMemo(
-    () =>
-      buildSnapshotFigures(
-        yearTransactions,
-        year,
-        figuresOptions,
-        deductionState.miscIncome,
-        taxResult,
-        deductionState.salaryIncome,
-      ),
-    [yearTransactions, year, figuresOptions, deductionState.miscIncome, taxResult, deductionState.salaryIncome],
-  );
-  const handleConfirmCalculation = async () => {
-    if (!currentFigures) return true;
-    const created = await createFilingSnapshot(year, currentFigures);
-    await refreshSnapshots();
-    return created !== null;
-  };
 
   // 総合タブのセクションリンク。納税者情報だけはタブではなく独立画面へ遷移する。
   const openSection = (section: FilingSection) => {
@@ -220,146 +102,18 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
     }
   };
 
-  const tabContent: Record<FilingTab, ReactNode> = {
-    overview: (
-      <>
-        <FilingPanel
-          year={year}
-          incomeSummary={incomeSummary}
-          filingType={filingType}
-          hasTransactions={yearTransactions.length > 0}
-          taxResult={taxResult}
-          snapshots={snapshots}
-          currentFigures={currentFigures}
-          onConfirmCalculation={handleConfirmCalculation}
-          onOpenSection={openSection}
-        />
-        <TaxpayerPanel
-          year={year}
-          transactions={yearTransactions}
-          deductions={deductionState.deductions}
-          taxCredits={deductionState.taxCredits}
-          miscIncome={deductionState.miscIncome}
-          salaryIncome={deductionState.salaryIncome}
-          expandedIncome={deductionState.expandedIncome}
-          agriculture={deductionState.agriculture}
-          filingType={deductionState.filingType}
-          realEstateBusinessScale={deductionState.realEstateBusinessScale}
-          balanceSheet={deductionState.balanceSheet}
-          taxResult={taxResult}
-          incomeTaxPayments={deductionState.incomeTaxPayments}
-          onIncomeTaxPaymentsChange={(next) => update((s) => ({ ...s, incomeTaxPayments: next }))}
-          expandedWithholding={expandedWithholdingTotal(expandedBreakdown)}
-          onOpenSection={openSection}
-        />
-        <SubmissionRecordPanel year={year} kind="income" />
-      </>
-    ),
-    balance: (
-      <>
-        <Card>
-          <View style={styles.balanceCard}>
-            <SectionHead title="収支" />
-            <BalanceSummary
-              transactions={yearTransactions}
-              figures={computed}
-              summary={incomeSummary}
-              filingType={filingType}
-            />
-            <FilingStatusToggle
-              bare
-              year={year}
-              statusKey="confirmed"
-              label="収支"
-              description="収支の金額・科目・区分に誤りがないか見直したら、ここで確定できます（総合・ダッシュボードと共有）。"
-            />
-          </View>
-        </Card>
-        <MonthlyBalance transactions={yearTransactions} />
-        <BalanceRecords key={year} transactions={yearTransactions} />
-        <BalanceSheetPanel
-          year={year}
-          balanceSheet={deductionState.balanceSheet}
-          incomeBeforeBlue={computed._detail.business_income_before_deduction}
-          previousIncomeBeforeBlue={previousComputed._detail.business_income_before_deduction}
-          filingType={deductionState.filingType}
-          onChange={updateBalanceSheet}
-        />
-      </>
-    ),
-    deductions: (
-      <>
-        <SalaryPanel
-          year={year}
-          salaryIncome={deductionState.salaryIncome}
-          onChange={updateSalaryIncome}
-        />
-        <MiscIncomePanel miscIncome={deductionState.miscIncome} onChange={updateMiscIncome} />
-        <ExpandedIncomePanel
-          expandedIncome={deductionState.expandedIncome}
-          breakdown={expandedBreakdown}
-          taxResult={taxResult}
-          onChange={updateExpandedIncome}
-        />
-        <AgriculturePanel
-          agriculture={deductionState.agriculture}
-          filingType={deductionState.filingType}
-          onChange={updateAgriculture}
-        />
-        <DeductionPanel
-          year={year}
-          deductions={deductionState.deductions}
-          breakdown={taxResult.deductions}
-          onChange={updateDeductions}
-          breakdownEntries={{
-            donations: deductionState.donationEntries,
-            socialInsurance: deductionState.socialInsuranceEntries,
-            mutualAid: deductionState.mutualAidEntries,
-            medical: deductionState.medicalEntries,
-          }}
-          onBreakdownEntriesChange={updateBreakdownEntries}
-        />
-        <TaxCreditPanel
-          taxCredits={deductionState.taxCredits}
-          result={taxResult}
-          dividendCreditDerived={expandedBreakdown.dividendDeclared}
-          onChange={updateTaxCredits}
-        />
-        <ConfirmComparePanel year={year} snapshots={snapshots} currentFigures={currentFigures} />
-        <FilingStatusToggle
-          year={year}
-          statusKey="calculated"
-          label="控除・計算"
-          description="所得控除・税額控除の入力が終わったら、ここで確定できます（総合・ダッシュボードと共有）。確定すると計算結果が控えられ、再確定のときに前回確定との差分が出ます。"
-          onConfirm={handleConfirmCalculation}
-        />
-      </>
-    ),
-    consumption: (
-      <>
-        <ConsumptionTaxPanel
-          transactions={transactions}
-          year={year}
-          consumptionFiling={deductionState.consumptionFiling}
-          onConsumptionFilingChange={(next) => update((s) => ({ ...s, consumptionFiling: next }))}
-        />
-        <SubmissionRecordPanel year={year} kind="consumption" />
-      </>
-    ),
-  };
-
+  const { Component } = filingTabs.find((item) => item.id === tab) ?? filingTabs[0];
   return (
     <View style={styles.wrap}>
       <AppText size="sm" tone="muted">
-        {year}年分の確定申告です。タブはそれぞれ独立した作業場で、順番は問いません。
+        {model.year}年分の確定申告です。タブはそれぞれ独立した作業場で、順番は問いません。
       </AppText>
-      <Tabs items={FILING_TABS} activeId={tab} onChange={setTab} />
-      {tabContent[tab]}
+      <Tabs items={filingTabs} activeId={tab} onChange={setTab} />
+      <Component model={model} update={update} onOpenSection={openSection} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { gap: space.md },
-  balanceCard: { gap: space.md },
 });

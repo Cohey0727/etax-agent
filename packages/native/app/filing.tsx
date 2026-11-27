@@ -1,7 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { ScreenContainer, SelectField } from "@/components";
-import { FilingWorkspace } from "@/features/filing/FilingWorkspace";
-import { FilingTab } from "@/features/filing/FilingWorkspace";
+import { FilingWorkspace, filingTabFromParam } from "@/features/filing/FilingWorkspace";
 import { useAppState } from "@/state/AppContext";
 
 /**
@@ -12,8 +11,7 @@ import { useAppState } from "@/state/AppContext";
 export default function FilingScreen() {
   const { year, years, setYear } = useAppState();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const initialTab: FilingTab =
-    tab === "balance" || tab === "deductions" || tab === "consumption" ? tab : "overview";
+  const initialTab = filingTabFromParam(tab);
   return (
     <ScreenContainer>
       <SelectField
