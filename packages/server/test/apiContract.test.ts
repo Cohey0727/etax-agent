@@ -6,6 +6,10 @@
  * import 前にテスト DB を指させる。
  */
 import { beforeAll, describe, expect, test } from "bun:test";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { sql } from "drizzle-orm";
+import { serverDataDir } from "../src/lib/config";
 import { createTestDb } from "./testDb";
 
 const testDatabaseUrl =
@@ -288,5 +292,39 @@ describe("数値パラメータの不正は DB に渡さず 400 で返す", () =
     const r = await req("/api/cash-flow?months=abc");
     expect(r.status).toBe(400);
     expect(r.body["error"]).toBe("months は1〜24の整数で指定してください");
+  });
+});
+
+describe("DB エラーと壊れた保存データの応答", () => {
+  test("DB の型に合わない入力は 400 で返し、SQL を応答に含めない", async () => {
+    await createTestDb();
+    const r = await req("/api/fixed-assets", {
+      method: "POST",
+      json: { name: "PC", acquisition_date: "2025-04-01", cost: 3_000_000_000, useful_life_years: 4 },
+    });
+    expect(r.status).toBe(400);
+    const text = JSON.stringify(r.body);
+    expect(text).not.toContain("Failed query");
+    expect(text).not.toContain("params:");
+    expect(text).not.toContain("fixed_assets");
+  });
+
+  test("開業入力: 保存値が JSON として壊れていれば未保存として返す", async () => {
+    const db = await createTestDb();
+    const saved = await req("/api/business-start-inputs", { method: "GET" });
+    expect(saved.status).toBe(200);
+    await db.execute(
+      sql`insert into business_start_inputs (owner_user_id, state, updated_at) values (1, '{broken', now())`,
+    );
+    const r = await req("/api/business-start-inputs");
+    expect(r.status).toBe(200);
+    expect(r.body["state"]).toBeNull();
+  });
+
+  test("freee 試算表: ファイルが壊れていれば理由を示す", async () => {
+    await writeFile(join(serverDataDir(), "freee-trial-balance.json"), "{broken", "utf-8");
+    const r = await req("/api/freee/trial-balance");
+    expect(r.status).toBe(500);
+    expect(String(r.body["error"])).toContain("freee");
   });
 });

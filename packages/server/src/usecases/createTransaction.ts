@@ -8,8 +8,7 @@
 import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import {
   insertTransactionRowWith,
@@ -46,8 +45,7 @@ export const createTransactionRoute = createRoute({
 });
 
 export const createTransactionHandler: RouteHandler<typeof createTransactionRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = CreateTransactionRequestSchema.safeParse(raw);
@@ -77,31 +75,26 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
   // 取引の登録と証憑の同時紐付けは1トランザクションで行う
   // （紐付けだけ失敗して取引が残る不整合を防ぐ。Issue #11）。
   const amount = Math.trunc(body.amount);
-  let row;
-  try {
-    row = await db.transaction(async (tx) => {
-      const inserted = await insertTransactionRowWith(tx, {
-        date,
-        fiscalYear,
-        description: body.description ?? "",
-        amount,
-        account: body.account ?? "",
-        category: body.category ? body.category : "未分類",
-        incomeType: body.income_type ?? "other",
-        taxCategory: body.tax_category ?? "",
-        businessRatioPercent: normalizeBusinessRatio(body.business_ratio_percent),
-        businessRatioBasis: body.business_ratio_basis ?? "",
-      });
-      if (inserted && body.receipt_file_ids) {
-        for (const fileId of body.receipt_file_ids) {
-          await linkReceiptRow(tx, fileId, inserted.id);
-        }
-      }
-      return inserted;
+  const row = await db.transaction(async (tx) => {
+    const inserted = await insertTransactionRowWith(tx, {
+      date,
+      fiscalYear,
+      description: body.description ?? "",
+      amount,
+      account: body.account ?? "",
+      category: body.category ? body.category : "未分類",
+      incomeType: body.income_type ?? "other",
+      taxCategory: body.tax_category ?? "",
+      businessRatioPercent: normalizeBusinessRatio(body.business_ratio_percent),
+      businessRatioBasis: body.business_ratio_basis ?? "",
     });
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+    if (inserted && body.receipt_file_ids) {
+      for (const fileId of body.receipt_file_ids) {
+        await linkReceiptRow(tx, fileId, inserted.id);
+      }
+    }
+    return inserted;
+  });
   const response: SingleTransactionResponse = { transaction: row ? transactionToApi(row) : null };
   return c.json(response, 201);
 };

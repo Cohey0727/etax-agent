@@ -153,7 +153,9 @@ export const importCsvHandler: RouteHandler<typeof importCsvRoute> = async (c) =
       alreadyImported = deduped.duplicates;
       persisted = true;
     } catch (e) {
-      persistWarning = `DBへの保存に失敗しました（プレビューとして返します）: ${errorMessage(e)}`;
+      // 例外の文面には SQL 文とバインド値が入るので、応答には載せずログにだけ残す。
+      console.error("CSV取込の保存に失敗しました:", e);
+      persistWarning = "DBへの保存に失敗しました（プレビューとして返します）";
     }
   }
 

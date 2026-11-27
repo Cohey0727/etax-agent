@@ -5,19 +5,14 @@
  * （サービス側）。入金取引そのものは残る。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { ErrorSchema } from "../schemas/common";
 import {
   InvoicePaymentIdParamSchema,
   InvoicePaymentsResponse,
   InvoicePaymentsResponseSchema,
 } from "../schemas/reconciliation";
-import {
-  ReconciliationError,
-  releaseInvoicePayment,
-} from "../services/reconciliation/reconcileInvoice";
+import { releaseInvoicePayment } from "../services/reconciliation/reconcileInvoice";
 
 export const deleteInvoicePaymentRoute = createRoute({
   method: "delete",
@@ -45,17 +40,8 @@ export const deleteInvoicePaymentRoute = createRoute({
 export const deleteInvoicePaymentHandler: RouteHandler<typeof deleteInvoicePaymentRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id, paymentId } = c.req.valid("param");
-  let response: InvoicePaymentsResponse;
-  try {
-    response = await releaseInvoicePayment(db, id, paymentId);
-  } catch (e) {
-    if (e instanceof ReconciliationError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: InvoicePaymentsResponse = await releaseInvoicePayment(db, id, paymentId);
   return c.json(response, 200);
 };

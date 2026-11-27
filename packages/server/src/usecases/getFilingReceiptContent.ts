@@ -7,16 +7,10 @@
  * 配信は領収書画像と同じく nosniff + CSP sandbox で封じる。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { StorageError } from "../gateways/storageGateway";
-import { getDb } from "../lib/db";
-import { databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { ErrorSchema } from "../schemas/common";
 import { FilingSubmissionKindParamSchema } from "../schemas/filingSubmission";
-import {
-  FilingSubmissionError,
-  getFilingReceiptBytes,
-} from "../services/filingSubmission/filingSubmissionRecords";
+import { getFilingReceiptBytes } from "../services/filingSubmission/filingSubmissionRecords";
 
 export const getFilingReceiptContentRoute = createRoute({
   method: "get",
@@ -41,22 +35,11 @@ export const getFilingReceiptContentRoute = createRoute({
 export const getFilingReceiptContentHandler: RouteHandler<
   typeof getFilingReceiptContentRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const params = c.req.valid("param");
   const { year } = params;
   let result: { filename: string; mimeType: string; dataBase64: string };
-  try {
-    result = await getFilingReceiptBytes(db, year, params.kind);
-  } catch (e) {
-    if (e instanceof FilingSubmissionError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    if (e instanceof StorageError) {
-      throw new HTTPException(503, { message: e.message });
-    }
-    throw e;
-  }
+  result = await getFilingReceiptBytes(db, year, params.kind);
   const bytes = Buffer.from(result.dataBase64, "base64");
   return c.body(bytes, 200, {
     "Content-Type": result.mimeType,

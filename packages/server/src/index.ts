@@ -51,9 +51,15 @@ import { join } from "node:path";
 import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { ensureTables, getDb, isDatabaseConfigured, tablesReady } from "./lib/db";
 import { encryptionEnabled } from "./lib/encryption";
+import {
+  databaseErrorKind,
+  databaseFailureMessage,
+  databaseInputErrorMessage,
+} from "./lib/errors";
 import { publicBaseUrl } from "./lib/publicUrl";
 import { defaultValidationHook } from "./lib/validationHook";
 import { billingEnabled } from "./gateways/stripeGateway";
+import { StorageError, StorageObjectNotFoundError } from "./gateways/storageGateway";
 import { hasActivePlan } from "./repositories/subscriptionRepository";
 import { authRequired, runWithTenant } from "./lib/tenantContext";
 import { resolveRequestUserId } from "./usecases/authSession";
@@ -62,6 +68,12 @@ import {
   createOpenApiDocumentHandler,
 } from "./usecases/getOpenApiDocument";
 import { seedTaxKnowledge } from "./services/knowledge/seedTaxKnowledge";
+import { AgentChatError } from "./services/agent/executeAgentChat";
+import { FilingSubmissionError } from "./services/filingSubmission/filingSubmissionRecords";
+import { InvoiceDocumentError } from "./services/invoice/invoiceDocuments";
+import { PdfFormError } from "./services/pdf/formPdfExports";
+import { ReceiptAnalysisError } from "./services/receipts/analyzeReceiptDraft";
+import { ReconciliationError } from "./services/reconciliation/reconcileInvoice";
 import { deleteExpiredAuthRows } from "./repositories/userRepository";
 import { createSystemOneClient } from "./gateways/systemOneGateway";
 import { loadSystemOneConfig } from "./lib/config";
@@ -243,14 +255,36 @@ app.get(OPENAPI_DOCUMENT_PATH, createOpenApiDocumentHandler(app));
 const webDistRoot = process.env.ETAX_WEB_ROOT || join(import.meta.dir, "../../web/dist");
 app.use("/*", serveStatic({ root: webDistRoot }));
 
-// エラーは従来どおり { error: string } 形式で返す（HTTPException の文言をそのまま使う）。
-// バリデータが投げる「Malformed JSON」は従来文言（JSONボディが必要です）に読み替える。
+/**
+ * エラーは { error: string } 形式で返す。ユースケースは業務エラー・ストレージ・
+ * DB の例外を個別に HTTP へ変換せずに投げ、ここでステータスを決める。
+ * DB の例外は SQL 文とバインド値を含むので、応答は固定文言にしてログにだけ残す。
+ */
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
+    // JSON として読めないボディでバリデータが投げる文言は、他の不備と同じ文言にそろえる。
     const message = err.message === "Malformed JSON in request body" ? "JSONボディが必要です" : err.message;
     return c.json({ error: message }, err.status);
   }
-  // 想定外の 500 は握り潰さず、原因追跡のために必ずログへ残す（Issue #11）。
+  if (
+    err instanceof InvoiceDocumentError ||
+    err instanceof ReconciliationError ||
+    err instanceof FilingSubmissionError ||
+    err instanceof PdfFormError ||
+    err instanceof ReceiptAnalysisError ||
+    err instanceof AgentChatError
+  ) {
+    return c.json({ error: err.message }, err.status);
+  }
+  if (err instanceof StorageObjectNotFoundError) return c.json({ error: err.message }, 404);
+  if (err instanceof StorageError) return c.json({ error: err.message }, 503);
+  const dbErrorKind = databaseErrorKind(err);
+  if (dbErrorKind !== null) {
+    console.error(`DB エラー (${c.req.method} ${c.req.path}):`, err);
+    return dbErrorKind === "input"
+      ? c.json({ error: databaseInputErrorMessage }, 400)
+      : c.json({ error: databaseFailureMessage }, 503);
+  }
   console.error(`未処理のエラー (${c.req.method} ${c.req.path}):`, err);
   return c.json({ error: "Internal Server Error" }, 500);
 });

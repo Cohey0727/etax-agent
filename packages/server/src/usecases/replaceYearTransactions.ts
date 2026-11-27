@@ -8,8 +8,7 @@
 import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import {
   replaceYearTransactionRows,
@@ -47,8 +46,7 @@ export const replaceYearTransactionsRoute = createRoute({
 export const replaceYearTransactionsHandler: RouteHandler<
   typeof replaceYearTransactionsRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = ReplaceYearTransactionsRequestSchema.safeParse(raw);
@@ -90,12 +88,7 @@ export const replaceYearTransactionsHandler: RouteHandler<
       businessRatioBasis: body.business_ratio_basis ?? "",
     };
   });
-  let rows;
-  try {
-    rows = await replaceYearTransactionRows(db, year, values);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const rows = await replaceYearTransactionRows(db, year, values);
   const response: ListTransactionsResponse = {
     count: rows.length,
     transactions: rows.map(transactionToApi),

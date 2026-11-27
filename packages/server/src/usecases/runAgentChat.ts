@@ -8,11 +8,10 @@
  * 変換する薄いハンドラだけを持つ。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
 import { readJsonBody } from "../lib/readJsonBody";
 import { AgentChatResponseSchema } from "../schemas/agentChat";
 import { ErrorSchema } from "../schemas/common";
-import { AgentChatError, executeAgentChat } from "../services/agent/executeAgentChat";
+import { executeAgentChat } from "../services/agent/executeAgentChat";
 
 export const runAgentChatRoute = createRoute({
   method: "post",
@@ -46,12 +45,5 @@ export const runAgentChatRoute = createRoute({
 
 export const runAgentChatHandler: RouteHandler<typeof runAgentChatRoute> = async (c) => {
   const raw = await readJsonBody(c);
-  try {
-    return c.json(await executeAgentChat(raw), 200);
-  } catch (e) {
-    if (e instanceof AgentChatError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw e;
-  }
+  return c.json(await executeAgentChat(raw), 200);
 };

@@ -7,8 +7,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import {
   taxpayerProfileToApi,
@@ -49,8 +48,7 @@ export const saveTaxpayerProfileRoute = createRoute({
 export const saveTaxpayerProfileHandler: RouteHandler<typeof saveTaxpayerProfileRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
@@ -75,12 +73,7 @@ export const saveTaxpayerProfileHandler: RouteHandler<typeof saveTaxpayerProfile
     previous_zip_code: parsed.data.previous_zip_code ?? "",
     previous_address: parsed.data.previous_address ?? "",
   };
-  let row;
-  try {
-    row = await upsertTaxpayerProfileRow(db, year, profile);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const row = await upsertTaxpayerProfileRow(db, year, profile);
   if (!row) throw new HTTPException(503, { message: "納税者プロフィールを保存できませんでした" });
   const response: SaveTaxpayerProfileResponse = { taxpayer: taxpayerProfileToApi(row) };
   return c.json(response, 200);

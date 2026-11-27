@@ -7,8 +7,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { ErrorSchema } from "../schemas/common";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
@@ -17,10 +16,7 @@ import {
   InvoicePaymentsResponse,
   InvoicePaymentsResponseSchema,
 } from "../schemas/reconciliation";
-import {
-  applyInvoicePayment,
-  ReconciliationError,
-} from "../services/reconciliation/reconcileInvoice";
+import { applyInvoicePayment } from "../services/reconciliation/reconcileInvoice";
 
 export const createInvoicePaymentRoute = createRoute({
   method: "post",
@@ -52,8 +48,7 @@ export const createInvoicePaymentRoute = createRoute({
 export const createInvoicePaymentHandler: RouteHandler<typeof createInvoicePaymentRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = CreateInvoicePaymentRequestSchema.safeParse(raw);
@@ -61,14 +56,6 @@ export const createInvoicePaymentHandler: RouteHandler<typeof createInvoicePayme
     throw new HTTPException(400, { message: "消込の入力が不正です" });
   }
   const { id } = c.req.valid("param");
-  let response: InvoicePaymentsResponse;
-  try {
-    response = await applyInvoicePayment(db, { invoiceId: id, ...parsed.data });
-  } catch (e) {
-    if (e instanceof ReconciliationError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: InvoicePaymentsResponse = await applyInvoicePayment(db, { invoiceId: id, ...parsed.data });
   return c.json(response, 201);
 };

@@ -9,8 +9,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -48,8 +47,7 @@ export const saveFilingSubmissionRoute = createRoute({
 export const saveFilingSubmissionHandler: RouteHandler<
   typeof saveFilingSubmissionRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const params = c.req.valid("param");
   const { year } = params;
   const raw = await readJsonBody(c);
@@ -58,12 +56,7 @@ export const saveFilingSubmissionHandler: RouteHandler<
   if (!parsed.success) {
     throw new HTTPException(400, { message: "受付番号・提出日が不正です" });
   }
-  let submission: FilingSubmissionResponse;
-  try {
-    submission = await saveFilingSubmissionRecord(db, year, params.kind, parsed.data);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const submission: FilingSubmissionResponse = await saveFilingSubmissionRecord(db, year, params.kind, parsed.data);
   const response: SingleFilingSubmissionResponse = { submission };
   return c.json(response, 200);
 };

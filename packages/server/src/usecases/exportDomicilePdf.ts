@@ -6,18 +6,13 @@
  * そのものが提出書類になる（提出日はリクエストの提出日を入れる）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
 import { ErrorSchema } from "../schemas/common";
 import {
   ExportDomicilePdfResponse,
   ExportDomicilePdfResponseSchema,
   ExportDomicilePdfRequestSchema,
 } from "../schemas/etax";
-import {
-  buildDomicilePdfExport,
-  FormPdfExport,
-  PdfFormError,
-} from "../services/pdf/formPdfExports";
+import { buildDomicilePdfExport, FormPdfExport } from "../services/pdf/formPdfExports";
 
 export const exportDomicilePdfRoute = createRoute({
   method: "post",
@@ -49,13 +44,7 @@ export const exportDomicilePdfRoute = createRoute({
 
 export const exportDomicilePdfHandler: RouteHandler<typeof exportDomicilePdfRoute> = async (c) => {
   const body = c.req.valid("json");
-  let result: FormPdfExport;
-  try {
-    result = await buildDomicilePdfExport(body.taxpayer, body.submission_date);
-  } catch (e) {
-    if (e instanceof PdfFormError) throw new HTTPException(e.status, { message: e.message });
-    throw e;
-  }
+  const result: FormPdfExport = await buildDomicilePdfExport(body.taxpayer, body.submission_date);
   const response: ExportDomicilePdfResponse = result;
   return c.json(response, 200);
 };

@@ -3,8 +3,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { receiptToApi, unlinkReceiptRow } from "../repositories/receiptRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -37,15 +36,9 @@ export const unlinkReceiptRoute = createRoute({
 });
 
 export const unlinkReceiptHandler: RouteHandler<typeof unlinkReceiptRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { fileId } = c.req.valid("param");
-  let row;
-  try {
-    row = await unlinkReceiptRow(db, fileId);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const row = await unlinkReceiptRow(db, fileId);
   if (!row) throw new HTTPException(404, { message: "証憑が見つかりません" });
   const response: SingleReceiptResponse = { receipt: receiptToApi(row) };
   return c.json(response, 200);

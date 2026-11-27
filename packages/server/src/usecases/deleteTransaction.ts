@@ -3,8 +3,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { deleteTransactionRow, transactionToApi } from "../repositories/transactionRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -41,15 +40,9 @@ export const deleteTransactionRoute = createRoute({
 });
 
 export const deleteTransactionHandler: RouteHandler<typeof deleteTransactionRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
-  let row;
-  try {
-    row = await deleteTransactionRow(db, id);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const row = await deleteTransactionRow(db, id);
   if (!row) throw new HTTPException(404, { message: "対象の取引が見つかりません" });
   const response: DeleteTransactionResponse = { deleted: transactionToApi(row) };
   return c.json(response, 200);

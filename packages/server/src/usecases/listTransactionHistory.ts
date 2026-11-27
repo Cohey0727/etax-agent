@@ -6,9 +6,7 @@
  * 消えるため、その履歴はこの一覧経由でしか辿れない。履歴は新しい順。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   listRecentTransactionHistoryRows,
   transactionHistoryToApi,
@@ -46,16 +44,10 @@ export const listTransactionHistoryRoute = createRoute({
 export const listTransactionHistoryHandler: RouteHandler<
   typeof listTransactionHistoryRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const requested = c.req.valid("query").limit;
   const limit = requested === undefined ? DEFAULT_LIMIT : Math.min(requested, MAX_LIMIT);
-  let rows;
-  try {
-    rows = await listRecentTransactionHistoryRows(db, limit);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const rows = await listRecentTransactionHistoryRows(db, limit);
   const response: ListTransactionHistoryResponse = {
     count: rows.length,
     history: rows.map(transactionHistoryToApi),

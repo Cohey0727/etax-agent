@@ -7,8 +7,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import {
   FilingStatusPatch,
@@ -49,8 +48,7 @@ export const updateFilingStatusRoute = createRoute({
 export const updateFilingStatusHandler: RouteHandler<typeof updateFilingStatusRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
@@ -60,12 +58,7 @@ export const updateFilingStatusHandler: RouteHandler<typeof updateFilingStatusRo
   if (parsed.data.confirmed !== undefined) patch.confirmed = parsed.data.confirmed;
   if (parsed.data.calculated !== undefined) patch.calculated = parsed.data.calculated;
   if (parsed.data.submitted !== undefined) patch.submitted = parsed.data.submitted;
-  let row;
-  try {
-    row = await upsertFilingStatusRow(db, year, patch);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const row = await upsertFilingStatusRow(db, year, patch);
   if (!row) throw new HTTPException(503, { message: "申告ステータスを保存できませんでした" });
   const response: SingleFilingStatusResponse = { status: filingStatusToApi(row) };
   return c.json(response, 200);

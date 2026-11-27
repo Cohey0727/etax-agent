@@ -8,8 +8,7 @@
 import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { TransactionRow } from "../repositories/schema";
 import { transactionToApi, updateTransactionRow } from "../repositories/transactionRepository";
@@ -49,8 +48,7 @@ export const updateTransactionRoute = createRoute({
 });
 
 export const updateTransactionHandler: RouteHandler<typeof updateTransactionRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
@@ -85,12 +83,7 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
     patch.businessRatioPercent = normalizeBusinessRatio(body.business_ratio_percent);
   }
   if (body.business_ratio_basis !== undefined) patch.businessRatioBasis = body.business_ratio_basis;
-  let row;
-  try {
-    row = await updateTransactionRow(db, id, patch);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const row = await updateTransactionRow(db, id, patch);
   if (!row) throw new HTTPException(404, { message: "対象の取引が見つかりません" });
   const response: SingleTransactionResponse = { transaction: transactionToApi(row) };
   return c.json(response, 200);

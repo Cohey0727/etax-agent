@@ -6,10 +6,9 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { createStorageClient, StorageError } from "../gateways/storageGateway";
+import { createStorageClient } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { fixedAssetImageDisplayUrl } from "../lib/fixedAssetImageUrl";
 import { getFixedAssetRow } from "../repositories/fixedAssetRepository";
 import {
@@ -53,26 +52,18 @@ export const listFixedAssetImagesRoute = createRoute({
 export const listFixedAssetImagesHandler: RouteHandler<typeof listFixedAssetImagesRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
   const storage = createStorageClient(loadStorageConfig());
-  let response: FixedAssetImageListResponse;
-  try {
-    const asset = await getFixedAssetRow(db, id);
-    if (!asset) {
-      throw new HTTPException(404, { message: "対象の固定資産が見つかりません" });
-    }
-    const rows = await listFixedAssetImageRows(db, id);
-    const images = [];
-    for (const row of rows) {
-      images.push(fixedAssetImageToApi(row, await fixedAssetImageDisplayUrl(storage, row.fileId)));
-    }
-    response = { images };
-  } catch (e) {
-    if (e instanceof HTTPException) throw e;
-    if (e instanceof StorageError) throw new HTTPException(503, { message: e.message });
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+  const asset = await getFixedAssetRow(db, id);
+  if (!asset) {
+    throw new HTTPException(404, { message: "対象の固定資産が見つかりません" });
   }
+  const rows = await listFixedAssetImageRows(db, id);
+  const images = [];
+  for (const row of rows) {
+    images.push(fixedAssetImageToApi(row, await fixedAssetImageDisplayUrl(storage, row.fileId)));
+  }
+  const response: FixedAssetImageListResponse = { images };
   return c.json(response, 200);
 };

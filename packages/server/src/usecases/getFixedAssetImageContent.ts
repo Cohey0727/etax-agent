@@ -8,12 +8,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import {
-  createStorageClient,
-  fixedAssetObjectKey,
-  StorageError,
-  StorageObjectNotFoundError,
-} from "../gateways/storageGateway";
+import { createStorageClient, fixedAssetObjectKey } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
 import { getDb } from "../lib/db";
 import { currentUserId } from "../lib/tenantContext";
@@ -53,25 +48,15 @@ export const getFixedAssetImageContentHandler: RouteHandler<
     const row = db ? await getFixedAssetImageRowByFileId(db, fileId) : null;
     if (!row) throw new HTTPException(404, { message: "ファイルが存在しません" });
   }
-  try {
-    const storage = createStorageClient(loadStorageConfig());
-    const downloaded = await storage.download(fixedAssetObjectKey(fileId));
-    const bytes = Buffer.from(downloaded.dataBase64, "base64");
-    // 配信タイプはホワイトリストで検証し、nosniff と CSP sandbox で
-    // ブラウザ側の解釈を封じる（Stored XSS 対策、Issue #7）。
-    return c.body(bytes, 200, {
-      "Content-Type": servedContentType(downloaded.mimeType),
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-      "Content-Disposition": "inline",
-    });
-  } catch (e) {
-    if (e instanceof StorageObjectNotFoundError) {
-      throw new HTTPException(404, { message: e.message });
-    }
-    if (e instanceof StorageError) {
-      throw new HTTPException(503, { message: e.message });
-    }
-    throw e;
-  }
+  const storage = createStorageClient(loadStorageConfig());
+  const downloaded = await storage.download(fixedAssetObjectKey(fileId));
+  const bytes = Buffer.from(downloaded.dataBase64, "base64");
+  // 配信タイプはホワイトリストで検証し、nosniff と CSP sandbox で
+  // ブラウザ側の解釈を封じる（Stored XSS 対策、Issue #7）。
+  return c.body(bytes, 200, {
+    "Content-Type": servedContentType(downloaded.mimeType),
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    "Content-Disposition": "inline",
+  });
 };

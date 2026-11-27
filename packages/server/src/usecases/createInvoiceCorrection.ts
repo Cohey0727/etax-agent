@@ -7,19 +7,14 @@
  * 発行日は当日で初期化する（取引年月日は修正書類自身の交付日）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { ErrorSchema } from "../schemas/common";
 import {
   InvoiceIdParamSchema,
   SingleInvoiceResponse,
   SingleInvoiceResponseSchema,
 } from "../schemas/invoice";
-import {
-  createInvoiceCorrectionDraft,
-  InvoiceDocumentError,
-} from "../services/invoice/invoiceDocuments";
+import { createInvoiceCorrectionDraft } from "../services/invoice/invoiceDocuments";
 
 export const createInvoiceCorrectionRoute = createRoute({
   method: "post",
@@ -51,17 +46,8 @@ export const createInvoiceCorrectionRoute = createRoute({
 export const createInvoiceCorrectionHandler: RouteHandler<
   typeof createInvoiceCorrectionRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
-  let response: SingleInvoiceResponse;
-  try {
-    response = { invoice: await createInvoiceCorrectionDraft(db, id) };
-  } catch (e) {
-    if (e instanceof InvoiceDocumentError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: SingleInvoiceResponse = { invoice: await createInvoiceCorrectionDraft(db, id) };
   return c.json(response, 201);
 };

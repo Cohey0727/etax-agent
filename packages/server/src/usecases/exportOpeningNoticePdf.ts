@@ -7,18 +7,13 @@
  * 記入内容の確認用。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
 import { ErrorSchema } from "../schemas/common";
 import {
   ExportBusinessStartPdfRequestSchema,
   ExportBusinessStartPdfResponse,
   ExportBusinessStartPdfResponseSchema,
 } from "../schemas/businessStart";
-import {
-  buildOpeningNoticePdfExport,
-  FormPdfExport,
-  PdfFormError,
-} from "../services/pdf/formPdfExports";
+import { buildOpeningNoticePdfExport, FormPdfExport } from "../services/pdf/formPdfExports";
 
 export const exportOpeningNoticePdfRoute = createRoute({
   method: "post",
@@ -52,13 +47,7 @@ export const exportOpeningNoticePdfHandler: RouteHandler<
   typeof exportOpeningNoticePdfRoute
 > = async (c) => {
   const body = c.req.valid("json");
-  let result: FormPdfExport;
-  try {
-    result = await buildOpeningNoticePdfExport(body.taxpayer, body.inputs, body.submission_date);
-  } catch (e) {
-    if (e instanceof PdfFormError) throw new HTTPException(e.status, { message: e.message });
-    throw e;
-  }
+  const result: FormPdfExport = await buildOpeningNoticePdfExport(body.taxpayer, body.inputs, body.submission_date);
   const response: ExportBusinessStartPdfResponse = result;
   return c.json(response, 200);
 };

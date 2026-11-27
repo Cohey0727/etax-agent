@@ -3,8 +3,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { linkReceiptRow, receiptToApi } from "../repositories/receiptRepository";
 import { getTransactionRow } from "../repositories/transactionRepository";
@@ -44,8 +43,7 @@ export const linkReceiptRoute = createRoute({
 });
 
 export const linkReceiptHandler: RouteHandler<typeof linkReceiptRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { fileId } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
@@ -53,17 +51,11 @@ export const linkReceiptHandler: RouteHandler<typeof linkReceiptRoute> = async (
   if (!parsed.success) {
     throw new HTTPException(400, { message: "transaction_id が不正です" });
   }
-  let row;
-  try {
-    const transaction = await getTransactionRow(db, parsed.data.transaction_id);
-    if (!transaction) {
-      throw new HTTPException(404, { message: "対象の取引が見つかりません" });
-    }
-    row = await linkReceiptRow(db, fileId, parsed.data.transaction_id);
-  } catch (e) {
-    if (e instanceof HTTPException) throw e;
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+  const transaction = await getTransactionRow(db, parsed.data.transaction_id);
+  if (!transaction) {
+    throw new HTTPException(404, { message: "対象の取引が見つかりません" });
   }
+  const row = await linkReceiptRow(db, fileId, parsed.data.transaction_id);
   const response: SingleReceiptResponse = { receipt: row ? receiptToApi(row) : null };
   return c.json(response, 200);
 };

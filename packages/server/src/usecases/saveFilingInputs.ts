@@ -3,7 +3,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
+import { requireDb } from "../lib/errors";
 import { upsertFilingInputRow } from "../repositories/filingInputRepository";
 import {
   FilingInputsResponseSchema,
@@ -30,8 +30,7 @@ export const saveFilingInputsRoute = createRoute({
 });
 
 export const saveFilingInputsHandler: RouteHandler<typeof saveFilingInputsRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
+  const db = requireDb();
   const { year } = c.req.valid("param");
   const body = (await c.req.json().catch(() => null)) as { state?: unknown } | null;
   if (!body || typeof body.state !== "object" || body.state === null) {

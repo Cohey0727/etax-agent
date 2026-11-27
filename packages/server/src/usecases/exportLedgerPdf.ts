@@ -7,8 +7,7 @@
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { z } from "@hono/zod-openapi";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   effectiveFiscalYear,
   listTransactionRows,
@@ -43,15 +42,9 @@ export const exportLedgerPdfRoute = createRoute({
 });
 
 export const exportLedgerPdfHandler: RouteHandler<typeof exportLedgerPdfRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year } = c.req.valid("query");
-  let rows;
-  try {
-    rows = await listTransactionRows(db);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const rows = await listTransactionRows(db);
   const yearRows = rows.filter((r) => effectiveFiscalYear(r) === year).map(transactionToApi);
   const fontBytes = await loadJapaneseFont();
   if (!fontBytes) {

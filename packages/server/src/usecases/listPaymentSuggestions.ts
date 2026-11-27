@@ -6,19 +6,14 @@
  * 推測処理は services/reconciliation（MCP と共用）に集約している。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { ErrorSchema } from "../schemas/common";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
 import {
   ReconciliationSuggestionsResponse,
   ReconciliationSuggestionsResponseSchema,
 } from "../schemas/reconciliation";
-import {
-  ReconciliationError,
-  suggestInvoicePayments,
-} from "../services/reconciliation/reconcileInvoice";
+import { suggestInvoicePayments } from "../services/reconciliation/reconcileInvoice";
 
 export const listPaymentSuggestionsRoute = createRoute({
   method: "get",
@@ -46,17 +41,8 @@ export const listPaymentSuggestionsRoute = createRoute({
 export const listPaymentSuggestionsHandler: RouteHandler<
   typeof listPaymentSuggestionsRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
-  let response: ReconciliationSuggestionsResponse;
-  try {
-    response = { candidates: await suggestInvoicePayments(db, id) };
-  } catch (e) {
-    if (e instanceof ReconciliationError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: ReconciliationSuggestionsResponse = { candidates: await suggestInvoicePayments(db, id) };
   return c.json(response, 200);
 };

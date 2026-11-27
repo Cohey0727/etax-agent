@@ -2,9 +2,7 @@
  * listFilingStatuses.ts — 申告ステータス一覧ユースケース（usecases）。DB必須。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   filingStatusToApi,
   listFilingStatusRows,
@@ -36,14 +34,8 @@ export const listFilingStatusesRoute = createRoute({
 export const listFilingStatusesHandler: RouteHandler<typeof listFilingStatusesRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  let rows;
-  try {
-    rows = await listFilingStatusRows(db);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const db = requireDb();
+  const rows = await listFilingStatusRows(db);
   const response: ListFilingStatusesResponse = { statuses: rows.map(filingStatusToApi) };
   return c.json(response, 200);
 };

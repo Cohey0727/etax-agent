@@ -5,9 +5,7 @@
  * carried_from に引き継ぎ元の年を入れる。どちらも無ければ空のプロフィール。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   emptyTaxpayerProfile,
   findTaxpayerCarryRow,
@@ -47,22 +45,17 @@ export const getTaxpayerProfileRoute = createRoute({
 export const getTaxpayerProfileHandler: RouteHandler<typeof getTaxpayerProfileRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year } = c.req.valid("param");
   let response: GetTaxpayerProfileResponse;
-  try {
-    const own = await getTaxpayerProfileRow(db, year);
-    if (own) {
-      response = { taxpayer: taxpayerProfileToApi(own), carried_from: null };
-    } else {
-      const carry = await findTaxpayerCarryRow(db, year);
-      response = carry
-        ? { taxpayer: taxpayerProfileToApi(carry), carried_from: carry.year }
-        : { taxpayer: emptyTaxpayerProfile(), carried_from: null };
-    }
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+  const own = await getTaxpayerProfileRow(db, year);
+  if (own) {
+    response = { taxpayer: taxpayerProfileToApi(own), carried_from: null };
+  } else {
+    const carry = await findTaxpayerCarryRow(db, year);
+    response = carry
+      ? { taxpayer: taxpayerProfileToApi(carry), carried_from: carry.year }
+      : { taxpayer: emptyTaxpayerProfile(), carried_from: null };
   }
   return c.json(response, 200);
 };

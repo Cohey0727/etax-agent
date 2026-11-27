@@ -2,9 +2,7 @@
  * listImports.ts — 取込履歴ユースケース（usecases）。DB必須。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { importToApi, listImportRows } from "../repositories/importRepository";
 import { ErrorSchema } from "../schemas/common";
 import { ListImportsResponse, ListImportsResponseSchema } from "../schemas/importRecord";
@@ -28,14 +26,8 @@ export const listImportsRoute = createRoute({
 });
 
 export const listImportsHandler: RouteHandler<typeof listImportsRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
-  let rows;
-  try {
-    rows = await listImportRows(db);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const db = requireDb();
+  const rows = await listImportRows(db);
   const response: ListImportsResponse = {
     count: rows.length,
     imports: rows.map(importToApi),

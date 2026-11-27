@@ -7,9 +7,7 @@
  * 追える（電子帳簿保存法の訂正・削除履歴に相当）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { ErrorSchema } from "../schemas/common";
 import {
   DeleteFilingSubmissionResponseSchema,
@@ -17,7 +15,6 @@ import {
 } from "../schemas/filingSubmission";
 import {
   deleteFilingSubmissionRecord,
-  FilingSubmissionError,
 } from "../services/filingSubmission/filingSubmissionRecords";
 
 export const deleteFilingSubmissionRoute = createRoute({
@@ -50,17 +47,9 @@ export const deleteFilingSubmissionRoute = createRoute({
 export const deleteFilingSubmissionHandler: RouteHandler<
   typeof deleteFilingSubmissionRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const params = c.req.valid("param");
   const { year } = params;
-  try {
-    await deleteFilingSubmissionRecord(db, year, params.kind);
-  } catch (e) {
-    if (e instanceof FilingSubmissionError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  await deleteFilingSubmissionRecord(db, year, params.kind);
   return c.json({ message: "提出の記録を削除しました" }, 200);
 };

@@ -9,7 +9,6 @@
  *   2. imageBase64 + mimeType: 従来経路（ストレージ未設定時のフォールバック）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -17,10 +16,7 @@ import {
   AnalyzeReceiptResponse,
   AnalyzeReceiptResponseSchema,
 } from "../schemas/receipt";
-import {
-  analyzeReceiptDraft,
-  ReceiptAnalysisError,
-} from "../services/receipts/analyzeReceiptDraft";
+import { analyzeReceiptDraft } from "../services/receipts/analyzeReceiptDraft";
 
 export const analyzeReceiptRoute = createRoute({
   method: "post",
@@ -56,18 +52,10 @@ export const analyzeReceiptRoute = createRoute({
 
 export const analyzeReceiptHandler: RouteHandler<typeof analyzeReceiptRoute> = async (c) => {
   const body = c.req.valid("json");
-  let result: AnalyzeReceiptResponse;
-  try {
-    result = await analyzeReceiptDraft(getDb(), {
-      fileId: body.fileId,
-      imageBase64: body.imageBase64,
-      mimeType: body.mimeType,
-    });
-  } catch (e) {
-    if (e instanceof ReceiptAnalysisError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw e;
-  }
+  const result: AnalyzeReceiptResponse = await analyzeReceiptDraft(getDb(), {
+    fileId: body.fileId,
+    imageBase64: body.imageBase64,
+    mimeType: body.mimeType,
+  });
   return c.json(result, 200);
 };

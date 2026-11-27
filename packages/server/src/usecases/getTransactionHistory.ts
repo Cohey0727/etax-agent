@@ -5,9 +5,7 @@
  * エンドポイント。履歴は新しい順に返す。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   listTransactionHistoryRows,
   transactionHistoryToApi,
@@ -45,15 +43,9 @@ export const getTransactionHistoryRoute = createRoute({
 export const getTransactionHistoryHandler: RouteHandler<
   typeof getTransactionHistoryRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
-  let rows;
-  try {
-    rows = await listTransactionHistoryRows(db, id);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const rows = await listTransactionHistoryRows(db, id);
   const response: ListTransactionHistoryResponse = {
     count: rows.length,
     history: rows.map(transactionHistoryToApi),

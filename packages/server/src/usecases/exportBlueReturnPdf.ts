@@ -6,18 +6,13 @@
  * e-Tax 等で本人が行い、この PDF は紙提出用と記入内容の確認用。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
 import { ErrorSchema } from "../schemas/common";
 import {
   ExportBusinessStartPdfRequestSchema,
   ExportBusinessStartPdfResponse,
   ExportBusinessStartPdfResponseSchema,
 } from "../schemas/businessStart";
-import {
-  buildBlueReturnPdfExport,
-  FormPdfExport,
-  PdfFormError,
-} from "../services/pdf/formPdfExports";
+import { buildBlueReturnPdfExport, FormPdfExport } from "../services/pdf/formPdfExports";
 
 export const exportBlueReturnPdfRoute = createRoute({
   method: "post",
@@ -51,13 +46,7 @@ export const exportBlueReturnPdfHandler: RouteHandler<
   typeof exportBlueReturnPdfRoute
 > = async (c) => {
   const body = c.req.valid("json");
-  let result: FormPdfExport;
-  try {
-    result = await buildBlueReturnPdfExport(body.taxpayer, body.inputs, body.submission_date);
-  } catch (e) {
-    if (e instanceof PdfFormError) throw new HTTPException(e.status, { message: e.message });
-    throw e;
-  }
+  const result: FormPdfExport = await buildBlueReturnPdfExport(body.taxpayer, body.inputs, body.submission_date);
   const response: ExportBusinessStartPdfResponse = result;
   return c.json(response, 200);
 };

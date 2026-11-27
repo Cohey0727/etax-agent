@@ -7,8 +7,7 @@
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { depreciationForYear, smallSpecialUsage } from "@etax/shared";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   fixedAssetToInput,
   isActiveInYear,
@@ -47,15 +46,9 @@ export const getDepreciationScheduleRoute = createRoute({
 export const getDepreciationScheduleHandler: RouteHandler<
   typeof getDepreciationScheduleRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year } = c.req.valid("query");
-  let rows;
-  try {
-    rows = await listFixedAssetRows(db);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const rows = await listFixedAssetRows(db);
   const active = rows.filter((row) => isActiveInYear(row, year));
   const result: DepreciationScheduleResponse["rows"] = [];
   const totals = { business: 0, real_estate: 0, agriculture: 0 };

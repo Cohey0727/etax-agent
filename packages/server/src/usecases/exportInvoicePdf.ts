@@ -6,13 +6,11 @@
  * 日本語フォントがサーバーに配置されていない場合は 503 で配置方法を案内する。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
 import { z } from "@hono/zod-openapi";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { ErrorSchema } from "../schemas/common";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
-import { getInvoicePdf, InvoiceDocumentError } from "../services/invoice/invoiceDocuments";
+import { getInvoicePdf } from "../services/invoice/invoiceDocuments";
 
 export const exportInvoicePdfRoute = createRoute({
   method: "get",
@@ -42,18 +40,10 @@ export const exportInvoicePdfRoute = createRoute({
 });
 
 export const exportInvoicePdfHandler: RouteHandler<typeof exportInvoicePdfRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
   let result: { filename: string; pdf: Uint8Array };
-  try {
-    result = await getInvoicePdf(db, id);
-  } catch (e) {
-    if (e instanceof InvoiceDocumentError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  result = await getInvoicePdf(db, id);
   const body = new Uint8Array(result.pdf.byteLength);
   body.set(result.pdf);
   return c.body(body, 200, {

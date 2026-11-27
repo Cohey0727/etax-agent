@@ -14,7 +14,6 @@ import {
   filingReceiptObjectKey,
   fixedAssetObjectKey,
   receiptObjectKey,
-  StorageError,
 } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
 import { isAllowedDocumentContentType, isAllowedUploadContentType } from "../lib/uploadTypes";
@@ -76,14 +75,7 @@ export const presignUploadFileHandler: RouteHandler<typeof presignUploadFileRout
       : body.purpose === "filing_receipt"
         ? filingReceiptObjectKey(fileId)
         : receiptObjectKey(fileId);
-  try {
-    const storage = createStorageClient(loadStorageConfig());
-    const uploadUrl = await storage.presignUpload(key, body.contentType, UPLOAD_URL_EXPIRES_IN_SECONDS);
-    return c.json({ fileId, uploadUrl, expiresInSeconds: UPLOAD_URL_EXPIRES_IN_SECONDS }, 200);
-  } catch (e) {
-    if (e instanceof StorageError) {
-      throw new HTTPException(503, { message: e.message });
-    }
-    throw e;
-  }
+  const storage = createStorageClient(loadStorageConfig());
+  const uploadUrl = await storage.presignUpload(key, body.contentType, UPLOAD_URL_EXPIRES_IN_SECONDS);
+  return c.json({ fileId, uploadUrl, expiresInSeconds: UPLOAD_URL_EXPIRES_IN_SECONDS }, 200);
 };

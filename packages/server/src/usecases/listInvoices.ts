@@ -4,9 +4,7 @@
  * 検索条件は電子帳簿保存法の検索要件（取引年月日・金額・取引先）に合わせる。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   fetchInvoiceResponse,
   InvoiceListFilters,
@@ -39,8 +37,7 @@ export const listInvoicesRoute = createRoute({
 });
 
 export const listInvoicesHandler: RouteHandler<typeof listInvoicesRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const query = c.req.valid("query");
   const filters: InvoiceListFilters = {
     q: query.q,
@@ -50,12 +47,7 @@ export const listInvoicesHandler: RouteHandler<typeof listInvoicesRoute> = async
     maxTotal: query.max_total,
     status: query.status,
   };
-  let response: InvoiceListResponse;
-  try {
-    const rows = await listInvoiceRows(db, filters);
-    response = { invoices: await Promise.all(rows.map((row) => fetchInvoiceResponse(db, row))) };
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const rows = await listInvoiceRows(db, filters);
+  const response: InvoiceListResponse = { invoices: await Promise.all(rows.map((row) => fetchInvoiceResponse(db, row))) };
   return c.json(response, 200);
 };

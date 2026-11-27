@@ -7,19 +7,14 @@
  * そのまま使い、自動生成・補完はしない）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { ErrorSchema } from "../schemas/common";
 import {
   InvoiceIdParamSchema,
   SingleInvoiceResponse,
   SingleInvoiceResponseSchema,
 } from "../schemas/invoice";
-import {
-  InvoiceDocumentError,
-  issueInvoiceDocument,
-} from "../services/invoice/invoiceDocuments";
+import { issueInvoiceDocument } from "../services/invoice/invoiceDocuments";
 
 export const issueInvoiceRoute = createRoute({
   method: "post",
@@ -49,17 +44,8 @@ export const issueInvoiceRoute = createRoute({
 });
 
 export const issueInvoiceHandler: RouteHandler<typeof issueInvoiceRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
-  let response: SingleInvoiceResponse;
-  try {
-    response = { invoice: await issueInvoiceDocument(db, id) };
-  } catch (e) {
-    if (e instanceof InvoiceDocumentError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: SingleInvoiceResponse = { invoice: await issueInvoiceDocument(db, id) };
   return c.json(response, 200);
 };

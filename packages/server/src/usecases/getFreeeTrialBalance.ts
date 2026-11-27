@@ -46,6 +46,10 @@ export const getFreeeTrialBalanceRoute = createRoute({
       content: { "application/json": { schema: ErrorSchema } },
       description: "試算表データが未取り込み",
     },
+    500: {
+      content: { "application/json": { schema: ErrorSchema } },
+      description: "試算表データの形式が不正",
+    },
   },
 });
 
@@ -58,6 +62,16 @@ export const getFreeeTrialBalanceHandler: RouteHandler<
   } catch {
     throw new HTTPException(404, { message: "freee試算表データがまだ取り込まれていません" });
   }
-  const parsed = JSON.parse(text) as FreeeTrialBalanceResponse;
-  return c.json(parsed, 200);
+  let stored: unknown;
+  try {
+    stored = JSON.parse(text);
+  } catch {
+    stored = null;
+  }
+  const parsed = FreeeTrialBalanceResponseSchema.safeParse(stored);
+  if (!parsed.success) {
+    throw new HTTPException(500, { message: "freee試算表データの形式が正しくないため読み込めません" });
+  }
+  const response: FreeeTrialBalanceResponse = parsed.data;
+  return c.json(response, 200);
 };

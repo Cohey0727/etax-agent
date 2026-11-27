@@ -2,9 +2,7 @@
  * listFilingSnapshots.ts — 確定スナップショット一覧ユースケース（usecases）。DB必須。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   filingSnapshotToApi,
   listFilingSnapshotRows,
@@ -42,15 +40,9 @@ export const listFilingSnapshotsRoute = createRoute({
 export const listFilingSnapshotsHandler: RouteHandler<
   typeof listFilingSnapshotsRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year } = c.req.valid("param");
-  let rows;
-  try {
-    rows = await listFilingSnapshotRows(db, year);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const rows = await listFilingSnapshotRows(db, year);
   const response: ListFilingSnapshotsResponse = {
     snapshots: rows.map(filingSnapshotToApi),
   };

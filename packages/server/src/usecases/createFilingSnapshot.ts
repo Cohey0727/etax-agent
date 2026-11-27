@@ -5,9 +5,7 @@
  * 履歴として1件追加する。差し戻しでは消さない（比較の材料として残す）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   filingSnapshotToApi,
   insertFilingSnapshotRow,
@@ -51,15 +49,9 @@ export const createFilingSnapshotRoute = createRoute({
 export const createFilingSnapshotHandler: RouteHandler<
   typeof createFilingSnapshotRoute
 > = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year } = c.req.valid("param");
   const body = c.req.valid("json");
-  let row;
-  try {
-    row = await insertFilingSnapshotRow(db, year, body.figures);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const row = await insertFilingSnapshotRow(db, year, body.figures);
   return c.json(filingSnapshotToApi(row), 200);
 };

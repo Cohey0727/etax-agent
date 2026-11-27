@@ -8,8 +8,7 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { createStorageClient, fixedAssetObjectKey } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { getFixedAssetRow } from "../repositories/fixedAssetRepository";
 import { deleteFixedAssetImageRow } from "../repositories/fixedAssetImageRepository";
 import { ErrorSchema } from "../schemas/common";
@@ -48,21 +47,15 @@ export const detachFixedAssetImageRoute = createRoute({
 export const detachFixedAssetImageHandler: RouteHandler<typeof detachFixedAssetImageRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id, fileId } = c.req.valid("param");
-  try {
-    const asset = await getFixedAssetRow(db, id);
-    if (!asset) {
-      throw new HTTPException(404, { message: "対象の固定資産が見つかりません" });
-    }
-    const deleted = await deleteFixedAssetImageRow(db, id, fileId);
-    if (!deleted) {
-      throw new HTTPException(404, { message: "対象の画像が見つかりません" });
-    }
-  } catch (e) {
-    if (e instanceof HTTPException) throw e;
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+  const asset = await getFixedAssetRow(db, id);
+  if (!asset) {
+    throw new HTTPException(404, { message: "対象の固定資産が見つかりません" });
+  }
+  const deleted = await deleteFixedAssetImageRow(db, id, fileId);
+  if (!deleted) {
+    throw new HTTPException(404, { message: "対象の画像が見つかりません" });
   }
   const storage = createStorageClient(loadStorageConfig());
   await storage.deleteObject(fixedAssetObjectKey(fileId)).catch(() => undefined);

@@ -9,14 +9,9 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import {
-  createStorageClient,
-  filingReceiptObjectKey,
-  StorageError,
-} from "../gateways/storageGateway";
+import { createStorageClient, filingReceiptObjectKey } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { isAllowedDocumentContentType, normalizeContentType } from "../lib/uploadTypes";
 import { getFilingSubmissionRowByFileId } from "../repositories/filingSubmissionRepository";
@@ -28,10 +23,7 @@ import {
   SingleFilingSubmissionResponse,
   SingleFilingSubmissionResponseSchema,
 } from "../schemas/filingSubmission";
-import {
-  attachFilingReceiptRecord,
-  FilingSubmissionError,
-} from "../services/filingSubmission/filingSubmissionRecords";
+import { attachFilingReceiptRecord } from "../services/filingSubmission/filingSubmissionRecords";
 
 export const attachFilingReceiptRoute = createRoute({
   method: "post",
@@ -63,8 +55,7 @@ export const attachFilingReceiptRoute = createRoute({
 export const attachFilingReceiptHandler: RouteHandler<typeof attachFilingReceiptRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const params = c.req.valid("param");
   const { year } = params;
   const raw = await readJsonBody(c);
@@ -75,34 +66,24 @@ export const attachFilingReceiptHandler: RouteHandler<typeof attachFilingReceipt
   }
   const fileId = parsed.data.file_id;
   const storage = createStorageClient(loadStorageConfig());
-  let submission: FilingSubmissionResponse;
-  try {
-    const existing = await getFilingSubmissionRowByFileId(db, fileId);
-    if (existing) {
-      throw new HTTPException(409, { message: "このファイルは添付済みです" });
-    }
-    // 実体がストレージにあることを確認してから登録する。
-    const head = await storage.head(filingReceiptObjectKey(fileId));
-    if (!head) {
-      throw new HTTPException(400, { message: "アップロードされたファイルが確認できません" });
-    }
-    const mimeType = normalizeContentType(head.contentType);
-    if (!isAllowedDocumentContentType(mimeType)) {
-      await storage.deleteObject(filingReceiptObjectKey(fileId)).catch(() => undefined);
-      throw new HTTPException(400, {
-        message: "対応していないファイル形式です（受信通知はPDFのみ添付できます）",
-      });
-    }
-    // 登録と、差し替え時の旧ファイルの実体削除はサービス側で行う。
-    submission = await attachFilingReceiptRecord(db, year, params.kind, fileId, mimeType);
-  } catch (e) {
-    if (e instanceof HTTPException) throw e;
-    if (e instanceof FilingSubmissionError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    if (e instanceof StorageError) throw new HTTPException(503, { message: e.message });
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+  const existing = await getFilingSubmissionRowByFileId(db, fileId);
+  if (existing) {
+    throw new HTTPException(409, { message: "このファイルは添付済みです" });
   }
+  // 実体がストレージにあることを確認してから登録する。
+  const head = await storage.head(filingReceiptObjectKey(fileId));
+  if (!head) {
+    throw new HTTPException(400, { message: "アップロードされたファイルが確認できません" });
+  }
+  const mimeType = normalizeContentType(head.contentType);
+  if (!isAllowedDocumentContentType(mimeType)) {
+    await storage.deleteObject(filingReceiptObjectKey(fileId)).catch(() => undefined);
+    throw new HTTPException(400, {
+      message: "対応していないファイル形式です（受信通知はPDFのみ添付できます）",
+    });
+  }
+  // 登録と、差し替え時の旧ファイルの実体削除はサービス側で行う。
+  const submission: FilingSubmissionResponse = await attachFilingReceiptRecord(db, year, params.kind, fileId, mimeType);
   const response: SingleFilingSubmissionResponse = { submission };
   return c.json(response, 201);
 };

@@ -2,8 +2,7 @@
  * getFilingInputs.ts — 対象年の申告入力を取得する（usecases）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
+import { requireDb } from "../lib/errors";
 import { getFilingInputRow } from "../repositories/filingInputRepository";
 import { FilingInputsResponseSchema, FilingInputsYearParamSchema } from "../schemas/filingInputs";
 
@@ -20,8 +19,7 @@ export const getFilingInputsRoute = createRoute({
 });
 
 export const getFilingInputsHandler: RouteHandler<typeof getFilingInputsRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
+  const db = requireDb();
   const { year } = c.req.valid("param");
   const row = await getFilingInputRow(db, year);
   if (!row) return c.json({ year, state: null, updated_at: null });

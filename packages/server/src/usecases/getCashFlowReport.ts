@@ -6,9 +6,7 @@
  * 返す。数値は「登録済み予定に基づく試算」であり、税務判断は含まない。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { defaultValidationMessage } from "../lib/validationHook";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -57,19 +55,13 @@ export function getCashFlowReportValidationMessage(issuePaths: string[]): string
 }
 
 export const getCashFlowReportHandler: RouteHandler<typeof getCashFlowReportRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const query = c.req.valid("query");
   const params: CashFlowReportParams = {
     fromMonth: query.from,
     monthCount: query.months,
     openingBalance: query.opening_balance,
   };
-  let response: CashFlowReportResponse;
-  try {
-    response = await fetchCashFlowReport(db, params);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: CashFlowReportResponse = await fetchCashFlowReport(db, params);
   return c.json(response, 200);
 };

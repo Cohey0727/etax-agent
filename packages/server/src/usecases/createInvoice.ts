@@ -3,8 +3,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -37,19 +36,13 @@ export const createInvoiceRoute = createRoute({
 });
 
 export const createInvoiceHandler: RouteHandler<typeof createInvoiceRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = CreateInvoiceRequestSchema.safeParse(raw);
   if (!parsed.success) {
     throw new HTTPException(400, { message: "請求書の入力が不正です" });
   }
-  let response: SingleInvoiceResponse;
-  try {
-    response = { invoice: await createInvoiceDocument(db, parsed.data) };
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: SingleInvoiceResponse = { invoice: await createInvoiceDocument(db, parsed.data) };
   return c.json(response, 201);
 };

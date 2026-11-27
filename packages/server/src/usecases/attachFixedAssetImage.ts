@@ -7,10 +7,9 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { createStorageClient, fixedAssetObjectKey, StorageError } from "../gateways/storageGateway";
+import { createStorageClient, fixedAssetObjectKey } from "../gateways/storageGateway";
 import { loadStorageConfig } from "../lib/config";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { fixedAssetImageDisplayUrl } from "../lib/fixedAssetImageUrl";
 import { readJsonBody } from "../lib/readJsonBody";
 import { isAllowedUploadContentType, normalizeContentType } from "../lib/uploadTypes";
@@ -62,8 +61,7 @@ export const attachFixedAssetImageRoute = createRoute({
 export const attachFixedAssetImageHandler: RouteHandler<typeof attachFixedAssetImageRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
@@ -73,32 +71,25 @@ export const attachFixedAssetImageHandler: RouteHandler<typeof attachFixedAssetI
   }
   const fileId = parsed.data.file_id;
   const storage = createStorageClient(loadStorageConfig());
-  let row;
-  try {
-    const asset = await getFixedAssetRow(db, id);
-    if (!asset) {
-      throw new HTTPException(404, { message: "対象の固定資産が見つかりません" });
-    }
-    const existing = await getFixedAssetImageRowByFileId(db, fileId);
-    if (existing) {
-      throw new HTTPException(409, { message: "この画像は添付済みです" });
-    }
-    // 実体がストレージにあることを確認してから登録する。
-    const head = await storage.head(fixedAssetObjectKey(fileId));
-    if (!head) {
-      throw new HTTPException(400, { message: "アップロードされた画像が確認できません" });
-    }
-    const mimeType = normalizeContentType(head.contentType);
-    if (!isAllowedUploadContentType(mimeType)) {
-      await storage.deleteObject(fixedAssetObjectKey(fileId)).catch(() => undefined);
-      throw new HTTPException(400, { message: "対応していないファイル形式です（画像のみ添付できます）" });
-    }
-    row = await insertFixedAssetImageRow(db, { assetId: id, fileId, mimeType });
-  } catch (e) {
-    if (e instanceof HTTPException) throw e;
-    if (e instanceof StorageError) throw new HTTPException(503, { message: e.message });
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
+  const asset = await getFixedAssetRow(db, id);
+  if (!asset) {
+    throw new HTTPException(404, { message: "対象の固定資産が見つかりません" });
   }
+  const existing = await getFixedAssetImageRowByFileId(db, fileId);
+  if (existing) {
+    throw new HTTPException(409, { message: "この画像は添付済みです" });
+  }
+  // 実体がストレージにあることを確認してから登録する。
+  const head = await storage.head(fixedAssetObjectKey(fileId));
+  if (!head) {
+    throw new HTTPException(400, { message: "アップロードされた画像が確認できません" });
+  }
+  const mimeType = normalizeContentType(head.contentType);
+  if (!isAllowedUploadContentType(mimeType)) {
+    await storage.deleteObject(fixedAssetObjectKey(fileId)).catch(() => undefined);
+    throw new HTTPException(400, { message: "対応していないファイル形式です（画像のみ添付できます）" });
+  }
+  const row = await insertFixedAssetImageRow(db, { assetId: id, fileId, mimeType });
   const url = await fixedAssetImageDisplayUrl(storage, fileId);
   const response: SingleFixedAssetImageResponse = {
     image: row ? fixedAssetImageToApi(row, url) : null,

@@ -3,8 +3,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { getInvoiceRow } from "../repositories/invoiceRepository";
 import { fetchPaymentsResponse } from "../repositories/reconciliationRepository";
 import { ErrorSchema } from "../schemas/common";
@@ -40,17 +39,10 @@ export const listInvoicePaymentsRoute = createRoute({
 export const listInvoicePaymentsHandler: RouteHandler<typeof listInvoicePaymentsRoute> = async (
   c,
 ) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
-  let response: InvoicePaymentsResponse;
-  try {
-    const row = await getInvoiceRow(db, id);
-    if (!row) throw new HTTPException(404, { message: "請求書が見つかりません" });
-    response = await fetchPaymentsResponse(db, row);
-  } catch (e) {
-    if (e instanceof HTTPException) throw e;
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const row = await getInvoiceRow(db, id);
+  if (!row) throw new HTTPException(404, { message: "請求書が見つかりません" });
+  const response: InvoicePaymentsResponse = await fetchPaymentsResponse(db, row);
   return c.json(response, 200);
 };

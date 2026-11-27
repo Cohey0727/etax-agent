@@ -2,9 +2,7 @@
  * listTransactions.ts — 取引一覧ユースケース（usecases）。DB必須。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import {
   listTransactionRows,
   transactionToApi,
@@ -36,16 +34,10 @@ export const listTransactionsRoute = createRoute({
 });
 
 export const listTransactionsHandler: RouteHandler<typeof listTransactionsRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { year, income_type: incomeType } = c.req.valid("query");
-  let rows;
-  try {
-    // 対象年の絞り込みは割り当て年度で、SQL 側で行う（日付の年とは限らない）
-    rows = await listTransactionRows(db, incomeType, year);
-  } catch (e) {
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  // 対象年の絞り込みは割り当て年度で、SQL 側で行う（日付の年とは限らない）
+  const rows = await listTransactionRows(db, incomeType, year);
   const response: ListTransactionsResponse = {
     count: rows.length,
     transactions: rows.map(transactionToApi),

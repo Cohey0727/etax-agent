@@ -6,8 +6,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
-import { databaseConnectionErrorMessage, databaseUnavailableMessage } from "../lib/errors";
+import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -16,10 +15,7 @@ import {
   SingleInvoiceResponseSchema,
   UpdateInvoiceRequestSchema,
 } from "../schemas/invoice";
-import {
-  InvoiceDocumentError,
-  updateInvoiceDocument,
-} from "../services/invoice/invoiceDocuments";
+import { updateInvoiceDocument } from "../services/invoice/invoiceDocuments";
 
 export const updateInvoiceRoute = createRoute({
   method: "put",
@@ -49,8 +45,7 @@ export const updateInvoiceRoute = createRoute({
 });
 
 export const updateInvoiceHandler: RouteHandler<typeof updateInvoiceRoute> = async (c) => {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: databaseUnavailableMessage });
+  const db = requireDb();
   const { id } = c.req.valid("param");
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
@@ -58,14 +53,6 @@ export const updateInvoiceHandler: RouteHandler<typeof updateInvoiceRoute> = asy
   if (!parsed.success) {
     throw new HTTPException(400, { message: "請求書の入力が不正です" });
   }
-  let response: SingleInvoiceResponse;
-  try {
-    response = { invoice: await updateInvoiceDocument(db, id, parsed.data) };
-  } catch (e) {
-    if (e instanceof InvoiceDocumentError) {
-      throw new HTTPException(e.status, { message: e.message });
-    }
-    throw new HTTPException(503, { message: databaseConnectionErrorMessage(e) });
-  }
+  const response: SingleInvoiceResponse = { invoice: await updateInvoiceDocument(db, id, parsed.data) };
   return c.json(response, 200);
 };
