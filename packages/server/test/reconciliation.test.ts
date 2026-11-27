@@ -1,5 +1,5 @@
 /**
- * reconciliation.test.ts — 入金消込（Issue #17 Phase 1-2）の検証。
+ * reconciliation.test.ts — 入金消込の検証。
  * テスト用 PostgreSQL で、消込の集計・手動消込・差額調整（振込手数料／
  * 売上値引／過入金の預り金）・解除・候補推測を確認する。
  * 納税者情報・取引先は東京のダミー値を使う。

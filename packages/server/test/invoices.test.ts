@@ -3,7 +3,6 @@
  * テスト用 PostgreSQL で検証する。納税者情報は東京のダミー値を使う。
  */
 import { describe, expect, test } from "bun:test";
-import { readFile } from "node:fs/promises";
 import { createTestDb } from "./testDb";
 import {
   deleteInvoice,
@@ -20,6 +19,7 @@ import {
 import { upsertTaxpayerProfileRow } from "../src/repositories/taxpayerRepository";
 import { emptyTaxpayerProfile } from "../src/repositories/taxpayerRepository";
 import { buildInvoicePdf } from "../src/services/pdf/buildInvoicePdf";
+import { loadJapaneseFont } from "../src/services/pdf/loadJapaneseFont";
 import {
   InvoiceDocumentError,
   issueInvoiceDocument,
@@ -217,20 +217,7 @@ describe("発行バリデーション（適格請求書の記載事項）", () =
 
 describe("請求書PDF", () => {
   test("発行済み帳票からPDFを生成できる", async () => {
-    const fontPaths = [
-      process.env.ETAX_FONT_PATH ?? "",
-      `${process.env.HOME ?? ""}/workspace/fonts/NotoSansJP.ttf`,
-      "/tmp/forms/ipa/ipaexg00401/ipaexg.ttf",
-    ].filter((path) => path !== "");
-    let fontBytes: Uint8Array | null = null;
-    for (const path of fontPaths) {
-      try {
-        fontBytes = new Uint8Array(await readFile(path));
-        break;
-      } catch {
-        // 次の候補へ
-      }
-    }
+    const fontBytes = await loadJapaneseFont();
     if (!fontBytes) return; // フォントの無い環境ではスキップ
     const db = await createTestDb();
     const row = await insertInvoice(db, header(), lines, null);

@@ -1,5 +1,5 @@
 /**
- * businessStart.test.ts — 開業届・青色申告承認申請書（Issue #22）の検証。
+ * businessStart.test.ts — 開業届・青色申告承認申請書の検証。
  *
  * - 専用入力リポジトリの往復と所有者分離
  * - 様式 PDF の復号（decryptPdfTemplate）の素通し・異常系

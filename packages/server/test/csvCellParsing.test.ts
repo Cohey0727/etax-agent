@@ -1,5 +1,5 @@
 /**
- * csvCellParsing.test.ts — CSVセルの日付・金額パースの回帰テスト（Issue #11）。
+ * csvCellParsing.test.ts — CSVセルの日付・金額パースの回帰テスト。
  * 全角表記・和暦の元年など、銀行・カード明細で実際に現れる表記が
  * 読めずに行ごと無言で落ちないことを担保する。
  */
@@ -54,7 +54,7 @@ describe("parseAmountCell", () => {
     expect(parseAmountCell("−500")).toBe(-500);
   });
 
-  test("従来表記も読める", () => {
+  test("半角の括弧・円記号付きの表記も読める", () => {
     expect(parseAmountCell("(2,500)")).toBe(-2500);
     expect(parseAmountCell("￥12,000円")).toBe(12000);
     expect(parseAmountCell("")).toBeNull();

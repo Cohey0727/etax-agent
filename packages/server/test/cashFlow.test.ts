@@ -1,5 +1,5 @@
 /**
- * cashFlow.test.ts — 資金繰りレポート（Issue #19）の結合テスト。
+ * cashFlow.test.ts — 資金繰りレポートの結合テスト。
  *
  * HTTP（GET /api/cash-flow）と MCP（get_cash_flow_report）が同じ結果を
  * 返すこと、未消込請求書の積み上げ（期日超過は当月・一部消込は残額・

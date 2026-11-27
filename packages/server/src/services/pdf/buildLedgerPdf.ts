@@ -91,7 +91,7 @@ function drawHeader(page: PDFPage, font: PDFFont, top: number): number {
 
 function formatDateTime(date: Date): string {
   // 作成日時はサーバーのタイムゾーン（コンテナは UTC 既定）に依存せず、
-  // 常に日本時間で印字する（Issue #11）。
+  // 常に日本時間で印字する。
   const parts = new Intl.DateTimeFormat("ja-JP", {
     timeZone: "Asia/Tokyo",
     year: "numeric",
