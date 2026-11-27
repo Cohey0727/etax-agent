@@ -35,20 +35,19 @@ export function useInvoicesData() {
     [],
   );
 
+  // 初回は検索条件なしで読み込む。以後の再検索は applyFilters から明示的に行う。
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
     void (async () => {
-      const ok = await reload(filters);
+      const ok = await reload({});
       if (cancelled) return;
       setStatus(ok ? "ready" : "unavailable");
     })();
     return () => {
       cancelled = true;
     };
-    // 初回だけ読み込む。以後の再検索は applyFilters から明示的に行う。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reload]);
 
   /** 現在の検索条件のまま一覧を再取得する（消込後の状態反映用）。 */
   const refreshList = useCallback(async () => {
