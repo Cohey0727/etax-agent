@@ -8,7 +8,8 @@
  *       事業所得/不動産所得の集計と青色申告特別控除を表示する。
  *       --real-estate-business-scale は不動産貸付けが事業的規模であることを示す。
  *   consumption --year YYYY --csv FILE [--business-kind KIND]
- *       消費税を 本則 / 簡易課税 / 2割特例 の3方式で比較表示する。
+ *       消費税を 本則 / 簡易課税 / 2割特例（令和9年分以後は3割特例）の3方式で
+ *       比較表示する（computeCorrectedFigures の値）。
  *       KIND は簡易課税の事業区分（wholesale/retail/manufacturing/other/
  *       services/real_estate、既定は services=第5種）。
  *   amend       --year YYYY --original ORIG.json [--corrected CORR.json] [--csv FILE]
@@ -30,14 +31,10 @@ import {
   amendmentDelta,
   blueDeduction,
   computeCorrectedFigures,
-  consumptionTax,
-  estimateInputTax,
   filterYear,
   importCsvText,
-  residentialRentTotal,
-  taxableSalesFromBreakdown,
+  outputTaxFromTaxInclusive,
   type BusinessKind,
-  type ConsumptionMethod,
   type CorrectedFiguresDetail,
   type FilingType,
   type Transaction,
@@ -199,34 +196,24 @@ async function cmdConsumption(opts: CliOptions): Promise<number> {
     console.error(`${year}年の取引がありませんでした。`);
     return 1;
   }
-  const b = aggregateIncome(tx);
-  const rent = residentialRentTotal(tx);
-  const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
-  const inputTax = estimateInputTax(tx);
   const businessKind = opts.businessKind ?? "services";
+  const figs = computeCorrectedFigures(tx, year, { businessKind });
+  const specialRate = figs._detail.small_business_special_rate;
   console.log(`== ${year}年 消費税（税込経理・税率10%） ==`);
-  console.log(`課税売上（税込）  : ${yen(taxable)}`);
-  console.log(`非課税売上（住宅家賃）: ${yen(nontaxable)}`);
-  console.log(`仕入税額（経費からの概算）: ${yen(inputTax)}`);
-  const methods: [ConsumptionMethod, string][] = [
-    ["standard", "本則課税"],
-    [
-      "simplified",
-      `簡易課税（みなし仕入率${Math.round(SIMPLIFIED_RATES[businessKind] * 100)}%・事業区分 ${businessKind}）`,
-    ],
-    ["special20", "2割特例"],
-  ];
-  for (const [method, label] of methods) {
-    const r = consumptionTax({
-      taxableSalesIncl: taxable,
-      nontaxableSalesIncl: nontaxable,
-      inputTax,
-      method,
-      businessKind,
-    });
-    console.log(`${label}: 売上税額 ${yen(r.outputTax)} → 納付税額 ${yen(r.payable)}`);
+  console.log(`課税売上（税込）  : ${yen(figs.taxable_sales)}`);
+  console.log(`非課税売上（住宅家賃）: ${yen(figs.nontaxable_sales)}`);
+  console.log(`売上税額（国税分）: ${yen(outputTaxFromTaxInclusive(figs.taxable_sales))}`);
+  console.log(`仕入税額（経費からの概算・国税分）: ${yen(figs.input_tax_estimate)}`);
+  console.log(`本則課税: 納付税額 ${yen(figs.consumption_tax_standard)}`);
+  console.log(
+    `簡易課税（みなし仕入率${Math.round(SIMPLIFIED_RATES[businessKind] * 100)}%・事業区分 ${businessKind}）: 納付税額 ${yen(figs.consumption_tax_simplified)}`,
+  );
+  if (specialRate === null) {
+    console.log("2割特例・3割特例: この年分は対象外");
+  } else {
+    console.log(`${Math.round(specialRate * 10)}割特例: 納付税額 ${yen(figs.consumption_tax_special20)}`);
   }
-  console.log("※ 仕入税額は概算です。2割特例・簡易課税の適用可否は要件確認が必要です。");
+  console.log("※ 納付税額は国税と地方消費税の合計です。仕入税額は概算です。特例・簡易課税の適用可否は要件確認が必要です。");
   return 0;
 }
 
