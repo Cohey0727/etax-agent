@@ -575,23 +575,44 @@ export function dividendCredit(
 }
 
 /**
- * 政党等寄附金特別控除:（対象寄附金 − 2,000円）× 30%（100円未満切捨て）。
- * 対象寄附金は総所得金額等の40%が上限。所得税額の25%上限は
- * 認定NPO等との合算で適用するため computeTaxCredits 側で処理する。
+ * 寄附金の税額控除の対象額。総所得金額等の40%の上限と2,000円の足切りは、
+ * 寄附金控除（所得控除）と各特別控除の寄附金の合計で1回だけかかるため、
+ * 先に使った寄附金の額（priorDonations）を差し引いた残りで判定する。
  */
-export function politicalDonationCredit(donations: number, totalIncome: number): number {
-  const eligible = Math.min(amount(donations), Math.floor(amount(totalIncome) * 0.4));
-  return Math.floor((Math.max(eligible - 2_000, 0) * 3) / 1000) * 100;
+function donationCreditBase(donations: number, totalIncome: number, priorDonations: number): number {
+  const prior = amount(priorDonations);
+  const capRemaining = Math.max(Math.floor(amount(totalIncome) * 0.4) - prior, 0);
+  const eligible = Math.min(amount(donations), capRemaining);
+  const thresholdRemaining = Math.max(2_000 - prior, 0);
+  return Math.max(eligible - thresholdRemaining, 0);
+}
+
+/**
+ * 政党等寄附金特別控除:（対象寄附金 − 2,000円）× 30%（100円未満切捨て）。
+ * 対象寄附金は総所得金額等の40%が上限。priorDonations は寄附金控除の対象に
+ * した寄附金の額（40%と2,000円の枠を先に使う）。所得税額の25%上限は
+ * computeTaxCredits 側で処理する。
+ */
+export function politicalDonationCredit(
+  donations: number,
+  totalIncome: number,
+  priorDonations = 0,
+): number {
+  return Math.floor((donationCreditBase(donations, totalIncome, priorDonations) * 3) / 1000) * 100;
 }
 
 /**
  * 認定NPO法人等寄附金特別控除:（対象寄附金 − 2,000円）× 40%
- * （100円未満切捨て）。対象寄附金は総所得金額等の40%が上限。
- * 所得税額の25%上限は政党等との合算で computeTaxCredits 側が処理する。
+ * （100円未満切捨て）。対象寄附金は総所得金額等の40%が上限。priorDonations は
+ * 寄附金控除・政党等寄附金特別控除の対象にした寄附金の額。所得税額の25%上限は
+ * computeTaxCredits 側で処理する。
  */
-export function certifiedNpoDonationCredit(donations: number, totalIncome: number): number {
-  const eligible = Math.min(amount(donations), Math.floor(amount(totalIncome) * 0.4));
-  return Math.floor((Math.max(eligible - 2_000, 0) * 4) / 1000) * 100;
+export function certifiedNpoDonationCredit(
+  donations: number,
+  totalIncome: number,
+  priorDonations = 0,
+): number {
+  return Math.floor((donationCreditBase(donations, totalIncome, priorDonations) * 4) / 1000) * 100;
 }
 
 /**
@@ -677,6 +698,7 @@ export interface TaxCreditBreakdown {
  * 以外の税額控除を引いた後）を、復興税分の限度額は基準所得税額（さらに
  * 定額減税を引いた後）の2.1%を基に按分する。
  * year を渡すと、定額減税は年度パラメータで対象年分の場合だけ控除する。
+ * incomeDeductionDonations は寄附金控除（所得控除）の対象にした寄附金の額。
  */
 export function computeTaxCredits(
   inputs: TaxCreditInputs,
@@ -684,6 +706,7 @@ export function computeTaxCredits(
   taxableIncome: number,
   totalIncome: number,
   year?: number,
+  incomeDeductionDonations = 0,
 ): TaxCreditBreakdown {
   const housingLoan = housingLoanCredit(
     inputs.housingLoanBalance,
@@ -694,14 +717,30 @@ export function computeTaxCredits(
     year === undefined || taxParametersFor(year).flatReductionApplies;
   const flatReduction = flatReductionApplies ? amount(inputs.flatReduction) : 0;
   const dividend = dividendCredit(inputs.dividendCorporate, inputs.dividendTrust, taxableIncome);
-  let politicalDonations = politicalDonationCredit(inputs.politicalDonations, totalIncome);
-  let certifiedNpoDonations = certifiedNpoDonationCredit(inputs.certifiedNpoDonations, totalIncome);
-  // 政党等・認定NPO等の寄附金特別控除は、合算で所得税額の25%が上限
+  // 40%の上限と2,000円の足切りは 寄附金控除 → 政党等 → 認定NPO等 の順に使う。
+  // 所得税額の25%の上限は、政党等と認定NPO等（公益社団法人等を含む）にそれぞれかかる
+  // （No.1260・No.1263）。
+  const deductionDonations = Math.min(
+    amount(incomeDeductionDonations),
+    Math.floor(amount(totalIncome) * 0.4),
+  );
+  const politicalEligible = Math.min(
+    amount(inputs.politicalDonations),
+    Math.max(Math.floor(amount(totalIncome) * 0.4) - deductionDonations, 0),
+  );
   const donationCreditCap = floor100(amount(baseIncomeTax) * 0.25);
-  if (politicalDonations + certifiedNpoDonations > donationCreditCap) {
-    certifiedNpoDonations = Math.max(donationCreditCap - politicalDonations, 0);
-    politicalDonations = Math.min(politicalDonations, donationCreditCap);
-  }
+  const politicalDonations = Math.min(
+    politicalDonationCredit(inputs.politicalDonations, totalIncome, deductionDonations),
+    donationCreditCap,
+  );
+  const certifiedNpoDonations = Math.min(
+    certifiedNpoDonationCredit(
+      inputs.certifiedNpoDonations,
+      totalIncome,
+      deductionDonations + politicalEligible,
+    ),
+    donationCreditCap,
+  );
   const seismicRetrofit = seismicRetrofitCredit(
     inputs.seismicRetrofitStandardCost,
     inputs.seismicRetrofitOtherCost,
@@ -1143,6 +1182,7 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
     taxableForCredits,
     grandTotalIncome,
     year,
+    options.deductions.donationsTotal,
   );
   const taxAfterOtherCredits = Math.max(
     incomeTaxBase - (taxCredits.total - taxCredits.foreignTax),

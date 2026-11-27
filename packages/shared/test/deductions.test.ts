@@ -290,14 +290,37 @@ describe("税額控除", () => {
     expect(certifiedNpoDonationCredit(102_000, 10_000_000)).toBe(40_000);
     expect(certifiedNpoDonationCredit(1_002_000, 10_000_000)).toBe(400_000);
   });
-  test("政党等＋認定NPOは合算で所得税額の25%が上限", () => {
+  test("所得税額の25%の上限は、政党等と認定NPO等でそれぞれ別にかかる", () => {
     const credits = computeTaxCredits(
       { ...EMPTY_TAX_CREDIT_INPUTS, politicalDonations: 1_002_000, certifiedNpoDonations: 1_002_000 },
       1_000_000,
       0,
       10_000_000,
     );
-    expect(credits.politicalDonations + credits.certifiedNpoDonations).toBe(250_000);
+    expect(credits.politicalDonations).toBe(250_000);
+    expect(credits.certifiedNpoDonations).toBe(250_000);
+  });
+  test("政党等・認定NPO等の両方: 2,000円の足切りは1回だけ（No.1260）", () => {
+    const credits = computeTaxCredits(
+      { ...EMPTY_TAX_CREDIT_INPUTS, politicalDonations: 1_000_000, certifiedNpoDonations: 1_000_000 },
+      2_000_000,
+      0,
+      10_000_000,
+    );
+    // 政党等 (100万 − 2,000) × 30% = 299,400。認定NPO等は足切り済みで 100万 × 40% = 400,000
+    expect(credits.politicalDonations).toBe(299_400);
+    expect(credits.certifiedNpoDonations).toBe(400_000);
+  });
+  test("寄附金控除（所得控除）の寄附金があれば、税額控除の足切りと40%上限はその残り", () => {
+    const result = computeIncomeTax({
+      year: 2025,
+      totalIncome: 10_000_000,
+      deductions: { ...EMPTY_DEDUCTION_INPUTS, donationsTotal: 3_900_000 },
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, politicalDonations: 1_000_000 },
+    });
+    // 40%上限 400万円のうち寄附金控除で 390万円 → 政党等の対象は 10万円、足切りは残りなし
+    expect(result.deductions.donations).toBe(3_898_000);
+    expect(result.taxCredits.politicalDonations).toBe(30_000);
   });
   test("配当控除: 1,000万円の枠は剰余金配当等から先に充当する", () => {
     // 配当以外の所得990万円・株式配当10万円・投信分配10万円、課税総所得1,010万円
