@@ -52,17 +52,19 @@ export function saveDeductionState(year: number, state: DeductionState): void {
 
 /**
  * サーバーの保存値をキャッシュ（localStorage）へ取り込む。
- * サーバーに値があればそれが正。無ければ端末の値をサーバーへ送る。
+ * サーバーに値があればそれが正。未保存なら端末の値をサーバーへ送る。
+ * 取得に失敗したときは何もせず false を返す（呼び出し側は保存を止める）。
  */
-export async function hydrateDeductionStateFromServer(year: number): Promise<void> {
+export async function hydrateDeductionStateFromServer(year: number): Promise<boolean> {
   const remote = await fetchFilingInputs(year);
-  if (remote) {
+  if (remote.status === "failed") return false;
+  if (remote.status === "loaded") {
     try {
-      localStorage.setItem(storageKey(year), JSON.stringify(remote.state));
+      localStorage.setItem(storageKey(year), JSON.stringify(remote.value));
     } catch {
       // キャッシュへ書けなくても表示はサーバー値で続けられるよう呼び出し側が再読込する。
     }
-    return;
+    return true;
   }
   let localRaw: string | null = null;
   try {
@@ -77,4 +79,5 @@ export async function hydrateDeductionStateFromServer(year: number): Promise<voi
       // 送れなくても端末の値で編集は続けられる。
     }
   }
+  return true;
 }

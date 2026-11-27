@@ -1,6 +1,7 @@
 import { BLUE_BOOK_OPTIONS, businessStartDeadlines } from "@etax/shared";
 import { useEffect, useRef, useState } from "react";
 import { Button, Card, Col, Row, SkeletonBar, Text, Textarea } from "@components/atoms";
+import { RetryNotice } from "@components/molecules/RetryNotice";
 import {
   BusinessStartIncomeType,
   BusinessStartInputs,
@@ -67,6 +68,8 @@ const BOOKKEEPING_OPTIONS: readonly { value: string; label: string }[] = [
 export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
   const [inputs, setInputs] = useState<BusinessStartInputs>(() => emptyBusinessStartInputs());
   const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput | null>(null);
   const [exporting, setExporting] = useState<"opening" | "blue" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -76,20 +79,24 @@ export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
 
   useEffect(() => {
     let cancelled = false;
-    void loadBusinessStartInputs().then((saved) => {
+    void loadBusinessStartInputs().then((result) => {
       if (cancelled) return;
-      if (saved) setInputs(saved);
+      if (result.status === "failed") {
+        setLoadFailed(true);
+        return;
+      }
+      if (result.status === "loaded") setInputs(result.value);
       setLoaded(true);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     let cancelled = false;
     void loadTaxpayer(year).then((next) => {
-      if (!cancelled) setTaxpayer(next.taxpayer);
+      if (!cancelled && next) setTaxpayer(next.taxpayer);
     });
     return () => {
       cancelled = true;
@@ -167,12 +174,22 @@ export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
       <Card>
         <Col gap="md">
           <Text variant="sectionTitle">開業届・青色申告承認申請書</Text>
-          {SKELETON_ROWS.map((row) => (
-            <Row key={row} gap="sm">
-              <SkeletonBar width="120px" height={14} />
-              <SkeletonBar height={36} />
-            </Row>
-          ))}
+          {loadFailed ? (
+            <RetryNotice
+              message="開業届・青色申告承認申請書の入力をサーバーから読み込めませんでした。"
+              onRetry={() => {
+                setLoadFailed(false);
+                setLoadAttempt((n) => n + 1);
+              }}
+            />
+          ) : (
+            SKELETON_ROWS.map((row) => (
+              <Row key={row} gap="sm">
+                <SkeletonBar width="120px" height={14} />
+                <SkeletonBar height={36} />
+              </Row>
+            ))
+          )}
         </Col>
       </Card>
     );

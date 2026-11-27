@@ -4,18 +4,21 @@
  * 保存先はサーバーのDB（年度別に1件）。対象年の保存が無ければ、直近の
  * 過去年のプロフィールを「引き継ぎ」として返す（引き継ぎの判定はサーバー
  * 側で行い、carried_from で知らせる）。保存は常に対象年に対して行う。
- * 移行前に端末の localStorage へ保存していた値だけが残っている場合は、
- * その値を読み込んでDBへ移し替える（移行は一度きり）。DBへ届かない
- * 場合は端末保存の値で編集を続けられるようにする。保存値が壊れていても
- * 空の入力にフォールバックする。
+ * サーバーに何も無く端末の localStorage にだけ値がある場合は、その値を
+ * 対象年としてサーバーへ送る。送れた年分は印を残し、以後はサーバーの値
+ * （空にした場合も含む）を正とする。保存値が壊れていても空の入力に
+ * フォールバックする。
  */
 import { XtxTaxpayerInput } from "@types";
 import { fetchTaxpayerProfile, saveTaxpayerProfile } from "@utils/api";
 import { userScopedKey } from "@utils/userStorage";
 
-const LEGACY_KEY = "etax-taxpayer";
+/** 年度を持たない端末保存のキー。 */
+const UNDATED_KEY = "etax-taxpayer";
 const KEY_PREFIX = "etax-taxpayer-";
-/** 引き継ぎ元を探す過去年の範囲（端末保存の移行用）。 */
+/** 端末の値をサーバーへ送った年分の印。 */
+const SENT_KEY_PREFIX = "etax-taxpayer-sent-";
+/** 端末保存の中から引き継ぎ元を探す過去年の範囲。 */
 const CARRY_SEARCH_YEARS = 10;
 
 export function emptyTaxpayer(): XtxTaxpayerInput {
@@ -88,48 +91,58 @@ export interface LoadedTaxpayer {
   taxpayer: XtxTaxpayerInput;
   /** 引き継ぎ元の年。対象年自身の保存を読んだ場合は null。 */
   carriedFrom: number | null;
-  /** 移行前の単一キーから引き継いだ場合は true。 */
-  carriedFromLegacy: boolean;
 }
 
-/** 端末保存（移行前）から読み込む。何も保存が無ければ null。 */
-function loadTaxpayerFromLocal(year: number): LoadedTaxpayer | null {
+/** 端末保存から読み込む（対象年 → 過去年 → 年度を持たないキーの順）。何も無ければ null。 */
+function loadTaxpayerFromLocal(year: number): XtxTaxpayerInput | null {
   const own = readKey(userScopedKey(`${KEY_PREFIX}${year}`));
-  if (own) return { taxpayer: own, carriedFrom: null, carriedFromLegacy: false };
+  if (own) return own;
   for (let y = year - 1; y >= year - CARRY_SEARCH_YEARS; y--) {
     const past = readKey(userScopedKey(`${KEY_PREFIX}${y}`));
-    if (past) return { taxpayer: past, carriedFrom: y, carriedFromLegacy: false };
+    if (past) return past;
   }
-  const legacy = readKey(userScopedKey(LEGACY_KEY));
-  if (legacy) return { taxpayer: legacy, carriedFrom: null, carriedFromLegacy: true };
-  return null;
+  return readKey(userScopedKey(UNDATED_KEY));
 }
 
-/** 対象年のプロフィールを読み込む。無ければ過去年からの引き継ぎ。 */
-export async function loadTaxpayer(year: number): Promise<LoadedTaxpayer> {
+function sentKey(year: number): string {
+  return userScopedKey(`${SENT_KEY_PREFIX}${year}`);
+}
+
+function wasSent(year: number): boolean {
+  try {
+    return localStorage.getItem(sentKey(year)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function markSent(year: number): void {
+  try {
+    localStorage.setItem(sentKey(year), "1");
+  } catch {
+    // 印を残せなくても、次回もサーバーに値があればそちらが使われる。
+  }
+}
+
+/**
+ * 対象年のプロフィールを読み込む。無ければ過去年からの引き継ぎ。
+ * サーバーから取得できなかった場合は null（空のプロフィールで上書き
+ * しないよう、呼び出し側は編集・保存をさせない）。
+ */
+export async function loadTaxpayer(year: number): Promise<LoadedTaxpayer | null> {
   const remote = await fetchTaxpayerProfile(year);
-  if (remote && (!isEmptyProfile(remote.taxpayer) || remote.carried_from !== null)) {
-    return {
-      taxpayer: remote.taxpayer,
-      carriedFrom: remote.carried_from,
-      carriedFromLegacy: false,
-    };
+  if (remote.status === "failed") return null;
+  const fromServer: LoadedTaxpayer = {
+    taxpayer: remote.value.taxpayer,
+    carriedFrom: remote.value.carried_from,
+  };
+  if (!isEmptyProfile(fromServer.taxpayer) || fromServer.carriedFrom !== null || wasSent(year)) {
+    return fromServer;
   }
   const local = loadTaxpayerFromLocal(year);
-  if (local && !isEmptyProfile(local.taxpayer)) {
-    // 端末にだけ残っていた値をDBへ移し替える（対象年として保存する）。
-    await saveTaxpayerProfile(year, local.taxpayer);
-    return { taxpayer: local.taxpayer, carriedFrom: null, carriedFromLegacy: false };
-  }
-  if (remote) {
-    return {
-      taxpayer: remote.taxpayer,
-      carriedFrom: remote.carried_from,
-      carriedFromLegacy: false,
-    };
-  }
-  if (local) return local;
-  return { taxpayer: emptyTaxpayer(), carriedFrom: null, carriedFromLegacy: false };
+  if (!local || isEmptyProfile(local)) return fromServer;
+  if (await saveTaxpayerProfile(year, local)) markSent(year);
+  return { taxpayer: local, carriedFrom: null };
 }
 
 /** 対象年のプロフィールとしてDBへ保存する。 */

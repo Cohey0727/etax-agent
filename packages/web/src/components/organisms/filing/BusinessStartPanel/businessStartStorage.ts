@@ -3,10 +3,14 @@
  *
  * 保存先はサーバーのDB（所有者ごとに1件）。開業は一度きりの手続きで
  * 年度に属さないため、プロフィール（年度別）とは別の保存になる。
- * 読み込みに失敗した場合は null を返し、呼び出し側が空の入力で始める。
+ * 保存は入力一式の置き換えなので、読み込みに失敗したときは編集させない。
  */
 import { BusinessStartInputs, SalarySituationRow } from "@types";
-import { fetchBusinessStartInputs, saveBusinessStartInputsToServer } from "@utils/api";
+import {
+  SavedInputResult,
+  fetchBusinessStartInputs,
+  saveBusinessStartInputsToServer,
+} from "@utils/api";
 
 function emptySalaryRow(): SalarySituationRow {
   return { count: null, terms: "", has_tax: null };
@@ -48,12 +52,14 @@ export function emptyBusinessStartInputs(): BusinessStartInputs {
   };
 }
 
-/** 保存済みの専用入力を読み込む。未保存・失敗時は null。 */
-export async function loadBusinessStartInputs(): Promise<BusinessStartInputs | null> {
+/**
+ * 保存済みの専用入力を読み込む。未保存（empty）と取得失敗（failed）を分けて
+ * 返す。保存値に欠けた項目があれば空の入力で補う。
+ */
+export async function loadBusinessStartInputs(): Promise<SavedInputResult<BusinessStartInputs>> {
   const result = await fetchBusinessStartInputs();
-  if (!result?.state) return null;
-  // 保存値に欠けた項目があっても空の入力で補って使う（旧い保存値対策）。
-  return { ...emptyBusinessStartInputs(), ...result.state };
+  if (result.status !== "loaded") return result;
+  return { status: "loaded", value: { ...emptyBusinessStartInputs(), ...result.value } };
 }
 
 /** 専用入力をDBへ保存する。失敗した場合は false。 */

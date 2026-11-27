@@ -58,8 +58,8 @@ export const BalanceSheetPanel = ({
     let cancelled = false;
     setPrevious(null);
     void fetchFilingInputs(year - 1).then((res) => {
-      if (cancelled || !res) return;
-      const prev = parseDeductionState(res.state as Partial<DeductionState>).balanceSheet;
+      if (cancelled || res.status !== "loaded") return;
+      const prev = parseDeductionState(res.value as Partial<DeductionState>).balanceSheet;
       if (prev && !isBalanceSheetEmpty(prev)) setPrevious(prev);
     });
     return () => {

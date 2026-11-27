@@ -600,18 +600,26 @@ export interface TaxpayerProfileResult {
   carried_from: number | null;
 }
 
-/** 納税者プロフィール（年度別・DB保存）を取得する。取得できない場合は null。 */
-/** 対象年の申告入力（控除・税額控除・雑所得・申告種別）をDBから取得する。未保存・失敗時は null。 */
-export async function fetchFilingInputs(
-  year: number,
-): Promise<{ state: unknown } | null> {
+/**
+ * サーバーに保存した入力の取得結果。未保存（empty）と取得失敗（failed）を
+ * 分ける。失敗を未保存と読むと、空の入力で保存値を丸ごと上書きしてしまう。
+ */
+export type SavedInputResult<T> =
+  | { status: "loaded"; value: T }
+  | { status: "empty" }
+  | { status: "failed" };
+
+/** 対象年の申告入力（控除・税額控除・雑所得・申告種別など）をDBから取得する。 */
+export async function fetchFilingInputs(year: number): Promise<SavedInputResult<unknown>> {
   try {
     const resp = await fetch(`/api/filing-inputs/${year}`);
-    if (!resp.ok) return null;
-    const data = (await resp.json()) as { state: unknown };
-    return data.state === null || data.state === undefined ? null : { state: data.state };
+    if (!resp.ok) return { status: "failed" };
+    const data = (await resp.json()) as { state?: unknown };
+    return data.state === null || data.state === undefined
+      ? { status: "empty" }
+      : { status: "loaded", value: data.state };
   } catch {
-    return null;
+    return { status: "failed" };
   }
 }
 
@@ -629,15 +637,19 @@ export async function saveFilingInputs(year: number, state: unknown): Promise<bo
   }
 }
 
+/**
+ * 納税者プロフィール（年度別・DB保存）を取得する。サーバーは保存が無くても
+ * 空のプロフィールを返すので、結果は取得できたか失敗したかの2通り。
+ */
 export async function fetchTaxpayerProfile(
   year: number,
-): Promise<TaxpayerProfileResult | null> {
+): Promise<Exclude<SavedInputResult<TaxpayerProfileResult>, { status: "empty" }>> {
   try {
     const resp = await fetch(`/api/taxpayer/${year}`);
-    if (!resp.ok) return null;
-    return (await resp.json()) as TaxpayerProfileResult;
+    if (!resp.ok) return { status: "failed" };
+    return { status: "loaded", value: (await resp.json()) as TaxpayerProfileResult };
   } catch {
-    return null;
+    return { status: "failed" };
   }
 }
 
@@ -683,14 +695,17 @@ export async function exportDomicilePdfFile(
   );
 }
 
-/** 開業の専用入力（開業届・青色申告承認申請書）を取得する。失敗時は null。 */
-export async function fetchBusinessStartInputs(): Promise<BusinessStartInputsResponse | null> {
+/** 開業の専用入力（開業届・青色申告承認申請書）を取得する。 */
+export async function fetchBusinessStartInputs(): Promise<
+  SavedInputResult<Partial<BusinessStartInputs>>
+> {
   try {
     const resp = await fetch("/api/business-start-inputs");
-    if (!resp.ok) return null;
-    return (await resp.json()) as BusinessStartInputsResponse;
+    if (!resp.ok) return { status: "failed" };
+    const data = (await resp.json()) as BusinessStartInputsResponse;
+    return data.state ? { status: "loaded", value: data.state } : { status: "empty" };
   } catch {
-    return null;
+    return { status: "failed" };
   }
 }
 

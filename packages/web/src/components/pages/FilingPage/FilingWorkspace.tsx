@@ -10,7 +10,6 @@ import {
   computeIncomeTax,
   computeManualIncomes,
   DeductionInputs,
-  DeductionState,
   ExpandedIncomeInput,
   MiscIncomeInput,
   SalaryIncomeInput,
@@ -20,9 +19,10 @@ import {
   TaxCreditInputs,
   Transaction,
 } from "@etax/shared";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useMemo } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import { Tabs } from "@components/molecules";
+import { RetryNotice } from "@components/molecules/RetryNotice";
 import {
   AgriculturePanel,
   BalanceRecords,
@@ -40,16 +40,13 @@ import {
   SubmissionRecordPanel,
   TaxCreditPanel,
   TaxpayerPanel,
+  DEDUCTION_STATE_LOAD_FAILED,
+  useDeductionState,
 } from "@components/organisms/filing";
 import {
   ConfirmComparePanel,
   useFilingSnapshots,
 } from "@components/organisms/filing/ConfirmComparePanel";
-import {
-  hydrateDeductionStateFromServer,
-  loadDeductionState,
-  saveDeductionState,
-} from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppView, FilingTab } from "@types";
 import { createFilingSnapshot } from "@utils/api";
 import { pathForView } from "@utils/routing";
@@ -85,25 +82,8 @@ export const FilingWorkspace = ({
   onTabChange,
 }: FilingWorkspaceProps) => {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const [deductionState, setDeductionState] = useState<DeductionState>(() =>
-    loadDeductionState(year),
-  );
-  // 申告入力の正はサーバーDB。表示時にサーバー値を取り込んでから再読込する。
-  // 取り込みが終わるまでは保存しない（端末に値が無い状態で編集すると
-  // 空状態がサーバーへ全体置換され、保存済みの控除等が消えてしまうため。
-  // 納税者画面と同じガード。Issue #10-4 の横展開）。
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    void hydrateDeductionStateFromServer(year).then(() => {
-      if (cancelled) return;
-      setDeductionState(loadDeductionState(year));
-      setHydrated(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [year]);
+  const deduction = useDeductionState(year);
+  const deductionState = deduction.state;
   const filingOptions: BlueDeductionOptions = {
     filingType: deductionState.filingType,
     realEstateBusinessScale: deductionState.realEstateBusinessScale,
@@ -123,46 +103,17 @@ export const FilingWorkspace = ({
     [transactions, year, deductionState.filingType, deductionState.realEstateBusinessScale, deductionState.agriculture],
   );
 
-  const updateDeductions = (next: DeductionInputs) => {
-    const state = { ...deductionState, deductions: next };
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
-  const updateTaxCredits = (next: TaxCreditInputs) => {
-    const state = { ...deductionState, taxCredits: next };
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
-  const updateMiscIncome = (next: MiscIncomeInput) => {
-    const state = { ...deductionState, miscIncome: next };
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
-  const updateSalaryIncome = (next: SalaryIncomeInput) => {
-    const state = { ...deductionState, salaryIncome: next };
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
-  const updateExpandedIncome = (next: ExpandedIncomeInput) => {
-    const state = { ...deductionState, expandedIncome: next };
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
-  const updateAgriculture = (next: AgricultureInput) => {
-    const state = { ...deductionState, agriculture: next };
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
-  const updateBalanceSheet = (next: XtxBalanceSheetInput | null) => {
-    const state = { ...deductionState, balanceSheet: next };
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
-  const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => {
-    const state = applyBreakdownEntries(deductionState, key, entries);
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(year, state);
-  };
+  const updateDeductions = (next: DeductionInputs) => deduction.update({ deductions: next });
+  const updateTaxCredits = (next: TaxCreditInputs) => deduction.update({ taxCredits: next });
+  const updateMiscIncome = (next: MiscIncomeInput) => deduction.update({ miscIncome: next });
+  const updateSalaryIncome = (next: SalaryIncomeInput) => deduction.update({ salaryIncome: next });
+  const updateExpandedIncome = (next: ExpandedIncomeInput) =>
+    deduction.update({ expandedIncome: next });
+  const updateAgriculture = (next: AgricultureInput) => deduction.update({ agriculture: next });
+  const updateBalanceSheet = (next: XtxBalanceSheetInput | null) =>
+    deduction.update({ balanceSheet: next });
+  const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) =>
+    deduction.replace(applyBreakdownEntries(deductionState, key, entries));
 
   // 各タブの警告から、帳簿画面をこの年度＋警告種別のフィルターで開く。
   // URLにクエリを付けてから画面遷移すると、AppPage のURL同期は
@@ -363,6 +314,9 @@ export const FilingWorkspace = ({
   return (
     <Col gap="md">
       <Tabs items={FILING_TABS} activeId={tab} onChange={onTabChange} />
+      {deduction.loadFailed ? (
+        <RetryNotice message={DEDUCTION_STATE_LOAD_FAILED} onRetry={deduction.retry} />
+      ) : null}
       {tabContent[tab]}
     </Col>
   );

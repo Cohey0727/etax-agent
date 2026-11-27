@@ -99,7 +99,7 @@ export const TaxpayerPanel = ({
   useEffect(() => {
     let cancelled = false;
     loadTaxpayer(year).then((loadedProfile) => {
-      if (!cancelled) setTaxpayer(loadedProfile.taxpayer);
+      if (!cancelled && loadedProfile) setTaxpayer(loadedProfile.taxpayer);
     });
     return () => {
       cancelled = true;

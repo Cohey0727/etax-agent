@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, Col, Input, Row, SkeletonBar, Text } from "@components/atoms";
+import { RetryNotice } from "@components/molecules/RetryNotice";
 import { XtxTaxpayerInput } from "@types";
 import {
   LoadedTaxpayer,
@@ -59,23 +60,29 @@ export interface TaxpayerProfilePanelProps {
  */
 export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
   const [loaded, setLoaded] = useState<LoadedTaxpayer | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
   const pendingRef = useRef<{ year: number; taxpayer: XtxTaxpayerInput } | null>(null);
   const timerRef = useRef<number | null>(null);
 
-  // 年度が切り替わったら、その年度のプロフィール（無ければ引き継ぎ）を読み直す。
+  // 対象年のプロフィール（無ければ引き継ぎ）を読む。読めなければ編集させない
+  // （空のフォームのまま保存すると、サーバーのプロフィールを空で上書きするため）。
   useEffect(() => {
     let cancelled = false;
-    setLoaded(null);
-    loadTaxpayer(year).then((next) => {
+    void loadTaxpayer(year).then((next) => {
       if (cancelled) return;
+      if (!next) {
+        setLoadFailed(true);
+        return;
+      }
       setLoaded(next);
       setTaxpayer(next.taxpayer);
     });
     return () => {
       cancelled = true;
     };
-  }, [year]);
+  }, [year, loadAttempt]);
 
   // 画面を離れるとき、保存待ちの入力があれば即座に保存する。
   useEffect(() => {
@@ -107,12 +114,22 @@ export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
       <Card>
         <Col gap="md">
           <Text variant="sectionTitle">納税者情報</Text>
-          {SKELETON_ROWS.map((row) => (
-            <Row key={row} gap="sm">
-              <SkeletonBar width="120px" height={14} />
-              <SkeletonBar height={36} />
-            </Row>
-          ))}
+          {loadFailed ? (
+            <RetryNotice
+              message="納税者情報をサーバーから読み込めませんでした。"
+              onRetry={() => {
+                setLoadFailed(false);
+                setLoadAttempt((n) => n + 1);
+              }}
+            />
+          ) : (
+            SKELETON_ROWS.map((row) => (
+              <Row key={row} gap="sm">
+                <SkeletonBar width="120px" height={14} />
+                <SkeletonBar height={36} />
+              </Row>
+            ))
+          )}
         </Col>
       </Card>
     );
@@ -127,15 +144,10 @@ export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
             申告書の見出しに入る情報です。プロフィールは年度別にサーバー（この
             アプリのDB）へ保存されます。
           </Text>
-          {loaded?.carriedFrom != null ? (
+          {loaded.carriedFrom !== null ? (
             <Text variant="muted">
               {loaded.carriedFrom}年分のプロフィールを引き継いでいます。変更すると
               {year}年分として保存されます。
-            </Text>
-          ) : loaded?.carriedFromLegacy ? (
-            <Text variant="muted">
-              これまでのプロフィールを引き継いでいます。変更すると{year}年分として
-              保存されます。
             </Text>
           ) : null}
         </Col>

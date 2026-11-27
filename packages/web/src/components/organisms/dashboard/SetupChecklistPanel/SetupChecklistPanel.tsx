@@ -41,8 +41,8 @@ export const SetupChecklistPanel = ({ transactions, year, onNavigate }: SetupChe
         if (cancelled) return;
         setSetupStatus({
           year,
-          profileDone: Boolean(profile?.taxpayer.name),
-          inputsDone: inputs !== null,
+          profileDone: profile.status === "loaded" && Boolean(profile.value.taxpayer.name),
+          inputsDone: inputs.status === "loaded",
         });
       },
     );
