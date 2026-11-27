@@ -226,6 +226,34 @@ export function floor1000(x: number): number {
 return Math.floor(x / 1000) * 1000;
 }
 
+/** 申告書の納付・還付の欄に転記する精算結果（本則・簡易課税・2割特例で共通）。 */
+export interface ConsumptionSettlement {
+  payableNational: number;
+  refundNational: number;
+  interimRefundNational: number;
+  payableLocal: number;
+  refundLocal: number;
+  interimRefundLocal: number;
+}
+
+/** 今回の消費税額（国税）。納付は正、控除不足還付・中間納付還付は負。 */
+export function signedNationalTax(r: ConsumptionSettlement): number {
+  return r.payableNational - r.refundNational - r.interimRefundNational;
+}
+
+/** 今回の譲渡割額（地方）。納付は正、還付は負。 */
+export function signedLocalTax(r: ConsumptionSettlement): number {
+  return r.payableLocal - r.refundLocal - r.interimRefundLocal;
+}
+
+/**
+ * 修正申告の差引納付税額（この申告により増加する税額）。今回の税額と
+ * 既確定税額はどちらも納付を正・還付を負で比べ、100円未満を切り捨てる。
+ */
+export function amendmentIncrease(current: number, original: number): number {
+  return floor100(Math.max(current - original, 0));
+}
+
 /** 税込金額 → 税抜金額（10%: ×100/110、8%: ×100/108、円未満切捨て）。 */
 export function exclFromIncl(incl: number, ratePercent: number): number {
 const i = Math.trunc(incl || 0);
@@ -474,11 +502,11 @@ aaj.push(amountAlways("AAJ00100", r.diffNational));
 aaj.push(amount("AAJ00110", interimNational));
 aaj.push(amount("AAJ00120", r.payableNational));
 aaj.push(amount("AAJ00130", r.interimRefundNational));
+let amendmentNational = 0;
 if (data.filingKind === 3 && data.originalNational!== null) {
-// 増加額は今回の納付税額 − 既確定税額（いずれも中間納付控除後の額）
-const increase = Math.max(r.payableNational - data.originalNational, 0);
+amendmentNational = amendmentIncrease(signedNationalTax(r), data.originalNational);
 aaj.push(
-`<AAJ00140>${amountAlways("AAJ00150", data.originalNational)}${amountAlways("AAJ00160", floor100(increase))}</AAJ00140>`,
+`<AAJ00140>${amountAlways("AAJ00150", data.originalNational)}${amountAlways("AAJ00160", amendmentNational)}</AAJ00140>`,
 );
 }
 aaj.push(
@@ -497,14 +525,17 @@ aak.push(`<AAK00040>${localTax.join("")}</AAK00040>`);
 aak.push(amount("AAK00070", interimLocal));
 aak.push(amount("AAK00080", r.payableLocal));
 aak.push(amount("AAK00090", r.interimRefundLocal));
+let amendmentLocal = 0;
 if (data.filingKind === 3 && data.originalLocal!== null) {
-const increaseLocal = Math.max(r.payableLocal - data.originalLocal, 0);
+amendmentLocal = amendmentIncrease(signedLocalTax(r), data.originalLocal);
 aak.push(
-`<AAK00100>${amountAlways("AAK00110", data.originalLocal)}${amountAlways("AAK00120", floor100(increaseLocal))}</AAK00100>`,
+`<AAK00100>${amountAlways("AAK00110", data.originalLocal)}${amountAlways("AAK00120", amendmentLocal)}</AAK00100>`,
 );
 }
-// 合計欄は納付の場合のみ出す
-aak.push(amount("AAK00130", r.payableNational + r.payableLocal));
+// 合計（納付又は還付）税額: 修正申告は増加額の合計、それ以外は納付を正・還付を負で書く
+aak.push(
+amountAlways("AAK00130", data.filingKind === 3? amendmentNational + amendmentLocal: r.totalPayable),
+);
 
 const aam: string[] = [];
 aam.push(kubun("AAM00020", options?.creditMethodKubun ?? (r.fullDeduction? 3: 2)));

@@ -325,4 +325,30 @@ describe("buildSimplifiedConsumptionXtx", () => {
     expect(xtx).toContain("<ABJ00110>84600</ABJ00110>");
     expect(xtx).toContain("<ABJ00130>115400</ABJ00130>"); // 90,000 + 25,400
   });
+
+  test("修正前・修正後とも還付なら、差引納付税額は還付の減少額になる", () => {
+    const input: SimplifiedConsumptionInput = {
+      ...EMPTY_INPUT,
+      salesByCategory: { 5: { incl10: 1_100_000, incl8: 0 } },
+      badDebtTax10: 200_000,
+    };
+    const result = computeSimplifiedConsumptionReturn(input);
+    expect(result.refundNational).toBe(161_000);
+    expect(result.refundLocal).toBe(45_410);
+    const xtx = buildSimplifiedConsumptionXtx({
+      taxpayer: TAXPAYER,
+      periodFrom: "2027-01-01",
+      periodTo: "2027-12-31",
+      submissionDate: "2028-05-15",
+      filingKind: 3,
+      basePeriodSales: 0,
+      input,
+      result,
+      originalNational: -200_000,
+      originalLocal: -56_410,
+    });
+    expect(xtx).toContain("<ABI00160>39000</ABI00160>"); // −161,000 − (−200,000)
+    expect(xtx).toContain("<ABJ00120>11000</ABJ00120>"); // −45,410 − (−56,410)
+    expect(xtx).toContain("<ABJ00130>50000</ABJ00130>");
+  });
 });

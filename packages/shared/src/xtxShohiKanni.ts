@@ -25,7 +25,16 @@
 import { SIMPLIFIED_RATES, BusinessKind} from "./taxcalc";
 import { normalizeXtxTaxpayer} from "./taxpayerNormalize";
 import { XtxTaxpayer, amount, amountAlways, esc, kubun, ref} from "./xtx";
-import { buildShohiIt, exclFromIncl, floor100, floor1000, nationalTaxFromIncl} from "./xtxShohi";
+import {
+amendmentIncrease,
+buildShohiIt,
+exclFromIncl,
+floor100,
+floor1000,
+nationalTaxFromIncl,
+signedLocalTax,
+signedNationalTax,
+} from "./xtxShohi";
 
 const SOFT_NAME = "eTaxAgent";
 const SHOHI_NS = "http://xml.e-tax.nta.go.jp/XSD/shohi";
@@ -518,8 +527,7 @@ abi.push(amount("ABI00120", r.payableNational));
 abi.push(amount("ABI00130", r.interimRefundNational));
 let amendmentNational = 0;
 if (data.filingKind === 3 && data.originalNational!== null) {
-// 増加額は今回の納付税額 − 既確定税額（いずれも中間納付控除後の額）
-amendmentNational = floor100(Math.max(r.payableNational - data.originalNational, 0));
+amendmentNational = amendmentIncrease(signedNationalTax(r), data.originalNational);
 abi.push(
 `<ABI00140>${amountAlways("ABI00150", data.originalNational)}${amountAlways("ABI00160", amendmentNational)}</ABI00140>`,
 );
@@ -539,7 +547,7 @@ abj.push(amount("ABJ00080", r.payableLocal));
 abj.push(amount("ABJ00090", r.interimRefundLocal));
 let amendmentLocal = 0;
 if (data.filingKind === 3 && data.originalLocal!== null) {
-amendmentLocal = floor100(Math.max(r.payableLocal - data.originalLocal, 0));
+amendmentLocal = amendmentIncrease(signedLocalTax(r), data.originalLocal);
 abj.push(
 `<ABJ00100>${amountAlways("ABJ00110", data.originalLocal)}${amountAlways("ABJ00120", amendmentLocal)}</ABJ00100>`,
 );

@@ -138,6 +138,47 @@ describe("buildConsumptionXtx", () => {
     expect(xtx).not.toContain("<DTF00000>");
   });
 
+  function buildFor(values: ConsumptionReturnInput, filingKind: 1 | 3, original: [number, number] | null) {
+    return buildConsumptionXtx({
+      taxpayer: TAXPAYER,
+      periodFrom: "2025-01-01",
+      periodTo: "2025-12-31",
+      submissionDate: "2026-06-10",
+      filingKind,
+      basePeriodSalesThousands: 0,
+      input: values,
+      result: computeConsumptionReturn(values),
+      originalNational: original ? original[0] : null,
+      originalLocal: original ? original[1] : null,
+    });
+  }
+
+  test("還付の確定申告では合計税額 AAK00130 に還付の合計を負の値で出す", () => {
+    const values = input({ salesIncl10: 1_100_000, purchasesIncl10: 5_500_000 });
+    expect(computeConsumptionReturn(values).totalPayable).toBe(-400_000);
+    expect(buildFor(values, 1, null)).toContain("<AAK00130>-400000</AAK00130>");
+  });
+
+  test("修正申告の合計税額 AAK00130 は差引納付税額と差引納付譲渡割額の合計", () => {
+    const values = input({ salesIncl10: 11_000_000, purchasesIncl10: 1_100_000 });
+    const xtx = buildFor(values, 3, [600_000, 169_200]);
+    expect(xtx).toContain("<AAJ00160>102000</AAJ00160>"); // 702,000 − 600,000
+    expect(xtx).toContain("<AAK00120>28800</AAK00120>"); // 198,000 − 169,200
+    expect(xtx).toContain("<AAK00130>130800</AAK00130>");
+  });
+
+  test("修正前・修正後とも還付なら、差引納付税額は還付の減少額になる", () => {
+    const values = input({ salesIncl10: 1_100_000, purchasesIncl10: 3_300_000 });
+    const result = computeConsumptionReturn(values);
+    expect(result.refundNational).toBe(156_000);
+    expect(result.refundLocal).toBe(44_000);
+    // 既確定は還付 312,000 / 88,000（△で入力）
+    const xtx = buildFor(values, 3, [-312_000, -88_000]);
+    expect(xtx).toContain("<AAJ00160>156000</AAJ00160>");
+    expect(xtx).toContain("<AAK00120>44000</AAK00120>");
+    expect(xtx).toContain("<AAK00130>200000</AAK00130>");
+  });
+
   test("仕様適合: 名前空間・IT部の並び順と必須要素・FORM_SEC", () => {
     const values = input({ salesIncl10: 15_352_564, purchasesIncl10: 4_496_249 });
     const xtx = buildConsumptionXtx({

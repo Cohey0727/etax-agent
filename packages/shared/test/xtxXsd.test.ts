@@ -348,6 +348,32 @@ function shohi8Sample(): string {
   });
 }
 
+/** 本則・還付の修正申告（AAK00130 に負の値、既確定税額に還付の△を出す） */
+function shohiRefundAmendSample(): string {
+  const input = {
+    salesIncl10: 1_100_000,
+    salesIncl8: 0,
+    nontaxableSales: 0,
+    exemptSales: 0,
+    purchasesIncl10: 3_300_000,
+    purchasesIncl8: 0,
+    interimNational: 0,
+    interimLocal: 0,
+  };
+  return buildConsumptionXtx({
+    taxpayer: TAXPAYER,
+    periodFrom: "2025-01-01",
+    periodTo: "2025-12-31",
+    submissionDate: "2026-06-10",
+    filingKind: 3,
+    basePeriodSalesThousands: 0,
+    input,
+    result: computeConsumptionReturn(input),
+    originalNational: -312_000,
+    originalLocal: -88_000,
+  });
+}
+
 function kanniSample(): string {
   const input = {
     salesByCategory: { 5: { incl10: 16_885_000, incl8: 0 } },
@@ -510,6 +536,7 @@ describe("公式XMLスキーマ検証", () => {
       ["shotokuExpanded2025.xtx", expandedSample(2025), "shotoku/RKO0010-250.xsd"],
       ["shohi2025.xtx", shohiSample(), "shohi/RSH0010-260.xsd"],
       ["shohi8.xtx", shohi8Sample(), "shohi/RSH0010-260.xsd"],
+      ["shohiRefundAmend.xtx", shohiRefundAmendSample(), "shohi/RSH0010-260.xsd"],
       ["shohiSpecial20.xtx", special20Sample(), "shohi/RSH0010-260.xsd"],
       ["shohiKanni2027.xtx", kanniSample(), "shohi/RSH0030-260.xsd"],
     ];
