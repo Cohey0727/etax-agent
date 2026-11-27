@@ -103,6 +103,15 @@ describe("配当所得（Phase B、No.1330 / No.1250）", () => {
     expect(r.separateIncome).toBe(270_000);
     expect(r.comprehensiveIncome).toBe(630_000);
   });
+
+  test("配当所得の赤字（負債の利子 > 収入）は他の所得と通算せず、総所得金額への加算は 0", () => {
+    const r = computeExpandedIncomes({
+      ...EMPTY_EXPANDED_INCOME,
+      dividend: { ...EMPTY_EXPANDED_INCOME.dividend, generalRevenue: 100_000, interestExpense: 400_000 },
+    });
+    expect(r.dividend.comprehensiveIncome).toBe(-300_000);
+    expect(r.comprehensiveAddition).toBe(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

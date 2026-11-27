@@ -140,7 +140,7 @@ export interface DividendIncomeBreakdown {
   interestComprehensive: number;
   /** 負債の利子のうち申告分離分への配分額 */
   interestSeparate: number;
-  /** 配当所得の金額（総合課税分。赤字は符号つきで返す＝他所得と通算可） */
+  /** 配当所得の金額（総合課税分。赤字は符号つきで返すが、他の所得とは通算しない） */
   comprehensiveIncome: number;
   /** 配当所得の金額（申告分離分、損益通算前。赤字は符号つき） */
   separateIncome: number;
@@ -364,7 +364,7 @@ export interface ExpandedIncomeBreakdown {
   stocks: StockTransferBreakdown;
   /** 配当の入力（収入金額・負債の利子のいずれか）があったか */
   dividendDeclared: boolean;
-  /** 総合課税の総所得金額へ加算する額（配当（総合）＋一時1/2算入額） */
+  /** 総合課税の総所得金額へ加算する額（配当（総合。赤字は 0）＋一時1/2算入額） */
   comprehensiveAddition: number;
   /**
    * 上場株式等の譲渡損失のうち、申告分離の上場配当等へ通算した額。
@@ -430,7 +430,8 @@ export function computeExpandedIncomes(input: ExpandedIncomeInput): ExpandedInco
     dividend,
     stocks,
     dividendDeclared,
-    comprehensiveAddition: dividend.comprehensiveIncome + temp.includedAmount,
+    // 配当所得の赤字は損益通算の対象外（所得税法69条）
+    comprehensiveAddition: Math.max(dividend.comprehensiveIncome, 0) + temp.includedAmount,
     listedLossOffsetToDividend: offset,
     separateDividendIncome,
     separateStockIncome,

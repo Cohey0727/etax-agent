@@ -132,8 +132,8 @@ describe("手入力所得の統合計算", () => {
   });
 });
 
-describe("雑所得の赤字（損益通算）", () => {
-  test("業務の赤字は 0 に潰されず合計に反映される", () => {
+describe("雑所得の赤字（損益通算しない）", () => {
+  test("雑所得の計が赤字なら 0 で、他の所得とは通算しない（行ごとの金額は符号つき）", () => {
     const manual = computeManualIncomes(
       2025,
       EMPTY_SALARY_INCOME,
@@ -142,7 +142,38 @@ describe("雑所得の赤字（損益通算）", () => {
     );
     expect(manual.miscBusiness).toBe(-200_000);
     expect(manual.miscOther).toBe(-50_000);
-    expect(manual.miscTotal).toBe(-250_000);
-    expect(manual.total).toBe(-250_000);
+    expect(manual.miscTotal).toBe(0);
+    expect(manual.total).toBe(0);
+  });
+
+  test("給与と業務の雑所得の赤字: 給与所得はそのまま残る", () => {
+    const manual = computeManualIncomes(
+      2025,
+      { revenue: 5_000_000 },
+      { ...EMPTY_MISC_INCOME, businessRevenue: 100_000, businessIncome: -1_000_000 },
+      0,
+    );
+    expect(manual.salary).toBe(3_560_000);
+    expect(manual.miscTotal).toBe(0);
+    expect(manual.total).toBe(3_560_000);
+  });
+
+  test("雑所得の中では公的年金等と業務の赤字を通算する", () => {
+    const manual = computeManualIncomes(
+      2025,
+      EMPTY_SALARY_INCOME,
+      {
+        ...EMPTY_MISC_INCOME,
+        pensionRevenue: 1_600_000,
+        pensionOver65: true,
+        businessRevenue: 100_000,
+        businessIncome: -200_000,
+      },
+      0,
+    );
+    // 年金所得 1,600,000 − 1,100,000 = 500,000、業務 −200,000 → 雑所得の計 300,000
+    expect(manual.pension).toBe(500_000);
+    expect(manual.miscTotal).toBe(300_000);
+    expect(manual.total).toBe(300_000);
   });
 });

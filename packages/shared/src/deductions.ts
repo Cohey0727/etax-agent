@@ -962,7 +962,7 @@ export interface ManualIncomeBreakdown {
   miscBusiness: number;
   /** その他の雑所得（第一表⑨） */
   miscOther: number;
-  /** 雑所得の計（第一表⑩ = ⑦+⑧+⑨） */
+  /** 雑所得の計（第一表⑩ = ⑦+⑧+⑨。赤字は 0） */
   miscTotal: number;
   /** 手入力所得の合計（給与＋雑計）。帳簿の事業・不動産は含まない */
   total: number;
@@ -988,17 +988,18 @@ export function computeManualIncomes(
     salaryInput.adjustmentEligible === true,
   );
   const salaryAfterAdj1 = Math.max(salaryBase - adjustment1, 0);
-  // 雑所得（業務・その他）は赤字もあり得るため、0で潰さず符号つきで扱う
-  // （赤字は他の所得と通算される）。
+  // 雑所得（業務・その他）の行は赤字もあり得るため符号つきで持つ。赤字は
+  // 雑所得の中（公的年金等）とだけ通算し、他の所得とは通算しない（所得税法69条）。
   const signed = (x: number): number => (Number.isFinite(x) ? Math.trunc(x) : 0);
   const miscBusiness = signed(miscInput.businessIncome);
   const miscOther = signed(miscInput.income);
+  const miscNonPension = Math.max(miscBusiness + miscOther, 0);
   const ledger = amount(ledgerIncomeTotal);
 
   let pension = 0;
   let adjustment2 = 0;
   for (let i = 0; i < 100; i++) {
-    const otherTotal = ledger + salaryAfterAdj1 - adjustment2 + miscBusiness + miscOther;
+    const otherTotal = ledger + salaryAfterAdj1 - adjustment2 + miscNonPension;
     const nextPension = publicPensionIncome(miscInput.pensionRevenue, miscInput.pensionOver65, otherTotal);
     const nextAdjustment2 = salaryAdjustmentDeduction2(salaryAfterAdj1, nextPension);
     if (nextPension === pension && nextAdjustment2 === adjustment2) break;
@@ -1009,7 +1010,7 @@ export function computeManualIncomes(
   // 判定に使った他の所得の合計と矛盾しない形にそろえる
   adjustment2 = salaryAdjustmentDeduction2(salaryAfterAdj1, pension);
   const salary = Math.max(salaryAfterAdj1 - adjustment2, 0);
-  const miscTotal = pension + miscBusiness + miscOther;
+  const miscTotal = Math.max(pension + miscBusiness + miscOther, 0);
   return {
     salaryBase,
     salaryAdjustment1: adjustment1,
