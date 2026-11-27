@@ -48,6 +48,25 @@ describe("減価償却スケジュール", () => {
   });
 });
 
+describe("除却した資産のスケジュール", () => {
+  test("一括償却資産は除却した翌年も償却を続け、定額法は除却した翌年に出さない", async () => {
+    const base = {
+      quantity: "",
+      incomeType: "business",
+      acquisitionDate: "2024-04-01",
+      serviceStartDate: null,
+      cost: 180_000,
+      businessRatioPercent: 100,
+      disposedDate: "2024-12-31",
+    } as const;
+    await asUser(() => insertFixedAssetRow(db, { ...base, name: "一括", usefulLifeYears: 3, method: "lump_sum" }));
+    await asUser(() => insertFixedAssetRow(db, { ...base, name: "定額", usefulLifeYears: 4, method: "straight_line" }));
+    const schedule = buildDepreciationSchedule(await asUser(() => listFixedAssetRows(db)), 2025);
+    expect(schedule.rows.map((row) => [row.name, row.deductible])).toEqual([["一括", 60_000]]);
+    expect(schedule.deductible_totals.business).toBe(60_000);
+  });
+});
+
 describe("申告ステータスの保存", () => {
   test("エージェント経由でも範囲外の年は保存しない", async () => {
     await expect(asUser(() => setFilingStatusForAgent(99999, { confirmed: true }))).rejects.toThrow(

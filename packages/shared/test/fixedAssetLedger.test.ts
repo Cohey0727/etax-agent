@@ -24,6 +24,22 @@ const asset = (partial: Partial<FixedAssetLedgerEntry>): FixedAssetLedgerEntry =
   ...partial,
 });
 
+describe("除却した一括償却資産", () => {
+  // 一括償却資産は除却しても3年均等で償却を続ける（所得税法施行令139条）
+  const lumpSum = asset({ cost: 180_000, useful_life_years: 3, method: "lump_sum", disposed_date: "2023-08-31" });
+
+  test("除却した翌年以後も3年の償却費が出て、残高は3年目に 0 になる", () => {
+    expect(fixedAssetSchedule(lumpSum).map((row) => row.year)).toEqual([2023, 2024, 2025]);
+    expect(fixedAssetYearFigures(lumpSum, 2024)).toMatchObject({ deductible: 60_000, bookValue: 60_000 });
+    expect(fixedAssetYearFigures(lumpSum, 2025)).toMatchObject({ deductible: 60_000, bookValue: 0 });
+  });
+
+  test("償却が続く年は対象年の一覧に出る", () => {
+    expect(isFixedAssetInYear(lumpSum, 2025)).toBe(true);
+    expect(isFixedAssetInYear(lumpSum, 2026)).toBe(false);
+  });
+});
+
 describe("fixedAssetYearFigures", () => {
   test("定額法4年: 年ごとの償却費と年末残高、進み具合", () => {
     const pc = asset({});

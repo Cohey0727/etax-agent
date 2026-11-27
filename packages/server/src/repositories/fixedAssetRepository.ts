@@ -3,9 +3,9 @@
  *
  * 行 → API 形式（snake_case）への変換と、shared の減価償却エンジンの
  * 入力形式（FixedAssetInput）への変換もここで行う。
- * 除却済み資産の扱い: 除却年の翌年以降は償却対象から外す。除却年の償却は
- * 除却日をエンジンに渡して除却月までの月割にする（除却時の未償却残高の
- * 必要経費算入は扱わない）。
+ * 除却済み資産の扱いは除却日をエンジンに渡して決める。定額法・定率法は除却した
+ * 年を除却月までの月割にして翌年以後は償却せず、一括償却資産は除却しても3年均等の
+ * 償却を続ける（所得税法施行令139条）。除却時の未償却残高の必要経費算入は扱わない。
  */
 import { and, asc, eq } from "drizzle-orm";
 import { DepreciationDetailRow, DepreciationMethod, FixedAssetInput, depreciationDetailRow } from "@etax/shared";
@@ -44,12 +44,6 @@ export function fixedAssetToInput(row: FixedAssetRow): FixedAssetInput {
     businessRatioPercent: row.businessRatioPercent,
     disposalDate: row.disposedDate ?? undefined,
   };
-}
-
-/** 指定年に償却対象になるか（除却年の翌年以降は対象外）。 */
-export function isActiveInYear(row: FixedAssetRow, year: number): boolean {
-  if (!row.disposedDate) return true;
-  return Number(row.disposedDate.slice(0, 4)) >= year;
 }
 
 export async function listFixedAssetRows(db: Db): Promise<FixedAssetRow[]> {
@@ -129,7 +123,6 @@ export function depreciationDetailRowsForYear(
   const realEstate: DepreciationDetailRow[] = [];
   const agriculture: DepreciationDetailRow[] = [];
   for (const row of rows) {
-    if (!isActiveInYear(row, year)) continue;
     const detail = depreciationDetailRow(row.name, fixedAssetToInput(row), year, row.quantity);
     if (!detail) continue;
     if (row.incomeType === "real_estate") realEstate.push(detail);

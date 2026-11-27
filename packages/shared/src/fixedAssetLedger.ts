@@ -77,18 +77,17 @@ export function disposedYearOf(asset: FixedAssetLedgerEntry): number | null {
 }
 
 /**
- * 全期間の償却スケジュール（供用開始年から残高が尽きる年まで。除却した
- * 資産は除却した年まで）。計算できない入力（定率法の表に無い耐用年数など）は空にする。
+ * 全期間の償却スケジュール（供用開始年から残高が尽きる年まで。除却した定額法・
+ * 定率法の資産は除却した年まで、一括償却資産は除却しても3年）。計算できない入力
+ * （定率法の表に無い耐用年数など）は空にする。
  */
 export function fixedAssetSchedule(asset: FixedAssetLedgerEntry): DepreciationYear[] {
   const startYear = Number((asset.service_start_date ?? asset.acquisition_date).slice(0, 4));
   if (!Number.isFinite(startYear)) return [];
   // 定率法でも残高は必ず尽きるが、耐用年数が長い資産でも計算の上限を置く。
   const lastYear = startYear + Math.max(asset.useful_life_years * 2, 10) + 5;
-  const disposedYear = disposedYearOf(asset);
   try {
-    const schedule = depreciationSchedule(toEngineInput(asset), lastYear);
-    return disposedYear === null ? schedule : schedule.filter((row) => row.year <= disposedYear);
+    return depreciationSchedule(toEngineInput(asset), lastYear);
   } catch {
     return [];
   }
@@ -97,9 +96,9 @@ export function fixedAssetSchedule(asset: FixedAssetLedgerEntry): DepreciationYe
 /** 資産1件の、対象年の数値。スケジュールは1回だけ求める。 */
 export interface FixedAssetYearFigures {
   schedule: DepreciationYear[];
-  /** 対象年の必要経費算入額（償却が無い年・除却の翌年以降は 0） */
+  /** 対象年の必要経費算入額（償却が無い年・定額法と定率法の除却の翌年以降は 0） */
   deductible: number;
-  /** 対象年末の未償却残高（除却後は除却年の残高で止まる） */
+  /** 対象年末の未償却残高（定額法・定率法は除却後は除却年の残高で止まる） */
   bookValue: number;
   /** 償却の進み具合（0〜1） */
   progress: number;
@@ -122,12 +121,10 @@ export function fixedAssetYearFigures(
 }
 
 /**
- * 対象年の一覧に出す資産か。その年のスケジュールに現れる資産を対象とし、
- * 除却年がその年より前の資産は対象外（除却した年までは対象）。
+ * 対象年の一覧に出す資産か。その年のスケジュールに現れる資産を対象とする
+ * （除却した資産は除却した年まで。一括償却資産は除却後も償却が続く年まで）。
  */
 export function isFixedAssetInYear(asset: FixedAssetLedgerEntry, year: number): boolean {
-  const disposedYear = disposedYearOf(asset);
-  if (disposedYear !== null && disposedYear < year) return false;
   return fixedAssetSchedule(asset).some((row) => row.year === year);
 }
 

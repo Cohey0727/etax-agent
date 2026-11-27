@@ -77,4 +77,25 @@ describe("固定資産台帳リポジトリ", () => {
     expect(rows2027.realEstate.length).toBe(0);
     expect(rows2027.business.length).toBe(1);
   });
+
+  test("一括償却資産は除却した翌年以後も3年均等の明細を出す（所得税法施行令139条）", async () => {
+    const db = await createTestDb();
+    await insertFixedAssetRow(db, {
+      name: "タブレット",
+      quantity: "",
+      incomeType: "business",
+      acquisitionDate: "2025-05-01",
+      serviceStartDate: null,
+      cost: 150_000,
+      usefulLifeYears: 3,
+      method: "lump_sum",
+      businessRatioPercent: 100,
+      disposedDate: "2025-11-30",
+    });
+    for (const year of [2025, 2026, 2027]) {
+      const rows = depreciationDetailRowsForYear(await listFixedAssetRows(db), year);
+      expect(rows.business.map((row) => row.ordinary)).toEqual([50_000]);
+    }
+    expect(depreciationDetailRowsForYear(await listFixedAssetRows(db), 2028).business).toEqual([]);
+  });
 });

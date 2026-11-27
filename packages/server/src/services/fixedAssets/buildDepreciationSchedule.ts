@@ -2,12 +2,13 @@
  * buildDepreciationSchedule.ts — 指定年の減価償却スケジュールの組み立て（services/fixedAssets）。
  *
  * 固定資産画面（REST の /api/fixed-assets/depreciation）と MCP の get_depreciation が
- * 共用する。台帳の資産のうち対象年に償却対象のものを shared のエンジンで計算し、
- * 資産ごとの行・所得区分ごとの必要経費算入額の合計・少額特例の上限の使用状況を返す。
+ * 共用する。台帳の資産を shared のエンジンで計算し、対象年に償却のある資産ごとの
+ * 行・所得区分ごとの必要経費算入額の合計・少額特例の上限の使用状況を返す。除却した
+ * 資産をその年に償却するか（一括償却資産は除却後も3年続ける）はエンジンが決める。
  */
 import { depreciationForYear, smallSpecialUsage } from "@etax/shared";
 import { BusinessError } from "../../lib/errors";
-import { fixedAssetToInput, isActiveInYear } from "../../repositories/fixedAssetRepository";
+import { fixedAssetToInput } from "../../repositories/fixedAssetRepository";
 import { FixedAssetRow } from "../../repositories/schema";
 import { DepreciationScheduleResponse } from "../../schemas/fixedAsset";
 
@@ -19,10 +20,9 @@ export function buildDepreciationSchedule(
   assets: readonly FixedAssetRow[],
   year: number,
 ): DepreciationScheduleResponse {
-  const active = assets.filter((row) => isActiveInYear(row, year));
   const rows: DepreciationScheduleResponse["rows"] = [];
   const totals = { business: 0, real_estate: 0, agriculture: 0 };
-  for (const asset of active) {
+  for (const asset of assets) {
     let dep;
     try {
       dep = depreciationForYear(fixedAssetToInput(asset), year);
@@ -55,6 +55,6 @@ export function buildDepreciationSchedule(
     year,
     rows,
     deductible_totals: totals,
-    small_special: smallSpecialUsage(active.map(fixedAssetToInput), year),
+    small_special: smallSpecialUsage(assets.map(fixedAssetToInput), year),
   };
 }
