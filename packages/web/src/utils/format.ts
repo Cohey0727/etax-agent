@@ -9,6 +9,20 @@ export const formatYen = (value: number): string =>
 export const formatNumber = (value: number): string =>
   Math.trunc(value).toLocaleString("ja-JP");
 
+/**
+ * ISO 日時や日付文字列を YYYY/MM/DD にする。サーバーは UTC で返すので、
+ * 文字列を切り出さずに端末の現地時刻へ直してから日付を取る。
+ */
+export const formatDate = (value: string | null | undefined): string => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${y}/${m}/${d}`;
+};
+
 /** ISO 日時を画面表示用に整える。解釈できない場合はそのまま返す。 */
 export const formatDateTime = (iso: string): string => {
   const date = new Date(iso);
