@@ -10,7 +10,7 @@
  * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
 import { mkdir, readFile } from "node:fs/promises";
-import { writeFileAtomic } from "../lib/atomicFile";
+import { serializeFileUpdate, writeFileAtomic } from "../lib/atomicFile";
 import {
   getRegexRulesOverride,
   serverDataDir,
@@ -61,12 +61,15 @@ export async function loadRegexRulesOverride(): Promise<void> {
 
 /** ルールを保存し、その場で上書きとして反映する。現在の上書きを返す。 */
 export async function saveRegexRulesOverride(rules: RegexRule[]): Promise<RegexRule[] | null> {
-  const ownerId = ownerIdForWrite();
+  const path = rulesPath(ownerIdForWrite());
   const cleaned = rules
     .map((r) => ({ pattern: r.pattern.trim(), category: r.category }))
     .filter((r) => r.pattern !== "");
-  await mkdir(serverDataDir(), { recursive: true });
-  await writeFileAtomic(rulesPath(ownerId), JSON.stringify({ rules: cleaned }, null, 2));
-  setRegexRulesOverride(cleaned.length > 0 ? cleaned : null);
+  // ファイルとメモリ上の上書きを、保存した順のまま揃える
+  await serializeFileUpdate(path, async () => {
+    await mkdir(serverDataDir(), { recursive: true });
+    await writeFileAtomic(path, JSON.stringify({ rules: cleaned }, null, 2));
+    setRegexRulesOverride(cleaned.length > 0 ? cleaned : null);
+  });
   return getRegexRulesOverride();
 }

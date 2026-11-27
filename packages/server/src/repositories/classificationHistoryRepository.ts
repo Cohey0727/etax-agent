@@ -3,14 +3,12 @@
  *
  * 過去にユーザーが確定した「摘要 → 勘定科目」の対応を蓄積し、次回以降の
  * 判定で使う自動生成ルールとプロンプトの材料にする（直接照合はしない）。
- * DB（PostgreSQL）とは独立に
- * 未設定でもサーバーが動く）のため、履歴はサーバーのデータディレクトリの
- * JSONファイルに保存する（Git管理外）。
- * マルチテナント分離のため、ファイルは所有者ごとに分ける
- * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
+ * DB が未設定でもサーバーが動くよう、履歴は DB と独立に、サーバーの
+ * データディレクトリの JSON ファイルに保存する（Git管理外）。
+ * マルチテナント分離のため、ファイルは所有者ごとに分ける（settingsFiles 参照）。
  */
 import { mkdir, readFile } from "node:fs/promises";
-import { writeFileAtomic } from "../lib/atomicFile";
+import { serializeFileUpdate, writeFileAtomic } from "../lib/atomicFile";
 import { normalizeSearchText } from "@etax/shared";
 import { serverDataDir } from "../lib/config";
 import { ownerIdForWrite } from "../lib/tenantContext";
@@ -46,8 +44,12 @@ function historyPath(): string {
 
 /** 学習履歴を全件読み込む。ファイルが無ければ空配列。 */
 export async function loadClassificationHistory(): Promise<ClassificationHistoryRecord[]> {
+  return readClassificationHistory(historyPath());
+}
+
+async function readClassificationHistory(path: string): Promise<ClassificationHistoryRecord[]> {
   try {
-    const text = await readFile(historyPath(), "utf-8");
+    const text = await readFile(path, "utf-8");
     const parsed = JSON.parse(text) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
@@ -62,14 +64,6 @@ export async function loadClassificationHistory(): Promise<ClassificationHistory
   }
 }
 
-/** 学習履歴を保存する。 */
-async function saveClassificationHistory(
-  records: ClassificationHistoryRecord[],
-): Promise<ClassificationHistoryRecord[]> {
-  await mkdir(serverDataDir(), { recursive: true });
-  await writeFileAtomic(historyPath(), JSON.stringify(records, null, 2));
-  return records;
-}
 
 /** 摘要（正規化キー）と科目で1件を引く（照合は摘要から作り直したキーで比べる）。 */
 function findRecord(
@@ -83,22 +77,30 @@ function findRecord(
   );
 }
 
-/** 確定した対応を1件記録する（同じ摘要×科目は回数を増やす）。 */
+/**
+ * 確定した対応を1件記録する（同じ摘要×科目は回数を増やす）。
+ * 読み→変更→書きは所有者のファイル単位で直列にする（並行に記録しても消えない）。
+ */
 export async function recordClassification(
   description: string,
   account: string,
 ): Promise<ClassificationHistoryRecord[]> {
-  const records = await loadClassificationHistory();
-  const key = normalizeDescriptionKey(description);
-  const now = new Date().toISOString();
-  const existing = findRecord(records, description, account);
-  if (existing) {
-    existing.key = key;
-    existing.count += 1;
-    existing.updatedAt = now;
-    existing.description = description;
-  } else {
-    records.push({ key, description, account, count: 1, updatedAt: now });
-  }
-  return saveClassificationHistory(records);
+  const path = historyPath();
+  return serializeFileUpdate(path, async () => {
+    const records = await readClassificationHistory(path);
+    const key = normalizeDescriptionKey(description);
+    const now = new Date().toISOString();
+    const existing = findRecord(records, description, account);
+    if (existing) {
+      existing.key = key;
+      existing.count += 1;
+      existing.updatedAt = now;
+      existing.description = description;
+    } else {
+      records.push({ key, description, account, count: 1, updatedAt: now });
+    }
+    await mkdir(serverDataDir(), { recursive: true });
+    await writeFileAtomic(path, JSON.stringify(records, null, 2));
+    return records;
+  });
 }

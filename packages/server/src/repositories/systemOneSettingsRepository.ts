@@ -9,7 +9,7 @@
  * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
 import { mkdir, readFile } from "node:fs/promises";
-import { writeFileAtomic } from "../lib/atomicFile";
+import { serializeFileUpdate, writeFileAtomic } from "../lib/atomicFile";
 import {
   serverDataDir,
   setSystemOneOverrides,
@@ -62,8 +62,11 @@ export async function loadSystemOneSettings(): Promise<void> {
 export async function saveSystemOneSettings(
   overrides: SystemOneOverrides,
 ): Promise<void> {
-  const ownerId = ownerIdForWrite();
-  await mkdir(serverDataDir(), { recursive: true });
-  await writeFileAtomic(settingsPath(ownerId), JSON.stringify(overrides, null, 2));
-  setSystemOneOverrides(overrides);
+  const path = settingsPath(ownerIdForWrite());
+  // ファイルとメモリ上の上書きを、保存した順のまま揃える
+  await serializeFileUpdate(path, async () => {
+    await mkdir(serverDataDir(), { recursive: true });
+    await writeFileAtomic(path, JSON.stringify(overrides, null, 2));
+    setSystemOneOverrides(overrides);
+  });
 }

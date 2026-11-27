@@ -9,7 +9,7 @@
  * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
  */
 import { mkdir, readFile } from "node:fs/promises";
-import { writeFileAtomic } from "../lib/atomicFile";
+import { serializeFileUpdate, writeFileAtomic } from "../lib/atomicFile";
 import {
   getJevPromptOverride,
   serverDataDir,
@@ -49,10 +49,13 @@ export async function loadJevPromptOverride(): Promise<void> {
 
 /** プロンプトを保存し、その場で上書きとして反映する。現在の上書きを返す。 */
 export async function saveJevPromptOverride(prompt: string): Promise<string> {
-  const ownerId = ownerIdForWrite();
+  const path = promptPath(ownerIdForWrite());
   const trimmed = prompt.trim();
-  await mkdir(serverDataDir(), { recursive: true });
-  await writeFileAtomic(promptPath(ownerId), JSON.stringify({ prompt: trimmed }, null, 2));
-  setJevPromptOverride(trimmed);
+  // ファイルとメモリ上の上書きを、保存した順のまま揃える
+  await serializeFileUpdate(path, async () => {
+    await mkdir(serverDataDir(), { recursive: true });
+    await writeFileAtomic(path, JSON.stringify({ prompt: trimmed }, null, 2));
+    setJevPromptOverride(trimmed);
+  });
   return getJevPromptOverride();
 }
