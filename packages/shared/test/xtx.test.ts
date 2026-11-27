@@ -700,7 +700,7 @@ describe("buildXtxFiling の仕様適合（公式XMLスキーマ準拠）", () =
   });
 });
 
-describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", () => {
+describe("第一表の区分・欠落タグ・税額チェーン", () => {
   const TAXPAYER = {
     name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
     address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
@@ -1052,7 +1052,7 @@ describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", (
   });
 });
 
-describe("toEraDate の元号境界 (#3-4)", () => {
+describe("toEraDate の元号境界", () => {
   test("改元の月日境界で元号が切り替わる", () => {
     expect(toEraDate("2019-04-30")).toEqual({ era: 4, yy: 31, mm: 4, dd: 30 }); // 平成31年
     expect(toEraDate("2019-05-01")).toEqual({ era: 5, yy: 1, mm: 5, dd: 1 }); // 令和元年

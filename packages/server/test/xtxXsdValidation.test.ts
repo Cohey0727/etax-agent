@@ -1,5 +1,5 @@
 /**
- * xtxXsdValidation.test.ts — XTX生成時の公式XSD常時検証（Issue #28 Phase 1）。
+ * xtxXsdValidation.test.ts — XTX生成時の公式XSD常時検証。
  *
  * 担保すること:
  * - 手続ID・VR から対応する公式XSDを特定できる（etaxSchemaRelativePath）

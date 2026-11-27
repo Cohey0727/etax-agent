@@ -7,10 +7,9 @@
  * 環境変数 ETAX_XSD_DIR があればそちらを優先する。
  * 検証には python3 + lxml が必要（無い環境ではスキップ扱いで通過）。
  *
- * 2026-11-19、WEB版「作成済みデータの利用」で SE00S170 になった原因は
- * この検証で特定した（手続VR・名前空間・IT部の必須要素と並び順・
- * zeimusho の表記）。構造面の常時チェックは xtx.test.ts /
- * xtxShohi.test.ts 側にもある。
+ * 手続VR・名前空間・IT部の必須要素と並び順・zeimusho の表記を外すと
+ * WEB版「作成済みデータの利用」で SE00S170 になるため、この検証で担保する。
+ * 構造面の常時チェックは xtx.test.ts / xtxShohi.test.ts 側にもある。
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
@@ -433,7 +432,7 @@ function special20Sample(): string {
   });
 }
 
-/** 配当・一時・株式等譲渡あり（第三表＋KOC080 の XSD 検証用、Issue #27） */
+/** 配当・一時・株式等譲渡あり（第三表＋KOC080 の XSD 検証用） */
 function expandedSample(year: number): string {
   const transactions: Transaction[] = [
     { date: `${year}-06-15`, year, description: "事業売上", amount: 12_000_000, account: "普通預金", category: "売上高", income_type: "business", tax_category: "" },
@@ -489,7 +488,7 @@ function expandedSample(year: number): string {
   });
 }
 
-describe("拡張所得ありのXTX構造（Issue #27）", () => {
+describe("拡張所得ありのXTX構造", () => {
   test("第三表と計算明細書が含まれ、分離区分と主要タグが出る", () => {
     const xml = expandedSample(2025);
     expect(xml).toContain("<KOA020-3");
