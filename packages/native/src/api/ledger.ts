@@ -3,7 +3,7 @@
  * 画面共通の Transaction（@etax/shared）との変換もここに置く。
  */
 import { IncomeType, Transaction } from "@etax/shared";
-import { apiJson, apiJsonOrNull } from "./client";
+import { apiJson, apiJsonOrNull, LONG_TIMEOUT_MS } from "./client";
 import {
   AccountClassification,
   ImportCsvResponse,
@@ -132,6 +132,7 @@ export async function importCsvBytes(
     rawBody: bytes as unknown as BodyInit,
     contentType: "text/csv",
     headers: { "X-Filename": encodeURIComponent(filename) },
+    timeoutMs: LONG_TIMEOUT_MS,
   });
 }
 
@@ -140,6 +141,7 @@ export async function classifyAccount(description: string): Promise<AccountClass
   return apiJson<AccountClassification>("/api/classify/account", {
     method: "POST",
     body: { description },
+    timeoutMs: LONG_TIMEOUT_MS,
   });
 }
 
@@ -150,6 +152,7 @@ export async function classifyAccountsBatch(
   const data = await apiJson<{ results: AccountClassification[] }>("/api/classify/batch", {
     method: "POST",
     body: { items: descriptions.map((description) => ({ description })) },
+    timeoutMs: LONG_TIMEOUT_MS,
   });
   return data.results;
 }

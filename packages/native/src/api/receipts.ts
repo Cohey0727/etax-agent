@@ -3,7 +3,7 @@
  * 解析は署名付きURLでアップロードしてファイルIDで依頼し、
  * アップロードできない場合は画像を Base64 で直接渡す。
  */
-import { apiJson, apiJsonOrNull, ApiError } from "./client";
+import { apiJson, apiJsonOrNull, ApiError, LONG_TIMEOUT_MS } from "./client";
 import { readLocalFileBytes, uploadViaPresignedUrl, UPLOADABLE_IMAGE_TYPES } from "./files";
 import { AnalyzeReceiptResponse, ReceiptRecord } from "./types";
 
@@ -45,6 +45,7 @@ export async function analyzeReceiptImage(
       const result = await apiJson<AnalyzeReceiptResponse>("/api/receipts/analyze", {
         method: "POST",
         body: { fileId },
+        timeoutMs: LONG_TIMEOUT_MS,
       });
       return { result, fileId };
     }
@@ -52,6 +53,7 @@ export async function analyzeReceiptImage(
   const result = await apiJson<AnalyzeReceiptResponse>("/api/receipts/analyze", {
     method: "POST",
     body: { imageBase64: encodeBase64(bytes), mimeType },
+    timeoutMs: LONG_TIMEOUT_MS,
   });
   return { result, fileId: null };
 }

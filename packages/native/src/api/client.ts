@@ -15,6 +15,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 応答を待つ上限（ミリ秒）。Android の fetch は既定で期限が無く、応答しない
+ * サーバーを無期限に待つため、すべての呼び出しに期限を付ける。
+ */
+const DEFAULT_TIMEOUT_MS = 30_000;
+/** AI の判定・解析やファイルの送受信など、時間のかかる呼び出しの期限。 */
+export const LONG_TIMEOUT_MS = 180_000;
+
 interface RequestOptions {
   method?: string;
   body?: unknown;
@@ -24,35 +32,51 @@ interface RequestOptions {
   headers?: Record<string, string>;
   /** 認証ヘッダを付けない（ログイン前の公開API用）。 */
   anonymous?: boolean;
+  /** 応答を待つ上限（ミリ秒）。既定は 30 秒。 */
+  timeoutMs?: number;
 }
 
-async function buildHeaders(options: RequestOptions): Promise<Record<string, string>> {
-  const headers: Record<string, string> = { ...(options.headers ?? {}) };
-  if (options.body !== undefined || options.contentType) {
-    headers["Content-Type"] = options.contentType ?? "application/json";
+/** 期限つきの fetch。通信できない・期限切れはどちらも ApiError(0) にする。 */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch {
+    throw new ApiError(
+      0,
+      controller.signal.aborted
+        ? "サーバーからの応答がありませんでした"
+        : "ネットワークに接続できませんでした",
+    );
+  } finally {
+    clearTimeout(timer);
   }
-  if (!options.anonymous) {
-    const token = currentSessionToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
-  return headers;
 }
 
 /** 生の Response を返す低レベル呼び出し（二進データの取得用）。 */
 export async function apiRaw(path: string, options: RequestOptions = {}): Promise<Response> {
-  const headers = await buildHeaders(options);
-  let resp: Response;
-  try {
-    resp = await fetch(`${API_URL}${path}`, {
+  const headers: Record<string, string> = { ...(options.headers ?? {}) };
+  if (options.body !== undefined || options.contentType) {
+    headers["Content-Type"] = options.contentType ?? "application/json";
+  }
+  const token = options.anonymous ? null : currentSessionToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const resp = await fetchWithTimeout(
+    `${API_URL}${path}`,
+    {
       method: options.method ?? (options.body !== undefined || options.rawBody ? "POST" : "GET"),
       headers,
       body:
         options.rawBody ??
         (options.body !== undefined ? JSON.stringify(options.body) : undefined),
-    });
-  } catch {
-    throw new ApiError(0, "ネットワークに接続できませんでした");
-  }
+    },
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
   return resp;
 }
 
@@ -92,11 +116,7 @@ export async function rawFetch(
   url: string,
   init: { method: string; headers?: Record<string, string>; body?: BodyInit },
 ): Promise<Response> {
-  try {
-    return await fetch(url, init);
-  } catch {
-    throw new ApiError(0, "ネットワークに接続できませんでした");
-  }
+  return fetchWithTimeout(url, init, LONG_TIMEOUT_MS);
 }
 
 /**

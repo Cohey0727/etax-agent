@@ -5,7 +5,7 @@
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { API_URL } from "../config";
-import { absoluteApiUrl, apiJson, ApiError, rawFetch } from "./client";
+import { absoluteApiUrl, apiJson, ApiError, apiRaw, LONG_TIMEOUT_MS, rawFetch } from "./client";
 import { currentSessionToken } from "./session";
 import { PresignUploadFileResponse } from "./types";
 
@@ -126,8 +126,7 @@ export async function downloadApiFile(
   path: string,
   filename: string,
 ): Promise<File> {
-  const { apiRaw } = await import("./client");
-  const resp = await apiRaw(path);
+  const resp = await apiRaw(path, { timeoutMs: LONG_TIMEOUT_MS });
   if (!resp.ok) {
     const data = (await resp.json().catch(() => ({}))) as { error?: string };
     throw new ApiError(resp.status, data.error ?? `HTTP ${resp.status}`);

@@ -1,7 +1,7 @@
 /**
  * settings.ts — APIキー・MCP情報・SystemOne接続・分類ルール・プロンプトのAPI。
  */
-import { apiJson } from "./client";
+import { apiJson, LONG_TIMEOUT_MS } from "./client";
 import {
   AgentTestResult,
   ApiKeyItem,
@@ -67,6 +67,7 @@ export async function testSystemOneSettings(input: {
   return apiJson<SystemOneTestResult>("/api/settings/systemone/test", {
     method: "POST",
     body: input,
+    timeoutMs: LONG_TIMEOUT_MS,
   });
 }
 
@@ -79,6 +80,7 @@ export async function testAgentSettings(input: {
   return apiJson<AgentTestResult>("/api/settings/agent/test", {
     method: "POST",
     body: input,
+    timeoutMs: LONG_TIMEOUT_MS,
   });
 }
 

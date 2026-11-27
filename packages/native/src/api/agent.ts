@@ -3,7 +3,7 @@
  * サーバー側のツール実行込みで応答を得る。
  */
 import { Transaction } from "@etax/shared";
-import { apiJson } from "./client";
+import { apiJson, LONG_TIMEOUT_MS } from "./client";
 import { AgentChatResponse, AgentConnectionConfig, ChatAttachmentUpload, ChatMessage } from "./types";
 
 export interface AgentChatDeductions {
@@ -26,6 +26,7 @@ export async function agentChat(
   };
   return apiJson<AgentChatResponse>("/api/agent/chat", {
     method: "POST",
+    timeoutMs: LONG_TIMEOUT_MS,
     body: {
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       transactions,
