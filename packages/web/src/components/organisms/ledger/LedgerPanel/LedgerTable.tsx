@@ -56,7 +56,7 @@ export const LedgerTable = ({
   currentPage: number;
   totalPages: number;
   isDirty: (row: LedgerTransaction) => boolean;
-  onEdit: (id: number, patch: Partial<LedgerTransactionInput>) => void;
+  onEdit: (row: LedgerTransaction, patch: Partial<LedgerTransactionInput>) => void;
   onSave: (row: LedgerTransaction) => void;
   onDelete: (row: LedgerTransaction) => void;
   onHistory: (row: LedgerTransaction) => void;
@@ -109,7 +109,7 @@ export const LedgerTable = ({
                       type="date"
                       className={`${styles.cellInput} ${styles.cellControl}`}
                       value={edit.date}
-                      onChange={(e) => onEdit(row.id, { date: e.target.value })}
+                      onChange={(e) => onEdit(row, { date: e.target.value })}
                       aria-label="日付"
                     />
                   </TableCell>
@@ -118,7 +118,7 @@ export const LedgerTable = ({
                       className={`${styles.cellInput} ${styles.cellSelect}`}
                       value={edit.fiscal_year}
                       onChange={(e) =>
-                        onEdit(row.id, { fiscal_year: Number(e.target.value) })
+                        onEdit(row, { fiscal_year: Number(e.target.value) })
                       }
                       aria-label="割り当て年度"
                       title={
@@ -140,7 +140,7 @@ export const LedgerTable = ({
                     <Input
                       className={`${styles.descriptionInput} ${styles.cellControl}`}
                       value={edit.description}
-                      onChange={(e) => onEdit(row.id, { description: e.target.value })}
+                      onChange={(e) => onEdit(row, { description: e.target.value })}
                       aria-label="摘要"
                     />
                   </TableCell>
@@ -150,7 +150,7 @@ export const LedgerTable = ({
                       className={`${styles.amountInput} ${styles.cellControl}`}
                       value={edit.amount}
                       onChange={(e) =>
-                        onEdit(row.id, { amount: Number(e.target.value) })
+                        onEdit(row, { amount: Number(e.target.value) })
                       }
                       aria-label="金額"
                     />
@@ -159,7 +159,7 @@ export const LedgerTable = ({
                     <Select
                       className={styles.cellSelect}
                       value={edit.category}
-                      onChange={(e) => onEdit(row.id, { category: e.target.value })}
+                      onChange={(e) => onEdit(row, { category: e.target.value })}
                       aria-label="勘定科目"
                     >
                       {CATEGORY_OPTIONS.map((name) => (
@@ -173,7 +173,7 @@ export const LedgerTable = ({
                     <Select
                       className={styles.cellSelect}
                       value={edit.income_type}
-                      onChange={(e) => onEdit(row.id, { income_type: e.target.value })}
+                      onChange={(e) => onEdit(row, { income_type: e.target.value })}
                       aria-label="区分"
                     >
                       {INCOME_TYPE_OPTIONS.map((option) => (
@@ -187,7 +187,7 @@ export const LedgerTable = ({
                     <Select
                       className={styles.cellSelect}
                       value={edit.tax_category}
-                      onChange={(e) => onEdit(row.id, { tax_category: e.target.value })}
+                      onChange={(e) => onEdit(row, { tax_category: e.target.value })}
                       aria-label="税区分"
                     >
                       {TAX_CATEGORY_OPTIONS.map((option) => (
@@ -211,7 +211,7 @@ export const LedgerTable = ({
                           className={`${styles.ratioInput} ${styles.cellControl}`}
                           value={edit.business_ratio_percent}
                           onChange={(e) =>
-                            onEdit(row.id, {
+                            onEdit(row, {
                               business_ratio_percent: Number(e.target.value),
                             })
                           }
@@ -229,7 +229,7 @@ export const LedgerTable = ({
                           className={`${styles.basisInput} ${styles.cellControl}`}
                           value={edit.business_ratio_basis}
                           onChange={(e) =>
-                            onEdit(row.id, { business_ratio_basis: e.target.value })
+                            onEdit(row, { business_ratio_basis: e.target.value })
                           }
                           placeholder="按分根拠（任意）"
                           aria-label="按分根拠"
@@ -241,7 +241,7 @@ export const LedgerTable = ({
                     <Input
                       className={`${styles.cellInput} ${styles.cellControl}`}
                       value={edit.account}
-                      onChange={(e) => onEdit(row.id, { account: e.target.value })}
+                      onChange={(e) => onEdit(row, { account: e.target.value })}
                       aria-label="出所"
                     />
                   </TableCell>

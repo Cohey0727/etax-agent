@@ -9,7 +9,16 @@ import {
   recordClassificationFeedback,
   updateLedgerTransaction,
 } from "@utils/api";
-import { emptyDraft, toInput } from "./ledgerOptions";
+import { emptyDraft } from "./ledgerOptions";
+import {
+  editLedgerRow,
+  isLedgerRowDirty,
+  LedgerRowsState,
+  ledgerRowAdded,
+  ledgerRowDeleted,
+  ledgerRowSaved,
+  ledgerRowsLoaded,
+} from "./ledgerRows";
 
 export type LoadStatus = "loading" | "ready" | "unavailable";
 
@@ -19,13 +28,17 @@ export type LoadStatus = "loading" | "ready" | "unavailable";
  * 帳簿（DB）が全年度の正。変更後は全行をそのままアプリ全体の取引へ
  * 反映する（onSyncTransactions）。帳簿は全年度を初回に読み込むだけ
  * （transactions の変化では読み直さない）。
+ *
+ * 行と編集中の値は stateRef と state の両方に同じものを持つ。保存・削除の
+ * 完了は通信やアニメーションの後に届くので、そのときの最新の行一覧へ
+ * 反映するために stateRef を使い、描画には state を使う。
  */
 export function useLedgerData(
   onSyncTransactions: ((transactions: Transaction[]) => void) | undefined,
 ) {
   const [status, setStatus] = useState<LoadStatus>("loading");
-  const [rows, setRows] = useState<LedgerTransaction[]>([]);
-  const [edits, setEdits] = useState<Record<number, LedgerTransactionInput>>({});
+  const [rowsState, setRowsState] = useState<LedgerRowsState>(() => ledgerRowsLoaded([]));
+  const stateRef = useRef(rowsState);
   const [draft, setDraft] = useState<LedgerTransactionInput>(() =>
     emptyDraft(new Date().getFullYear()),
   );
@@ -37,18 +50,19 @@ export function useLedgerData(
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const syncParent = (freshRows: LedgerTransaction[]) => {
-    if (!onSyncTransactions) return;
-    const merged = freshRows
-      .map(ledgerRowToTransaction)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    onSyncTransactions(merged);
+  const commit = (next: LedgerRowsState) => {
+    stateRef.current = next;
+    setRowsState(next);
   };
 
-  const applyRows = (freshRows: LedgerTransaction[]) => {
-    setRows(freshRows);
-    setEdits(Object.fromEntries(freshRows.map((row) => [row.id, toInput(row)])));
+  /** 行一覧の変更を確定し、アプリ全体の取引へも反映する。 */
+  const commitRows = (next: LedgerRowsState) => {
+    commit(next);
     setDeleteArmedId(null);
+    if (!onSyncTransactions) return;
+    onSyncTransactions(
+      next.rows.map(ledgerRowToTransaction).sort((a, b) => a.date.localeCompare(b.date)),
+    );
   };
 
   // 削除の武装は誤操作のもとになるので、4秒で自動解除する。武装した
@@ -79,7 +93,9 @@ export function useLedgerData(
         setStatus("unavailable");
         return;
       }
-      applyRows(fetched);
+      const loaded = ledgerRowsLoaded(fetched);
+      stateRef.current = loaded;
+      setRowsState(loaded);
       // 追加フォームの初期年度は、データにある最新の割り当て年度に合わせる。
       const latestYear = fetched.reduce((max, row) => Math.max(max, row.fiscal_year), 0);
       if (latestYear > 0) setDraft(emptyDraft(latestYear));
@@ -88,41 +104,22 @@ export function useLedgerData(
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleEdit = (id: number, patch: Partial<LedgerTransactionInput>) => {
-    setEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  const handleEdit = (row: LedgerTransaction, patch: Partial<LedgerTransactionInput>) => {
+    commit(editLedgerRow(stateRef.current, row, patch));
   };
 
-  const isDirty = (row: LedgerTransaction): boolean => {
-    const edit = edits[row.id];
-    if (!edit) return false;
-    const original = toInput(row);
-    return (
-      edit.date !== original.date ||
-      edit.fiscal_year !== original.fiscal_year ||
-      edit.description !== original.description ||
-      edit.amount !== original.amount ||
-      edit.account !== original.account ||
-      edit.category !== original.category ||
-      edit.income_type !== original.income_type ||
-      edit.tax_category !== original.tax_category ||
-      edit.business_ratio_percent !== original.business_ratio_percent ||
-      edit.business_ratio_basis !== original.business_ratio_basis
-    );
-  };
+  const isDirty = (row: LedgerTransaction): boolean => isLedgerRowDirty(rowsState, row);
 
   const handleSave = async (row: LedgerTransaction) => {
-    const edit = edits[row.id];
+    const edit = stateRef.current.edits[row.id];
     if (!edit || busy) return;
     setBusy(true);
     setError(null);
     try {
       const updated = await updateLedgerTransaction(row.id, edit);
-      const fresh = rows.map((r) => (r.id === row.id ? updated : r));
-      applyRows(fresh);
-      syncParent(fresh);
+      commitRows(ledgerRowSaved(stateRef.current, updated));
       // 科目を直したら学習履歴にも記録し、次回から同じ摘要は直した科目で判定されるようにする。
       if (updated.category !== row.category && updated.category !== "未分類") {
         void recordClassificationFeedback(updated.description, updated.category);
@@ -147,13 +144,11 @@ export function useLedgerData(
     setError(null);
     try {
       await deleteLedgerTransaction(row.id);
-      const fresh = rows.filter((r) => r.id !== row.id);
       setDeleteArmedId(null);
       // 行はアニメーションで消してから状態へ反映する。
       setDeletingId(row.id);
       setTimeout(() => {
-        applyRows(fresh);
-        syncParent(fresh);
+        commitRows(ledgerRowDeleted(stateRef.current, row.id));
         setDeletingId(null);
       }, 380);
     } catch (e) {
@@ -181,9 +176,7 @@ export function useLedgerData(
     setError(null);
     try {
       const created = await createLedgerTransaction(draft);
-      const fresh = [...rows, created].sort((a, b) => a.date.localeCompare(b.date));
-      applyRows(fresh);
-      syncParent(fresh);
+      commitRows(ledgerRowAdded(stateRef.current, created));
       setDraft(emptyDraft(created.fiscal_year));
       // 手入力で科目を選んだ行も学習履歴に記録する（次回の判定で優先される）。
       if (created.category !== "未分類") {
@@ -198,8 +191,8 @@ export function useLedgerData(
 
   return {
     status,
-    rows,
-    edits,
+    rows: rowsState.rows,
+    edits: rowsState.edits,
     draft,
     setDraft,
     deleteArmedId,
