@@ -76,16 +76,18 @@ export function disposedYearOf(asset: FixedAssetLedgerEntry): number | null {
 }
 
 /**
- * 全期間の償却スケジュール（供用開始年から残高が尽きる年まで）。
- * 計算できない入力（定率法の表に無い耐用年数など）は空にする。
+ * 全期間の償却スケジュール（供用開始年から残高が尽きる年まで。除却した
+ * 資産は除却した年まで）。計算できない入力（定率法の表に無い耐用年数など）は空にする。
  */
 export function fixedAssetSchedule(asset: FixedAssetLedgerEntry): DepreciationYear[] {
   const startYear = Number((asset.service_start_date ?? asset.acquisition_date).slice(0, 4));
   if (!Number.isFinite(startYear)) return [];
   // 定率法でも残高は必ず尽きるが、耐用年数が長い資産でも計算の上限を置く。
   const lastYear = startYear + Math.max(asset.useful_life_years * 2, 10) + 5;
+  const disposedYear = disposedYearOf(asset);
   try {
-    return depreciationSchedule(toEngineInput(asset), lastYear);
+    const schedule = depreciationSchedule(toEngineInput(asset), lastYear);
+    return disposedYear === null ? schedule : schedule.filter((row) => row.year <= disposedYear);
   } catch {
     return [];
   }
@@ -107,17 +109,12 @@ export function fixedAssetYearFigures(
   year: number,
 ): FixedAssetYearFigures {
   const schedule = fixedAssetSchedule(asset);
-  const disposedYear = disposedYearOf(asset);
-  const effectiveYear = disposedYear !== null ? Math.min(year, disposedYear) : year;
   let bookValue = asset.cost;
   for (const row of schedule) {
-    if (row.year > effectiveYear) break;
+    if (row.year > year) break;
     bookValue = row.closingBookValue;
   }
-  const deductible =
-    disposedYear !== null && year > disposedYear
-      ? 0
-      : (schedule.find((row) => row.year === year)?.deductible ?? 0);
+  const deductible = schedule.find((row) => row.year === year)?.deductible ?? 0;
   const progress =
     asset.cost > 0 ? Math.min(1, Math.max(0, (asset.cost - bookValue) / asset.cost)) : 0;
   return { schedule, deductible, bookValue, progress };

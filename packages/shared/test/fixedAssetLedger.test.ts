@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test";
 import {
   FixedAssetLedgerEntry,
   fixedAssetIncomeTypeLabel,
+  fixedAssetSchedule,
   fixedAssetYearFigures,
   isFixedAssetInYear,
   summarizeFixedAssets,
@@ -52,6 +53,14 @@ describe("fixedAssetYearFigures", () => {
       deductible: 0,
       bookValue: 200_000,
     });
+  });
+});
+
+describe("fixedAssetSchedule", () => {
+  test("除却した資産は除却した年までのスケジュールにする", () => {
+    const schedule = fixedAssetSchedule(asset({ disposed_date: "2024-06-30" }));
+    expect(schedule.map((row) => row.year)).toEqual([2023, 2024]);
+    expect(schedule.reduce((sum, row) => sum + row.deductible, 0)).toBe(200_000);
   });
 });
 
