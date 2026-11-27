@@ -655,6 +655,10 @@ function buildKoa020Face1(data: XtxFilingData): string {
   const differential = Math.max(tax.incomeTaxBase - creditsBeforeFlatReduction, 0);
   const standardIncomeTax = tax.taxAfterOtherCredits;
   const taxTotal = standardIncomeTax + tax.reconstructionTaxGross;
+  // 外国税額控除の所得税分は基準所得税額が限度（所得税部分は0で止まる）。
+  // 控除限度額は定額減税前の額が基になるため、基準所得税額を上回ることがある
+  const foreignTaxCredit =
+    Math.min(c.foreignTaxIncomePart, standardIncomeTax) + c.foreignTaxReconstructionPart;
   // 課税される所得金額: 第三表がある場合は総合＋分離課税分の合計
   const taxableTotal =
     tax.taxableIncome +
@@ -679,10 +683,10 @@ function buildKoa020Face1(data: XtxFilingData): string {
   taxCalc.push(amountAlways("ABB01010", standardIncomeTax));
   taxCalc.push(amountAlways("ABB01020", tax.reconstructionTaxGross));
   taxCalc.push(amountAlways("ABB01030", taxTotal));
-  taxCalc.push(amount("ABB01040", c.foreignTax));
+  taxCalc.push(amount("ABB01040", foreignTaxCredit));
   taxCalc.push(amount("ABB00710", data.withholdingTax));
   // 申告納税額は100円未満切捨て（国税通則法119条）。還付になる場合は切り捨てず負のまま出す。
-  const declaredRaw = taxTotal - c.foreignTax - data.withholdingTax;
+  const declaredRaw = taxTotal - foreignTaxCredit - data.withholdingTax;
   const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : declaredRaw;
   taxCalc.push(amountAlways("ABB00720", declaredTax));
   taxCalc.push(amount("ABB00730", data.prepaidTax));

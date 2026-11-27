@@ -801,6 +801,48 @@ describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", (
     expect(tagValue(xtx, "ABB00720")).toBe(tax.finalTax);
   });
 
+  test("外国税額控除の所得税分が基準所得税額を上回っても、所得税部分は0で止まり ABB00720 = finalTax", () => {
+    const txs = [tx({ date: "2024-06-15", year: 2024, amount: 4_000_000, category: "売上高" })];
+    const figures = computeCorrectedFigures(txs, 2024);
+    const computed = computeIncomeTax({
+      year: 2024,
+      totalIncome: figures._detail.business_income,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, flatReduction: 30_000, foreignTaxPaid: 50_000, foreignIncome: 1_000_000 },
+    });
+    // 所得税分の控除限度額は定額減税前の額が基になるため、基準所得税額を上回りうる
+    const base = computed.taxAfterOtherCredits;
+    const reconstructionPart = 300;
+    const tax = {
+      ...computed,
+      taxCredits: {
+        ...computed.taxCredits,
+        foreignTaxIncomePart: base + 5_000,
+        foreignTaxReconstructionPart: reconstructionPart,
+        foreignTax: base + 5_000 + reconstructionPart,
+      },
+      finalTax: Math.floor((computed.reconstructionTaxGross - reconstructionPart) / 100) * 100,
+    };
+    expect(base).toBeGreaterThan(0);
+    const xtx = buildXtxFiling({
+      year: 2024,
+      amendment: false,
+      submissionDate: "2025-03-10",
+      taxpayer: TAXPAYER,
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome: EMPTY_MISC_INCOME,
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    // 外国税額控除等は実際に控除できた額（所得税分は基準所得税額まで）
+    expect(tagValue(xtx, "ABB01040")).toBe(base + reconstructionPart);
+    expect(tagValue(xtx, "ABB00720")).toBe(tax.finalTax);
+  });
+
   test("令和6年分で定額減税が所得税額を上回っても、差引所得税額・再差引所得税額は所得税額を超えない", () => {
     const { xtx, tax } = buildCustom({
       year: 2024,
