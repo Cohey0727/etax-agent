@@ -10,6 +10,7 @@ import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { issueChallenge } from "../lib/loginChallenge";
 import { publicBaseUrl } from "../lib/publicUrl";
+import { enforceAccountRateLimit } from "../lib/rateLimit";
 import { authRequired, currentUserId } from "../lib/tenantContext";
 import { usersTable } from "../repositories/schema";
 import {
@@ -93,6 +94,10 @@ export const registerHandler: RouteHandler<typeof registerRoute> = async (c) => 
   return c.json({ user: { id: user.id, email: user.email, totp_enabled: false }, token });
 };
 
+/** 同じメールアドレスへのログイン試行の上限（接続元 IP を変えた総当たりを止める）。 */
+const ACCOUNT_LOGIN_LIMIT = 10;
+const ACCOUNT_LOGIN_WINDOW_MS = 5 * 60 * 1000;
+
 export const loginRoute = createRoute({
   method: "post",
   path: "/api/auth/login",
@@ -118,6 +123,9 @@ export const loginHandler: RouteHandler<typeof loginRoute> = async (c) => {
     | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
+  if (email) {
+    enforceAccountRateLimit(`login-account:${email}`, ACCOUNT_LOGIN_LIMIT, ACCOUNT_LOGIN_WINDOW_MS);
+  }
   const user = email ? await getUserByEmail(db, email) : undefined;
   if (!user || !(await verifyUserPassword(user, password))) {
     throw new HTTPException(401, { message: "メールアドレスまたはパスワードが違います" });

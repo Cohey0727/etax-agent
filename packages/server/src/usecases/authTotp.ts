@@ -8,7 +8,8 @@ import { eq } from "drizzle-orm";
 import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
-import { beginChallengeUse, burnChallenge } from "../lib/loginChallenge";
+import { beginChallengeUse, burnChallenge, verifyChallenge } from "../lib/loginChallenge";
+import { enforceAccountRateLimit } from "../lib/rateLimit";
 import { currentUserId } from "../lib/tenantContext";
 import { generateTotpSecret, totpOtpauthUrl, verifyTotpCode } from "../lib/totp";
 import { usersTable } from "../repositories/schema";
@@ -129,6 +130,10 @@ export const totpDisableHandler: RouteHandler<typeof totpDisableRoute> = async (
   return c.json({ user: { id: user.id, email: user.email, totp_enabled: false } });
 };
 
+/** 同じユーザーへの TOTP 試行の上限。 */
+const ACCOUNT_TOTP_LIMIT = 10;
+const ACCOUNT_TOTP_WINDOW_MS = 5 * 60 * 1000;
+
 export const loginTotpRoute = createRoute({
   method: "post",
   path: "/api/auth/login/totp",
@@ -150,6 +155,15 @@ export const loginTotpHandler: RouteHandler<typeof loginTotpRoute> = async (c) =
     | null;
   const challenge = typeof body?.challenge === "string" ? body.challenge : "";
   const code = typeof body?.code === "string" ? body.code : "";
+  // チャレンジを取り直しながらの総当たりを止めるため、ユーザー単位でも数える
+  const challengedUserId = verifyChallenge(challenge, "totp-login");
+  if (challengedUserId !== undefined) {
+    enforceAccountRateLimit(
+      `login-totp-account:${challengedUserId}`,
+      ACCOUNT_TOTP_LIMIT,
+      ACCOUNT_TOTP_WINDOW_MS,
+    );
+  }
   // チャレンジは試行回数を数え（上限で失効）、成功時は消費して再利用を防ぐ
   const userId = beginChallengeUse(challenge, "totp-login");
   if (userId === undefined) {

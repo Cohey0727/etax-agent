@@ -13,6 +13,7 @@ import { HTTPException } from "hono/http-exception";
 import { getDb } from "../lib/db";
 import { publicBaseUrl } from "../lib/publicUrl";
 import { issueChallenge } from "../lib/loginChallenge";
+import { enforceAccountRateLimit } from "../lib/rateLimit";
 import {
   clearUserPassword,
   consumeMagicLinkToken,
@@ -36,6 +37,10 @@ function requireDb(c: Context) {
   return db;
 }
 
+/** 同じメールアドレスへのリンク送信の上限（宛先へのメール爆撃を止める）。 */
+const ACCOUNT_MAGIC_LINK_LIMIT = 5;
+const ACCOUNT_MAGIC_LINK_WINDOW_MS = 10 * 60 * 1000;
+
 export const magicLinkRequestRoute = createRoute({
   method: "post",
   path: "/api/auth/magic-link",
@@ -54,6 +59,13 @@ export const magicLinkRequestHandler: RouteHandler<typeof magicLinkRequestRoute>
   const db = requireDb(c);
   const body = (await c.req.json().catch(() => null)) as { email?: unknown } | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (email.includes("@")) {
+    enforceAccountRateLimit(
+      `magic-link-account:${email}`,
+      ACCOUNT_MAGIC_LINK_LIMIT,
+      ACCOUNT_MAGIC_LINK_WINDOW_MS,
+    );
+  }
   const base = publicBaseUrl();
   if (email.includes("@") && base) {
     const token = await createMagicLinkToken(db, email);
