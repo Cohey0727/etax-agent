@@ -300,6 +300,21 @@ describe("HTTP: XTX出力時の常時検証", () => {
     expect(special20.body.xtx as string).toContain("<AAM00020><kubun_CD>8</kubun_CD></AAM00020>");
   });
 
+  test("貸借対照表に不明な勘定キーがあれば、キー名つきの 400 になる（貸借不一致と取り違えない）", async () => {
+    const r = await requestJson("POST", "/api/etax/export-xtx", {
+      ...exportIncomeRequest(2025),
+      balance_sheet: {
+        opening: { cahs: 1_000_000, capital: 1_000_000 },
+        closing: { cash: 1_000_000 },
+        owner_loan: 0,
+        owner_borrowing: 0,
+      },
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error as string).toContain("cahs");
+    expect(r.body.error as string).not.toContain("貸借一致");
+  });
+
   test("固定資産の償却計算に失敗したら、どの資産かが分かる 400 になる", async () => {
     const r = await requestJson("POST", "/api/etax/export-xtx", {
       ...exportIncomeRequest(2025),

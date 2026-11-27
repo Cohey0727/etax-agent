@@ -23,6 +23,7 @@ import {
   resolveAgriculture,
   resolveExpandedTax,
   toTaxpayer,
+  unknownBalanceSheetKeys,
 } from "./xtxInputs";
 import { xsdWarningOrThrow } from "./xsdValidator";
 
@@ -46,6 +47,10 @@ export async function generateIncomeTaxXtx(body: ExportXtxRequest): Promise<Gene
     agriculture: agriculture.input,
   });
   const depreciation = depreciationFromWire(body);
+  const unknownAccounts = unknownBalanceSheetKeys(body);
+  if (unknownAccounts.length > 0) {
+    throw new XtxInputError(`貸借対照表に不明な勘定があります: ${unknownAccounts.join("、")}`);
+  }
   const balanceSheet = balanceSheetFromWire(body);
   const miscIncome = normalizeMiscIncomeInput(body.misc_income);
   const salaryIncome = normalizeSalaryIncomeInput(body.salary_income);

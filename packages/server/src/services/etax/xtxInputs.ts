@@ -7,6 +7,8 @@ import {
   AgricultureInput,
   AgricultureStatement,
   AgricultureWire,
+  BS_ASSET_ACCOUNTS,
+  BS_LIABILITY_ACCOUNTS,
   BalanceSheetAccount,
   DepreciationDetailRow,
   ExpandedIncomeBreakdown,
@@ -143,6 +145,39 @@ export function depreciationFromWire(
   return { business, realEstate, agriculture };
 }
 
+const BALANCE_SHEET_ACCOUNTS: ReadonlySet<string> = new Set([
+  ...BS_ASSET_ACCOUNTS.map(([account]) => account),
+  ...BS_LIABILITY_ACCOUNTS.map(([account]) => account),
+  "allowance_for_doubtful_accounts",
+  "capital",
+]);
+
+function isBalanceSheetAccount(key: string): key is BalanceSheetAccount {
+  return BALANCE_SHEET_ACCOUNTS.has(key);
+}
+
+/** 勘定キー → 金額のうち、貸借対照表の勘定だけを取り出す。 */
+function balanceSheetAmounts(side: Record<string, number>): Partial<Record<BalanceSheetAccount, number>> {
+  const amounts: Partial<Record<BalanceSheetAccount, number>> = {};
+  for (const [key, value] of Object.entries(side)) {
+    if (isBalanceSheetAccount(key)) amounts[key] = value;
+  }
+  return amounts;
+}
+
+/**
+ * 貸借対照表入力のうち、勘定として知らないキー。XTX 出力では綴り違いの
+ * キーを黙って捨てると「貸借一致しません」という別の原因に見えるため、
+ * 生成前にキー名で知らせる。
+ */
+export function unknownBalanceSheetKeys(body: Pick<ExportXtxRequest, "balance_sheet">): string[] {
+  const bs = body.balance_sheet;
+  if (!bs) return [];
+  return [...Object.keys(bs.opening), ...Object.keys(bs.closing)].filter(
+    (key) => !isBalanceSheetAccount(key),
+  );
+}
+
 /** リクエストの貸借対照表入力を XTX ビルダーの形式へ変換する。 */
 export function balanceSheetFromWire(
   body: Pick<ExportXtxRequest, "balance_sheet">,
@@ -150,8 +185,8 @@ export function balanceSheetFromWire(
   const bs = body.balance_sheet;
   if (!bs) return undefined;
   return {
-    opening: bs.opening as Partial<Record<BalanceSheetAccount, number>>,
-    closing: bs.closing as Partial<Record<BalanceSheetAccount, number>>,
+    opening: balanceSheetAmounts(bs.opening),
+    closing: balanceSheetAmounts(bs.closing),
     extraAsset: bs.extra_asset
       ? { name: bs.extra_asset.name, opening: bs.extra_asset.opening, closing: bs.extra_asset.closing }
       : undefined,
