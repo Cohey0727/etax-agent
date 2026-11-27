@@ -326,4 +326,7 @@ void (async () => {
 export default {
   port,
   fetch: app.fetch,
+  // エージェント対話・科目判定・接続テストは外部 LLM を何度も呼び、応答を
+  // 書き始めるまで 10 秒（Bun の既定）を超えることがある。Bun の上限まで延ばす。
+  idleTimeout: 255,
 };
