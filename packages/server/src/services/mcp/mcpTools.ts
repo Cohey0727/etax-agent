@@ -232,13 +232,16 @@ export async function dispatchMcpTool(
         });
       }
       case "export_consumption_xtx": {
-        const periodFrom = typeof args["period_from"] === "string" ? args["period_from"] : "";
-        // 納税者情報を省いたら、課税期間の年の保存済みプロフィールを使う
-        const taxpayer = taxpayerArg(
+        // 納税者情報を省いたら、課税期間の年の保存済みプロフィールを使う。課税期間が
+        // 読めなければ探さず、スキーマの検証で period_from の不備として返す
+        const periodYear =
+          typeof args["period_from"] === "string" ? /^(\d{4})-/.exec(args["period_from"])?.[1] : undefined;
+        const taxpayer =
           args["taxpayer"] !== undefined
-            ? args["taxpayer"]
-            : await savedTaxpayerProfile(requireDb(), Number(periodFrom.slice(0, 4))),
-        );
+            ? taxpayerArg(args["taxpayer"])
+            : periodYear !== undefined
+              ? taxpayerArg(await savedTaxpayerProfile(requireDb(), Number(periodYear)))
+              : undefined;
         const amountOrZero = (key: string): unknown => args[key] ?? 0;
         const parsed = ExportConsumptionXtxRequestSchema.safeParse({
           ...args,

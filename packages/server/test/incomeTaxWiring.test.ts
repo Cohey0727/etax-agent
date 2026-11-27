@@ -215,4 +215,11 @@ describe("MCP の XTX 出力は REST と同じ生成・XSD 検証を使う", () 
     expect(result.isError).toBeUndefined();
     expect(String(json(result).xtx)).toContain("テスト太郎");
   }, 30_000);
+
+  test("export_consumption_xtx は課税期間が無ければ、保存済みプロフィールを探さずに period_from の不備を返す", async () => {
+    await call("save_taxpayer_profile", { year: 2025, taxpayer: TAXPAYER });
+    const result = await call("export_consumption_xtx", { period_to: "2025-12-31", base_period_sales_thousands: 5_000 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("period_from");
+  });
 });
