@@ -149,20 +149,26 @@ function toSlices(rows: readonly CategoryAmount[], total: number): BreakdownSlic
   });
 }
 
-// スライス上限を超えた科目は「その他」に合算する。
+/** 上限を超えた科目のまとめ。勘定科目の「その他」（受け皿の科目）もここに入れる。 */
+const REST_CATEGORY = "その他";
+
+// スライス上限を超えた科目は「その他」に合算する。勘定科目の「その他」を
+// 別のスライスに残すと、同じ名前のスライスが2つになるため一緒にまとめる。
 function groupSlices(rows: readonly CategoryAmount[]): CategoryAmount[] {
   if (rows.length <= BREAKDOWN_MAX_SLICES) return [...rows];
-  const head = rows.slice(0, BREAKDOWN_MAX_SLICES - 1);
-  const rest = rows.slice(BREAKDOWN_MAX_SLICES - 1);
-  const restTotal = rest.reduce((sum, row) => sum + row.amount, 0);
-  return [...head, { category: "その他", amount: restTotal }];
+  const head = rows
+    .filter((row) => row.category !== REST_CATEGORY)
+    .slice(0, BREAKDOWN_MAX_SLICES - 1);
+  const total = rows.reduce((sum, row) => sum + row.amount, 0);
+  const headTotal = head.reduce((sum, row) => sum + row.amount, 0);
+  return [...head, { category: REST_CATEGORY, amount: total - headTotal }];
 }
 
 // 固定色のある科目はその色、無い科目は空いている色を順に使う。「その他」は灰色。
 function assignColorIndexes(slices: readonly CategoryAmount[]): (number | null)[] {
   const used = new Set<number>();
   const assigned = slices.map((slice): number | null | undefined => {
-    if (slice.category === "その他") return null;
+    if (slice.category === REST_CATEGORY) return null;
     const fixed = CATEGORY_COLOR_INDEX[slice.category];
     if (fixed !== undefined && !used.has(fixed)) {
       used.add(fixed);

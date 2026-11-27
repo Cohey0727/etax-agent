@@ -67,6 +67,24 @@ describe("categoryBreakdown", () => {
     ]);
     expect(slices[5]?.colorIndex).toBeNull();
   });
+
+  test("勘定科目「その他」がある場合も、まとめの「その他」と重ならず1つになる", () => {
+    const tx = csv(
+      ["A", "B", "C", "D", "E", "F"].map(
+        (name, i) => `2025-03-0${i + 1},${name},-${(10 - i) * 1000},カード,科目${name},business`,
+      ).concat(["2025-03-09,雑多な支出,-9500,カード,その他,business"]),
+    );
+    const { slices } = categoryBreakdown(tx, "expense");
+    expect(slices.map((s) => [s.category, s.amount])).toEqual([
+      ["科目A", 10000],
+      ["科目B", 9000],
+      ["科目C", 8000],
+      ["科目D", 7000],
+      ["科目E", 6000],
+      ["その他", 14500],
+    ]);
+    expect(new Set(slices.map((s) => s.key)).size).toBe(slices.length);
+  });
 });
 
 describe("yearlyIncomeTotals", () => {
