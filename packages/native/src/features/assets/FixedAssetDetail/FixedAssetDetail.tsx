@@ -1,9 +1,13 @@
+import {
+  DEPRECIATION_METHOD_LABELS,
+  fixedAssetIncomeTypeLabel,
+  fixedAssetSchedule,
+} from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { FixedAssetImageRecord, FixedAssetRecord } from "@/api";
 import { AppButton, AppText, Chip, LabeledValue } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatDate, formatNumber, formatYen } from "@/utils";
-import { INCOME_TYPE_LABELS, METHOD_LABELS, fullSchedule } from "../assetOptions";
 import { FixedAssetImages } from "../FixedAssetImages";
 
 export interface FixedAssetDetailProps {
@@ -30,15 +34,15 @@ export function FixedAssetDetail({
   onUploadImage,
   onDeleteImage,
 }: FixedAssetDetailProps) {
-  const schedule = fullSchedule(asset);
+  const schedule = fixedAssetSchedule(asset);
   const meta: readonly { label: string; value: string }[] = [
     { label: "取得日", value: formatDate(asset.acquisition_date) },
     { label: "事業供用日", value: asset.service_start_date ? formatDate(asset.service_start_date) : "（取得日と同じ）" },
     { label: "取得価額", value: formatYen(asset.cost) },
     { label: "数量", value: asset.quantity || "—" },
     { label: "耐用年数", value: `${asset.useful_life_years}年` },
-    { label: "償却方法", value: METHOD_LABELS[asset.method] },
-    { label: "所得区分", value: INCOME_TYPE_LABELS[asset.income_type] ?? asset.income_type },
+    { label: "償却方法", value: DEPRECIATION_METHOD_LABELS[asset.method].short },
+    { label: "所得区分", value: fixedAssetIncomeTypeLabel(asset.income_type) },
     { label: "事業専用割合", value: `${asset.business_ratio_percent}%` },
     { label: "除却日", value: asset.disposed_date ? formatDate(asset.disposed_date) : "—" },
   ];

@@ -1,8 +1,9 @@
+import { USEFUL_LIFE_PRESETS } from "@etax/shared";
 import { useState } from "react";
 import { Button, Col, Input, Row, Select } from "@components/atoms";
 import { FixedAssetInput } from "@types";
 import styles from "./FixedAssetPanel.css";
-import { INCOME_TYPE_OPTIONS, METHOD_OPTIONS, USEFUL_LIFE_PRESETS } from "./fixedAssetOptions";
+import { INCOME_TYPE_OPTIONS, METHOD_OPTIONS } from "./fixedAssetOptions";
 
 export interface FixedAssetFormProps {
   submitLabel: string;

@@ -1,8 +1,8 @@
+import { summarizeFixedAssets } from "@etax/shared";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { DepreciationSummary, FixedAssetRecord } from "@types";
 import { formatYen } from "@utils/format";
 import styles from "./FixedAssetPanel.css";
-import { bookValueAt, disposedYearOf } from "./fixedAssetOptions";
 
 export interface FixedAssetSummaryProps {
   assets: FixedAssetRecord[];
@@ -12,13 +12,7 @@ export interface FixedAssetSummaryProps {
 
 /** 対象年度のサマリ帯（件数・取得価額・償却費・期末簿価・少額特例の使用状況）。 */
 export const FixedAssetSummary = ({ assets, summary, year }: FixedAssetSummaryProps) => {
-  const active = assets.filter((asset) => {
-    const disposedYear = disposedYearOf(asset);
-    return disposedYear === null || disposedYear >= year;
-  });
-  const disposedCount = assets.length - active.length;
-  const totalCost = active.reduce((sum, asset) => sum + asset.cost, 0);
-  const totalBookValue = active.reduce((sum, asset) => sum + bookValueAt(asset, year), 0);
+  const { count, disposedCount, totalCost, totalBookValue } = summarizeFixedAssets(assets, year);
   const businessDeductible = summary?.deductible_totals.business ?? 0;
   const realEstateDeductible = summary?.deductible_totals.real_estate ?? 0;
   const agricultureDeductible = summary?.deductible_totals.agriculture ?? 0;
@@ -30,7 +24,7 @@ export const FixedAssetSummary = ({ assets, summary, year }: FixedAssetSummaryPr
   const stats: readonly { label: string; value: string }[] = [
     {
       label: "資産件数",
-      value: disposedCount > 0 ? `${active.length}件（除却済み${disposedCount}件）` : `${active.length}件`,
+      value: disposedCount > 0 ? `${count}件（除却済み${disposedCount}件）` : `${count}件`,
     },
     { label: "取得価額 合計", value: formatYen(totalCost) },
     { label: `${year}年の償却費（事業）`, value: formatYen(businessDeductible) },

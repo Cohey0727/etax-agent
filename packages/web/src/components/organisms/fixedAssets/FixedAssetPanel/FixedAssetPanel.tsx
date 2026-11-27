@@ -1,3 +1,4 @@
+import { isFixedAssetInYear } from "@etax/shared";
 import { useState } from "react";
 import { Badge, Button, Col, Icon, Row, Text } from "@components/atoms";
 import { AlertBox, Drawer } from "@components/molecules";
@@ -7,7 +8,7 @@ import { FixedAssetForm } from "./FixedAssetForm";
 import { FixedAssetList } from "./FixedAssetList";
 import { FixedAssetSkeleton } from "./FixedAssetSkeleton";
 import { FixedAssetSummary } from "./FixedAssetSummary";
-import { emptyDraft, isAssetInYear, toInput } from "./fixedAssetOptions";
+import { emptyDraft, toInput } from "./fixedAssetOptions";
 import { useFixedAssetsData } from "./useFixedAssetsData";
 
 export interface FixedAssetPanelProps {
@@ -65,7 +66,7 @@ export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
     formState?.kind === "edit"
       ? (assets.find((asset) => asset.id === formState.id) ?? null)
       : null;
-  const inYearAssets = assets.filter((asset) => isAssetInYear(asset, year));
+  const inYearAssets = assets.filter((asset) => isFixedAssetInYear(asset, year));
   const pastCount = assets.length - inYearAssets.length;
   const visibleAssets = showPastAssets ? assets : inYearAssets;
 

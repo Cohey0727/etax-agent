@@ -1,10 +1,11 @@
+import { USEFUL_LIFE_PRESETS } from "@etax/shared";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { FixedAssetInput } from "@/api";
 import { AppButton, DateField, Field, MoneyField, SelectField, SwitchRow } from "@/components";
 import { space } from "@/theme";
 import { parseAmount, parseOptionalNumber } from "@/utils";
-import { INCOME_TYPE_OPTIONS, METHOD_OPTIONS, USEFUL_LIFE_PRESETS } from "../assetOptions";
+import { INCOME_TYPE_OPTIONS, METHOD_OPTIONS } from "../assetOptions";
 
 export interface FixedAssetFormProps {
   submitLabel: string;

@@ -1,3 +1,4 @@
+import { validateFixedAssetInput } from "@etax/shared";
 import { useCallback, useEffect, useState } from "react";
 import {
   DepreciationSummary,
@@ -15,7 +16,6 @@ import {
   updateFixedAsset,
   uploadFixedAssetImage,
 } from "@utils/api";
-import { validateInput } from "./fixedAssetOptions";
 
 export type LoadStatus = "loading" | "ready" | "unavailable";
 
@@ -96,7 +96,7 @@ export function useFixedAssetsData(year: number) {
   }, [selectedId, images, status, loadImages]);
 
   const handleCreate = async (input: FixedAssetInput): Promise<boolean> => {
-    const problem = validateInput(input);
+    const problem = validateFixedAssetInput(input);
     if (problem) {
       setError(problem);
       return false;
@@ -118,7 +118,7 @@ export function useFixedAssetsData(year: number) {
   };
 
   const handleUpdate = async (id: number, input: FixedAssetInput): Promise<boolean> => {
-    const problem = validateInput(input);
+    const problem = validateFixedAssetInput(input);
     if (problem) {
       setError(problem);
       return false;

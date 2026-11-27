@@ -2,6 +2,7 @@
  * useAssetsData.ts — 固定資産台帳の読み込みと CRUD・画像の管理。
  * 台帳（DB）が正。サマリは対象年度ごとにサーバー集計を取り直す。
  */
+import { validateFixedAssetInput } from "@etax/shared";
 import { useCallback, useEffect, useState } from "react";
 import {
   DepreciationSummary,
@@ -17,7 +18,6 @@ import {
   updateFixedAsset,
   uploadFixedAssetImage,
 } from "@/api";
-import { validateInput } from "./assetOptions";
 
 export type LoadStatus = "loading" | "ready" | "unavailable";
 
@@ -76,7 +76,7 @@ export function useAssetsData(year: number) {
   }, [reload]);
 
   const handleCreate = async (input: FixedAssetInput): Promise<FixedAssetRecord | null> => {
-    const problem = validateInput(input);
+    const problem = validateFixedAssetInput(input);
     if (problem) {
       setError(problem);
       return null;
@@ -97,7 +97,7 @@ export function useAssetsData(year: number) {
   };
 
   const handleUpdate = async (id: number, input: FixedAssetInput): Promise<boolean> => {
-    const problem = validateInput(input);
+    const problem = validateFixedAssetInput(input);
     if (problem) {
       setError(problem);
       return false;

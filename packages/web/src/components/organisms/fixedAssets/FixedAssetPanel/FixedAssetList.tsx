@@ -1,15 +1,13 @@
+import {
+  DEPRECIATION_METHOD_LABELS,
+  disposedYearOf,
+  fixedAssetIncomeTypeLabel,
+  fixedAssetYearFigures,
+} from "@etax/shared";
 import { Badge, Card, Col, Icon, Row, Text } from "@components/atoms";
 import { FixedAssetImageRecord, FixedAssetRecord } from "@types";
 import { formatYen } from "@utils/format";
 import styles from "./FixedAssetPanel.css";
-import {
-  INCOME_TYPE_LABELS,
-  METHOD_LABELS,
-  bookValueAt,
-  deductibleAt,
-  depreciationProgress,
-  disposedYearOf,
-} from "./fixedAssetOptions";
 
 export interface FixedAssetListProps {
   assets: FixedAssetRecord[];
@@ -26,7 +24,8 @@ export const FixedAssetList = ({ assets, year, selectedId, images, onSelect }: F
       {assets.map((asset) => {
         const firstImage = images[asset.id]?.[0];
         const disposedYear = disposedYearOf(asset);
-        const progress = Math.round(depreciationProgress(asset, year) * 100);
+        const figures = fixedAssetYearFigures(asset, year);
+        const progress = Math.round(figures.progress * 100);
         return (
           <Card
             key={asset.id}
@@ -45,8 +44,8 @@ export const FixedAssetList = ({ assets, year, selectedId, images, onSelect }: F
                 <Col gap="sm">
                   <Text variant="sectionTitle">{asset.name}</Text>
                   <Row gap="sm" wrap>
-                    <Badge>{INCOME_TYPE_LABELS[asset.income_type] ?? asset.income_type}</Badge>
-                    <Badge>{METHOD_LABELS[asset.method]}</Badge>
+                    <Badge>{fixedAssetIncomeTypeLabel(asset.income_type)}</Badge>
+                    <Badge>{DEPRECIATION_METHOD_LABELS[asset.method].short}</Badge>
                     {disposedYear !== null ? <Badge>除却済み（{asset.disposed_date}）</Badge> : null}
                   </Row>
                 </Col>
@@ -60,7 +59,7 @@ export const FixedAssetList = ({ assets, year, selectedId, images, onSelect }: F
                   {year}年の償却費 / 年末残高
                 </Text>
                 <Text variant="body">
-                  {formatYen(deductibleAt(asset, year))} / {formatYen(bookValueAt(asset, year))}
+                  {formatYen(figures.deductible)} / {formatYen(figures.bookValue)}
                 </Text>
               </Row>
               <div className={styles.miniProgressTrack}>

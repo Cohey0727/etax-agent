@@ -1,9 +1,9 @@
+import { summarizeFixedAssets } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { DepreciationSummary, FixedAssetRecord } from "@/api";
 import { AppText, Card, LabeledValue } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatYen } from "@/utils";
-import { bookValueAt, disposedYearOf } from "../assetOptions";
 
 export interface FixedAssetSummaryProps {
   assets: FixedAssetRecord[];
@@ -13,14 +13,8 @@ export interface FixedAssetSummaryProps {
 
 /** 対象年度のサマリ（件数・取得価額・所得区分別の償却費・期末簿価・少額特例の使用状況）。 */
 export function FixedAssetSummary({ assets, summary, year }: FixedAssetSummaryProps) {
-  const active = assets.filter((asset) => {
-    const disposedYear = disposedYearOf(asset);
-    return disposedYear === null || disposedYear >= year;
-  });
-  const disposedCount = assets.length - active.length;
-  const totalCost = active.reduce((sum, asset) => sum + asset.cost, 0);
+  const { count, disposedCount, totalCost, totalBookValue } = summarizeFixedAssets(assets, year);
   // 償却累計額は取得価額合計から期末簿価を差し引いたもの。
-  const totalBookValue = active.reduce((sum, asset) => sum + bookValueAt(asset, year), 0);
   const accumulated = totalCost - totalBookValue;
   const smallSpecial = summary?.small_special ?? null;
   const smallSpecialPercent = smallSpecial
@@ -35,7 +29,7 @@ export function FixedAssetSummary({ assets, summary, year }: FixedAssetSummaryPr
       <LabeledValue
         label="資産件数"
         value={
-          disposedCount > 0 ? `${active.length}件（除却済み${disposedCount}件）` : `${active.length}件`
+          disposedCount > 0 ? `${count}件（除却済み${disposedCount}件）` : `${count}件`
         }
       />
       <LabeledValue label="取得価額 合計" value={formatYen(totalCost)} />

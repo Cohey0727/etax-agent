@@ -1,16 +1,14 @@
+import {
+  DEPRECIATION_METHOD_LABELS,
+  disposedYearOf,
+  fixedAssetIncomeTypeLabel,
+  fixedAssetYearFigures,
+} from "@etax/shared";
 import { Image, StyleSheet, View } from "react-native";
 import { FixedAssetImageRecord, FixedAssetRecord, imageSource } from "@/api";
 import { AppText, BouncePressable, Card, Chip, LabeledValue } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatDate, formatYen } from "@/utils";
-import {
-  INCOME_TYPE_LABELS,
-  METHOD_LABELS,
-  bookValueAt,
-  deductibleAt,
-  depreciationProgress,
-  disposedYearOf,
-} from "../assetOptions";
 
 export interface FixedAssetListProps {
   assets: FixedAssetRecord[];
@@ -26,7 +24,8 @@ export function FixedAssetList({ assets, year, images, onSelect }: FixedAssetLis
       {assets.map((asset, index) => {
         const firstImage = images[asset.id]?.[0];
         const disposedYear = disposedYearOf(asset);
-        const progress = Math.round(depreciationProgress(asset, year) * 100);
+        const figures = fixedAssetYearFigures(asset, year);
+        const progress = Math.round(figures.progress * 100);
         return (
           <BouncePressable
             key={asset.id}
@@ -50,8 +49,8 @@ export function FixedAssetList({ assets, year, images, onSelect }: FixedAssetLis
                     {asset.name}
                   </AppText>
                   <View style={styles.chips}>
-                    <Chip label={INCOME_TYPE_LABELS[asset.income_type] ?? asset.income_type} />
-                    <Chip label={METHOD_LABELS[asset.method]} tone="accent" />
+                    <Chip label={fixedAssetIncomeTypeLabel(asset.income_type)} />
+                    <Chip label={DEPRECIATION_METHOD_LABELS[asset.method].short} tone="accent" />
                     {disposedYear !== null ? (
                       <Chip label={`除却済み（${formatDate(asset.disposed_date)}）`} tone="warn" />
                     ) : null}
@@ -61,7 +60,7 @@ export function FixedAssetList({ assets, year, images, onSelect }: FixedAssetLis
               <LabeledValue label="取得価額" value={formatYen(asset.cost)} />
               <LabeledValue
                 label={`${year}年の償却費 / 年末残高`}
-                value={`${formatYen(deductibleAt(asset, year))} / ${formatYen(bookValueAt(asset, year))}`}
+                value={`${formatYen(figures.deductible)} / ${formatYen(figures.bookValue)}`}
               />
               <View style={styles.track}>
                 <View style={[styles.fill, { width: `${progress}%` }]} />

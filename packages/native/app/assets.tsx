@@ -1,3 +1,4 @@
+import { isFixedAssetInYear } from "@etax/shared";
 import { useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { FixedAssetInput, FixedAssetRecord } from "@/api";
@@ -15,7 +16,7 @@ import { FixedAssetDetail } from "@/features/assets/FixedAssetDetail";
 import { FixedAssetForm } from "@/features/assets/FixedAssetForm";
 import { FixedAssetList } from "@/features/assets/FixedAssetList";
 import { FixedAssetSummary } from "@/features/assets/FixedAssetSummary";
-import { emptyDraft, isAssetInYear, toInput } from "@/features/assets/assetOptions";
+import { emptyDraft, toInput } from "@/features/assets/assetOptions";
 import { useAssetsData } from "@/features/assets/useAssetsData";
 import { useAppState } from "@/state/AppContext";
 import { space } from "@/theme";
@@ -72,7 +73,7 @@ export default function AssetsScreen() {
     detailId !== null ? (assets.find((asset) => asset.id === detailId) ?? null) : null;
   const editingAsset =
     formState?.kind === "edit" ? (assets.find((asset) => asset.id === formState.id) ?? null) : null;
-  const inYearAssets = assets.filter((asset) => isAssetInYear(asset, year));
+  const inYearAssets = assets.filter((asset) => isFixedAssetInYear(asset, year));
   const pastCount = assets.length - inYearAssets.length;
   const visibleAssets = showPastAssets ? assets : inYearAssets;
 
