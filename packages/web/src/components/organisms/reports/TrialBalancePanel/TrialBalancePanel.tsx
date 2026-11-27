@@ -70,15 +70,16 @@ export const TrialBalancePanel = ({ transactions, year, onNavigate }: TrialBalan
   );
 
   // 科目から帳簿へドリルダウンする。帳簿はマウント時にURLクエリから
-  // 初期フィルターを読むため、遷移前にクエリを書き換えておく
-  // （AppPage のURL同期はパスだけを見るのでクエリは保持される）。
+  // 初期フィルターを読むため、遷移前にクエリ付きの帳簿のURLを履歴に積む
+  // （試算表の履歴は残り、「戻る」で試算表へ戻れる。AppPage のURL同期は
+  // パスが一致すれば何もしないのでクエリは保持される）。
   const handleDrillDown = (incomeType: IncomeType, categories: string[]) => {
     const params = new URLSearchParams();
     params.set("filters", "year,category,incomeType");
     params.set("year", String(year));
     for (const category of categories) params.append("cat", category);
     params.append("itype", incomeType);
-    window.history.replaceState(null, "", `/ledger?${params.toString()}`);
+    window.history.pushState(null, "", `/ledger?${params.toString()}`);
     onNavigate?.(AppView.Ledger);
   };
 
