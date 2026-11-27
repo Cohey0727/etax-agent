@@ -20,6 +20,7 @@ import {
   fetchMe,
   logoutAccount,
   saveSessionToken,
+  subscribeSessionToken,
 } from "@/api";
 import { clearAgentConnection } from "@/features/settings/agentConnectionStorage";
 import { bootstrapAuth } from "./bootstrapAuth";
@@ -72,6 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void reloadAuth();
   }, [reloadAuth]);
+
+  // API がセッションの失効（401）を検知してトークンを消したら、未ログインに戻す
+  useEffect(
+    () =>
+      subscribeSessionToken((token) => {
+        if (token === null) setUser(null);
+      }),
+    [],
+  );
 
   const applyLoginResponse = useCallback(
     async (response: LoginResponse): Promise<LoginOutcome> => {

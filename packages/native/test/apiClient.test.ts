@@ -1,7 +1,8 @@
 import { json, stubFetch } from "./nativeMocks";
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
-const { apiJson, ApiError } = await import("../src/api/client");
+const { apiJson, apiJsonOrNull, ApiError } = await import("../src/api/client");
+const { currentSessionToken, saveSessionToken, subscribeSessionToken } = await import("../src/api/session");
 
 describe("apiRaw の期限", () => {
   test("期限までに応答が無ければ ApiError(0) で打ち切る", async () => {
@@ -22,5 +23,38 @@ describe("apiRaw の期限", () => {
       status: 0,
       message: "ネットワークに接続できませんでした",
     });
+  });
+});
+
+describe("セッションの失効（401）", () => {
+  beforeEach(async () => {
+    await saveSessionToken("token-a");
+  });
+
+  test("送ったトークンが 401 で拒否されたら、トークンを消して購読者へ知らせる", async () => {
+    const notified: (string | null)[] = [];
+    const unsubscribe = subscribeSessionToken((token) => notified.push(token));
+    stubFetch(() => json(401, { message: "ログインが必要です" }));
+    expect(await apiJsonOrNull("/api/transactions")).toBeNull();
+    unsubscribe();
+    expect(currentSessionToken()).toBeNull();
+    expect(notified).toEqual([null]);
+  });
+
+  test("トークンを送らない呼び出し（ログイン等）の 401 ではトークンを消さない", async () => {
+    stubFetch(() => json(401, { error: "メールアドレスまたはパスワードが違います" }));
+    await expect(apiJson("/api/auth/login", { method: "POST", body: {}, anonymous: true })).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(currentSessionToken()).toBe("token-a");
+  });
+
+  test("応答を待つ間にトークンが替わっていたら、新しいトークンは消さない", async () => {
+    stubFetch(async () => {
+      await saveSessionToken("token-b");
+      return json(401, { message: "ログインが必要です" });
+    });
+    await apiJsonOrNull("/api/transactions");
+    expect(currentSessionToken()).toBe("token-b");
   });
 });

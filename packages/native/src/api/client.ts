@@ -4,7 +4,7 @@
  * error 文言を持つ ApiError として投げる。
  */
 import { API_URL } from "../config";
-import { currentSessionToken } from "./session";
+import { clearSessionToken, currentSessionToken } from "./session";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -77,6 +77,11 @@ export async function apiRaw(path: string, options: RequestOptions = {}): Promis
     },
     options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
   );
+  // 送ったトークンが拒否されたらセッションは失効している。購読者（AuthContext）へ
+  // 知らせてログイン画面へ戻す。待つ間に別のトークンへ替わっていたら消さない。
+  if (resp.status === 401 && token && currentSessionToken() === token) {
+    await clearSessionToken();
+  }
   return resp;
 }
 
