@@ -8,7 +8,7 @@ import { buildTrialBalance, normalizeTransactions, TrialBalance } from "@etax/sh
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { ErrorSchema } from "../schemas/common";
 import { CalculateTrialBalanceRequestSchema } from "../schemas/trialBalance";
-import { balanceSheetFromWire } from "./exportXtx";
+import { balanceSheetFromWire } from "../services/etax/xtxInputs";
 
 export const calculateTrialBalanceRoute = createRoute({
   method: "post",

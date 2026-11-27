@@ -44,7 +44,7 @@ import { buildReturnPdf } from "../pdf/buildReturnPdf";
 import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import { loadReturnFormTemplate } from "../pdf/loadReturnFormTemplate";
 import { buildReturnFormValues } from "../pdf/returnFormValues";
-import { toTaxpayer } from "../../usecases/exportXtx";
+import { toTaxpayer } from "../etax/xtxInputs";
 import { savedTaxpayerProfile } from "./mcpBusinessStartTools";
 import {
   McpToolModule,

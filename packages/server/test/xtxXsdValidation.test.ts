@@ -255,4 +255,67 @@ describe("HTTP: XTX出力時の常時検証", () => {
     }
     expect(r.body.xsd_warning).toBeNull();
   });
+
+  test("消費税は方式ごとのファイル名と合計税額を返す（簡易課税・2割特例の修正申告）", async () => {
+    const base = {
+      taxpayer: TAXPAYER,
+      period_from: "2025-01-01",
+      period_to: "2025-12-31",
+      submission_date: "2026-02-10",
+      base_period_sales_thousands: 1000,
+      sales_incl_10: 11_000_000,
+      sales_incl_8: 0,
+      nontaxable_sales: 0,
+      exempt_sales: 0,
+      purchases_incl_10: 0,
+      purchases_incl_8: 0,
+      interim_national: 0,
+      interim_local: 0,
+    };
+    const simplified = await requestJson("POST", "/api/etax/export-consumption-xtx", {
+      ...base,
+      filing_kind: 1,
+      original_national: null,
+      original_local: null,
+      method: "simplified",
+      business_category: 5,
+    });
+    expect(simplified.status).toBe(200);
+    expect(simplified.body.filename).toBe("etax-shohi-2025-kanni-kakutei.xtx");
+    // 第5種: 国税 390,000 + 地方 110,000
+    expect(simplified.body.total_payable).toBe(500_000);
+    expect(simplified.body.xtx as string).toContain('<RSH0030 VR="26.0.0"');
+
+    const special20 = await requestJson("POST", "/api/etax/export-consumption-xtx", {
+      ...base,
+      filing_kind: 3,
+      original_national: 0,
+      original_local: 0,
+      method: "special20",
+    });
+    expect(special20.status).toBe(200);
+    expect(special20.body.filename).toBe("etax-shohi-2025-special20-shusei.xtx");
+    // 国税 780,000 × 20% = 156,000 + 地方 44,000
+    expect(special20.body.total_payable).toBe(200_000);
+    expect(special20.body.xtx as string).toContain("<AAM00020><kubun_CD>8</kubun_CD></AAM00020>");
+  });
+
+  test("固定資産の償却計算に失敗したら、どの資産かが分かる 400 になる", async () => {
+    const r = await requestJson("POST", "/api/etax/export-xtx", {
+      ...exportIncomeRequest(2025),
+      fixed_assets: [
+        {
+          name: "車両",
+          income_type: "business",
+          acquisition_date: "2025-04-01",
+          cost: 600_000,
+          useful_life_years: 0,
+          method: "straight_line",
+          business_ratio_percent: 100,
+        },
+      ],
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error as string).toContain("固定資産「車両」の減価償却計算に失敗しました");
+  });
 });

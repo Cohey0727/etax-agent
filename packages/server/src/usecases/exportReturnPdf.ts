@@ -26,7 +26,7 @@ import { buildReturnPdf } from "../services/pdf/buildReturnPdf";
 import { loadJapaneseFont } from "../services/pdf/loadJapaneseFont";
 import { loadReturnFormTemplate } from "../services/pdf/loadReturnFormTemplate";
 import { buildReturnFormValues } from "../services/pdf/returnFormValues";
-import { resolveAgriculture, resolveExpandedTax, toTaxpayer } from "./exportXtx";
+import { resolveAgriculture, resolveExpandedTax, toTaxpayer } from "../services/etax/xtxInputs";
 
 export const exportReturnPdfRoute = createRoute({
   method: "post",

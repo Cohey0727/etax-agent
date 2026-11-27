@@ -25,6 +25,7 @@ import {
   isAgricultureEmpty,
   resolveTaxCreditInputs,
   computeManualIncomes,
+  statementCategoryTotals,
   xtxSupportedYears,
 } from "@etax/shared";
 import { DrizzleQueryError } from "drizzle-orm/errors";
@@ -46,7 +47,7 @@ import { mcpLedgerTools } from "./mcpLedgerTools";
 import { mcpMetaTools } from "./mcpMetaTools";
 import { mcpProfileTools } from "./mcpProfileTools";
 import { mcpSubmissionTools } from "./mcpSubmissionTools";
-import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
+import { toTaxpayer } from "../etax/xtxInputs";
 import {
   McpToolDef,
   McpToolHandler,

@@ -24,7 +24,7 @@ import { settingsFilePath } from "../../repositories/settingsFiles";
 import { getSubscriptionRow } from "../../repositories/subscriptionRepository";
 import { listTransactionRows } from "../../repositories/transactionRepository";
 import { BalanceSheetInputSchema } from "../../schemas/etax";
-import { balanceSheetFromWire } from "../../usecases/exportXtx";
+import { balanceSheetFromWire } from "../etax/xtxInputs";
 import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsView";
 import { AgentChatError, executeAgentChat } from "../agent/executeAgentChat";
 import { testAgentConnection } from "../agent/testAgentConnection";
