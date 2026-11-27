@@ -11,6 +11,7 @@
  */
 import {
   fetchInvoiceResponse,
+  fetchInvoiceResponses,
   getInvoiceRow,
   InvoiceListFilters,
   listInvoiceRows,
@@ -233,7 +234,7 @@ export const mcpInvoiceTools: McpToolModule = {
         filters.status = args["status"];
       }
       const rows = await listInvoiceRows(db, filters);
-      const invoices = await Promise.all(rows.map((row) => fetchInvoiceResponse(db, row)));
+      const invoices = await fetchInvoiceResponses(db, rows);
       return textResult({ invoices });
     },
     get_invoice: async (args) => {

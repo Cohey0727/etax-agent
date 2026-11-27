@@ -335,20 +335,59 @@ export async function nextDocumentNumber(db: DbOrTx, issueDate: string): Promise
   return `${year}-${String(rows.length + 1).padStart(4, "0")}`;
 }
 
-/** 帳票行から、明細と修正元番号を引いた完全な API レスポンスを組み立てる。 */
+/**
+ * 帳票行の一覧から、明細・修正元の帳票番号・消込サマリ（発行済みのみ）を引いた
+ * API レスポンスを組み立てる。一覧全体でまとめて引き、件数に比例してクエリを増やさない。
+ */
+export async function fetchInvoiceResponses(
+  db: Db,
+  rows: readonly DocumentRow[],
+): Promise<InvoiceResponse[]> {
+  if (rows.length === 0) return [];
+  const lineRows = await db
+    .select()
+    .from(documentLinesTable)
+    .where(inArray(documentLinesTable.documentId, rows.map((row) => row.id)))
+    .orderBy(asc(documentLinesTable.lineOrder), asc(documentLinesTable.id));
+  const linesByDocument = new Map<number, DocumentLineRow[]>();
+  for (const line of lineRows) {
+    const list = linesByDocument.get(line.documentId) ?? [];
+    list.push(line);
+    linesByDocument.set(line.documentId, list);
+  }
+  const sourceIds = [
+    ...new Set(rows.flatMap((row) => (row.correctsDocumentId === null ? [] : [row.correctsDocumentId]))),
+  ];
+  const numberBySource = new Map<number, string | null>();
+  if (sourceIds.length > 0) {
+    const owner = currentUserId();
+    const conditions = [inArray(documentsTable.id, sourceIds)];
+    if (owner !== undefined) conditions.push(eq(documentsTable.ownerUserId, owner));
+    const sources = await db
+      .select({ id: documentsTable.id, documentNumber: documentsTable.documentNumber })
+      .from(documentsTable)
+      .where(and(...conditions));
+    for (const source of sources) numberBySource.set(source.id, source.documentNumber);
+  }
+  const settlements = await settlementSummaries(
+    db,
+    new Map(rows.filter((row) => row.status === "issued").map((row) => [row.id, row.totalAmount])),
+  );
+  return rows.map((row) =>
+    invoiceToApi(
+      row,
+      linesByDocument.get(row.id) ?? [],
+      row.correctsDocumentId === null ? null : (numberBySource.get(row.correctsDocumentId) ?? null),
+      settlements.get(row.id),
+    ),
+  );
+}
+
+/** 帳票行1件から、明細と修正元番号を引いた完全な API レスポンスを組み立てる。 */
 export async function fetchInvoiceResponse(db: Db, row: DocumentRow): Promise<InvoiceResponse> {
-  const lines = await listInvoiceLines(db, row.id);
-  let correctsDocumentNumber: string | null = null;
-  if (row.correctsDocumentId !== null) {
-    const source = await getInvoiceRow(db, row.correctsDocumentId);
-    correctsDocumentNumber = source?.documentNumber ?? null;
-  }
-  let settlement: InvoiceSettlement | undefined;
-  if (row.status === "issued") {
-    const summaries = await settlementSummaries(db, new Map([[row.id, row.totalAmount]]));
-    settlement = summaries.get(row.id);
-  }
-  return invoiceToApi(row, lines, correctsDocumentNumber, settlement);
+  const [response] = await fetchInvoiceResponses(db, [row]);
+  if (!response) throw new Error("請求書を組み立てられませんでした");
+  return response;
 }
 
 /** 下書きを発行済みにする（採番と発行者スナップショットを凍結する）。 */

@@ -6,7 +6,7 @@
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { requireDb } from "../lib/errors";
 import {
-  fetchInvoiceResponse,
+  fetchInvoiceResponses,
   InvoiceListFilters,
   listInvoiceRows,
 } from "../repositories/invoiceRepository";
@@ -48,6 +48,6 @@ export const listInvoicesHandler: RouteHandler<typeof listInvoicesRoute> = async
     status: query.status,
   };
   const rows = await listInvoiceRows(db, filters);
-  const response: InvoiceListResponse = { invoices: await Promise.all(rows.map((row) => fetchInvoiceResponse(db, row))) };
+  const response: InvoiceListResponse = { invoices: await fetchInvoiceResponses(db, rows) };
   return c.json(response, 200);
 };
