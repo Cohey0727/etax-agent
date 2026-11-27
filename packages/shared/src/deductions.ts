@@ -15,7 +15,8 @@
  *   税率 No.2260 / 住宅借入金等特別控除 No.1211-1 / 配当控除 No.1250
  * 端数処理: 課税所得金額は1,000円未満切捨て（国税通則法118条）、
  *   確定税額は100円未満切捨て（同119条）。復興特別所得税は
- *   税額控除後の所得税額（基準所得税額）× 2.1%（円未満切捨て）。
+ *   基準所得税額（外国税額控除を適用しないで計算した所得税額）× 2.1%
+ *   （円未満切捨て）。
  *
  * 前提・簡略化（呼び出し側の責任範囲）:
  * - 合計所得金額は「青色申告特別控除後の所得の合計」を呼び出し側が渡す。
@@ -609,13 +610,15 @@ export interface ForeignTaxCreditSplit {
 }
 
 /**
- * 外国税額控除（確定申告書等作成コーナー別添4の按分方法）。
- * incomeTaxAfterOtherCredits は「外国税額控除以外の税額控除を引いた後の
- * 所得税額」（差引所得税額 A）。所得総額には合計所得金額（所得控除前）を
- * 渡すこと。手順:
+ * 外国税額控除（外国税額控除に関する明細書の計算）。所得総額には合計所得金額
+ * （所得控除前）を渡すこと。
+ * - incomeTax（A）: 所得税の控除限度額の基になる所得税額。外国税額控除と
+ *   定額減税以外の税額控除を引いた後の額（再差引所得税額）。
+ * - standardIncomeTax（B）: 基準所得税額。外国税額控除を適用しないで計算した
+ *   所得税額で、定額減税がある年分はその控除後の額。省略時は A と同じ。
+ * 手順:
  *   所得税控除限度額 = A ×（調整国外所得金額 ÷ 所得総額）（円未満切捨て）
  *   所得税分 = min(外国所得税額, 所得税控除限度額）
- *   基準所得税額 B = A − 所得税分
  *   復興特別所得税（控除前）R = B × 2.1%（円未満切捨て）
  *   復興税控除限度額 = R ×（調整国外所得金額 ÷ 所得総額）（円未満切捨て）
  *   復興税分 = min(外国所得税額 − 所得税分， 復興税控除限度額）
@@ -624,17 +627,17 @@ export function foreignTaxCredit(
   paid: number,
   foreignIncome: number,
   totalIncome: number,
-  incomeTaxAfterOtherCredits: number,
+  incomeTax: number,
+  standardIncomeTax: number = incomeTax,
 ): ForeignTaxCreditSplit {
   const p = amount(paid);
   const t = amount(totalIncome);
   if (p <= 0 || t <= 0) return { incomePart: 0, reconstructionPart: 0, total: 0 };
-  const a = amount(incomeTaxAfterOtherCredits);
+  const a = amount(incomeTax);
   const foreign = Math.min(amount(foreignIncome), t);
   const incomeLimit = Math.floor((a * foreign) / t);
   const incomePart = Math.min(p, incomeLimit);
-  const standardIncomeTax = a - incomePart;
-  const reconstructionGross = Math.floor((standardIncomeTax * 21) / 1000);
+  const reconstructionGross = Math.floor((amount(standardIncomeTax) * 21) / 1000);
   const reconstructionLimit = Math.floor((reconstructionGross * foreign) / t);
   const reconstructionPart = Math.min(p - incomePart, reconstructionLimit);
   return { incomePart, reconstructionPart, total: incomePart + reconstructionPart };
@@ -663,8 +666,9 @@ export interface TaxCreditBreakdown {
  * baseIncomeTax は税額控除前の所得税額（速算表の税額）。
  * taxableIncome は配当控除の判定に使う課税総所得金額等、
  * totalIncome は外国税額控除の限度額計算に使う合計所得金額。
- * 外国税額控除の限度額は、外国以外の税額控除を引いた後の所得税額
- * （差引所得税額）を基準に按分する（作成コーナー別添4の順序）。
+ * 外国税額控除の所得税分の限度額は再差引所得税額（定額減税・外国税額控除
+ * 以外の税額控除を引いた後）を、復興税分の限度額は基準所得税額（さらに
+ * 定額減税を引いた後）の2.1%を基に按分する。
  */
 export function computeTaxCredits(
   inputs: TaxCreditInputs,
@@ -691,14 +695,16 @@ export function computeTaxCredits(
     inputs.seismicRetrofitStandardCost,
     inputs.seismicRetrofitOtherCost,
   );
-  const othersTotal =
-    housingLoan + flatReduction + dividend + politicalDonations + certifiedNpoDonations + seismicRetrofit;
-  const incomeTaxAfterOtherCredits = Math.max(amount(baseIncomeTax) - othersTotal, 0);
+  const creditsBeforeFlatReduction =
+    housingLoan + dividend + politicalDonations + certifiedNpoDonations + seismicRetrofit;
+  const othersTotal = creditsBeforeFlatReduction + flatReduction;
+  const reSubtractedIncomeTax = Math.max(amount(baseIncomeTax) - creditsBeforeFlatReduction, 0);
   const foreign = foreignTaxCredit(
     inputs.foreignTaxPaid,
     inputs.foreignIncome,
     totalIncome,
-    incomeTaxAfterOtherCredits,
+    reSubtractedIncomeTax,
+    Math.max(reSubtractedIncomeTax - flatReduction, 0),
   );
   return {
     housingLoan,
@@ -1060,22 +1066,30 @@ export interface IncomeTaxResult {
   taxCreditsTotal: number;
   /** 差引所得税額（外国税額控除以外の税額控除を引いた後の所得税額） */
   taxAfterOtherCredits: number;
-  /** 基準所得税額（差引所得税額 − 外国税額控除の所得税分） */
+  /**
+   * 基準所得税額。外国税額控除を適用しないで計算した所得税額
+   * （定額減税がある年分はその控除後）で、差引所得税額と同額。
+   */
   standardIncomeTax: number;
   /** 復興特別所得税（外国税額控除前）= 基準所得税額 × 2.1%（円未満切捨て） */
   reconstructionTaxGross: number;
   /** 復興特別所得税（外国税額控除の復興税分を引いた後） */
   reconstructionTax: number;
-  /** 確定税額（100円未満切捨て）。修正申告の income_tax に使える金額 */
+  /** 所得税額（基準所得税額 − 外国税額控除の所得税分。0未満は0） */
+  incomeTaxAfterForeignCredit: number;
+  /**
+   * 確定税額 =（所得税額 ＋ 復興特別所得税額）の100円未満切捨て。
+   * 源泉徴収税額が0のときの申告納税額で、修正申告の income_tax に使える金額
+   */
   finalTax: number;
 }
 
 /**
  * 所得税額の全計算: 所得控除 → 課税所得 → 速算表 → 税額控除 →
  * 復興特別所得税 → 確定税額（100円未満切捨て）。
- * 復興特別所得税は基準所得税額（外国税額控除の所得税分を引いた後の
- * 所得税額）× 2.1% で確定し、外国税額控除は所得税分・復興税分に
- * 分けて差し引く（作成コーナー別添4の順序）。
+ * 基準所得税額は外国税額控除を適用しないで計算した所得税額で、復興特別
+ * 所得税はその2.1%。外国税額控除は所得税分を所得税額から、復興税分を
+ * 復興特別所得税額から差し引く。
  * 源泉徴収税額・予定納税の精算は含まない（申告納税額とは別に扱うこと）。
  */
 export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
@@ -1109,10 +1123,14 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
     incomeTaxBase - (taxCredits.total - taxCredits.foreignTax),
     0,
   );
-  const standardIncomeTax = taxAfterOtherCredits - taxCredits.foreignTaxIncomePart;
+  const standardIncomeTax = taxAfterOtherCredits;
   const reconstructionTaxGross = Math.floor((standardIncomeTax * 21) / 1000);
   const reconstructionTax = reconstructionTaxGross - taxCredits.foreignTaxReconstructionPart;
-  const finalTax = floor100(standardIncomeTax + reconstructionTax);
+  const incomeTaxAfterForeignCredit = Math.max(
+    standardIncomeTax - taxCredits.foreignTaxIncomePart,
+    0,
+  );
+  const finalTax = floor100(incomeTaxAfterForeignCredit + reconstructionTax);
   return {
     year,
     totalIncome,
@@ -1133,6 +1151,7 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
     standardIncomeTax,
     reconstructionTaxGross,
     reconstructionTax,
+    incomeTaxAfterForeignCredit,
     finalTax,
   };
 }

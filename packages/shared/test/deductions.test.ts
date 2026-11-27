@@ -286,12 +286,12 @@ describe("税額控除", () => {
     expect(small.total).toBe(100_000);
   });
   test("外国税額: 所得税分を超えた分は復興税分に回る（別添4の按分）", () => {
-    // A=1,500,000・割合20% → 所得税限度額 300,000。基準所得税額 1,200,000、
-    // 復興税（控除前）25,200、その限度額 5,040 が復興税分になる
+    // 所得税額 1,500,000・割合20% → 所得税限度額 300,000。基準所得税額は
+    // 外国税額控除前の 1,500,000 で、復興税（控除前）31,500 の 20% = 6,300 が復興税分
     const split = foreignTaxCredit(500_000, 2_000_000, 10_000_000, 1_500_000);
     expect(split.incomePart).toBe(300_000);
-    expect(split.reconstructionPart).toBe(5_040);
-    expect(split.total).toBe(305_040);
+    expect(split.reconstructionPart).toBe(6_300);
+    expect(split.total).toBe(306_300);
   });
 });
 
@@ -361,28 +361,60 @@ describe("所得税額の計算", () => {
     expect(breakdown.total).toBe(480_000);
   });
 
-  test("外国税額控除がある場合: 復興税は基準所得税額 × 2.1% で先に確定する（別添4）", () => {
+  test("外国税額控除がある場合: 基準所得税額は外国税額控除前の所得税額、復興税はその2.1%", () => {
     const result = computeIncomeTax({
       year: 2023,
       totalIncome: 10_000_000,
       deductions: EMPTY_DEDUCTION_INPUTS,
       taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, foreignTaxPaid: 500_000, foreignIncome: 2_000_000 },
     });
-    // 課税所得 952万円 → 所得税額 952万 × 33% − 1,536,000 = 1,605,600（= 差引所得税額 A）
+    // 課税所得 952万円 → 所得税額 952万 × 33% − 1,536,000 = 1,605,600
     expect(result.incomeTaxBase).toBe(1_605_600);
     expect(result.taxAfterOtherCredits).toBe(1_605_600);
+    // 基準所得税額 = 外国税額控除を適用しないで計算した所得税額
+    expect(result.standardIncomeTax).toBe(1_605_600);
+    // 復興税（外国税額控除前）= 1,605,600 × 2.1% = 33,717
+    expect(result.reconstructionTaxGross).toBe(33_717);
     // 所得税分: 限度額 1,605,600 × 20% = 321,120
     expect(result.taxCredits.foreignTaxIncomePart).toBe(321_120);
-    // 基準所得税額 B = 1,605,600 − 321,120 = 1,284,480
-    expect(result.standardIncomeTax).toBe(1_284_480);
-    // 復興税（控除前）R = B × 2.1% = 26,974（恒等式: R = floor(B × 0.021)）
-    expect(result.reconstructionTaxGross).toBe(26_974);
-    expect(result.reconstructionTaxGross).toBe(Math.floor(result.standardIncomeTax * 0.021));
-    // 復興税分: 限度額 26,974 × 20% = 5,394
-    expect(result.taxCredits.foreignTaxReconstructionPart).toBe(5_394);
-    expect(result.reconstructionTax).toBe(21_580);
-    // 確定税額: B + (R − 復興税分) = 1,306,060 → 1,306,000
-    expect(result.finalTax).toBe(1_306_000);
+    // 復興税分: 限度額 33,717 × 20% = 6,743
+    expect(result.taxCredits.foreignTaxReconstructionPart).toBe(6_743);
+    expect(result.incomeTaxAfterForeignCredit).toBe(1_284_480);
+    expect(result.reconstructionTax).toBe(26_974);
+    // 確定税額: 1,284,480 + 26,974 = 1,311,454 → 1,311,400
+    expect(result.finalTax).toBe(1_311_400);
+  });
+
+  test("国税庁 別添4の計算例（令和6年分・定額減税と外国税額控除の併用）と一致する", () => {
+    // 所得総額 3,280,000・調整国外所得金額 280,000・外国所得税額 28,000・定額減税 90,000。
+    // 所得控除 138万円で課税所得 190万円 → 再差引所得税額 95,000
+    const result = computeIncomeTax({
+      year: 2024,
+      totalIncome: 3_280_000,
+      deductions: { ...EMPTY_DEDUCTION_INPUTS, socialInsurancePaid: 900_000 },
+      taxCredits: {
+        ...EMPTY_TAX_CREDIT_INPUTS,
+        foreignTaxPaid: 28_000,
+        foreignIncome: 280_000,
+        flatReduction: 90_000,
+      },
+    });
+    expect(result.taxableIncome).toBe(1_900_000);
+    expect(result.incomeTaxBase).toBe(95_000);
+    // 所得税の控除限度額は再差引所得税額 95,000 を基に 8,109
+    expect(result.taxCredits.foreignTaxIncomePart).toBe(8_109);
+    // 基準所得税額 = 95,000 − 定額減税 90,000 = 5,000、復興税（外税前）105
+    expect(result.standardIncomeTax).toBe(5_000);
+    expect(result.reconstructionTaxGross).toBe(105);
+    // 復興税分の控除限度額 = 105 × 280,000 / 3,280,000 = 8
+    expect(result.taxCredits.foreignTaxReconstructionPart).toBe(8);
+    expect(result.taxCredits.foreignTax).toBe(8_117);
+    // 所得税額 = 95,000 − 8,109 − 90,000 → 0、復興税（外税後）= 97
+    expect(result.incomeTaxAfterForeignCredit).toBe(0);
+    expect(result.reconstructionTax).toBe(97);
+    // 所得税額＋復興特別所得税額 = 97（源泉徴収 0 なら100円未満切捨てで 0）
+    expect(result.incomeTaxAfterForeignCredit + result.reconstructionTax).toBe(97);
+    expect(result.finalTax).toBe(0);
   });
 });
 
