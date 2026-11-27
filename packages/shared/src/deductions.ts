@@ -220,13 +220,19 @@ export interface LifeInsurancePremiums {
   oldPension: number;
 }
 
-/** 新契約（平成24年1月1日以後締結）の計算式。区分ごとの上限は40,000円。 */
-export function lifeInsuranceNewFormula(premium: number): number {
+/** 生命保険料控除の新契約の区分ごとの上限（本則）。 */
+const LIFE_INSURANCE_NEW_CAP = 40_000;
+
+/**
+ * 新契約（平成24年1月1日以後締結）の計算式。区分ごとの上限は cap（本則 40,000円）で、
+ * 段の境は上限の 1/2・1倍・2倍（上限 60,000円の特例では 3万・6万・12万円）。
+ */
+export function lifeInsuranceNewFormula(premium: number, cap = LIFE_INSURANCE_NEW_CAP): number {
   const p = amount(premium);
-  if (p <= 20_000) return p;
-  if (p <= 40_000) return Math.floor(p / 2) + 10_000;
-  if (p <= 80_000) return Math.floor(p / 4) + 20_000;
-  return 40_000;
+  if (p <= cap / 2) return p;
+  if (p <= cap) return Math.floor(p / 2) + cap / 4;
+  if (p <= cap * 2) return Math.floor(p / 4) + cap / 2;
+  return cap;
 }
 
 /** 旧契約（平成23年12月31日以前締結）の計算式。区分ごとの上限は50,000円。 */
@@ -239,26 +245,35 @@ export function lifeInsuranceOldFormula(premium: number): number {
 }
 
 /**
- * 新旧両方の契約がある区分（一般・個人年金）の控除額。
- * 旧契約の支払保険料が60,000円を超える場合は旧契約の式のみで計算し、
- * 60,000円以下の場合は新旧の式の合計（上限40,000円）とする
- * （国税庁 No.1140 の「新契約と旧契約の双方に加入している場合」）。
+ * 新旧両方の契約がある区分（一般・個人年金）の控除額。新契約のみ・旧契約のみ・
+ * 新旧の合計（上限は新契約の上限 newCap）のうち大きい方とする（国税庁 No.1140 の
+ * 「新契約と旧契約の双方に加入している場合」。本則では旧契約の支払保険料が
+ * 60,000円を超えると旧契約のみ、以下なら新旧の合計が大きくなる）。
  */
-function lifeInsuranceCategoryDeduction(newPremium: number, oldPremium: number): number {
+function lifeInsuranceCategoryDeduction(
+  newPremium: number,
+  oldPremium: number,
+  newCap = LIFE_INSURANCE_NEW_CAP,
+): number {
   const n = amount(newPremium);
   const o = amount(oldPremium);
-  if (n > 0 && o > 0) {
-    if (o > 60_000) return lifeInsuranceOldFormula(o);
-    return Math.min(lifeInsuranceNewFormula(n) + lifeInsuranceOldFormula(o), 40_000);
-  }
-  if (o > 0) return lifeInsuranceOldFormula(o);
-  return lifeInsuranceNewFormula(n);
+  const newOnly = lifeInsuranceNewFormula(n, newCap);
+  if (o <= 0) return newOnly;
+  const oldOnly = lifeInsuranceOldFormula(o);
+  if (n <= 0) return oldOnly;
+  return Math.max(newOnly, oldOnly, Math.min(newOnly + oldOnly, newCap));
 }
 
-/** 生命保険料控除。全体の上限は120,000円。 */
-export function lifeInsuranceDeduction(premiums: LifeInsurancePremiums): number {
+/**
+ * 生命保険料控除。全体の上限は120,000円。generalNewCap は一般生命保険料
+ * （新契約）の区分の上限（23歳未満の扶養親族がいる年分の特例では 60,000円）。
+ */
+export function lifeInsuranceDeduction(
+  premiums: LifeInsurancePremiums,
+  generalNewCap = LIFE_INSURANCE_NEW_CAP,
+): number {
   const total =
-    lifeInsuranceCategoryDeduction(premiums.newGeneral, premiums.oldGeneral) +
+    lifeInsuranceCategoryDeduction(premiums.newGeneral, premiums.oldGeneral, generalNewCap) +
     lifeInsuranceNewFormula(premiums.newCareMedical) +
     lifeInsuranceCategoryDeduction(premiums.newPension, premiums.oldPension);
   return Math.min(total, 120_000);
@@ -381,6 +396,8 @@ export interface DeductionInputs {
   isWorkingStudent: boolean;
   /** 特定親族（19歳以上23歳未満）の合計所得金額。いなければ null */
   specialRelativeTotalIncome: number | null;
+  /** 23歳未満の扶養親族がいるか（生命保険料控除の特例の判定。未指定は false） */
+  hasDependentUnder23?: boolean;
 }
 
 export const EMPTY_DEDUCTION_INPUTS: DeductionInputs = {
@@ -400,6 +417,7 @@ export const EMPTY_DEDUCTION_INPUTS: DeductionInputs = {
   isSingleParent: false,
   isWorkingStudent: false,
   specialRelativeTotalIncome: null,
+  hasDependentUnder23: false,
 };
 
 export interface IncomeDeductionBreakdown {
@@ -439,24 +457,32 @@ export function computeIncomeDeductions(
 ): IncomeDeductionBreakdown {
   const t = amount(totalIncome);
   const tg = grandTotalIncome !== undefined ? amount(grandTotalIncome) : t;
-  // 寡婦・ひとり親は合計所得金額500万円以下が要件。両方に該当する場合は
-  // ひとり親控除が優先し、寡婦控除は適用しない（排他）。
-  const singleParent = inputs.isSingleParent && tg <= 5_000_000 ? 350_000 : 0;
-  const widow = inputs.isWidow && !inputs.isSingleParent && tg <= 5_000_000 ? 270_000 : 0;
+  const params = taxParametersFor(year);
+  // 寡婦・ひとり親は合計所得金額が年度パラメータの上限以下が要件。両方に該当する
+  // 場合はひとり親控除が優先し、寡婦控除は適用しない（排他）。
+  const withinSingleParentLimit = tg <= params.singleParentWidowIncomeLimit;
+  const singleParent =
+    inputs.isSingleParent && withinSingleParentLimit ? params.singleParentDeduction : 0;
+  const widow =
+    inputs.isWidow && !inputs.isSingleParent && withinSingleParentLimit ? params.widowDeduction : 0;
   // 勤労学生は合計所得金額が年度パラメータの上限以下が要件
   const workingStudent =
-    inputs.isWorkingStudent && tg <= taxParametersFor(year).workingStudentLimit ? 270_000 : 0;
+    inputs.isWorkingStudent && tg <= params.workingStudentLimit ? 270_000 : 0;
+  const lifeInsuranceGeneralCap =
+    inputs.hasDependentUnder23 === true && params.lifeInsuranceGeneralYoungDependentCap !== null
+      ? params.lifeInsuranceGeneralYoungDependentCap
+      : undefined;
   // 配偶者の合計所得が入力されていて要件を超えるなら、配偶者控除ではなく
   // 配偶者特別控除の側（両者は併用できない）
   const spouseOverLimit =
     inputs.spouseTotalIncome !== null &&
-    amount(inputs.spouseTotalIncome) > taxParametersFor(year).spouseIncomeLimit;
+    amount(inputs.spouseTotalIncome) > params.spouseIncomeLimit;
   const breakdown: IncomeDeductionBreakdown = {
     casualtyLoss: inputs.casualtyLoss ? casualtyLossDeduction(inputs.casualtyLoss, tg) : 0,
     medical: medicalDeduction(inputs.medicalExpensesPaid, inputs.medicalReimbursement, tg),
     socialInsurance: amount(inputs.socialInsurancePaid),
     smallBusinessMutualAid: amount(inputs.smallBusinessMutualAidPaid),
-    lifeInsurance: lifeInsuranceDeduction(inputs.lifeInsurance),
+    lifeInsurance: lifeInsuranceDeduction(inputs.lifeInsurance, lifeInsuranceGeneralCap),
     earthquakeInsurance: earthquakeInsuranceDeduction(inputs.earthquakeInsurance),
     donations: donationDeduction(inputs.donationsTotal, tg),
     disability: disabilityDeduction(inputs.disability),

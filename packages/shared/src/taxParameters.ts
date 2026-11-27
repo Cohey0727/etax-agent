@@ -58,6 +58,17 @@ export interface YearTaxParameters {
   specialRelativeLowerBound: number;
   /** 勤労学生控除の所得要件（本人の合計所得金額の上限。給与のみなら収入金額に換算可）。 */
   workingStudentLimit: number;
+  /** ひとり親控除の額（No.1171）。 */
+  singleParentDeduction: number;
+  /** 寡婦控除の額（No.1170）。 */
+  widowDeduction: number;
+  /** ひとり親控除・寡婦控除の所得要件（本人の合計所得金額の上限）。 */
+  singleParentWidowIncomeLimit: number;
+  /**
+   * 23歳未満の扶養親族がいる場合の一般生命保険料（新契約）の控除の上限。
+   * 特例が無い年分は null（上限 40,000円の本則）。
+   */
+  lifeInsuranceGeneralYoungDependentCap: number | null;
   /** 給与所得控除の段階表（国税庁 No.1410 の速算表）。 */
   salaryDeductionTiers: readonly SalaryDeductionTier[];
   /** 別表第五で給与所得が 0 になる収入金額の境（この額未満は 0）。 */
@@ -174,6 +185,10 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeTiers: null,
     specialRelativeLowerBound: 480_000,
     workingStudentLimit: 750_000,
+    singleParentDeduction: 350_000,
+    widowDeduction: 270_000,
+    singleParentWidowIncomeLimit: 5_000_000,
+    lifeInsuranceGeneralYoungDependentCap: null,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
     salaryIncomeZeroBelow: 551_000,
     salaryIncomeFixedBands: SALARY_FIXED_BANDS_2023_2024,
@@ -187,6 +202,10 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeTiers: null,
     specialRelativeLowerBound: 480_000,
     workingStudentLimit: 750_000,
+    singleParentDeduction: 350_000,
+    widowDeduction: 270_000,
+    singleParentWidowIncomeLimit: 5_000_000,
+    lifeInsuranceGeneralYoungDependentCap: null,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
     salaryIncomeZeroBelow: 551_000,
     salaryIncomeFixedBands: SALARY_FIXED_BANDS_2023_2024,
@@ -211,6 +230,10 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeTiers: SPECIAL_RELATIVE_TIERS_2025,
     specialRelativeLowerBound: 580_000,
     workingStudentLimit: 850_000,
+    singleParentDeduction: 350_000,
+    widowDeduction: 270_000,
+    singleParentWidowIncomeLimit: 5_000_000,
+    lifeInsuranceGeneralYoungDependentCap: null,
     salaryDeductionTiers: SALARY_TIERS_2025,
     salaryIncomeZeroBelow: 651_000,
     salaryIncomeFixedBands: [],
@@ -226,6 +249,10 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeTiers: SPECIAL_RELATIVE_TIERS_2026_2027,
     specialRelativeLowerBound: 620_000,
     workingStudentLimit: 890_000,
+    singleParentDeduction: 350_000,
+    widowDeduction: 270_000,
+    singleParentWidowIncomeLimit: 5_000_000,
+    lifeInsuranceGeneralYoungDependentCap: 60_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
     salaryIncomeZeroBelow: 741_000,
     salaryIncomeFixedBands: SALARY_FIXED_BANDS_2026_2027,
@@ -240,6 +267,10 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeTiers: SPECIAL_RELATIVE_TIERS_2026_2027,
     specialRelativeLowerBound: 620_000,
     workingStudentLimit: 890_000,
+    singleParentDeduction: 380_000,
+    widowDeduction: 270_000,
+    singleParentWidowIncomeLimit: 5_000_000,
+    lifeInsuranceGeneralYoungDependentCap: 60_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
     salaryIncomeZeroBelow: 741_000,
     salaryIncomeFixedBands: SALARY_FIXED_BANDS_2026_2027,

@@ -162,6 +162,33 @@ describe("生命保険料控除", () => {
   test("新旧両方・旧6万円超: 旧契約の式のみ（7万円 → 4.25万円）", () => {
     expect(lifeInsuranceDeduction({ ...empty, newGeneral: 40_000, oldGeneral: 70_000 })).toBe(42_500);
   });
+  test("令和8・9年分: 23歳未満の扶養親族がいれば一般（新契約）の上限は6万円", () => {
+    const inputs = (newGeneral: number, oldGeneral = 0) => ({
+      ...EMPTY_DEDUCTION_INPUTS,
+      lifeInsurance: { ...empty, newGeneral, oldGeneral },
+      hasDependentUnder23: true,
+    });
+    expect(computeIncomeDeductions(2026, 5_000_000, inputs(120_000)).lifeInsurance).toBe(60_000);
+    // 8万円 × 1/4 + 3万円
+    expect(computeIncomeDeductions(2026, 5_000_000, inputs(80_000)).lifeInsurance).toBe(50_000);
+    expect(computeIncomeDeductions(2027, 5_000_000, inputs(30_000)).lifeInsurance).toBe(30_000);
+    // 新旧合算: 新8万円 → 5万円、旧4万円 → 3.25万円、合算の上限6万円
+    expect(computeIncomeDeductions(2026, 5_000_000, inputs(80_000, 40_000)).lifeInsurance).toBe(60_000);
+  });
+  test("23歳未満の扶養親族がいても令和7年分は4万円、いなければ令和8年分も4万円", () => {
+    const life = { ...empty, newGeneral: 120_000 };
+    expect(
+      computeIncomeDeductions(2025, 5_000_000, {
+        ...EMPTY_DEDUCTION_INPUTS,
+        lifeInsurance: life,
+        hasDependentUnder23: true,
+      }).lifeInsurance,
+    ).toBe(40_000);
+    expect(
+      computeIncomeDeductions(2026, 5_000_000, { ...EMPTY_DEDUCTION_INPUTS, lifeInsurance: life })
+        .lifeInsurance,
+    ).toBe(40_000);
+  });
   test("全体の上限12万円", () => {
     expect(
       lifeInsuranceDeduction({
@@ -485,6 +512,11 @@ describe("寡婦・ひとり親・勤労学生の所得要件と排他", () => {
       isWidow: true,
     });
     expect(widow.widow).toBe(270_000);
+  });
+  test("令和9年分以後のひとり親控除は38万円", () => {
+    const input = { ...EMPTY_DEDUCTION_INPUTS, isSingleParent: true };
+    expect(computeIncomeDeductions(2027, 3_000_000, input).singleParent).toBe(380_000);
+    expect(computeIncomeDeductions(2026, 3_000_000, input).singleParent).toBe(350_000);
   });
   test("合計所得500万円超は ひとり親・寡婦とも 0", () => {
     const b = computeIncomeDeductions(2025, 5_000_001, {
