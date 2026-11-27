@@ -1,10 +1,10 @@
+import { ledgerIncomeTypeLabel } from "@etax/shared";
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
 import { LedgerTransaction } from "@/api";
 import { AppText, BouncePressable, Chip } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatDate, formatYen } from "@/utils";
-import { incomeTypeLabel } from "../options";
 
 export interface LedgerRowProps {
   row: LedgerTransaction;
@@ -20,7 +20,7 @@ export const LedgerRow = memo(function LedgerRow({ row, onPress }: LedgerRowProp
         <AppText size="md" weight="medium" numberOfLines={2}>{row.description || "（摘要なし）"}</AppText>
         <View style={styles.chips}>
           <Chip label={row.category} tone="accent" />
-          <Chip label={incomeTypeLabel(row.income_type)} />
+          <Chip label={ledgerIncomeTypeLabel(row.income_type)} />
           {row.tax_category ? <Chip label={row.tax_category} /> : null}
         </View>
       </View>

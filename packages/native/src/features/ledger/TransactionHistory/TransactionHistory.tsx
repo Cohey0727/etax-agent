@@ -1,3 +1,4 @@
+import { ledgerIncomeTypeLabel } from "@etax/shared";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import {
@@ -7,7 +8,6 @@ import {
 } from "@/api";
 import { AppText, Chip } from "@/components";
 import { formatDate, formatYen } from "@/utils";
-import { incomeTypeLabel } from "../options";
 
 const ACTION_LABELS: Record<string, string> = {
   create: "登録",
@@ -53,7 +53,7 @@ export function TransactionHistory({ transactionId }: { transactionId?: number }
             </View>
             {snap ? (
               <AppText size="sm">
-                {snap.date} {snap.description} {formatYen(snap.amount)}／{snap.category}／{incomeTypeLabel(snap.income_type)}
+                {snap.date} {snap.description} {formatYen(snap.amount)}／{snap.category}／{ledgerIncomeTypeLabel(snap.income_type)}
               </AppText>
             ) : null}
             {entry.before && entry.after ? (

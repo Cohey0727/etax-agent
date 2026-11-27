@@ -1,15 +1,13 @@
-import { ACCOUNT_NAMES, TAX_CATEGORIES } from "@etax/shared";
+import { ACCOUNT_NAMES, IncomeType, LEDGER_INCOME_TYPE_LABELS, TAX_CATEGORIES } from "@etax/shared";
 import { LedgerTransaction, LedgerTransactionInput } from "@types";
 
 /**
  * ledgerOptions.ts — 帳簿画面の選択肢と行変換ヘルパー。
  */
 
-export const INCOME_TYPE_OPTIONS = [
-  { value: "business", label: "事業" },
-  { value: "real_estate", label: "不動産" },
-  { value: "other", label: "対象外" },
-] as const;
+export const INCOME_TYPE_OPTIONS: readonly { value: IncomeType; label: string }[] = (
+  Object.keys(LEDGER_INCOME_TYPE_LABELS) as IncomeType[]
+).map((value) => ({ value, label: LEDGER_INCOME_TYPE_LABELS[value] }));
 
 export const CATEGORY_OPTIONS: readonly string[] = ["未分類", ...ACCOUNT_NAMES];
 

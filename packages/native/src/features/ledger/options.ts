@@ -1,11 +1,9 @@
-import { ACCOUNT_NAMES, TAX_CATEGORIES } from "@etax/shared";
+import { ACCOUNT_NAMES, IncomeType, LEDGER_INCOME_TYPE_LABELS, TAX_CATEGORIES } from "@etax/shared";
 import { LedgerTransaction, LedgerTransactionInput } from "@/api";
 
-export const INCOME_TYPE_OPTIONS = [
-  { value: "business", label: "事業" },
-  { value: "real_estate", label: "不動産" },
-  { value: "other", label: "対象外" },
-] as const;
+export const INCOME_TYPE_OPTIONS: readonly { value: IncomeType; label: string }[] = (
+  Object.keys(LEDGER_INCOME_TYPE_LABELS) as IncomeType[]
+).map((value) => ({ value, label: LEDGER_INCOME_TYPE_LABELS[value] }));
 
 export const CATEGORY_OPTIONS: readonly string[] = ["未分類", ...ACCOUNT_NAMES];
 
@@ -25,10 +23,6 @@ export const BUSINESS_RATIO_GUIDE_CATEGORIES: ReadonlySet<string> = new Set([
 
 export const BUSINESS_RATIO_GUIDE_TEXT =
   "家事按分がある場合は事業割合を設定してください（例: 家賃は面積割合、通信費は使用時間割合）";
-
-export function incomeTypeLabel(value: string): string {
-  return INCOME_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-}
 
 export function toInput(row: LedgerTransaction): LedgerTransactionInput {
   return {

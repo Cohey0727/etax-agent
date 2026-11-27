@@ -1,3 +1,4 @@
+import { ledgerIncomeTypeLabel } from "@etax/shared";
 import {
   buildHistoryChanges,
   formatHistoryDateTime,
@@ -7,7 +8,6 @@ import {
 } from "@components/molecules/HistoryTimeline/historyChanges";
 import { LedgerTransactionSnapshot, TransactionHistoryEntry } from "@types";
 import { formatYen } from "@utils/format";
-import { INCOME_TYPE_OPTIONS } from "../LedgerPanel/ledgerOptions";
 
 /**
  * transactionHistoryFields.ts — 取引の変更履歴（API形式）を、タイムライン
@@ -24,7 +24,7 @@ export const transactionSnapshotFields = (
   { label: "摘要", value: snapshot.description },
   { label: "金額", value: formatYen(snapshot.amount) },
   { label: "勘定科目", value: snapshot.category },
-  { label: "区分", value: incomeTypeLabel(snapshot.income_type) },
+  { label: "区分", value: ledgerIncomeTypeLabel(snapshot.income_type) },
   { label: "税区分", value: snapshot.tax_category || "未設定" },
   { label: "事業割合", value: `${snapshot.business_ratio_percent}%` },
   { label: "按分根拠", value: snapshot.business_ratio_basis || "―" },
@@ -53,6 +53,3 @@ export const toTransactionTimelineEntry = (
     ),
   };
 };
-
-const incomeTypeLabel = (value: string): string =>
-  INCOME_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
