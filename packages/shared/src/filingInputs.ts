@@ -428,5 +428,6 @@ export function deriveBasePeriodSalesThousands(transactions: Transaction[], year
   const base = summarizeConsumptionTax(transactions, year - 2);
   const excl10 = Math.floor((base.salesIncl10 * 100) / 110);
   const excl8 = Math.floor((base.salesIncl8 * 100) / 108);
-  return Math.floor((excl10 + excl8) / 1000);
+  // 輸出などの免税売上も基準期間の課税売上高に含める（消費税がかからないので税抜きしない）
+  return Math.floor((excl10 + excl8 + base.exemptSales) / 1000);
 }
