@@ -15,6 +15,9 @@ export type ValidateRegexRulesResult =
 /** パターンの最大長（極端に長いパターンは照合コストが読めないため）。 */
 export const MAX_REGEX_PATTERN_LENGTH = 200;
 
+/** ルールの最大件数（判定のたびに先頭から全件を照合するため）。 */
+export const MAX_REGEX_RULES = 500;
+
 function isQuantifierAt(pattern: string, index: number): boolean {
   const ch = pattern[index];
   if (ch === "+" || ch === "*") return true;
@@ -153,6 +156,9 @@ const MAX_WIDE_QUANTIFIERS = 2;
 
 /** ルール入力を検証する。空配列は「自動生成に戻す」として有効。 */
 export function validateRegexRules(input: readonly RegexRule[]): ValidateRegexRulesResult {
+  if (input.length > MAX_REGEX_RULES) {
+    return { ok: false, message: `正規表現ルールは${MAX_REGEX_RULES}件までです` };
+  }
   const rules: RegexRule[] = [];
   for (const [index, rule] of input.entries()) {
     const pattern = typeof rule?.pattern === "string" ? rule.pattern.trim() : "";

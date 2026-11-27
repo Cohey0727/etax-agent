@@ -36,6 +36,7 @@ import { classifyAccount } from "../classification/classifyAccount";
 import { buildRegexRulesView } from "../classification/regexRulesView";
 import { RegexRule, generateRules } from "../classification/generateRules";
 import { updateSystemOneSettings } from "../classification/updateSystemOneSettings";
+import { validateJevPrompt } from "../classification/validateJevPrompt";
 import { validateRegexRules } from "../classification/validateRegexRules";
 import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsView";
 
@@ -69,6 +70,8 @@ export async function getJevPromptForAgent() {
 
 /** jev 用プロンプトを保存する。空文字で自動生成に戻る。 */
 export async function setJevPromptForAgent(prompt: string) {
+  const validated = validateJevPrompt(prompt);
+  if (!validated.ok) throw new Error(validated.message);
   const customPrompt = await saveJevPromptOverride(prompt);
   const history = await loadClassificationHistory();
   const generatedPrompt = generateRules(history).jevPrompt;

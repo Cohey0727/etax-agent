@@ -25,6 +25,9 @@ import { RegexRule, generateRules, matchGeneratedRule } from "./generateRules";
 
 export type ClassificationSource = "generated" | "systemone" | "rules" | "none";
 
+/** 一括判定で1回に受け付ける摘要の最大件数（1件ごとに判定モデルへ問い合わせるため）。 */
+export const MAX_CLASSIFY_BATCH_ITEMS = 200;
+
 export interface AccountCandidate {
   account: string;
   probability: number;

@@ -204,3 +204,33 @@ describe("中核ツールの引数検証", () => {
     expect(text(result)).toContain("データベース");
   });
 });
+
+describe("REST と同じ入力上限", () => {
+  test("classify_batch は200件まで", async () => {
+    const items = Array.from({ length: 201 }, (_, i) => ({ description: `摘要 ${i}` }));
+    const result = await call("classify_batch", { items });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("200件");
+  });
+
+  test("update_classify_settings はプロンプトの長さとルールを検証してから保存する", async () => {
+    const tooLong = await call("update_classify_settings", { jev_prompt: "あ".repeat(8001) });
+    expect(tooLong.isError).toBe(true);
+    expect(text(tooLong)).toContain("8000");
+
+    const invalidRules = await call("update_classify_settings", {
+      jev_prompt: "新しいプロンプト",
+      regex_rules: [{ pattern: "(a+)+", category: "雑費" }],
+    });
+    expect(invalidRules.isError).toBe(true);
+    const settings = json(await call("get_classify_settings", {}));
+    expect((settings["jev_prompt"] as { customPrompt: string }).customPrompt).toBe("");
+  });
+
+  test("正規表現ルールは500件まで", async () => {
+    const rules = Array.from({ length: 501 }, (_, i) => ({ pattern: `店${i}`, category: "雑費" }));
+    const result = await call("update_classify_settings", { regex_rules: rules });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("500件");
+  });
+});

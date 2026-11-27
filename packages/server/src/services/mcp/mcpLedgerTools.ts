@@ -30,7 +30,7 @@ import {
   transactionToApi,
 } from "../../repositories/transactionRepository";
 import { ReplaceYearTransactionsRequestSchema } from "../../schemas/transaction";
-import { classifyAccount } from "../classification/classifyAccount";
+import { MAX_CLASSIFY_BATCH_ITEMS, classifyAccount } from "../classification/classifyAccount";
 import { buildLedgerPdf } from "../pdf/buildLedgerPdf";
 import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import { analyzeReceiptDraft } from "../receipts/analyzeReceiptDraft";
@@ -136,7 +136,7 @@ export const mcpLedgerTools: McpToolModule = {
     {
       name: "classify_batch",
       description:
-        "複数の摘要の勘定科目をまとめて判定する（履歴→SystemOne→ルールの順、classify_account と同じ判定）。結果は入力と同じ順序で返る。",
+        "複数の摘要の勘定科目をまとめて判定する（履歴→SystemOne→ルールの順、classify_account と同じ判定）。1回に200件まで。結果は入力と同じ順序で返る。",
       inputSchema: {
         type: "object",
         properties: {
@@ -310,6 +310,9 @@ export const mcpLedgerTools: McpToolModule = {
       const items = args["items"];
       if (!Array.isArray(items)) {
         throw new Error("items（摘要の一覧）が必要です");
+      }
+      if (items.length > MAX_CLASSIFY_BATCH_ITEMS) {
+        throw new Error(`items は${MAX_CLASSIFY_BATCH_ITEMS}件までにしてください`);
       }
       const history = await loadClassificationHistory();
       const systemOne = createSystemOneClient(loadSystemOneConfig());

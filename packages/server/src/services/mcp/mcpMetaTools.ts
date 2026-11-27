@@ -35,6 +35,7 @@ import { testSystemOneConnection } from "../classification/testSystemOneConnecti
 import { updateSystemOneSettings } from "../classification/updateSystemOneSettings";
 import { generateRules, RegexRule } from "../classification/generateRules";
 import { buildRegexRulesView } from "../classification/regexRulesView";
+import { validateJevPrompt } from "../classification/validateJevPrompt";
 import { validateRegexRules } from "../classification/validateRegexRules";
 import {
   McpToolModule,
@@ -302,17 +303,23 @@ export const mcpMetaTools: McpToolModule = {
       });
     },
     update_classify_settings: async (args) => {
-      if (typeof args["jev_prompt"] === "string") {
-        await saveJevPromptOverride(args["jev_prompt"]);
+      // 片方だけ保存されてエラーを返すことのないよう、両方を検証してから保存する。
+      const prompt = typeof args["jev_prompt"] === "string" ? args["jev_prompt"] : undefined;
+      if (prompt !== undefined) {
+        const validatedPrompt = validateJevPrompt(prompt);
+        if (!validatedPrompt.ok) throw new Error(validatedPrompt.message);
       }
+      let rules: RegexRule[] | undefined;
       if (args["regex_rules"] !== undefined) {
         if (!Array.isArray(args["regex_rules"])) {
           throw new Error("regex_rules は配列で渡してください");
         }
         const validated = validateRegexRules(args["regex_rules"] as RegexRule[]);
         if (!validated.ok) throw new Error(validated.message);
-        await saveRegexRulesOverride(validated.rules);
+        rules = validated.rules;
       }
+      if (prompt !== undefined) await saveJevPromptOverride(prompt);
+      if (rules !== undefined) await saveRegexRulesOverride(rules);
       const history = await loadClassificationHistory();
       const customPrompt = getJevPromptOverride();
       const generatedPrompt = generateRules(history).jevPrompt;
