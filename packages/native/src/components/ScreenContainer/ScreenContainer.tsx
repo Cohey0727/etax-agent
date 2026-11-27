@@ -9,6 +9,9 @@ export interface ScreenContainerProps {
   noScroll?: boolean;
 }
 
+// フローティングボトムバー（高さ約48 + 下マージン）に末尾の内容が隠れないための逃げ。
+const BOTTOM_BAR_CLEARANCE = 64;
+
 /** 画面の地（淡いラベンダーグレー）と余白を担うコンテナ。下端は端末のセーフエリア分も空ける。 */
 export function ScreenContainer({ children, noScroll }: ScreenContainerProps) {
   const insets = useSafeAreaInsets();
@@ -17,7 +20,7 @@ export function ScreenContainer({ children, noScroll }: ScreenContainerProps) {
   }
   return (
     <ScrollView
-      contentContainerStyle={[styles.content, { paddingBottom: space.xl + insets.bottom }]}
+      contentContainerStyle={[styles.content, { paddingBottom: space.xl + BOTTOM_BAR_CLEARANCE + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
       style={styles.scroll}
     >

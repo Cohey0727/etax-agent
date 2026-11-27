@@ -1,5 +1,6 @@
 export * from "./AlertBox";
 export * from "./AnimatedSplash";
+export * from "./AppBottomBar";
 export * from "./AppButton";
 export * from "./ErrorBoundary";
 export * from "./AppSidebar";

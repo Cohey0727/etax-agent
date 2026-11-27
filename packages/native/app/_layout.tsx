@@ -3,32 +3,19 @@ import { Redirect, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { AnimatedSplash } from "@/components/AnimatedSplash";
+import { AppBottomBar } from "@/components/AppBottomBar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ChatSheet } from "@/components/ChatSheet";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { LineIcon } from "@/components/LineIcon";
 import { AppProvider } from "@/state/AppContext";
-import { SidebarProvider, useSidebar } from "@/state/SidebarContext";
+import { ChatSheetProvider } from "@/state/ChatSheetContext";
+import { SidebarProvider } from "@/state/SidebarContext";
 import { colors } from "@/theme";
 
 void SplashScreen.preventAutoHideAsync();
-
-function MenuButton() {
-  const { openSidebar } = useSidebar();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="メニューを開く"
-      hitSlop={8}
-      onPress={openSidebar}
-      style={{ paddingHorizontal: 4, paddingVertical: 4 }}
-    >
-      <LineIcon name="menu" size={24} color={colors.surface} />
-    </Pressable>
-  );
-}
 
 function AppStack() {
   const { ready, user, loginRequired } = useAuth();
@@ -38,6 +25,7 @@ function AppStack() {
 
   // 認証ガード: ログイン必須の構成で未ログインなら、ログイン画面以外へは進ませない。
   const onLoginScreen = segments[0] === "login";
+  const onAuthCallback = segments[0] === "auth-callback";
   const mustLogin = ready && loginRequired && !user && !onLoginScreen;
 
   return (
@@ -48,13 +36,11 @@ function AppStack() {
             headerStyle: { backgroundColor: colors.navyDeep },
             headerTintColor: colors.surface,
             headerTitleStyle: { fontWeight: "700" },
-            headerLeft: () => <MenuButton />,
           }}
         >
           <Stack.Screen name="index" options={{ title: "eTaxAgent" }} />
           <Stack.Screen name="ledger" options={{ title: "帳簿" }} />
           <Stack.Screen name="filing" options={{ title: "確定申告" }} />
-          <Stack.Screen name="agent" options={{ title: "チャット" }} />
           <Stack.Screen name="settings" options={{ title: "設定" }} />
           <Stack.Screen name="import" options={{ title: "取引・CSV取込" }} />
           <Stack.Screen name="receipt" options={{ title: "領収書から帳簿" }} />
@@ -68,7 +54,9 @@ function AppStack() {
           <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
         </Stack>
       </ErrorBoundary>
+      {!onLoginScreen && !onAuthCallback ? <AppBottomBar /> : null}
       <AppSidebar />
+      <ChatSheet />
       {mustLogin ? <Redirect href="/login" /> : null}
       {!splashDone ? <AnimatedSplash ready={ready} onFinish={handleSplashFinish} /> : null}
     </View>
@@ -97,8 +85,10 @@ export default function RootLayout() {
     <AuthProvider>
       <AppProvider>
         <SidebarProvider>
-          <StatusBar style="light" />
-          <AppStack />
+          <ChatSheetProvider>
+            <StatusBar style="light" />
+            <AppStack />
+          </ChatSheetProvider>
         </SidebarProvider>
       </AppProvider>
     </AuthProvider>
