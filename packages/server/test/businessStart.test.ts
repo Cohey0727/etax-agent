@@ -206,7 +206,7 @@ beforeAll(async () => {
 
   process.env.ETAX_OPENING_FORM_PDF_PATH = openingPath;
   process.env.ETAX_BLUE_FORM_PDF_PATH = bluePath;
-  process.env.ETAX_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+  // 日本語フォントは preload が一時のデータフォルダへ写した fonts/ から読む。
 
   const mod = await import("../src/index");
   appFetch = mod.default.fetch as AppFetch;

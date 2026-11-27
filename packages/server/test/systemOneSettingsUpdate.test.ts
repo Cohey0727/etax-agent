@@ -19,6 +19,8 @@ import { dispatchMcpTool } from "../src/services/mcp/mcpTools";
 
 const privateUrl = "http://169.254.169.254/latest";
 
+const sharedDataDir = process.env.ETAX_DATA_DIR;
+
 beforeEach(async () => {
   process.env.ETAX_DATA_DIR = await mkdtemp(join(tmpdir(), "etax-systemone-settings-"));
   setSystemOneOverrides({});
@@ -26,6 +28,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   delete process.env.ETAX_AUTH_MODE;
+  // preload が用意した共通のデータフォルダへ戻す（後に流れるテストファイルのため）。
+  process.env.ETAX_DATA_DIR = sharedDataDir;
 });
 
 describe("updateSystemOneSettings", () => {

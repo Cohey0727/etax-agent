@@ -4,7 +4,7 @@
  * HTTP を介さず、テナント文脈を載せて dispatchMcpTool を直接呼ぶ。
  * 引数の検証・REST と揃えるべき既定の挙動・失敗時の結果の形を担保する。
  */
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,10 +35,18 @@ function json(result: McpToolResult): Record<string, unknown> {
   return JSON.parse(text(result)) as Record<string, unknown>;
 }
 
+const sharedDataDir = process.env.ETAX_DATA_DIR;
+
 beforeEach(async () => {
   process.env.ETAX_DATA_DIR = await mkdtemp(join(tmpdir(), "etax-mcp-tools-"));
   db = await createTestDb();
   userId = (await createUser(db, "mcp-tools@example.com", "password-123")).id;
+});
+
+// テストごとの空のデータフォルダから、preload が用意した共通のフォルダへ戻す
+// （後に流れる他のテストファイルが fonts/ などを読めるように）。
+afterEach(() => {
+  process.env.ETAX_DATA_DIR = sharedDataDir;
 });
 
 describe("add_transaction / update_transaction の学習の記録", () => {

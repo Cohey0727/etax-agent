@@ -2,7 +2,7 @@
  * agentSettingsTools.test.ts — 対話エージェントの設定系ツールの検証。
  * 設定画面（REST）と同じ入力上限がエージェント経由でも効くことを担保する。
  */
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,9 +26,17 @@ const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ?? "postgres://etax:etax@127.0.0.1:5432/etaxagent_test";
 process.env.DATABASE_URL = testDatabaseUrl;
 
+const sharedDataDir = process.env.ETAX_DATA_DIR;
+
 beforeEach(async () => {
   process.env.ETAX_DATA_DIR = await mkdtemp(join(tmpdir(), "etax-agent-settings-"));
   setJevPromptOverride("");
+});
+
+// テストごとの空のデータフォルダから、preload が用意した共通のフォルダへ戻す
+// （後に流れる他のテストファイルが fonts/ などを読めるように）。
+afterEach(() => {
+  process.env.ETAX_DATA_DIR = sharedDataDir;
 });
 
 describe("エージェントの設定ツールの入力上限", () => {

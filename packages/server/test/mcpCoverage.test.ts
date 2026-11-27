@@ -67,9 +67,7 @@ beforeAll(async () => {
   await writeFile(bluePath, await blue.save());
   process.env.ETAX_OPENING_FORM_PDF_PATH = openingPath;
   process.env.ETAX_BLUE_FORM_PDF_PATH = bluePath;
-  process.env.ETAX_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-  const dataDir = await mkdtemp(join(tmpdir(), "etax-mcp-coverage-data-"));
-  process.env.ETAX_DATA_DIR = dataDir;
+  // 日本語フォントは preload が一時のデータフォルダへ写した fonts/ から読む。
   // 接続テストと agent_chat は「AI の接続先が未設定」の環境を前提にする。
   // 開発機の .env や手元で動く判定モデルに結果が左右されないよう、
   // キーを外し、判定モデルの接続先を到達できないポートに向ける。

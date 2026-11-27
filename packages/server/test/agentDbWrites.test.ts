@@ -4,7 +4,7 @@
  * 一括変更の安全策（絞り込み条件・変更内容が必須）が空文字で
  * すり抜けられないこと、書き込み後の読み直しが家事按分を保つことを担保する。
  */
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,10 +50,18 @@ async function addRow(values: Partial<Parameters<typeof insertTransactionRow>[1]
   );
 }
 
+const sharedDataDir = process.env.ETAX_DATA_DIR;
+
 beforeEach(async () => {
   process.env.ETAX_DATA_DIR = await mkdtemp(join(tmpdir(), "etax-agent-db-writes-"));
   db = await createTestDb();
   userId = (await createUser(db, "agent-writes@example.com", "password-123")).id;
+});
+
+// テストごとの空のデータフォルダから、preload が用意した共通のフォルダへ戻す
+// （後に流れる他のテストファイルが fonts/ などを読めるように）。
+afterEach(() => {
+  process.env.ETAX_DATA_DIR = sharedDataDir;
 });
 
 describe("updateTransactionsBulk", () => {
