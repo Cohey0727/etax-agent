@@ -58,7 +58,7 @@ export const FilingTypeFields = ({
             onChange={(e) => onChange(filingType, e.target.value === "scale")}
             aria-label="不動産貸付けの規模"
           >
-            <option value="non-scale">事業的規模でない（不動産分は10万円まで）</option>
+            <option value="non-scale">事業的規模でない（事業所得が無ければ10万円まで）</option>
             <option value="scale">事業的規模（不動産も事業と同じ上限）</option>
           </Select>
         </Row>

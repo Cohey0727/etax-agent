@@ -44,7 +44,8 @@ export const TaxSummary = ({ taxResult }: TaxSummaryProps) => {
         </Row>
       </Col>
       <Text variant="muted">
-        源泉徴収税額・予定納税額との精算（申告納税額）は提出パネルで確認します。
+        源泉徴収税額・予定納税額は提出パネルで入力します。差し引いた申告納税額は
+        e-Tax用データ（XTX）に入ります。
       </Text>
     </Col>
   );

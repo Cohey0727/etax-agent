@@ -33,8 +33,8 @@ export const TaxCreditPanel = ({ taxCredits, result, dividendCreditDerived, onCh
         <Col gap="sm">
           <Text variant="sectionTitle">税額控除の入力と税額計算</Text>
           <Text variant="muted">
-            住宅ローンの年末残高などを入れると税額控除が計算され、確定税額が
-            上の差分表の所得税額（修正後）に入ります。控除限度額は住宅の区分で決まります
+            住宅ローンの年末残高などを入れると税額控除が計算され、確定税額に
+            反映されます。控除限度額は住宅の区分で決まります
             （認定住宅35万円・ZEH水準31.5万円・省エネ基準適合28万円・その他21万円など）。
           </Text>
         </Col>
