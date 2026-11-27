@@ -87,7 +87,7 @@ const BalanceNote = ({ label, balanced, diff }: { label: string; balanced: boole
   ) : (
     <Text variant="caption">
       <span className={styles.amountNegative}>
-        {label}の貸借が一致していません（差額 {formatYen(diff)}円）。
+        {label}の貸借が一致していません（差額 {formatYen(diff)}）。
       </span>
     </Text>
   );

@@ -94,7 +94,7 @@ function BalanceNote({ label, balanced, diff }: { label: string; balanced: boole
     </AppText>
   ) : (
     <AppText size="xs" tone="negative">
-      {label}の貸借が一致していません（差額 {formatYen(diff)}円）。
+      {label}の貸借が一致していません（差額 {formatYen(diff)}）。
     </AppText>
   );
 }
