@@ -26,11 +26,13 @@ const SOURCE_LABELS: Record<ImportCsvResponse["mappingSource"], string> = {
 export interface MappingSummaryCardProps {
   result: ImportCsvResponse;
   using: boolean;
+  /** 登録済みで、押し直すと二重に登録されるとき。 */
+  disabled: boolean;
   onUse: () => void;
 }
 
 /** CSV取込の列マッピングと件数の要約。 */
-export function MappingSummaryCard({ result, using, onUse }: MappingSummaryCardProps) {
+export function MappingSummaryCard({ result, using, disabled, onUse }: MappingSummaryCardProps) {
   return (
     <Card>
       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
@@ -52,6 +54,7 @@ export function MappingSummaryCard({ result, using, onUse }: MappingSummaryCardP
       <AppButton
         label={result.persisted ? "帳簿を読み直して使う" : "このデータを帳簿に登録する"}
         loading={using}
+        disabled={disabled}
         onPress={onUse}
       />
     </Card>

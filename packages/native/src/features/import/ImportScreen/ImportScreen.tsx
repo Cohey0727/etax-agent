@@ -1,10 +1,13 @@
-import { ACCOUNT_NAMES, guessIncomeType, sampleTransactions, Transaction } from "@etax/shared";
+import {
+  ACCOUNT_NAMES, applyCsvClassificationEdits, guessIncomeType, sampleTransactions, Transaction,
+} from "@etax/shared";
 import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
 import { View } from "react-native";
 import {
   classifyAccountsBatch, createLedgerTransaction, fetchLedgerTransactions, ImportCsvResponse,
-  importCsvBytes, readLocalFileBytes, recordClassificationFeedback, transactionToLedgerInput,
+  importCsvBytes, ledgerRowToTransaction, readLocalFileBytes, recordClassificationFeedback,
+  transactionToLedgerInput, updateLedgerTransaction,
 } from "@/api";
 import { AlertBox, AppButton, AppText, Card, ScreenContainer, SelectField } from "@/components";
 import { useAppState } from "@/state/AppContext";
@@ -53,11 +56,20 @@ export function ImportScreen() {
   };
 
   const handleUse = async () => {
-    if (!result || using) return;
+    if (!result || using || (used && !result.persisted)) return;
     setUsing(true); setError(null);
     try {
       if (result.persisted) {
-        // 保存済みなら取込分で置き換えず、サーバーの帳簿を正として読み直す
+        // 保存済みの取込はサーバーの帳簿を正とし、科目判定で付け直した科目だけを帳簿の行へ反映する
+        for (const importYear of new Set(txs.map((tx) => tx.year))) {
+          const rows = await fetchLedgerTransactions(importYear);
+          if (rows === null) throw new Error("帳簿データベースに接続できません。");
+          await applyCsvClassificationEdits(
+            rows,
+            txs.filter((tx) => tx.year === importYear),
+            (row) => updateLedgerTransaction(row.id, transactionToLedgerInput(ledgerRowToTransaction(row))),
+          );
+        }
         await reloadLedger();
       } else {
         for (const tx of txs) {
@@ -125,10 +137,8 @@ export function ImportScreen() {
     }
     setSuggestions(null);
     setClassified(true);
-    // 未保存の取込では科目の反映はプレビュー上のもの。保存済みの場合は帳簿側の科目は変わらない旨は画面文言で補足する
-    if (result?.persisted) {
-      setError(null);
-    }
+    // 保存済みの取込は「帳簿を読み直して使う」で帳簿へ反映するので、押し直せるようにする
+    if (result?.persisted) setUsed(false);
   };
 
   return (
@@ -162,10 +172,12 @@ export function ImportScreen() {
 
       {result ? (
         <>
-          <MappingSummaryCard result={{ ...result, transactions: txs }} using={using} onUse={() => void handleUse()} />
-          {result.persisted ? (
-            <AppText size="xs" tone="muted">保存済みの取込では、科目判定の反映はプレビュー表示のみです（帳簿の科目は帳簿画面で編集できます）。</AppText>
-          ) : null}
+          <MappingSummaryCard
+            result={{ ...result, transactions: txs }}
+            using={using}
+            disabled={used && !result.persisted}
+            onUse={() => void handleUse()}
+          />
           {unclassifiedCount > 0 || suggestions ? (
             <Card>
               <AppText size="lg" weight="bold">勘定科目の判定（未分類 {unclassifiedCount}件）</AppText>
