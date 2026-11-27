@@ -13,7 +13,10 @@ import { useInvoicesData } from "./useInvoicesData";
 // 編集・詳細の請求書は、開いたときの値も持つ（検索条件で一覧から外れても消えない）。
 type FormState = { kind: "create" } | { kind: "edit"; invoice: InvoiceRecord } | null;
 
-const STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] = [
+/** 状態の絞り込み。空文字は「すべて」。 */
+type StatusFilter = "" | InvoiceRecord["status"];
+
+const STATUS_FILTER_OPTIONS: readonly { value: StatusFilter; label: string }[] = [
   { value: "", label: "すべて" },
   { value: "issued", label: "発行済み" },
   { value: "draft", label: "下書き" },
@@ -48,7 +51,7 @@ export const InvoicePanel = () => {
   const [searchText, setSearchText] = useState("");
   const [searchFrom, setSearchFrom] = useState("");
   const [searchTo, setSearchTo] = useState("");
-  const [searchStatus, setSearchStatus] = useState("");
+  const [searchStatus, setSearchStatus] = useState<StatusFilter>("");
 
   if (status === "loading") {
     return <InvoiceSkeleton />;
@@ -100,7 +103,7 @@ export const InvoicePanel = () => {
       q: searchText || undefined,
       from: searchFrom || undefined,
       to: searchTo || undefined,
-      status: searchStatus ? (searchStatus as "draft" | "issued") : undefined,
+      status: searchStatus === "" ? undefined : searchStatus,
     });
   };
 
@@ -153,7 +156,11 @@ export const InvoicePanel = () => {
           <Select
             id="inv-search-status"
             value={searchStatus}
-            onChange={(e) => setSearchStatus(e.target.value)}
+            onChange={(e) =>
+              setSearchStatus(
+                STATUS_FILTER_OPTIONS.find((option) => option.value === e.target.value)?.value ?? "",
+              )
+            }
           >
             {STATUS_FILTER_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>

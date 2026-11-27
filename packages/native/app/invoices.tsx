@@ -22,7 +22,10 @@ import { space } from "@/theme";
 // 編集・詳細の請求書は、開いたときの値も持つ（検索条件で一覧から外れても消えない）。
 type FormState = { kind: "create" } | { kind: "edit"; invoice: InvoiceRecord } | null;
 
-const STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] = [
+/** 状態の絞り込み。空文字は「すべて」。 */
+type StatusFilter = "" | InvoiceRecord["status"];
+
+const STATUS_FILTER_OPTIONS: readonly { value: StatusFilter; label: string }[] = [
   { value: "", label: "すべて" },
   { value: "issued", label: "発行済み" },
   { value: "draft", label: "下書き" },
@@ -55,7 +58,7 @@ export default function InvoicesScreen() {
   const [searchText, setSearchText] = useState("");
   const [searchFrom, setSearchFrom] = useState("");
   const [searchTo, setSearchTo] = useState("");
-  const [searchStatus, setSearchStatus] = useState("");
+  const [searchStatus, setSearchStatus] = useState<StatusFilter>("");
 
   if (status === "loading") {
     return (
@@ -132,7 +135,7 @@ export default function InvoicesScreen() {
       q: searchText || undefined,
       from: searchFrom || undefined,
       to: searchTo || undefined,
-      status: searchStatus ? (searchStatus as "draft" | "issued") : undefined,
+      status: searchStatus === "" ? undefined : searchStatus,
     };
     void applyFilters(next);
   };
