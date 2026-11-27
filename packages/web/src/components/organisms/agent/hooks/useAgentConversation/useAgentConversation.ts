@@ -1,8 +1,7 @@
-import { Transaction } from "@etax/shared";
+import { AgentUiAction, deriveUiActions, Transaction } from "@etax/shared";
 import { useEffect, useRef, useState } from "react";
 import { AgentConnectionConfig, ChatMessage, ChatRole } from "@types";
 import { agentChat, loadCurrentMessages, saveCurrentMessages } from "@utils";
-import { AgentUiAction, deriveUiActions } from "../../AgentChatPanel/agentChatHelpers";
 import { PendingAttachment, toChatAttachmentUpload } from "../../AgentChatPanel/chatAttachments";
 
 export interface AgentConversationOptions {

@@ -1,11 +1,10 @@
-import { sampleTransactions, Transaction } from "@etax/shared";
+import { AgentScreen, AgentUiAction, sampleTransactions, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageSkeleton, TableSkeleton } from "@components/molecules";
 import { DashboardSkeleton } from "@components/organisms/dashboard";
 import {
   AgentChatPanel,
   AgentHeaderActions,
-  AgentUiAction,
   useAgentConversation,
 } from "@components/organisms/agent";
 import {
@@ -45,6 +44,16 @@ import { appViews, filingNavChildren } from "./appViews";
 import { useAuthGate } from "./hooks/useAuthGate";
 import { useLedgerSync } from "./hooks/useLedgerSync";
 import { useYearSelection } from "./hooks/useYearSelection";
+
+/** エージェントの画面操作の対象 → この画面の表示切替。 */
+const agentScreenViews = {
+  dashboard: AppView.Dashboard,
+  ledger: AppView.Ledger,
+  receipt: AppView.Receipt,
+  filing: AppView.Filing,
+  taxpayer: AppView.Taxpayer,
+  settings: AppView.Settings,
+} as const satisfies Record<AgentScreen, AppView>;
 
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);
@@ -198,13 +207,14 @@ export const AppPage = () => {
         if (ok) setViewRefreshKey((v) => v + 1);
       });
     } else if (action.type === "reloadView") {
-      setViewReloads((current) => ({ ...current, [action.view]: (current[action.view] ?? 0) + 1 }));
+      const view = agentScreenViews[action.screen];
+      setViewReloads((current) => ({ ...current, [view]: (current[view] ?? 0) + 1 }));
     } else if (action.type === "reloadTransactions") {
       reloadTransactions();
     } else if (action.type === "setTheme") {
       handleThemeModeChange(action.mode);
-    } else if (appViews.some((view) => view.id === action.view)) {
-      setActiveView(action.view);
+    } else if (action.type === "navigate") {
+      setActiveView(agentScreenViews[action.screen]);
     }
   };
 

@@ -1,12 +1,12 @@
+import { chatSessionExcerpt, formatChatSessionDate } from "@etax/shared";
 import { clsx } from "clsx";
 import { DragEvent, useEffect, useRef, useState } from "react";
 import { Button, Col, Icon, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { ChatMessage, ChatRole, SendKeyMode } from "@types";
-import { ChatSession, formatDateTime } from "@utils";
+import { ChatSession } from "@utils";
 import { MessageBubbles } from "./MessageBubbles";
 import { PendingAttachmentChips } from "./PendingAttachmentChips";
-import { sessionExcerpt } from "./agentChatHelpers";
 import { ATTACH_ACCEPT, PendingAttachment } from "./chatAttachments";
 import { useChatAttachments } from "../hooks/useChatAttachments";
 import styles from "./AgentChatPanel.css";
@@ -98,7 +98,7 @@ export const AgentChatPanel = ({
       {viewing ? (
         <div className={styles.chatLog} ref={logRef}>
           <Text variant="muted">
-            {formatDateTime(viewing.savedAt)} の会話（保存済み・{viewing.messages.length}件）
+            {formatChatSessionDate(viewing.savedAt)} の会話（保存済み・{viewing.messages.length}件）
           </Text>
           <MessageBubbles items={viewing.messages} />
         </div>
@@ -118,9 +118,9 @@ export const AgentChatPanel = ({
               >
                 <Col gap="none">
                   <Text variant="caption">
-                    {formatDateTime(session.savedAt)} ・ {session.messages.length}件
+                    {formatChatSessionDate(session.savedAt)} ・ {session.messages.length}件
                   </Text>
-                  <Text>{sessionExcerpt(session)}</Text>
+                  <Text>{chatSessionExcerpt(session.messages)}</Text>
                 </Col>
               </Button>
             ))}

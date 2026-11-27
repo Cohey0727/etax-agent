@@ -1,10 +1,10 @@
+import { agentToolLabel } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ChatMessage } from "@/api";
 import { AppText } from "@/components/AppText";
 import { Chip } from "@/components/Chip";
 import { colors, radius, space, springs } from "@/theme";
-import { toolLabel } from "../agentChatHelpers";
 
 /** 会話の吹き出し一覧（使ったツールと添付も添える）。 */
 export function MessageBubbles({ items }: { items: ChatMessage[] }) {
@@ -29,7 +29,7 @@ export function MessageBubbles({ items }: { items: ChatMessage[] }) {
           {message.toolCalls && message.toolCalls.length > 0 ? (
             <View style={styles.chips}>
               {message.toolCalls.map((tc, i) => (
-                <Chip key={`${tc.name}-${i}`} label={toolLabel(tc.name)} tone="muted" />
+                <Chip key={`${tc.name}-${i}`} label={agentToolLabel(tc.name)} tone="muted" />
               ))}
             </View>
           ) : null}

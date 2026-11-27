@@ -62,21 +62,3 @@ export async function loadSessions(userId: number | null): Promise<ChatSession[]
 export function saveSessions(userId: number | null, sessions: ChatSession[]): void {
   AsyncStorage.setItem(sessionsKey(userId), JSON.stringify(sessions)).catch(() => undefined);
 }
-
-/** 履歴一覧の日付表示。 */
-export function formatSessionDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  const hh = `${date.getHours()}`.padStart(2, "0");
-  const mm = `${date.getMinutes()}`.padStart(2, "0");
-  return `${date.getFullYear()}/${m}/${d} ${hh}:${mm}`;
-}
-
-/** 履歴一覧に出す会話の要約（最初のユーザー発言）。 */
-export function sessionExcerpt(session: ChatSession): string {
-  const first = session.messages.find((m) => m.role === "user");
-  const text = first?.content ?? session.messages[0]?.content ?? "";
-  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
-}

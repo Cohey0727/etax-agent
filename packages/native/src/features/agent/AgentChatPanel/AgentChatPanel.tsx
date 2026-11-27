@@ -1,4 +1,10 @@
-import { Transaction } from "@etax/shared";
+import {
+  AgentUiAction,
+  chatSessionExcerpt,
+  deriveUiActions,
+  formatChatSessionDate,
+  Transaction,
+} from "@etax/shared";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { AgentConnectionConfig, ChatMessage, agentChat } from "@/api";
@@ -10,7 +16,6 @@ import { Chip } from "@/components/Chip";
 import { LineIcon } from "@/components/LineIcon";
 import { SorobanMark } from "@/components/SorobanMark";
 import { colors, radius, space } from "@/theme";
-import { AgentUiAction, deriveUiActions } from "../agentChatHelpers";
 import {
   MAX_CHAT_ATTACHMENTS,
   PendingAttachment,
@@ -20,12 +25,10 @@ import {
 } from "../chatAttachments";
 import {
   ChatSession,
-  formatSessionDate,
   loadCurrentMessages,
   loadSessions,
   saveCurrentMessages,
   saveSessions,
-  sessionExcerpt,
 } from "../chatSessions";
 import { MessageBubbles } from "../MessageBubbles";
 
@@ -199,9 +202,9 @@ export function AgentChatPanel({
                 style={styles.sessionItem}
               >
                 <AppText size="xs" tone="muted">
-                  {formatSessionDate(session.savedAt)} ・ {session.messages.length}件
+                  {formatChatSessionDate(session.savedAt)} ・ {session.messages.length}件
                 </AppText>
-                <AppText size="md">{sessionExcerpt(session)}</AppText>
+                <AppText size="md">{chatSessionExcerpt(session.messages)}</AppText>
               </BouncePressable>
             ))
           )}
@@ -209,7 +212,7 @@ export function AgentChatPanel({
       ) : viewMode === "session" && viewing ? (
         <ScrollView contentContainerStyle={styles.logContent}>
           <AppText size="sm" tone="muted">
-            {formatSessionDate(viewing.savedAt)} の会話（保存済み・{viewing.messages.length}件）
+            {formatChatSessionDate(viewing.savedAt)} の会話（保存済み・{viewing.messages.length}件）
           </AppText>
           <MessageBubbles items={viewing.messages} />
           <AppButton label="この会話を再開" size="sm" onPress={() => resumeSession(viewing)} />

@@ -3,9 +3,10 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { agentToolLabel } from "@etax/shared";
 import { Icon } from "@components/atoms";
 import { ChatMessage, ChatRole } from "@types";
-import { summarizeToolArgs, toolLabel } from "./agentChatHelpers";
+import { summarizeToolArgs } from "./agentChatHelpers";
 import styles from "./AgentChatPanel.css";
 
 /** 会話の吹き出し列。進行中の会話と履歴閲覧で共用する（助手は Markdown で描く）。 */
@@ -34,7 +35,7 @@ export const MessageBubbles = ({ items }: { items: ChatMessage[] }) => {
               <div className={styles.toolList}>
                 {m.toolCalls.map((tc, j) => (
                   <span key={j} className={styles.toolChip} title={tc.name}>
-                    🔧 {toolLabel(tc.name)}
+                    🔧 {agentToolLabel(tc.name)}
                     {summarizeToolArgs(tc.arguments) ? `（${summarizeToolArgs(tc.arguments)}）` : ""}
                   </span>
                 ))}
