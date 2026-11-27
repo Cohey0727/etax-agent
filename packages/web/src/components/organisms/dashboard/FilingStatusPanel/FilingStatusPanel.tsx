@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, Col, Row, Text } from "@components/atoms";
 import { AppView, FilingStatus } from "@types";
 import { fetchFilingStatuses } from "@utils/api";
+import { formatDate } from "@utils/format";
 import styles from "./FilingStatusPanel.css";
 
 type ManualKey = "confirmed" | "calculated";
@@ -154,7 +155,3 @@ const EMPTY_STATUS: FilingStatus = {
   submitted: false,
   submitted_at: null,
 };
-
-function formatDate(iso: string): string {
-  return iso.slice(0, 10).replaceAll("-", "/");
-}
