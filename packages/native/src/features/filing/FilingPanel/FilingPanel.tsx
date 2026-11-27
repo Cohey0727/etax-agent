@@ -1,4 +1,4 @@
-import { FilingType, IncomeTaxResult } from "@etax/shared";
+import { FilingFigures, FilingType } from "@etax/shared";
 import { ComponentType } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppButton, AppText, Card } from "@/components";
@@ -7,7 +7,6 @@ import { space } from "@/theme";
 import { ConfirmComparePanel } from "../ConfirmComparePanel";
 import { FilingStatusToggle } from "../FilingStatusToggle";
 import { IncomeSummary } from "../IncomeSummary";
-import { IncomeSummaryFigures } from "../incomeSummaryFigures";
 import { TaxSummary } from "../TaxSummary";
 import { FilingStatusKey } from "../useFilingStatus";
 
@@ -27,29 +26,27 @@ const sectionOpenLabels: Record<FilingSection, string> = {
 /** 各項目の下に出す、その項目の結果の数字。 */
 interface ManualItemSummaryProps {
   year: number;
-  incomeSummary: IncomeSummaryFigures;
+  /** 帳簿と申告入力から求めた所得と所得税額 */
+  figures: FilingFigures;
   filingType: FilingType;
   hasTransactions: boolean;
-  taxResult: IncomeTaxResult;
   snapshots: FilingSnapshot[] | null;
   currentFigures: FilingSnapshotFigures | null;
 }
 
-function BalanceItemSummary({ incomeSummary, filingType, hasTransactions }: ManualItemSummaryProps) {
-  return (
-    <IncomeSummary summary={incomeSummary} filingType={filingType} hasTransactions={hasTransactions} />
-  );
+function BalanceItemSummary({ figures, filingType, hasTransactions }: ManualItemSummaryProps) {
+  return <IncomeSummary figures={figures} filingType={filingType} hasTransactions={hasTransactions} />;
 }
 
 function CalculationItemSummary({
   year,
-  taxResult,
+  figures,
   snapshots,
   currentFigures,
 }: ManualItemSummaryProps) {
   return (
     <>
-      <TaxSummary taxResult={taxResult} />
+      <TaxSummary taxResult={figures.taxResult} />
       <ConfirmComparePanel bare year={year} snapshots={snapshots} currentFigures={currentFigures} />
     </>
   );

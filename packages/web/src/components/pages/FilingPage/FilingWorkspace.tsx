@@ -4,6 +4,7 @@ import {
   filterYear,
   snapshotFiguresOf,
   Transaction,
+  UNCLASSIFIED_CATEGORY,
 } from "@etax/shared";
 import { ComponentType, useMemo, useState } from "react";
 import { Col, Text } from "@components/atoms";
@@ -51,7 +52,7 @@ const FILING_TABS = [
 const LEDGER_FILTER_SEARCH: Record<LedgerFilterKind, (year: number) => string> = {
   mismatch: (year) => `?filters=year,mismatch&year=${year}`,
   taxUnset: (year) => `?filters=year,taxCategory&year=${year}&tax=`,
-  unclassified: (year) => `?filters=year,category&year=${year}&cat=${encodeURIComponent("未分類")}`,
+  unclassified: (year) => `?filters=year,category&year=${year}&cat=${encodeURIComponent(UNCLASSIFIED_CATEGORY)}`,
 };
 
 const STATUS_SAVE_FAILED = "申告ステータスを保存できませんでした。サーバーへの接続を確認してください。";

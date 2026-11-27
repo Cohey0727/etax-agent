@@ -227,6 +227,36 @@ describe("computeFilingFigures / snapshotFiguresOf", () => {
   });
 });
 
+describe("computeFilingFigures の総所得金額（損益通算 → 一時所得の1/2）", () => {
+  // 事業の赤字 100万（白色）と一時所得の金額 150万（収入 200万 − 特別控除 50万）
+  const transactions = [
+    tx("2025-03-01", 1_000_000, "売上高"),
+    tx("2025-03-02", -2_000_000, "外注費"),
+  ];
+  const state = {
+    ...freshDeductionState(),
+    filingType: "white" as const,
+    expandedIncome: {
+      ...freshDeductionState().expandedIncome,
+      temp: { revenue: 2_000_000, expenses: 0 },
+    },
+  };
+
+  test("事業の赤字は一時所得と通算してから1/2にする", () => {
+    const f = computeFilingFigures(transactions, 2025, state);
+    // (150万 − 100万) × 1/2 = 25万（先に1/2にして 75万 − 100万 = −25万 とはしない）
+    expect(f.totalIncome).toBe(250_000);
+    expect(f.taxResult.totalIncome).toBe(250_000);
+    expect(f.tempIncomeAddition).toBe(1_250_000);
+  });
+
+  test("経常所得が黒字なら一時所得の金額の1/2をそのまま加える", () => {
+    const f = computeFilingFigures([tx("2025-03-01", 1_000_000, "売上高")], 2025, state);
+    expect(f.totalIncome).toBe(1_750_000);
+    expect(f.tempIncomeAddition).toBe(750_000);
+  });
+});
+
 describe("deriveBasePeriodSalesThousands", () => {
   test("2年前の課税売上（税込）を税抜にして千円未満を切り捨てる", () => {
     const transactions = [

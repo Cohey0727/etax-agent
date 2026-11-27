@@ -1,11 +1,12 @@
 import {
   DeductionState,
+  FilingFigures,
   IncomeTaxPaymentInputs,
-  IncomeTaxResult,
   Transaction,
   agricultureToWire,
   balanceSheetToWire,
   buildTrialBalanceSheet,
+  declaredIncomeTaxOf,
   expandedIncomeToWire,
   isAgricultureEmpty,
   isBalanceSheetEmpty,
@@ -25,7 +26,6 @@ import {
 } from "@/components";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@/api";
 import { space } from "@/theme";
-import { declaredIncomeTax } from "../declaredIncomeTax";
 import { AmountField, LoadFailedNotice, ResultRow, SectionHead } from "../fields";
 import { FilingSection } from "../FilingPanel";
 import { ReturnExportActions } from "../ReturnExportActions";
@@ -41,12 +41,8 @@ export interface TaxpayerPanelProps {
   transactions: Transaction[];
   /** 申告入力（控除・帳簿に載らない所得・申告の種類・貸借対照表・源泉徴収税額など） */
   deductionState: DeductionState;
-  /** 青色申告特別控除前の事業所得（貸借対照表の貸借チェックに使う） */
-  businessIncomeBeforeBlue: number;
-  /** 所得税の計算結果。申告納税額の精算に使う。 */
-  taxResult: IncomeTaxResult;
-  /** 配当・株式等譲渡の入力に含まれる源泉徴収税額（XTX でも源泉徴収税額へ加算される） */
-  expandedWithholding: number;
+  /** 帳簿と申告入力から求めた所得と所得税額。申告納税額の精算と貸借チェックに使う。 */
+  figures: FilingFigures;
   onIncomeTaxPaymentsChange: (next: IncomeTaxPaymentInputs) => void;
   /** 納税者情報画面への遷移（確定申告画面の総合でのみ渡される）。 */
   onOpenSection?: (section: FilingSection) => void;
@@ -61,9 +57,7 @@ export function TaxpayerPanel({
   year,
   transactions,
   deductionState,
-  businessIncomeBeforeBlue,
-  taxResult,
-  expandedWithholding,
+  figures,
   onIncomeTaxPaymentsChange,
   onOpenSection,
 }: TaxpayerPanelProps) {
@@ -72,7 +66,8 @@ export function TaxpayerPanel({
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
   const { incomeTaxPayments, expandedIncome, balanceSheet } = deductionState;
   const { withholdingTax, prepaidTax } = incomeTaxPayments;
-  const declared = declaredIncomeTax(taxResult, withholdingTax + expandedWithholding, prepaidTax);
+  const declared = declaredIncomeTaxOf(figures, incomeTaxPayments);
+  const businessIncomeBeforeBlue = figures.corrected._detail.business_income_before_deduction;
 
   const buildRequest = (profile: XtxTaxpayerInput): ExportXtxRequest => ({
     year,

@@ -1,7 +1,12 @@
-import { FilingFigures, FilingType } from "@etax/shared";
+import {
+  FilingFigures,
+  FilingType,
+  filingIncomeBridgeRows,
+  filingIncomeStatCards,
+  filingTotalIncomeLabel,
+} from "@etax/shared";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
-import { incomeBridgeRows, incomeStatCards, totalIncomeLabel } from "./IncomeSummary.utils";
 import styles from "./IncomeSummary.css";
 
 export interface IncomeSummaryProps {
@@ -25,7 +30,7 @@ export const IncomeSummary = ({ figures, filingType, ledgerTransactionCount }: I
         <Text variant="muted">この年の取引はまだありません。先に帳簿へ取り込んでください。</Text>
       ) : null}
       <div className={styles.statGrid}>
-        {incomeStatCards(figures, isWhite).map((card) => (
+        {filingIncomeStatCards(figures, isWhite).map((card) => (
           <Card key={card.label}>
             <Col gap="none">
               <Text variant="statLabel">{card.label}</Text>
@@ -35,14 +40,14 @@ export const IncomeSummary = ({ figures, filingType, ledgerTransactionCount }: I
         ))}
       </div>
       <Col gap="sm">
-        {incomeBridgeRows(figures, isWhite).map((row) => (
+        {filingIncomeBridgeRows(figures, isWhite).map((row) => (
           <Row key={row.label} align="center" justify="spaceBetween">
             <Text variant="muted">{row.label}</Text>
             <Text className={styles.amount}>{formatYen(row.amount)}</Text>
           </Row>
         ))}
         <Row align="center" justify="spaceBetween" className={styles.totalRow}>
-          <Text>{totalIncomeLabel(isWhite)}</Text>
+          <Text>{filingTotalIncomeLabel(isWhite)}</Text>
           <Text className={styles.amount}>{formatYen(figures.totalIncome)}</Text>
         </Row>
       </Col>

@@ -104,6 +104,9 @@ export const ACCOUNT_CRITERIA: AccountCriterion[] = [
   { account: "雑費", criteria: "少額で他の科目に分類しにくい経費（振込手数料、書籍、セミナー参加費など）" },
 ];
 
+/** 勘定科目を推定できなかった取引に付ける勘定科目の値。 */
+export const UNCLASSIFIED_CATEGORY = "未分類";
+
 /** 科目判定の選択肢名の一覧（ACCOUNT_CRITERIA と同じ順序）。 */
 export const ACCOUNT_NAMES: string[] = ACCOUNT_CRITERIA.map((c) => c.account);
 

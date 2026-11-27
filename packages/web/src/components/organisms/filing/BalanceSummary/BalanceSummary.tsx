@@ -1,12 +1,16 @@
-import { FilingFigures, FilingType, Transaction, transactionBusinessAmount } from "@etax/shared";
+import {
+  FilingFigures,
+  FilingType,
+  Transaction,
+  UNCLASSIFIED_CATEGORY,
+  filingIncomeBridgeRows,
+  filingIncomeStatCards,
+  filingTotalIncomeLabel,
+  transactionBusinessAmount,
+} from "@etax/shared";
 import { useMemo } from "react";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import {
-  incomeBridgeRows,
-  incomeStatCards,
-  totalIncomeLabel,
-} from "@components/organisms/filing/IncomeSummary";
 import { formatYen } from "@utils";
 import styles from "./BalanceSummary.css";
 
@@ -58,7 +62,7 @@ export const BalanceSummary = ({ transactions, figures, filingType, onOpenUnclas
         .reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
     };
   }, [transactions]);
-  const unclassifiedCount = transactions.filter((t) => t.category === "未分類").length;
+  const unclassifiedCount = transactions.filter((t) => t.category === UNCLASSIFIED_CATEGORY).length;
   const isWhite = filingType === "white";
   const c = figures.corrected;
 
@@ -68,7 +72,7 @@ export const BalanceSummary = ({ transactions, figures, filingType, onOpenUnclas
         <Text variant="muted">この年の取引はまだありません。先に帳簿へ取り込んでください。</Text>
       ) : null}
       <div className={styles.statGrid}>
-        {incomeStatCards(figures, isWhite).map((card) => (
+        {filingIncomeStatCards(figures, isWhite).map((card) => (
           <Card key={card.label}>
             <Col gap="none">
               <Text variant="statLabel">{card.label}</Text>
@@ -89,14 +93,14 @@ export const BalanceSummary = ({ transactions, figures, filingType, onOpenUnclas
 
       <Col gap="sm">
         <Text variant="statLabel">所得の内訳</Text>
-        {incomeBridgeRows(figures, isWhite).map((row) => (
+        {filingIncomeBridgeRows(figures, isWhite).map((row) => (
           <Row key={row.label} align="center" justify="spaceBetween">
             <Text variant="muted">{row.label}</Text>
             <Text className={styles.amount}>{formatYen(row.amount)}</Text>
           </Row>
         ))}
         <Row align="center" justify="spaceBetween" className={styles.totalRow}>
-          <Text>{totalIncomeLabel(isWhite)}</Text>
+          <Text>{filingTotalIncomeLabel(isWhite)}</Text>
           <Text className={styles.amount}>{formatYen(figures.totalIncome)}</Text>
         </Row>
       </Col>

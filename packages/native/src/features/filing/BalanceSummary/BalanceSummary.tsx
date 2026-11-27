@@ -1,11 +1,19 @@
-import { CorrectedFigures, FilingType, Transaction, transactionBusinessAmount } from "@etax/shared";
+import {
+  FilingFigures,
+  FilingType,
+  Transaction,
+  UNCLASSIFIED_CATEGORY,
+  filingIncomeBridgeRows,
+  filingIncomeStatCards,
+  filingTotalIncomeLabel,
+  transactionBusinessAmount,
+} from "@etax/shared";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { AlertBox, AppText } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatYen } from "@/utils";
 import { ResultRow, SectionHead, StatBlock } from "../fields";
-import { IncomeSummaryFigures } from "../incomeSummaryFigures";
 
 interface CategoryAmount {
   category: string;
@@ -15,10 +23,8 @@ interface CategoryAmount {
 export interface BalanceSummaryProps {
   /** 対象年の取引（割り当て年度で絞り込み済み） */
   transactions: Transaction[];
-  /** 対象年の申告数値（事業・不動産ごとの収入と経費） */
-  figures: CorrectedFigures;
-  /** 所得の要約（確定申告画面で税額と同じ入力から求めたもの） */
-  summary: IncomeSummaryFigures;
+  /** 帳簿と申告入力から求めた所得と所得税額（確定申告画面が計算したもの） */
+  figures: FilingFigures;
   /** 申告の種類（白色申告では所得合計に「青色控除後」を付けない） */
   filingType: FilingType;
 }
@@ -31,7 +37,7 @@ export interface BalanceSummaryProps {
  * MonthlyBalance と BalanceRecords がそれぞれ別カードで並べる。
  * 未分類が残っていれば注意も出す。
  */
-export function BalanceSummary({ transactions, figures, summary, filingType }: BalanceSummaryProps) {
+export function BalanceSummary({ transactions, figures, filingType }: BalanceSummaryProps) {
   const scopedTransactions = useMemo(
     () => transactions.filter((t) => t.income_type !== "other"),
     [transactions],
@@ -55,7 +61,7 @@ export function BalanceSummary({ transactions, figures, summary, filingType }: B
         .reduce((sum, t) => sum + Math.abs(Math.trunc(t.amount)), 0),
     };
   }, [transactions]);
-  const unclassifiedCount = transactions.filter((t) => t.category === "未分類").length;
+  const unclassifiedCount = transactions.filter((t) => t.category === UNCLASSIFIED_CATEGORY).length;
 
   if (transactions.length === 0) {
     return (
@@ -65,39 +71,34 @@ export function BalanceSummary({ transactions, figures, summary, filingType }: B
     );
   }
 
-  const suffix = filingType === "white" ? "" : "（青色控除後）";
-  const statCards: readonly { label: string; value: number }[] = [
-    { label: "収入合計", value: summary.incomeTotal },
-    { label: "支出合計", value: summary.expenseTotal },
-    { label: "収支（差引）", value: summary.incomeTotal - summary.expenseTotal },
-    { label: `所得合計${suffix}`, value: summary.totalIncome },
-  ];
+  const isWhite = filingType === "white";
+  const corrected = figures.corrected;
 
   return (
     <View style={styles.wrap}>
       <View style={styles.statGrid}>
-        {statCards.map((card) => (
-          <StatBlock key={card.label} label={card.label} value={card.value} />
+        {filingIncomeStatCards(figures, isWhite).map((card) => (
+          <StatBlock key={card.label} label={card.label} value={card.amount} />
         ))}
       </View>
 
       <DivisionBalance
         title="事業の収支"
-        revenue={figures.business_revenue}
-        expenses={figures.business_expenses}
+        revenue={corrected.business_revenue}
+        expenses={corrected.business_expenses}
       />
       <DivisionBalance
         title="不動産の収支"
-        revenue={figures.real_estate_revenue}
-        expenses={figures.real_estate_expenses}
+        revenue={corrected.real_estate_revenue}
+        expenses={corrected.real_estate_expenses}
       />
 
       <View>
         <SectionHead title="所得の内訳" />
-        {summary.bridgeRows.map((row) => (
+        {filingIncomeBridgeRows(figures, isWhite).map((row) => (
           <ResultRow key={row.label} label={row.label} value={row.amount} />
         ))}
-        <ResultRow label={`所得合計${suffix}`} value={summary.totalIncome} strong />
+        <ResultRow label={filingTotalIncomeLabel(isWhite)} value={figures.totalIncome} strong />
       </View>
 
       <CategoryList title="収入の内訳" rows={income} tone="income" />

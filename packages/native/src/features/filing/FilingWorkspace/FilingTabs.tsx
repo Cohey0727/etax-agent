@@ -1,4 +1,4 @@
-import { DeductionState, applyBreakdownEntries, expandedWithholdingTotal } from "@etax/shared";
+import { DeductionState, applyBreakdownEntries } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { Card } from "@/components";
 import { space } from "@/theme";
@@ -32,15 +32,14 @@ export interface FilingTabProps {
 
 /** 総合タブ: 確定の状況と所得・税額の要約、提出パネル、提出の記録。 */
 export function FilingOverviewTab({ model, update, onOpenSection }: FilingTabProps) {
-  const { year, yearTransactions, deductionState: state, taxResult } = model;
+  const { year, yearTransactions, deductionState: state, figures } = model;
   return (
     <>
       <FilingPanel
         year={year}
-        incomeSummary={model.incomeSummary}
+        figures={figures}
         filingType={state.filingType}
         hasTransactions={yearTransactions.length > 0}
-        taxResult={taxResult}
         snapshots={model.snapshots}
         currentFigures={model.currentFigures}
         onConfirmCalculation={model.confirmCalculation}
@@ -50,9 +49,7 @@ export function FilingOverviewTab({ model, update, onOpenSection }: FilingTabPro
         year={year}
         transactions={yearTransactions}
         deductionState={state}
-        businessIncomeBeforeBlue={model.computed._detail.business_income_before_deduction}
-        taxResult={taxResult}
-        expandedWithholding={expandedWithholdingTotal(model.expandedBreakdown)}
+        figures={figures}
         onIncomeTaxPaymentsChange={(next) => update((s) => ({ ...s, incomeTaxPayments: next }))}
         onOpenSection={onOpenSection}
       />
@@ -63,7 +60,7 @@ export function FilingOverviewTab({ model, update, onOpenSection }: FilingTabPro
 
 /** 収支タブ: 収支の集計と確定、月別の収支、対象の取引、貸借対照表。 */
 export function FilingBalanceTab({ model, update }: FilingTabProps) {
-  const { year, yearTransactions, deductionState: state, computed } = model;
+  const { year, yearTransactions, deductionState: state, figures } = model;
   return (
     <>
       <Card>
@@ -71,8 +68,7 @@ export function FilingBalanceTab({ model, update }: FilingTabProps) {
           <SectionHead title="収支" />
           <BalanceSummary
             transactions={yearTransactions}
-            figures={computed}
-            summary={model.incomeSummary}
+            figures={figures}
             filingType={state.filingType}
           />
           <FilingStatusToggle
@@ -89,8 +85,8 @@ export function FilingBalanceTab({ model, update }: FilingTabProps) {
       <BalanceSheetPanel
         year={year}
         balanceSheet={state.balanceSheet}
-        incomeBeforeBlue={computed._detail.business_income_before_deduction}
-        previousIncomeBeforeBlue={model.previousComputed._detail.business_income_before_deduction}
+        incomeBeforeBlue={figures.corrected._detail.business_income_before_deduction}
+        previousIncomeBeforeBlue={model.previousIncomeBeforeBlue}
         filingType={state.filingType}
         onChange={(next) => update((s) => ({ ...s, balanceSheet: next }))}
       />
@@ -100,7 +96,8 @@ export function FilingBalanceTab({ model, update }: FilingTabProps) {
 
 /** 控除タブ: 帳簿に載らない所得、所得控除・税額控除の入力と、控除・計算の確定。 */
 export function FilingDeductionsTab({ model, update }: FilingTabProps) {
-  const { year, deductionState: state, taxResult, expandedBreakdown } = model;
+  const { year, deductionState: state } = model;
+  const { taxResult, expanded: expandedBreakdown } = model.figures;
   return (
     <>
       <SalaryPanel
