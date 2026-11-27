@@ -33,6 +33,9 @@ process.env.ETAX_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 type AppFetch = (req: Request) => Promise<Response>;
 let appFetch: AppFetch;
 
+const CONNECTION_ENV_KEYS = ["AGENT_API_KEY", "SYSTEMONE_API_KEY", "SYSTEMONE_BASE_URL"] as const;
+const savedConnectionEnv: Partial<Record<(typeof CONNECTION_ENV_KEYS)[number], string>> = {};
+
 const CHECKBOX_NAMES = [
   "Check Box63", "Check Box64", "Check Box65", "Check Box66", "Check Box67",
   "Check Box68", "Check Box69", "Check Box70", "Check Box71", "Check Box72",
@@ -67,6 +70,13 @@ beforeAll(async () => {
   process.env.ETAX_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
   const dataDir = await mkdtemp(join(tmpdir(), "etax-mcp-coverage-data-"));
   process.env.ETAX_DATA_DIR = dataDir;
+  // 接続テストと agent_chat は「AI の接続先が未設定」の環境を前提にする。
+  // 開発機の .env や手元で動く判定モデルに結果が左右されないよう、
+  // キーを外し、判定モデルの接続先を到達できないポートに向ける。
+  for (const key of CONNECTION_ENV_KEYS) savedConnectionEnv[key] = process.env[key];
+  delete process.env.AGENT_API_KEY;
+  delete process.env.SYSTEMONE_API_KEY;
+  process.env.SYSTEMONE_BASE_URL = "http://127.0.0.1:9";
 
   process.env.ETAX_AUTH_MODE = "required";
   const mod = await import("../src/index");
@@ -76,6 +86,11 @@ beforeAll(async () => {
 
 afterAll(() => {
   delete process.env.ETAX_AUTH_MODE;
+  for (const key of CONNECTION_ENV_KEYS) {
+    const value = savedConnectionEnv[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 });
 
 interface McpResponse {
