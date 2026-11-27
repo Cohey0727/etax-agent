@@ -5,10 +5,11 @@
  * どちらも無ければプロセス内ランダム（再起動で失効する）にする。
  *
  * 再利用対策: 署名だけでは TTL 内に何度でも使えてしまうため、jti 単位で
- * 「使用回数」と「消費済み」をプロセス内メモリで数える。TOTP 試行は
- * 5回まででチャレンジを失効させ、成功時は即座に消費済みにして再利用を防ぐ。
- * OAuth state も同じ仕組みで単回使用にする。状態はプロセス内のみ
- * （単一インスタンス運用前提。再起動で失効するのも安全側）。
+ * 「使用回数」と「消費済み」をプロセス内メモリで数える（jti の無いトークンは
+ * 数えられないので受け付けない）。TOTP 試行は5回まででチャレンジを失効させ、
+ * 成功時は即座に消費済みにして再利用を防ぐ。OAuth state も同じ仕組みで
+ * 単回使用にする。状態はプロセス内のみ（単一インスタンス運用前提。
+ * 再起動で失効するのも安全側）。
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
@@ -43,7 +44,7 @@ interface ChallengePayload {
   uid: number;
   purpose: string;
   exp: number;
-  jti?: string;
+  jti: string;
 }
 
 /** 署名・期限・用途を検証してペイロードを返す（使用回数は数えない）。 */
@@ -67,12 +68,8 @@ function parseChallenge(token: string, purpose: string): ChallengePayload | unde
     if (parsed.purpose !== purpose) return undefined;
     if (typeof parsed.exp !== "number" || parsed.exp < Date.now()) return undefined;
     if (typeof parsed.uid !== "number" || !Number.isInteger(parsed.uid)) return undefined;
-    return {
-      uid: parsed.uid,
-      purpose,
-      exp: parsed.exp,
-      jti: typeof parsed.jti === "string" ? parsed.jti : undefined,
-    };
+    if (typeof parsed.jti !== "string" || parsed.jti === "") return undefined;
+    return { uid: parsed.uid, purpose, exp: parsed.exp, jti: parsed.jti };
   } catch {
     return undefined;
   }
@@ -103,12 +100,10 @@ function pruneChallengeUses(now: number): void {
 /**
  * チャレンジの使用を1回分記録し、ユーザーIDを返す。
  * 消費済み・試行上限到達・不正・期限切れは undefined（上限到達時は失効させる）。
- * jti を持たない旧形式のトークンは数えずに検証だけ通す（互換用）。
  */
 export function beginChallengeUse(token: string, purpose: string): number | undefined {
   const parsed = parseChallenge(token, purpose);
   if (!parsed) return undefined;
-  if (!parsed.jti) return parsed.uid;
   const now = Date.now();
   pruneChallengeUses(now);
   const use = challengeUses.get(parsed.jti) ?? { attempts: 0, consumed: false, exp: parsed.exp };
@@ -124,7 +119,7 @@ export function beginChallengeUse(token: string, purpose: string): number | unde
 /** チャレンジを消費済みにする（成功直後に呼ぶ。再利用を防ぐ）。 */
 export function burnChallenge(token: string, purpose: string): void {
   const parsed = parseChallenge(token, purpose);
-  if (!parsed?.jti) return;
+  if (!parsed) return;
   const use = challengeUses.get(parsed.jti) ?? { attempts: 0, consumed: false, exp: parsed.exp };
   challengeUses.set(parsed.jti, { ...use, consumed: true });
 }

@@ -19,7 +19,6 @@ export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 export type DbOrTx = Db | DbTx;
 
 let cached: Db | null = null;
-let attempted = false;
 
 /** DB が利用可能か（DATABASE_URL が設定されているか）。 */
 export function isDatabaseConfigured(): boolean {
@@ -31,7 +30,6 @@ export function getDb(): Db | null {
   if (cached) return cached;
   const url = process.env.DATABASE_URL;
   if (!url) return null;
-  attempted = true;
   const pool = new Pool({ connectionString: url });
   // アイドル接続の切断等で Pool が出す 'error' を未捕捉のままにすると
   // プロセスごと落ちるため、必ずログに残して握る（Issue #11）。
@@ -40,11 +38,6 @@ export function getDb(): Db | null {
   });
   cached = drizzle(pool, { schema });
   return cached;
-}
-
-/** DB接続を試みたことがあるか。 */
-export function dbWasAttempted(): boolean {
-  return attempted;
 }
 
 /**

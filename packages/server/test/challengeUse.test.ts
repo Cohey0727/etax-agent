@@ -1,7 +1,8 @@
 /**
- * challengeUse.test.ts — ログインチャレンジの再利用防止（Issue #6）。
+ * challengeUse.test.ts — ログインチャレンジの再利用防止。
  * TTL 内でも、消費済みチャレンジや試行上限を超えたチャレンジは使えない。
  */
+import { createHmac } from "node:crypto";
 import { describe, expect, test } from "bun:test";
 import {
   MAX_CHALLENGE_ATTEMPTS,
@@ -30,5 +31,25 @@ describe("チャレンジの使用回数管理", () => {
     const token = issueChallenge(9, "oauth:google", 60_000);
     expect(beginChallengeUse(token, "totp-login")).toBeUndefined();
     expect(beginChallengeUse(`${token}x`, "oauth:google")).toBeUndefined();
+  });
+});
+
+describe("使用回数を数えられないチャレンジ", () => {
+  test("一意な jti を持たないチャレンジは、署名が正しくても使用できない", () => {
+    const previous = process.env.ETAX_AUTH_SECRET;
+    process.env.ETAX_AUTH_SECRET = "challenge-test-secret";
+    try {
+      const payload = Buffer.from(
+        JSON.stringify({ uid: 10, purpose: "totp-login", exp: Date.now() + 60_000 }),
+        "utf8",
+      ).toString("base64url");
+      const signature = createHmac("sha256", "challenge-test-secret")
+        .update(payload)
+        .digest("base64url");
+      expect(beginChallengeUse(`${payload}.${signature}`, "totp-login")).toBeUndefined();
+    } finally {
+      if (previous === undefined) delete process.env.ETAX_AUTH_SECRET;
+      else process.env.ETAX_AUTH_SECRET = previous;
+    }
   });
 });
