@@ -425,11 +425,11 @@ export interface IncomeDeductionBreakdown {
 
 /**
  * 所得控除の内訳と合計を計算する。基礎控除は合計所得金額から自動で決まる。
- * grandTotalIncome（合計所得金額＝総合＋申告分離の所得金額）を渡すと、
- * 基礎控除・配偶者（特別）控除・寡婦・ひとり親・勤労学生の所得要件の
- * 判定にそちらを使う（これらの要件は合計所得金額が基準）。医療費控除の
- * 足切り・寄附金控除の40%上限・雑損控除の10%は総所得金額等が基準のため、
- * 常に totalIncome（総合課税分）で判定する。省略時は totalIncome と同じ。
+ * grandTotalIncome（総合＋申告分離の所得金額）を渡すと、所得要件・足切りの
+ * 判定はすべてそちらで行う。基礎控除・配偶者（特別）控除・寡婦・ひとり親・
+ * 勤労学生は合計所得金額、医療費控除の足切り・寄附金控除の40%上限・雑損控除の
+ * 10%は総所得金額等が基準で、どちらも申告分離課税の所得を含む（繰越控除は
+ * 扱わないため両者は同額）。省略時は totalIncome と同じ。
  */
 export function computeIncomeDeductions(
   year: number,
@@ -452,13 +452,13 @@ export function computeIncomeDeductions(
     inputs.spouseTotalIncome !== null &&
     amount(inputs.spouseTotalIncome) > taxParametersFor(year).spouseIncomeLimit;
   const breakdown: IncomeDeductionBreakdown = {
-    casualtyLoss: inputs.casualtyLoss ? casualtyLossDeduction(inputs.casualtyLoss, totalIncome) : 0,
-    medical: medicalDeduction(inputs.medicalExpensesPaid, inputs.medicalReimbursement, totalIncome),
+    casualtyLoss: inputs.casualtyLoss ? casualtyLossDeduction(inputs.casualtyLoss, tg) : 0,
+    medical: medicalDeduction(inputs.medicalExpensesPaid, inputs.medicalReimbursement, tg),
     socialInsurance: amount(inputs.socialInsurancePaid),
     smallBusinessMutualAid: amount(inputs.smallBusinessMutualAidPaid),
     lifeInsurance: lifeInsuranceDeduction(inputs.lifeInsurance),
     earthquakeInsurance: earthquakeInsuranceDeduction(inputs.earthquakeInsurance),
-    donations: donationDeduction(inputs.donationsTotal, totalIncome),
+    donations: donationDeduction(inputs.donationsTotal, tg),
     disability: disabilityDeduction(inputs.disability),
     widow,
     singleParent,
@@ -671,7 +671,8 @@ export interface TaxCreditBreakdown {
  * 税額控除の内訳と合計を計算する。
  * baseIncomeTax は税額控除前の所得税額（速算表の税額）。
  * taxableIncome は配当控除の判定に使う課税総所得金額等、
- * totalIncome は外国税額控除の限度額計算に使う合計所得金額。
+ * totalIncome は寄附金の40%上限と外国税額控除の所得総額に使う、申告分離
+ * 課税の所得を含む合計所得金額。
  * 外国税額控除の所得税分の限度額は再差引所得税額（定額減税・外国税額控除
  * 以外の税額控除を引いた後）を、復興税分の限度額は基準所得税額（さらに
  * 定額減税を引いた後）の2.1%を基に按分する。
@@ -1129,11 +1130,12 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
   // 配当控除の1,000万円枠の判定に使う課税総所得金額等には、申告分離課税の
   // 課税所得金額も含める（No.1250 の「課税総所得金額等」）。
   const taxableForCredits = taxableIncome + taxableSeparateStocks + taxableSeparateDividends;
+  // 寄附金の40%上限と外国税額控除の所得総額も、申告分離課税の所得を含めて判定する
   const taxCredits = computeTaxCredits(
     options.taxCredits,
     incomeTaxBase,
     taxableForCredits,
-    totalIncome,
+    grandTotalIncome,
     year,
   );
   const taxAfterOtherCredits = Math.max(

@@ -244,6 +244,32 @@ describe("株式等譲渡（Phase C、No.1463 / No.1474 / No.1476）", () => {
 // ---------------------------------------------------------------------------
 
 describe("分離課税を含む所得税計算", () => {
+  test("医療費控除の足切り・寄附金控除の40%上限は、分離課税の所得を含む総所得金額等で判定する", () => {
+    const result = computeIncomeTax({
+      year: 2025,
+      totalIncome: 1_000_000,
+      deductions: { ...EMPTY_DEDUCTION_INPUTS, medicalExpensesPaid: 150_000, donationsTotal: 1_000_000 },
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+      separateTaxation: { stockIncome: 3_000_000, dividendIncome: 0 },
+    });
+    // 総所得金額等 400万円 → 足切り 10万円、寄附金の上限 160万円
+    expect(result.deductions.medical).toBe(50_000);
+    expect(result.deductions.donations).toBe(998_000);
+  });
+
+  test("政党等寄附金の40%上限も総所得金額等で判定する", () => {
+    const result = computeIncomeTax({
+      year: 2025,
+      totalIncome: 1_000_000,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, politicalDonations: 1_000_000 },
+      separateTaxation: { stockIncome: 9_000_000, dividendIncome: 0 },
+    });
+    // 総所得金額等 1,000万円 → 対象 100万円（40%上限 400万円の内）→ (100万 − 2,000) × 30%。
+    // 所得税額 1,371,000 の25%（342,700）以内
+    expect(result.taxCredits.politicalDonations).toBe(299_400);
+  });
+
   test("分離税率は年度パラメータの15%（所得税分）", () => {
     expect(separateTaxAmount(2025, "stocks", 1_000_000)).toBe(150_000);
     expect(separateTaxAmount(2025, "listedDividend", 333_333)).toBe(49_999);
