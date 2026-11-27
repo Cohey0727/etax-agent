@@ -1,4 +1,4 @@
-import { applyDeductionPatch, sampleTransactions, Transaction } from "@etax/shared";
+import { sampleTransactions, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageSkeleton, TableSkeleton } from "@components/molecules";
 import { DashboardSkeleton } from "@components/organisms/dashboard";
@@ -9,8 +9,9 @@ import {
   useAgentConversation,
 } from "@components/organisms/agent";
 import {
+  applyDeductionPatchToSaved,
+  hydrateDeductionStateFromServer,
   loadDeductionState,
-  saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppTemplate } from "@components/templates";
 import {
@@ -103,6 +104,19 @@ export const AppPage = () => {
   // エージェントの変更の影響を受けた画面ごとの読み直し回数。表示中の画面の key に使い、
   // 影響の無い画面（入力途中の設定など）は作り直さない。
   const [viewReloads, setViewReloads] = useState<Partial<Record<AppView, number>>>({});
+  // エージェントへ送る控除入力は、サーバーの値を取り込めた年度のものだけにする
+  // （取り込む前の端末キャッシュは空か古いことがある）。
+  const [deductionsHydratedYear, setDeductionsHydratedYear] = useState<number | null>(null);
+  useEffect(() => {
+    if (!authChecked || loginRequired) return;
+    let cancelled = false;
+    void hydrateDeductionStateFromServer(year).then((ok) => {
+      if (!cancelled && ok) setDeductionsHydratedYear(year);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authChecked, loginRequired, authUser?.id, year]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingSession, setViewingSession] = useState<ChatSession | null>(null);
 
@@ -178,10 +192,11 @@ export const AppPage = () => {
     if (action.type === "setYear") {
       handleYearChange(action.year);
     } else if (action.type === "applyDeductions") {
-      // エージェントの控除変更を、画面側の保存値（localStorage）へ適用する。
-      const patch = withEntryIds(action.patch);
-      saveDeductionState(action.year, applyDeductionPatch(loadDeductionState(action.year), patch));
-      setViewRefreshKey((v) => v + 1);
+      // エージェントの控除変更を、サーバーの保存値に当てて保存する。保存が
+      // 終わってから画面を読み直させる（先に読み直すと変更前の値が出る）。
+      void applyDeductionPatchToSaved(action.year, withEntryIds(action.patch)).then((ok) => {
+        if (ok) setViewRefreshKey((v) => v + 1);
+      });
     } else if (action.type === "reloadView") {
       setViewReloads((current) => ({ ...current, [action.view]: (current[action.view] ?? 0) + 1 }));
     } else if (action.type === "reloadTransactions") {
@@ -197,7 +212,8 @@ export const AppPage = () => {
   const conversation = useAgentConversation({
     transactions,
     agentConnection,
-    getDeductionsSnapshot: () => ({ year, state: loadDeductionState(year) }),
+    getDeductionsSnapshot: () =>
+      deductionsHydratedYear === year ? { year, state: loadDeductionState(year) } : null,
     onUiAction: handleUiAction,
     onArchive: handleArchiveChat,
   });
