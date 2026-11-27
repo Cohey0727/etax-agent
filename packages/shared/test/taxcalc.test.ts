@@ -319,6 +319,11 @@ describe("行の分類（classifyTransactionRow）", () => {
     expect(r.income_type).toBe("real_estate");
   });
 
+  test("科目が地代家賃（家賃の支払い）なら摘要に「家賃」があっても事業所得", () => {
+    const r = classifyTransactionRow({ description: "事務所家賃 6月分", category: "地代家賃", incomeType: null });
+    expect(r.income_type).toBe("business");
+  });
+
   test("収入区分が空欄なら other、不正な値なら Error", () => {
     expect(
       classifyTransactionRow({ description: "AWS 利用料", category: "", incomeType: "" })

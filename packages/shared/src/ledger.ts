@@ -106,9 +106,14 @@ export const ACCOUNT_CRITERIA: AccountCriterion[] = [
 /** 科目判定の選択肢名の一覧（ACCOUNT_CRITERIA と同じ順序）。 */
 export const ACCOUNT_NAMES: string[] = ACCOUNT_CRITERIA.map((c) => c.account);
 
-/** 摘要・科目から収入区分を推定する（家賃まわりは不動産所得、それ以外は科目が付けば事業所得）。 */
+/**
+ * 摘要・科目から収入区分を推定する（家賃まわりは不動産所得、それ以外は科目が付けば
+ * 事業所得）。地代家賃は家賃の支払い（事務所・店舗など）の科目なので、摘要に
+ * 「家賃」があっても事業所得にする。
+ */
 export function guessIncomeType(description: string, category: string): IncomeType {
   if (category === "家賃収入") return "real_estate";
+  if (category === "地代家賃") return "business";
   if (/家賃|賃料|賃貸/.test(description)) return "real_estate";
   if (category !== "未分類") return "business";
   return "other";
