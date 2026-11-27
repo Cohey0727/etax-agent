@@ -16,6 +16,7 @@ import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/F
 import { IncomeSummary } from "@components/organisms/filing/IncomeSummary";
 import { TaxSummary } from "@components/organisms/filing/TaxSummary";
 import { FilingTab } from "@types";
+import { formatDate } from "@utils";
 import { createFilingSnapshot } from "@utils/api";
 import styles from "./FilingPanel.css";
 
@@ -214,7 +215,3 @@ export const FilingPanel = ({
     </Col>
   );
 };
-
-function formatDate(iso: string): string {
-  return iso.slice(0, 10).replaceAll("-", "/");
-}

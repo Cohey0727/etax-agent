@@ -1,4 +1,5 @@
 import { Badge, Button, Card, Col, Row, Text } from "@components/atoms";
+import { formatDate } from "@utils";
 import { FilingStatusKey, useFilingStatus } from "./useFilingStatus";
 import styles from "./FilingStatusToggle.css";
 
@@ -68,7 +69,3 @@ export const FilingStatusToggle = ({
 
   return bare ? content : <Card>{content}</Card>;
 };
-
-function formatDate(iso: string): string {
-  return iso.slice(0, 10).replaceAll("-", "/");
-}

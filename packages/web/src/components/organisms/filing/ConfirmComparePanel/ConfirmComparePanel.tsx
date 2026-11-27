@@ -1,7 +1,7 @@
 import { Card, Col, Row, Text } from "@components/atoms";
 import { useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";
 import { FilingSnapshot, FilingSnapshotFigures } from "@types";
-import { formatYen } from "@utils";
+import { formatDate, formatYen } from "@utils";
 import styles from "./ConfirmComparePanel.css";
 
 const COMPARE_ROWS: readonly { key: keyof FilingSnapshotFigures; label: string }[] = [
@@ -97,8 +97,4 @@ function formatDelta(delta: number): string {
   if (delta === 0) return "±0円";
   if (delta > 0) return `+${formatYen(delta)}`;
   return `−${formatYen(-delta)}`;
-}
-
-function formatDate(iso: string): string {
-  return iso.slice(0, 10).replaceAll("-", "/");
 }
