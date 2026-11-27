@@ -104,7 +104,7 @@ export const CreateTransactionRequestSchema = z
     amount: z.number().optional(),
     account: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
-    /** 未知の値・型違いは未指定として扱う（登録では「その他」になる）。 */
+    /** 未知の値・型違いは未指定として扱う（登録では摘要と勘定科目から推定する）。 */
     income_type: IncomeTypeSchema.optional().catch(undefined),
     tax_category: z.string().optional().catch(undefined),
     /** 事業専用割合（家事按分、0〜100）。範囲外はハンドラ側で正規化する */
@@ -126,7 +126,7 @@ export const UpdateTransactionRequestSchema = z
     amount: z.number().optional(),
     account: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
-    /** 未知の値・型違いは未指定として扱う（登録では「その他」になる）。 */
+    /** 未知の値・型違いは未指定として扱う（登録では摘要と勘定科目から推定する）。 */
     income_type: IncomeTypeSchema.optional().catch(undefined),
     tax_category: z.string().optional().catch(undefined),
     /** 事業専用割合（家事按分、0〜100）。範囲外はハンドラ側で正規化する */

@@ -5,20 +5,19 @@
  * 先に返すため（ルート定義にボディは置かない）。
  * 指定されたフィールドだけを更新する（部分更新）。
  */
-import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import { TransactionRow } from "../repositories/schema";
-import { transactionToApi, updateTransactionRow } from "../repositories/transactionRepository";
-import { CalendarDateSchema, ErrorSchema } from "../schemas/common";
+import { transactionToApi } from "../repositories/transactionRepository";
+import { ErrorSchema } from "../schemas/common";
 import {
   SingleTransactionResponse,
   SingleTransactionResponseSchema,
   TransactionIdParamSchema,
   UpdateTransactionRequestSchema,
 } from "../schemas/transaction";
+import { updateTransaction } from "../services/transactions/transactionWrites";
 
 export const updateTransactionRoute = createRoute({
   method: "put",
@@ -61,36 +60,25 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
     });
   }
   const body = parsed.data;
-  const patch: Partial<TransactionRow> = {};
-  if (body.date !== undefined) {
-    // 登録時と同じ日付チェック（不正な日付で年度判定・月次集計が壊れるのを防ぐ）。
-    if (!CalendarDateSchema.safeParse(body.date).success) {
-      throw new HTTPException(400, { message: "date は存在する日付を YYYY-MM-DD 形式で指定してください" });
-    }
-    patch.date = body.date;
-  }
-  if (
-    typeof body.fiscal_year === "number" &&
-    Number.isInteger(body.fiscal_year) &&
-    body.fiscal_year >= 1900 &&
-    body.fiscal_year <= 2100
-  ) {
-    patch.fiscalYear = body.fiscal_year;
-  }
-  if (body.description !== undefined) patch.description = body.description;
-  if (typeof body.amount === "number" && Number.isFinite(body.amount)) {
-    patch.amount = Math.trunc(body.amount);
-  }
-  if (body.account !== undefined) patch.account = body.account;
-  if (body.category !== undefined) patch.category = body.category;
-  if (body.income_type !== undefined) patch.incomeType = body.income_type;
-  if (body.tax_category !== undefined) patch.taxCategory = body.tax_category;
-  if (typeof body.business_ratio_percent === "number" && Number.isFinite(body.business_ratio_percent)) {
-    patch.businessRatioPercent = normalizeBusinessRatio(body.business_ratio_percent);
-  }
-  if (body.business_ratio_basis !== undefined) patch.businessRatioBasis = body.business_ratio_basis;
-  const row = await updateTransactionRow(db, id, patch);
-  if (!row) throw new HTTPException(404, { message: "対象の取引が見つかりません" });
-  const response: SingleTransactionResponse = { transaction: transactionToApi(row) };
+  // 画面は科目を直したときに学習履歴へ別途記録するため、ここでは記録しない。
+  const result = await updateTransaction(
+    db,
+    id,
+    {
+      date: body.date,
+      fiscalYear: body.fiscal_year,
+      description: body.description,
+      amount: body.amount,
+      account: body.account,
+      category: body.category,
+      incomeType: body.income_type,
+      taxCategory: body.tax_category,
+      businessRatioPercent: body.business_ratio_percent,
+      businessRatioBasis: body.business_ratio_basis,
+    },
+    { learn: false },
+  );
+  if (!result) throw new HTTPException(404, { message: "対象の取引が見つかりません" });
+  const response: SingleTransactionResponse = { transaction: transactionToApi(result.transaction) };
   return c.json(response, 200);
 };

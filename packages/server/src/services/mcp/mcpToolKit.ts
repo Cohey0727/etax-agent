@@ -129,9 +129,9 @@ export function mergeTaxCreditInputs(input: unknown): TaxCreditInputs {
   return { ...EMPTY_TAX_CREDIT_INPUTS, ...(input as Partial<TaxCreditInputs>) };
 }
 
-/** 所得区分の検証。未指定は business、不正な値はエラーにする。 */
-export function parseIncomeType(value: unknown): IncomeType {
-  if (value === undefined || value === null) return "business";
+/** 収入区分の検証。未指定は undefined（既定は呼び出し先が決める）、不正な値はエラーにする。 */
+export function parseIncomeType(value: unknown): IncomeType | undefined {
+  if (value === undefined || value === null) return undefined;
   if (typeof value === "string" && VALID_INCOME_TYPES.has(value)) return value as IncomeType;
   throw new Error(`income_type が不正です: ${String(value)}`);
 }

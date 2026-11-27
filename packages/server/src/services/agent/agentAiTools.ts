@@ -194,7 +194,7 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
         income_type: z
           .enum(["business", "real_estate", "other"])
           .optional()
-          .describe("区分（省略時は other）"),
+          .describe("区分（省略時は摘要と勘定科目から推定）"),
         tax_category: z.string().optional().describe("税区分（例: 課対仕入10%）"),
         year: z.number().int().optional().describe("割り当て年度（西暦）。省略時は日付の年"),
       }),

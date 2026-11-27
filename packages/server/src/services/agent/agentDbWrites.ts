@@ -11,22 +11,24 @@
  *   - 一括変更は「絞り込み条件が1つ以上」かつ「変更内容が1つ以上」を必須とし、
  *     500件を超える対象はエラーにして条件を絞らせる。
  *   - 削除は日付・摘要・金額が完全一致する1件だけに限る（複数該当はエラー）。
- *   - 科目を付け替えた場合は分類の学習（recordClassification）にも反映する
- *     （MCP の add/update_transaction と同じ扱い）。
+ *   - 科目を付け替えた場合は分類の学習にも反映する（MCP の add/update_transaction と
+ *     同じ扱い）。取引の追加は帳簿画面・MCP と同じ本体（transactionWrites）を使う。
  */
 import { IncomeType, Transaction, normalizeSearchText } from "@etax/shared";
 import { getDb } from "../../lib/db";
-import { recordClassification } from "../../repositories/classificationHistoryRepository";
 import {
   deleteTransactionRow,
   effectiveFiscalYear,
-  insertTransactionRow,
   listTransactionRows,
   transactionToApi,
   updateTransactionRowWith,
 } from "../../repositories/transactionRepository";
 import { TransactionRow } from "../../repositories/schema";
 import { rowToTransaction } from "../mcp/mcpToolKit";
+import {
+  createTransaction,
+  recordClassificationAfterSave,
+} from "../transactions/transactionWrites";
 
 /** 一括変更の上限件数（誤った条件での大量変更を防ぐ）。 */
 const MAX_BULK_UPDATE = 500;
@@ -126,15 +128,18 @@ export async function updateTransactionsBulk(rawArgs: UpdateTransactionsArgs) {
     }
     return count;
   });
-  // 科目の付け替えは分類の学習にも反映する（摘要ごとに1回）。
+  // 科目の付け替えは分類の学習にも反映する（摘要ごとに1回）。変更は確定済みなので、
+  // 記録の失敗は変更の失敗にせず警告として返す。
+  let warning: string | null = null;
   if (args.setCategory !== undefined && args.setCategory !== "未分類") {
     const descriptions = [...new Set(matched.map((row) => row.description))].slice(0, 20);
     for (const description of descriptions) {
-      await recordClassification(description, args.setCategory);
+      warning ??= await recordClassificationAfterSave(description, args.setCategory);
     }
   }
   return {
     ok: true as const,
+    ...(warning ? { warning } : {}),
     matched: matched.length,
     updated,
     total_amount: matched.reduce((sum, row) => sum + row.amount, 0),
@@ -165,35 +170,29 @@ export interface AddTransactionArgs {
   year?: number;
 }
 
-/** 取引を1件、帳簿DBへ追加する。 */
+/** 取引を1件、帳簿DBへ追加する（帳簿画面・MCP と同じ本体で検証・学習する）。 */
 export async function addTransactionForAgent(args: AddTransactionArgs) {
   const db = getDb();
   if (!db) throw new Error("帳簿DBが利用できないため、取引を追加できませんでした");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
-    throw new Error("date は YYYY-MM-DD 形式で指定してください");
-  }
-  if (!Number.isFinite(args.amount) || args.amount === 0) {
-    throw new Error("amount は 0 でない数値で指定してください（収入は正、支出は負）");
-  }
-  const category = args.category && args.category !== "" ? args.category : "未分類";
-  const row = await insertTransactionRow(db, {
-    date: args.date,
-    fiscalYear: args.year ?? Number(args.date.slice(0, 4)),
-    description: args.description,
-    amount: Math.trunc(args.amount),
-    account: args.account ?? "",
-    category,
-    incomeType: args.incomeType ?? "other",
-    taxCategory: args.taxCategory ?? "",
-    // エージェント経由の登録では按分は扱わない（未指定＝全額事業分）。
-    businessRatioPercent: 100,
-    businessRatioBasis: "",
-  });
-  if (!row) throw new Error("取引の登録に失敗しました");
-  if (category !== "未分類") {
-    await recordClassification(row.description, category);
-  }
-  return { ok: true as const, transaction: transactionToApi(row) };
+  const { transaction, learningWarning } = await createTransaction(
+    db,
+    {
+      date: args.date,
+      fiscalYear: args.year,
+      description: args.description,
+      amount: args.amount,
+      account: args.account,
+      category: args.category,
+      incomeType: args.incomeType,
+      taxCategory: args.taxCategory,
+    },
+    { learn: true },
+  );
+  return {
+    ok: true as const,
+    transaction: transactionToApi(transaction),
+    ...(learningWarning ? { warning: learningWarning } : {}),
+  };
 }
 
 export interface DeleteTransactionArgs {

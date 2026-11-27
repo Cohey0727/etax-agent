@@ -5,22 +5,18 @@
  * 400 より先に返すため（ルート定義にボディは置かない）。
  * スキーマ自体は schemas/transaction.ts の CreateTransactionRequestSchema。
  */
-import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import {
-  insertTransactionRowWith,
-  transactionToApi,
-} from "../repositories/transactionRepository";
-import { linkReceiptRow } from "../repositories/receiptRepository";
-import { CalendarDateSchema, ErrorSchema } from "../schemas/common";
+import { transactionToApi } from "../repositories/transactionRepository";
+import { ErrorSchema } from "../schemas/common";
 import {
   CreateTransactionRequestSchema,
   SingleTransactionResponse,
   SingleTransactionResponseSchema,
 } from "../schemas/transaction";
+import { createTransaction } from "../services/transactions/transactionWrites";
 
 export const createTransactionRoute = createRoute({
   method: "post",
@@ -57,44 +53,23 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
     });
   }
   const body = parsed.data;
-  const date = body.date ?? "";
-  if (!CalendarDateSchema.safeParse(date).success) {
-    throw new HTTPException(400, { message: "date は存在する日付を YYYY-MM-DD 形式で指定してください" });
-  }
-  if (typeof body.amount !== "number" || !Number.isFinite(body.amount)) {
-    throw new HTTPException(400, { message: "amount は数値で指定してください" });
-  }
-  // 割り当て年度は指定があればそれ、無ければ日付の年。
-  const fiscalYear =
-    typeof body.fiscal_year === "number" &&
-    Number.isInteger(body.fiscal_year) &&
-    body.fiscal_year >= 1900 &&
-    body.fiscal_year <= 2100
-      ? body.fiscal_year
-      : Number(date.slice(0, 4));
-  // 取引の登録と証憑の同時紐付けは1トランザクションで行う
-  // （紐付けだけ失敗して取引が残る不整合を防ぐ）。
-  const amount = Math.trunc(body.amount);
-  const row = await db.transaction(async (tx) => {
-    const inserted = await insertTransactionRowWith(tx, {
-      date,
-      fiscalYear,
-      description: body.description ?? "",
-      amount,
-      account: body.account ?? "",
-      category: body.category ? body.category : "未分類",
-      incomeType: body.income_type ?? "other",
-      taxCategory: body.tax_category ?? "",
-      businessRatioPercent: normalizeBusinessRatio(body.business_ratio_percent),
-      businessRatioBasis: body.business_ratio_basis ?? "",
-    });
-    if (inserted && body.receipt_file_ids) {
-      for (const fileId of body.receipt_file_ids) {
-        await linkReceiptRow(tx, fileId, inserted.id);
-      }
-    }
-    return inserted;
-  });
-  const response: SingleTransactionResponse = { transaction: row ? transactionToApi(row) : null };
+  // 画面は科目の確定時に学習履歴へ別途記録するため、ここでは記録しない。
+  const { transaction } = await createTransaction(
+    db,
+    {
+      date: body.date,
+      fiscalYear: body.fiscal_year,
+      description: body.description,
+      amount: body.amount,
+      account: body.account,
+      category: body.category,
+      incomeType: body.income_type,
+      taxCategory: body.tax_category,
+      businessRatioPercent: body.business_ratio_percent,
+      businessRatioBasis: body.business_ratio_basis,
+    },
+    { learn: false, receiptFileIds: body.receipt_file_ids },
+  );
+  const response: SingleTransactionResponse = { transaction: transactionToApi(transaction) };
   return c.json(response, 201);
 };

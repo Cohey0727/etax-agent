@@ -10,7 +10,6 @@ import { normalizeBusinessRatio } from "@etax/shared";
 import { createStorageClient, receiptObjectKey } from "../../gateways/storageGateway";
 import { loadStorageConfig } from "../../lib/config";
 import { getDb } from "../../lib/db";
-import { errorMessage } from "../../lib/errors";
 import { isAllowedUploadContentType, normalizeContentType } from "../../lib/uploadTypes";
 import { recordClassification } from "../../repositories/classificationHistoryRepository";
 import {
@@ -21,19 +20,16 @@ import {
   receiptToApi,
   unlinkReceiptRow,
 } from "../../repositories/receiptRepository";
-import { TransactionRow } from "../../repositories/schema";
 import {
   deleteTransactionRow,
   effectiveFiscalYear,
   getTransactionRow,
-  insertTransactionRow,
   listRecentTransactionHistoryRows,
   listTransactionHistoryRows,
   listTransactionRows,
   replaceYearTransactionRows,
   transactionHistoryToApi,
   transactionToApi,
-  updateTransactionRow,
 } from "../../repositories/transactionRepository";
 import { ReplaceYearTransactionsRequestSchema } from "../../schemas/transaction";
 import { MAX_CLASSIFY_BATCH_ITEMS, classifyAccount } from "../classification/classifyAccount";
@@ -41,6 +37,12 @@ import { loadClassifyDeps } from "../classification/loadClassifyDeps";
 import { buildLedgerPdf } from "../pdf/buildLedgerPdf";
 import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import { analyzeReceiptDraft } from "../receipts/analyzeReceiptDraft";
+import {
+  TransactionInput,
+  TransactionWriteResult,
+  createTransaction,
+  updateTransaction,
+} from "../transactions/transactionWrites";
 import {
   McpToolModule,
   idArg,
@@ -74,22 +76,35 @@ const transactionItemProperties = {
   business_ratio_basis: { type: "string", description: "按分根拠のメモ（任意）" },
 };
 
-/**
- * 保存済みの取引の科目を学習履歴に記録する。取引はすでに確定しているため、
- * 記録の失敗でツール全体を失敗にすると、クライアントの再実行で取引が
- * 二重に登録される。失敗は警告文として返す（成功なら null）。
- */
-async function recordClassificationAfterSave(
-  description: string,
-  category: string,
-): Promise<string | null> {
-  try {
-    await recordClassification(description, category);
-    return null;
-  } catch (e) {
-    console.warn(`[mcp] 分類の学習履歴に記録できませんでした: ${errorMessage(e)}`);
-    return `取引は保存しましたが、分類の学習履歴には記録できませんでした: ${errorMessage(e)}`;
-  }
+/** 取引の登録・更新の引数を、共通の本体（transactionWrites）の入力にする。型の違う値はエラーにする。 */
+function transactionInputArg(args: Record<string, unknown>): TransactionInput {
+  const text = (key: string): string | undefined => {
+    const value = args[key];
+    if (value === undefined || value === null) return undefined;
+    if (typeof value !== "string") throw new Error(`${key} は文字列で渡してください`);
+    return value;
+  };
+  return {
+    date: text("date"),
+    fiscalYear: typeof args["fiscal_year"] === "number" ? args["fiscal_year"] : undefined,
+    description: text("description"),
+    amount: args["amount"] === undefined ? undefined : numArg(args, "amount"),
+    account: text("account"),
+    category: text("category"),
+    incomeType: parseIncomeType(args["income_type"]),
+    taxCategory: text("tax_category"),
+    businessRatioPercent:
+      typeof args["business_ratio_percent"] === "number" ? args["business_ratio_percent"] : undefined,
+    businessRatioBasis: text("business_ratio_basis"),
+  };
+}
+
+/** 取引の保存結果をツールの結果にする（学習履歴に記録できなかったときは warning つき）。 */
+function transactionResult(result: TransactionWriteResult) {
+  return textResult({
+    transaction: transactionToApi(result.transaction),
+    ...(result.learningWarning ? { warning: result.learningWarning } : {}),
+  });
 }
 
 export const mcpLedgerTools: McpToolModule = {
@@ -250,19 +265,20 @@ export const mcpLedgerTools: McpToolModule = {
     {
       name: "add_transaction",
       description:
-        "帳簿DBに取引を1件追加する。amount は符号つき税込金額（収入は正、支出は負）。category に未分類以外を指定すると分類の学習履歴にも記録される。",
+        "帳簿DBに取引を1件追加する。amount は符号つき税込金額（収入は正、支出は負、0 は不可）。category に未分類以外を指定すると分類の学習履歴にも記録される。",
       inputSchema: {
         type: "object",
         properties: {
           date: { type: "string", description: "日付（YYYY-MM-DD）" },
           description: { type: "string", description: "摘要" },
-          amount: { type: "number", description: "符号つき税込金額" },
+          amount: { type: "number", description: "符号つき税込金額（0 以外）" },
           account: { type: "string", description: "口座・支払手段など（任意）" },
           category: { type: "string", description: "勘定科目（任意、既定は未分類）" },
           income_type: {
             type: "string",
             enum: ["business", "real_estate", "other"],
-            description: "所得区分（任意、既定は business）",
+            description:
+              "収入区分（任意。省略時は摘要と勘定科目から推定する: 家賃まわりは real_estate、科目が決まっていれば business、それ以外は other）",
           },
           tax_category: {
             type: "string",
@@ -288,7 +304,8 @@ export const mcpLedgerTools: McpToolModule = {
     },
     {
       name: "update_transaction",
-      description: "帳簿DBの取引を部分更新する。id 以外は変更したい項目だけ渡す。",
+      description:
+        "帳簿DBの取引を部分更新する。id 以外は変更したい項目だけ渡す。category を未分類以外の別の科目に変えると分類の学習履歴にも記録される。",
       inputSchema: {
         type: "object",
         properties: {
@@ -545,82 +562,22 @@ export const mcpLedgerTools: McpToolModule = {
     },
     add_transaction: async (args) => {
       const db = requireDb();
-      const category = typeof args["category"] === "string" && args["category"] !== ""
-        ? args["category"]
-        : "未分類";
-      // String()/Number() で変換すると "undefined" や NaN がそのまま保存されるため、型を確かめてから使う。
-      const date = args["date"];
-      if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        throw new Error("date は YYYY-MM-DD 形式で渡してください");
-      }
+      if (typeof args["date"] !== "string") throw new Error("date は YYYY-MM-DD 形式で渡してください");
       if (typeof args["description"] !== "string") {
         throw new Error("description（摘要）は文字列で渡してください");
       }
       if (args["amount"] === undefined || args["amount"] === null) {
         throw new Error("amount（符号つき税込金額）が必要です");
       }
-      const fiscalYearArg = args["fiscal_year"];
-      const row = await insertTransactionRow(db, {
-        date,
-        fiscalYear:
-          typeof fiscalYearArg === "number" &&
-          Number.isInteger(fiscalYearArg) &&
-          fiscalYearArg >= 1900 &&
-          fiscalYearArg <= 2100
-            ? fiscalYearArg
-            : Number(date.slice(0, 4)),
-        description: args["description"],
-        amount: numArg(args, "amount"),
-        account: typeof args["account"] === "string" ? args["account"] : "",
-        category,
-        incomeType: parseIncomeType(args["income_type"]),
-        taxCategory: typeof args["tax_category"] === "string" ? args["tax_category"] : "",
-        businessRatioPercent: normalizeBusinessRatio(args["business_ratio_percent"]),
-        businessRatioBasis:
-          typeof args["business_ratio_basis"] === "string" ? args["business_ratio_basis"] : "",
-      });
-      if (!row) throw new Error("取引の登録に失敗しました");
-      const warning =
-        category !== "未分類" ? await recordClassificationAfterSave(row.description, category) : null;
-      return textResult({ transaction: transactionToApi(row), ...(warning ? { warning } : {}) });
+      const result = await createTransaction(db, transactionInputArg(args), { learn: true });
+      return transactionResult(result);
     },
     update_transaction: async (args) => {
       const db = requireDb();
       const id = idArg(args, "id");
-      const patch: Partial<TransactionRow> = {};
-      if (typeof args["date"] === "string") {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(args["date"])) {
-          throw new Error("date は YYYY-MM-DD 形式で渡してください");
-        }
-        patch.date = args["date"];
-      }
-      if (
-        typeof args["fiscal_year"] === "number" &&
-        Number.isInteger(args["fiscal_year"]) &&
-        args["fiscal_year"] >= 1900 &&
-        args["fiscal_year"] <= 2100
-      ) {
-        patch.fiscalYear = args["fiscal_year"];
-      }
-      if (typeof args["description"] === "string") patch.description = args["description"];
-      if (args["amount"] !== undefined) patch.amount = numArg(args, "amount");
-      if (typeof args["account"] === "string") patch.account = args["account"];
-      if (typeof args["category"] === "string") patch.category = args["category"];
-      if (args["income_type"] !== undefined) patch.incomeType = parseIncomeType(args["income_type"]);
-      if (typeof args["tax_category"] === "string") patch.taxCategory = args["tax_category"];
-      if (typeof args["business_ratio_percent"] === "number") {
-        patch.businessRatioPercent = normalizeBusinessRatio(args["business_ratio_percent"]);
-      }
-      if (typeof args["business_ratio_basis"] === "string") {
-        patch.businessRatioBasis = args["business_ratio_basis"];
-      }
-      const row = await updateTransactionRow(db, id, patch);
-      if (!row) throw new Error(`取引が見つかりません: id=${id}`);
-      const warning =
-        patch.category !== undefined && patch.category !== "未分類"
-          ? await recordClassificationAfterSave(row.description, patch.category)
-          : null;
-      return textResult({ transaction: transactionToApi(row), ...(warning ? { warning } : {}) });
+      const result = await updateTransaction(db, id, transactionInputArg(args), { learn: true });
+      if (!result) throw new Error(`取引が見つかりません: id=${id}`);
+      return transactionResult(result);
     },
     delete_transaction: async (args) => {
       const db = requireDb();
