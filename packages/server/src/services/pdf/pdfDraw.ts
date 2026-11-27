@@ -3,8 +3,8 @@
  *
  * 座標はすべてページ寸法に対する比率で持ち、ページサイズに比例させる。
  * フォントサイズは A4（595×842pt）換算で指定し、実ページへ直す倍率
- * （scale = height / 841.89）を掛ける。異動申出書・開業届・青色申告
- * 承認申請書の各 builder が共有する。
+ * （scale = height / 841.89）を掛ける。申告書・異動申出書・開業届・
+ * 青色申告承認申請書の各 builder が共有する。
  */
 import { PDFPage, PDFFont, rgb } from "pdf-lib";
 
@@ -56,6 +56,26 @@ export function drawTextRight(
   const w = ctx.font.widthOfTextAtSize(text, s);
   ctx.page.drawText(text, {
     x: rightRatio * ctx.width - w,
+    y: baseline(ctx, center, s),
+    size: s,
+    font: ctx.font,
+    color: FORM_INK,
+  });
+}
+
+/** 中央を揃えて描く。空文字は描かない。 */
+export function drawTextCentered(
+  ctx: DrawContext,
+  text: string,
+  centerRatio: number,
+  center: number,
+  size: number,
+): void {
+  if (!text) return;
+  const s = size * ctx.scale;
+  const w = ctx.font.widthOfTextAtSize(text, s);
+  ctx.page.drawText(text, {
+    x: centerRatio * ctx.width - w / 2,
     y: baseline(ctx, center, s),
     size: s,
     font: ctx.font,

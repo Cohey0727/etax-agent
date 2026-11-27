@@ -8,11 +8,16 @@
  * これは確認用のイメージで、提出は XTX の e-Tax 取り込みで行う前提。
  */
 import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, PDFPage, PDFFont, rgb } from "pdf-lib";
-import { eraDateOf } from "./formDates";
+import { PDFDocument } from "pdf-lib";
+import { eraDateOf, parseIsoDate, splitPhone, splitZip } from "./formDates";
+import {
+  DrawContext,
+  drawText,
+  drawTextCentered,
+  drawTextFitted,
+  drawTextRight,
+} from "./pdfDraw";
 import { ReturnAmountKey, ReturnFormValues } from "./returnFormValues";
-
-const INK = rgb(0.05, 0.05, 0.25);
 
 /** 第一表の金額行の中心位置（ページ高さに対する比率、上から）。38 行共通グリッド。 */
 const ROW_CENTERS: readonly number[] = [
@@ -92,76 +97,6 @@ const RIGHT_EDGE = 0.96;
 /** 印字済み 0 の1桁分の幅（比率）。 */
 const ZERO_WIDTH = 0.0195;
 
-interface DrawContext {
-  page: PDFPage;
-  font: PDFFont;
-  width: number;
-  height: number;
-  /** A4（595×842pt）換算のフォントサイズを実ページへ直す倍率。 */
-  scale: number;
-}
-
-/** セル中心（上から比率 center）を、文字ベースラインの y 座標へ変換する。 */
-function baseline(ctx: DrawContext, center: number, size: number): number {
-  return ctx.height * (1 - center) - size * 0.35;
-}
-
-function drawText(
-  ctx: DrawContext,
-  text: string,
-  xRatio: number,
-  center: number,
-  size: number,
-): void {
-  if (!text) return;
-  const s = size * ctx.scale;
-  ctx.page.drawText(text, {
-    x: xRatio * ctx.width,
-    y: baseline(ctx, center, s),
-    size: s,
-    font: ctx.font,
-    color: INK,
-  });
-}
-
-function drawTextCentered(
-  ctx: DrawContext,
-  text: string,
-  centerRatio: number,
-  center: number,
-  size: number,
-): void {
-  if (!text) return;
-  const s = size * ctx.scale;
-  const w = ctx.font.widthOfTextAtSize(text, s);
-  ctx.page.drawText(text, {
-    x: centerRatio * ctx.width - w / 2,
-    y: baseline(ctx, center, s),
-    size: s,
-    font: ctx.font,
-    color: INK,
-  });
-}
-
-function drawTextRight(
-  ctx: DrawContext,
-  text: string,
-  rightRatio: number,
-  center: number,
-  size: number,
-): void {
-  if (!text) return;
-  const s = size * ctx.scale;
-  const w = ctx.font.widthOfTextAtSize(text, s);
-  ctx.page.drawText(text, {
-    x: rightRatio * ctx.width - w,
-    y: baseline(ctx, center, s),
-    size: s,
-    font: ctx.font,
-    color: INK,
-  });
-}
-
 /** 金額を描く。印字済み 0 のあるセルは、その桁を落として右端もずらす。 */
 function drawAmount(
   ctx: DrawContext,
@@ -173,46 +108,12 @@ function drawAmount(
   const digits = String(scaled);
   const edge = (cell.side === "left" ? LEFT_EDGE : RIGHT_EDGE) - zeros * ZERO_WIDTH - 0.002;
   const center = ROW_CENTERS[cell.row - 1];
-  if (value < 0) {
-    // 還付側の修正前税額などは頭に △ を付ける（様式の注記どおり）。
-    const s = 11 * ctx.scale;
-    const w = ctx.font.widthOfTextAtSize(digits, s);
-    drawTextRight(ctx, digits, edge, center, 11);
-    ctx.page.drawText("△", {
-      x: edge * ctx.width - w - 13 * ctx.scale,
-      y: baseline(ctx, center, s),
-      size: s,
-      font: ctx.font,
-      color: INK,
-    });
-    return;
-  }
   drawTextRight(ctx, digits, edge, center, 11);
-}
-
-/** 令和表記の年月日。ISO 文字列を分解する（不正なら null）。 */
-function parseIsoDate(iso: string): { year: number; month: number; day: number } | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return null;
-  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
-}
-
-
-/** 枠の幅に収まるよう、必要ならフォントを縮めて左寄せで描く。 */
-function drawTextFitted(
-  ctx: DrawContext,
-  text: string,
-  xRatio: number,
-  center: number,
-  size: number,
-  maxWidthRatio: number,
-): void {
-  if (!text) return;
-  const width = ctx.font.widthOfTextAtSize(text, size * ctx.scale);
-  const fitted = width > maxWidthRatio * ctx.width
-    ? Math.max(size * ((maxWidthRatio * ctx.width) / width), 4.2)
-    : size;
-  drawText(ctx, text, xRatio, center, fitted);
+  if (value < 0) {
+    // 還付側の修正前税額・赤字の申告納税額は頭に △ を付ける（様式の注記どおり）。
+    const w = ctx.font.widthOfTextAtSize(digits, 11 * ctx.scale);
+    drawText(ctx, "△", (edge * ctx.width - w - 13 * ctx.scale) / ctx.width, center, 11);
+  }
 }
 
 function drawHeader(ctx: DrawContext, values: ReturnFormValues): void {
@@ -239,12 +140,12 @@ function drawHeader(ctx: DrawContext, values: ReturnFormValues): void {
     drawTextCentered(ctx, String(birth.day), 0.944, 0.1217, 10.5);
   }
   // 納税地の行: 郵便番号（印字済みの ― の前後に分けて描く）・個人番号
-  const zipDigits = t.zipCode.replace(/\D/g, "");
-  if (zipDigits.length === 7) {
-    drawTextRight(ctx, zipDigits.slice(0, 3), 0.338, 0.1217, 11);
-    drawText(ctx, zipDigits.slice(3), 0.352, 0.1217, 11);
-  } else if (t.zipCode) {
-    drawText(ctx, t.zipCode, 0.283, 0.1217, 11);
+  const zip = splitZip(t.zipCode);
+  if (zip.second) {
+    drawTextRight(ctx, zip.first, 0.338, 0.1217, 11);
+    drawText(ctx, zip.second, 0.352, 0.1217, 11);
+  } else {
+    drawText(ctx, zip.first, 0.283, 0.1217, 11);
   }
   if (t.myNumber) drawSpacedDigits(ctx, t.myNumber, 0.4825, 0.0215, 0.1217, 10.5);
   // 住所・フリガナ・氏名
@@ -260,12 +161,12 @@ function drawHeader(ctx: DrawContext, values: ReturnFormValues): void {
   if ((values.amounts.blueDeduction ?? 0) > 0) drawTextCentered(ctx, "1", 0.184, 0.211, 11);
   if (values.amendment) drawTextCentered(ctx, "1", 0.556, 0.211, 11);
   // 電話番号（ハイフン区切りの3部分を各欄へ）
-  const phoneParts = t.phone.split("-");
+  const phoneParts = splitPhone(t.phone);
   if (phoneParts.length === 3) {
-    drawTextCentered(ctx, phoneParts[0], 0.798, 0.211, 10.5);
-    drawTextCentered(ctx, phoneParts[1], 0.878, 0.211, 10.5);
-    drawTextCentered(ctx, phoneParts[2], 0.94, 0.211, 10.5);
-  } else if (t.phone) {
+    drawTextCentered(ctx, phoneParts[0] ?? "", 0.798, 0.211, 10.5);
+    drawTextCentered(ctx, phoneParts[1] ?? "", 0.878, 0.211, 10.5);
+    drawTextCentered(ctx, phoneParts[2] ?? "", 0.94, 0.211, 10.5);
+  } else {
     drawText(ctx, t.phone, 0.762, 0.211, 10.5);
   }
 }
