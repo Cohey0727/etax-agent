@@ -104,15 +104,22 @@ real_estate: 0.4, // 第6種 不動産業
 export type BusinessKind = keyof typeof SIMPLIFIED_RATES;
 export type ConsumptionMethod = "standard" | "simplified" | "special20";
 
-/** 円未満を切り捨てる（消費税の端数処理に合わせる）。浮動小数の誤差吸収つき。 */
-function floorYen(x: number): number {
-return Math.floor(x + 1e-9);
+/**
+ * 税込の課税売上から売上税額（国税分）を求める（税率10%）。申告書と同じく、
+ * 課税標準額 = 税抜金額（税込 × 100/110）の千円未満切捨て、売上税額 = 課税標準額 × 7.8%。
+ */
+export function outputTaxFromTaxInclusive(salesInclTax: number): number {
+const incl = Math.trunc(salesInclTax);
+if (incl <= 0) return 0;
+const taxBase = Math.floor(Math.floor((incl * 100) / 110) / 1000) * 1000;
+return Math.floor((taxBase * 78) / 1000);
 }
 
-/** 税込の課税売上から売上税額（預かった消費税）を求める。税率10%: 税額 = 税込 × 10/110。 */
-export function outputTaxFromTaxInclusive(salesInclTax: number): number {
-if (salesInclTax <= 0) return 0;
-return floorYen((salesInclTax * 10) / 110);
+/** 税込の課税仕入から仕入税額（国税分）を求める（税率10%: 税込 × 7.8/110、円未満切捨て）。 */
+export function inputTaxFromTaxInclusive(purchasesInclTax: number): number {
+const incl = Math.trunc(purchasesInclTax);
+if (incl <= 0) return 0;
+return Math.floor((incl * 78) / 1100);
 }
 
 // ---------------------------------------------------------------------------
@@ -308,11 +315,15 @@ method: ConsumptionMethod;
 taxableSalesIncl: number;
 /** 非課税売上（税込）— 住宅家賃など */
 nontaxableSalesIncl: number;
-/** 売上税額 */
+/** 売上税額（国税分 = 課税標準額 × 7.8%） */
 outputTax: number;
-/** 仕入税額（本則のみ実額、その他は参考値） */
+/** 控除する仕入税額（国税分。本則は実額の概算、簡易課税・2割特例はみなしの額） */
 inputTax: number;
-/** 納付税額（マイナスは還付側） */
+/** 納付税額のうち国税（差引税額。100円未満切捨て。マイナスは控除不足還付税額） */
+nationalPayable: number;
+/** 納付税額のうち地方消費税（譲渡割額。100円未満切捨て。マイナスは還付） */
+localPayable: number;
+/** 納付税額（国税＋地方消費税。マイナスは還付側） */
 payable: number;
 detail: Record<string, unknown>;
 }
@@ -320,6 +331,7 @@ detail: Record<string, unknown>;
 export interface ConsumptionTaxOptions {
 taxableSalesIncl: number;
 nontaxableSalesIncl?: number;
+/** 仕入税額（国税分）。本則課税で使う（estimateInputTax の値など） */
 inputTax?: number;
 method?: ConsumptionMethod;
 businessKind?: BusinessKind;
@@ -337,14 +349,16 @@ export function taxableSalesRatioPercent(taxableSalesIncl: number, nontaxableSal
 }
 
 /**
-* 消費税の納付税額を計算する（税込経理・税率10%前提）。
-* - standard （本則）: 売上税額 - 仕入税額。
+* 消費税の納付税額を計算する（税込経理・税率10%前提）。端数処理は申告書と同じで、
+* 差引税額（国税）を100円未満切捨て、地方消費税（譲渡割額）は差引税額 × 22/78 を
+* 100円未満切捨てにする。控除不足（還付）の場合は切り捨てない。
+* - standard （本則）: 売上税額 − 仕入税額。
 * 課税売上には非課税の住宅家賃を含めないこと（呼び出し側の
 * 責任。taxableSalesFromBreakdown がそれを担う）。課税売上割合が
 * 95%未満のときは、仕入税額に課税売上割合を掛ける（一括比例配分方式）。
-* - simplified（簡易課税）: 売上税額 × (1 - みなし仕入率)。
+* - simplified（簡易課税）: 売上税額 −（売上税額 × みなし仕入率）。
 * 既定はサービス業（第5種・50%）。
-* - special20 （2割特例）: 売上税額 × 20%。
+* - special20 （2割特例）: 売上税額 −（売上税額 × 80%）。
 */
 export function consumptionTax(opts: ConsumptionTaxOptions): ConsumptionTaxResult {
 const {
@@ -357,7 +371,6 @@ businessKind = "services",
 
 const output = outputTaxFromTaxInclusive(taxableSalesIncl);
 
-let payable: number;
 let detail: Record<string, unknown>;
 let usedInput: number;
 
@@ -365,26 +378,31 @@ if (method === "standard") {
 const ratio = taxableSalesRatioPercent(taxableSalesIncl, nontaxableSalesIncl);
 const rawInput = Math.trunc(inputTax);
 usedInput = ratio >= 95 ? rawInput : Math.floor((rawInput * ratio) / 100);
-payable = output - usedInput;
 detail = { formula: "output_tax - input_tax", taxable_sales_ratio_percent: ratio };
 } else if (method === "simplified") {
 const rate = SIMPLIFIED_RATES[businessKind];
-payable = floorYen(output * (1 - rate));
+// みなし仕入率は10%刻みなので整数演算で切り捨てる
+usedInput = Math.floor((output * Math.round(rate * 10)) / 10);
 detail = {
-formula: "output_tax * (1 - deemed_purchase_rate)",
+formula: "output_tax - output_tax * deemed_purchase_rate",
 deemed_purchase_rate: rate,
 business_kind: businessKind,
 };
-usedInput = output - payable; // 参考値（みなし仕入税額）
 } else if (method === "special20") {
-payable = floorYen(output * 0.2);
-detail = { formula: "output_tax * 20% (2割特例)"};
-usedInput = output - payable; // 参考値
+usedInput = Math.floor((output * 80) / 100);
+detail = { formula: "output_tax - output_tax * 80% (2割特例)"};
 } else {
 throw new Error(
 `未知の計算方式です: ${JSON.stringify(method)} (standard / simplified / special20)`,
 );
 }
+
+const diff = output - usedInput;
+const nationalPayable = diff >= 0 ? Math.floor(diff / 100) * 100 : diff;
+const localPayable =
+  nationalPayable >= 0
+    ? Math.floor(Math.floor((nationalPayable * 22) / 78) / 100) * 100
+    : -Math.floor((-nationalPayable * 22) / 78);
 
 return {
 method,
@@ -392,7 +410,9 @@ taxableSalesIncl: Math.trunc(taxableSalesIncl),
 nontaxableSalesIncl: Math.trunc(nontaxableSalesIncl),
 outputTax: output,
 inputTax: usedInput,
-payable,
+nationalPayable,
+localPayable,
+payable: nationalPayable + localPayable,
 detail,
 };
 }
@@ -450,7 +470,7 @@ export const NON_TAXABLE_EXPENSE_CATEGORIES: ReadonlySet<string> = new Set([
 ]);
 
 /**
-* 経費取引から仕入税額を概算する（税込経費 × 10/110、課税仕入のみ）。
+* 経費取引から仕入税額（国税分）を概算する（税込経費 × 7.8/110、課税仕入のみ）。
 * 対象は事業・不動産の経費科目だけで、資金移動・私用（収入区分 other）は数えない。
 * 課税売上割合による按分前の額。
 * あくまで概算。本則課税の正式な仕入税額は請求書等で確定させること。
@@ -465,7 +485,7 @@ if (NON_TAXABLE_EXPENSE_CATEGORIES.has(category)) continue;
 total += amount;
 }
 }
-return outputTaxFromTaxInclusive(total);
+return inputTaxFromTaxInclusive(total);
 }
 
 // ---------------------------------------------------------------------------

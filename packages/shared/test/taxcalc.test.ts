@@ -1,11 +1,11 @@
 /**
  * taxcalc.test.ts — 税額計算の検証（bun test）。
  * 検証する主な税務ルール:
- *   (a) 簡易課税: 課税売上（税込） ¥15,000,000 → 納付税額 ¥681,818
- *   (b) 2割特例 : 同上 → ¥272,727
- *   (c) 青色申告特別控除: 不動産所得30万・事業所得500万 → 10万 + 65万 = 75万
+ *   (a) 簡易課税: 課税売上（税込） ¥15,000,000 → 納付税額 ¥681,700（国税＋地方）
+ *   (b) 2割特例 : 同上 → ¥272,600
+ *   (c) 青色申告特別控除: 不動産所得30万・事業所得500万 → 30万 + 35万 = 65万（合算限度）
  *   (d) 本則課税: 住宅家賃（非課税）は課税売上から除外される
- *   サンプル2024年分: 消費税3方式 本則 901,935 / 簡易 518,181 / 2割 207,272
+ *   サンプル2024年分: 消費税3方式 本則 901,700 / 簡易 518,000 / 2割 207,100
  *   修正申告差分: 税額 +135,000
  */
 import { describe, expect, test } from "bun:test";
@@ -14,7 +14,10 @@ import {
   amendmentDelta,
   blueDeduction,
   classifyTransactionRow,
+  computeConsumptionReturn,
   computeCorrectedFigures,
+  computeSimplifiedConsumptionReturn,
+  computeSpecial20ConsumptionReturn,
   consumptionTax,
   estimateInputTax,
   filterYear,
@@ -28,29 +31,63 @@ import {
   SAMPLE_ORIGINAL_2024,
 } from "../src/index";
 
-describe("消費税の素計算", () => {
-  test("(a) 簡易課税 課税売上（税込）15,000,000 → 681,818", () => {
+describe("消費税の素計算（申告書と同じ端数処理）", () => {
+  test("(a) 簡易課税 課税売上（税込）15,000,000 → 国税 531,800 + 地方 149,900 = 681,700", () => {
     const r = consumptionTax({ taxableSalesIncl: 15_000_000, method: "simplified" });
-    expect(r.payable).toBe(681_818);
+    expect(r.nationalPayable).toBe(531_800);
+    expect(r.localPayable).toBe(149_900);
+    expect(r.payable).toBe(681_700);
   });
 
-  test("(a2) 売上税額は 1,363,636", () => {
+  test("(a2) 売上税額（国税分）は 課税標準額 13,636,000 × 7.8% = 1,063,608", () => {
     const r = consumptionTax({ taxableSalesIncl: 15_000_000, method: "simplified" });
-    expect(r.outputTax).toBe(1_363_636);
+    expect(r.outputTax).toBe(1_063_608);
   });
 
-  test("(b) 2割特例 課税売上（税込）15,000,000 → 272,727", () => {
+  test("(b) 2割特例 課税売上（税込）15,000,000 → 272,600", () => {
     const r = consumptionTax({ taxableSalesIncl: 15_000_000, method: "special20" });
-    expect(r.payable).toBe(272_727);
+    expect(r.payable).toBe(272_600);
   });
 
-  test("本則: 1,363,636 − 100,000 = 1,263,636", () => {
+  test("本則: (1,063,608 − 100,000) → 国税 963,600 + 地方 271,700", () => {
     const r = consumptionTax({
       taxableSalesIncl: 15_000_000,
       inputTax: 100_000,
       method: "standard",
     });
-    expect(r.payable).toBe(1_263_636);
+    expect(r.nationalPayable).toBe(963_600);
+    expect(r.localPayable).toBe(271_700);
+    expect(r.payable).toBe(1_235_300);
+  });
+
+  test("本則: 仕入税額が売上税額を超えると還付（国税・地方とも端数を切り捨てない）", () => {
+    const r = consumptionTax({ taxableSalesIncl: 1_100_000, inputTax: 200_000, method: "standard" });
+    // 売上税額 1,000,000 × 7.8% = 78,000、控除不足 122,000、地方 122,000 × 22/78 = 34,410
+    expect(r.nationalPayable).toBe(-122_000);
+    expect(r.localPayable).toBe(-34_410);
+    expect(r.payable).toBe(-156_410);
+  });
+
+  test("消費税申告書の計算（本則・簡易課税・2割特例）と納付税額が一致する", () => {
+    for (const salesIncl10 of [1_234_567, 9_876_543, 15_000_000]) {
+      const purchasesIncl10 = Math.floor(salesIncl10 / 3);
+      const inputTax = Math.floor((purchasesIncl10 * 78) / 1100);
+      const zero = { salesIncl8: 0, nontaxableSales: 0, exemptSales: 0, interimNational: 0, interimLocal: 0 };
+      const adjustments = { returnsIncl10: 0, returnsIncl8: 0, badDebtRecoveryTax10: 0, badDebtRecoveryTax8: 0, badDebtTax10: 0, badDebtTax8: 0 };
+      expect(consumptionTax({ taxableSalesIncl: salesIncl10, inputTax, method: "standard" }).payable).toBe(
+        computeConsumptionReturn({ ...zero, salesIncl10, purchasesIncl10, purchasesIncl8: 0 }).totalPayable,
+      );
+      expect(consumptionTax({ taxableSalesIncl: salesIncl10, method: "simplified" }).payable).toBe(
+        computeSimplifiedConsumptionReturn({
+          ...zero,
+          ...adjustments,
+          salesByCategory: { 5: { incl10: salesIncl10, incl8: 0 } },
+        }).totalPayable,
+      );
+      expect(consumptionTax({ taxableSalesIncl: salesIncl10, method: "special20" }).payable).toBe(
+        computeSpecial20ConsumptionReturn({ ...zero, ...adjustments, salesIncl10 }).totalPayable,
+      );
+    }
   });
 });
 
@@ -176,7 +213,7 @@ describe("サンプルCSV（2024年分）", () => {
     expect(nontaxable).toBe(1_764_000);
     expect(taxable).toBe(11_400_000);
     const r = consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, method: "standard", inputTax: estimateInputTax(tx2024) });
-    expect(r.outputTax).toBe(1_036_363);
+    expect(r.outputTax).toBe(808_314);
   });
 
   test("集計の基本（事業所得・不動産所得）", () => {
@@ -185,14 +222,14 @@ describe("サンプルCSV（2024年分）", () => {
     expect(blueDeduction(b.realEstateIncome, b.businessIncome).total).toBe(650_000);
   });
 
-  test("消費税3方式のサンプル値（本則 901,935 / 簡易 518,181 / 2割 207,272）", () => {
+  test("消費税3方式のサンプル値（本則 901,700 / 簡易 518,000 / 2割 207,100）", () => {
     const rent = residentialRentTotal(tx2024);
     const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
     const inputTax = estimateInputTax(tx2024);
-    expect(inputTax).toBe(157_318);
-    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "standard" }).payable).toBe(901_935);
-    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "simplified" }).payable).toBe(518_181);
-    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "special20" }).payable).toBe(207_272);
+    expect(inputTax).toBe(122_708);
+    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "standard" }).payable).toBe(901_700);
+    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "simplified" }).payable).toBe(518_000);
+    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "special20" }).payable).toBe(207_100);
   });
 
   test("内部形式CSVの再パースでも件数が一致する", () => {
@@ -211,13 +248,13 @@ describe("サンプルCSV（2024年分）", () => {
       tax_category: "",
     });
     const txs = [
-      mk("通信費", -110_000), // 課税仕入: 110,000 × 10/110 = 10,000
+      mk("通信費", -110_000), // 課税仕入: 110,000 × 7.8/110 = 7,800
       mk("損害保険料", -110_000), // 非課税仕入（旧表記「保険料」では一致しなかった）
       mk("給料賃金", -110_000), // 非課税仕入（旧表記「給与賃金」では一致しなかった）
       mk("利子割引料", -110_000),
       mk("貸倒金", -110_000),
     ];
-    expect(estimateInputTax(txs)).toBe(10_000);
+    expect(estimateInputTax(txs)).toBe(7_800);
   });
 
   test("estimateInputTax は収入区分 other（資金移動・私用）の出金を数えない", () => {
@@ -226,7 +263,7 @@ describe("サンプルCSV（2024年分）", () => {
       { date: "2025-04-01", year: 2025, description: "定期預金へ振替", amount: -1_100_000, category: "未分類", income_type: "other" },
       { date: "2025-04-02", year: 2025, description: "生活費", amount: -550_000, category: "未分類", income_type: "other" },
     ]);
-    expect(estimateInputTax(txs)).toBe(10_000);
+    expect(estimateInputTax(txs)).toBe(7_800);
   });
 
   test("経費の返金は課税売上ではなく仕入の減額として扱う", () => {
@@ -241,7 +278,7 @@ describe("サンプルCSV（2024年分）", () => {
     expect(figures.business_revenue).toBe(1_100_000);
     expect(figures.business_expenses).toBe(55_000);
     expect(figures.taxable_sales).toBe(1_100_000);
-    expect(figures.input_tax_estimate).toBe(5_000);
+    expect(figures.input_tax_estimate).toBe(3_900);
   });
 
   test("家賃収入の返金は住宅家賃（非課税売上）を減らし、課税売上を負にしない", () => {
@@ -389,16 +426,16 @@ describe("修正パイプライン（computeCorrectedFigures）", () => {
     expect(figs.nontaxable_sales).toBe(1_764_000);
   });
 
-  test("パイプライン: 消費税 本則 901,935", () => {
-    expect(figs.consumption_tax_standard).toBe(901_935);
+  test("パイプライン: 消費税 本則 901,700", () => {
+    expect(figs.consumption_tax_standard).toBe(901_700);
   });
 
-  test("パイプライン: 消費税 簡易課税 518,181", () => {
-    expect(figs.consumption_tax_simplified).toBe(518_181);
+  test("パイプライン: 消費税 簡易課税 518,000", () => {
+    expect(figs.consumption_tax_simplified).toBe(518_000);
   });
 
-  test("パイプライン: 消費税 2割特例 207,272", () => {
-    expect(figs.consumption_tax_special20).toBe(207_272);
+  test("パイプライン: 消費税 2割特例 207,100", () => {
+    expect(figs.consumption_tax_special20).toBe(207_100);
   });
 
   test("パイプライン: 控除後所得 事業 9,850,500・不動産 837,000", () => {

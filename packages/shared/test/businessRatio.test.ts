@@ -132,10 +132,10 @@ describe("消費税への反映", () => {
   ];
 
   test("仕入税額控除の概算（本則）は按分後の事業分が母数になる", () => {
-    // 事業分 55,000 × 10/110 = 5,000
-    expect(estimateInputTax(withRatio(50))).toBe(5_000);
-    // 按分なし（全額事業分）: 110,000 × 10/110 = 10,000
-    expect(estimateInputTax(withRatio(100))).toBe(10_000);
+    // 事業分 55,000 × 7.8/110 = 3,900
+    expect(estimateInputTax(withRatio(50))).toBe(3_900);
+    // 按分なし（全額事業分）: 110,000 × 7.8/110 = 7,800
+    expect(estimateInputTax(withRatio(100))).toBe(7_800);
   });
 
   test("本則の納付税額は按分で変わり、簡易課税・2割特例は按分の影響を受けない", () => {
