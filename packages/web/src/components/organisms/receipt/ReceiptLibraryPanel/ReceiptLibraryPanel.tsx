@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Col, Row, Select, Text } from "@components/atoms";
+import { Button, Card, Col, LoadingCircle, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { LedgerTransaction, ReceiptRecord } from "@types";
 import {
@@ -23,26 +23,31 @@ const transactionLabel = (tx: LedgerTransaction): string =>
   `${tx.date} ${tx.description || "（摘要なし）"} ${formatAmount(tx.amount)}`;
 
 export const ReceiptLibraryPanel = ({ year }: ReceiptLibraryPanelProps) => {
+  const [loaded, setLoaded] = useState(false);
   const [receipts, setReceipts] = useState<ReceiptRecord[] | null>(null);
   const [ledger, setLedger] = useState<LedgerTransaction[]>([]);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 紐付け・解除のあとに一覧を取り直す回数。
+  const [reloadCount, setReloadCount] = useState(0);
 
-  const reload = async () => {
-    const [receiptList, ledgerList] = await Promise.all([
-      fetchReceipts(),
-      fetchLedgerTransactions(year),
-    ]);
-    setReceipts(receiptList);
-    setLedger(ledgerList ?? []);
-  };
-
+  // 年度を切り替えたら紐付け先の候補を取り直す。先に出した取得の結果が後から
+  // 返っても、切り替え後の年度の候補を上書きしないよう捨てる。
   useEffect(() => {
-    void reload();
-    // year が変わったら候補を取り直す
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year]);
+    let cancelled = false;
+    void Promise.all([fetchReceipts(), fetchLedgerTransactions(year)]).then(
+      ([receiptList, ledgerList]) => {
+        if (cancelled) return;
+        setReceipts(receiptList);
+        setLedger(ledgerList ?? []);
+        setLoaded(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [year, reloadCount]);
 
   const handleLink = async (receipt: ReceiptRecord) => {
     const target = Number(selected[receipt.file_id] ?? "");
@@ -54,7 +59,7 @@ export const ReceiptLibraryPanel = ({ year }: ReceiptLibraryPanelProps) => {
     setError(null);
     try {
       await linkReceipt(receipt.file_id, target);
-      await reload();
+      setReloadCount((count) => count + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -67,7 +72,7 @@ export const ReceiptLibraryPanel = ({ year }: ReceiptLibraryPanelProps) => {
     setError(null);
     try {
       await unlinkReceipt(receipt.file_id);
-      await reload();
+      setReloadCount((count) => count + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -90,7 +95,8 @@ export const ReceiptLibraryPanel = ({ year }: ReceiptLibraryPanelProps) => {
           （電子帳簿保存法の相互関連性）。
         </Text>
         {error && <AlertBox variant="error">{error}</AlertBox>}
-        {receipts === null && (
+        {!loaded && <LoadingCircle />}
+        {loaded && receipts === null && (
           <Text variant="muted">帳簿DBに接続できないため、証憑の一覧を表示できません。</Text>
         )}
         {receipts !== null && receipts.length === 0 && (

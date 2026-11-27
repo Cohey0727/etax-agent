@@ -8,6 +8,8 @@ import styles from "./ReceiptPanel.css";
 import { registerReceiptTransaction } from "./ReceiptPanel.utils";
 
 export interface ReceiptPanelProps {
+  /** 画像を解析した（証憑台帳に記録された）。 */
+  onAnalyzed: () => void;
   /** 帳簿へ登録した取引を画面の取引へ加える。 */
   onRegistered: (transaction: Transaction) => void;
 }
@@ -29,7 +31,7 @@ interface ReceiptDraft {
   fileId: string | null;
 }
 
-export const ReceiptPanel = ({ onRegistered }: ReceiptPanelProps) => {
+export const ReceiptPanel = ({ onAnalyzed, onRegistered }: ReceiptPanelProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [draft, setDraft] = useState<ReceiptDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export const ReceiptPanel = ({ onRegistered }: ReceiptPanelProps) => {
         classification: res.classification,
         fileId,
       });
+      onAnalyzed();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
