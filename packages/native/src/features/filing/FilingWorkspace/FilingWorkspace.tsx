@@ -202,9 +202,10 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
     [transactions, year, figuresOptions, deductionState.miscIncome, taxResult, deductionState.salaryIncome],
   );
   const handleConfirmCalculation = async () => {
-    if (!currentFigures) return;
-    await createFilingSnapshot(year, currentFigures);
+    if (!currentFigures) return true;
+    const created = await createFilingSnapshot(year, currentFigures);
     await refreshSnapshots();
+    return created !== null;
   };
 
   // 総合タブのセクションリンク。納税者情報だけはタブではなく独立画面へ遷移する。

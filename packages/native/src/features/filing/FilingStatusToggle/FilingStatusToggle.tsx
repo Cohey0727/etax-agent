@@ -1,8 +1,14 @@
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { AppButton, AppText, Card, Chip } from "@/components";
+import { AlertBox, AppButton, AppText, Card, Chip } from "@/components";
 import { space } from "@/theme";
 import { formatDate } from "@/utils";
-import { FilingStatusKey, useFilingStatus } from "../useFilingStatus";
+import {
+  FilingStatusKey,
+  FilingStatusToggleOutcome,
+  toggleFilingStatus,
+  useFilingStatus,
+} from "../useFilingStatus";
 
 export interface FilingStatusToggleProps {
   year: number;
@@ -10,11 +16,18 @@ export interface FilingStatusToggleProps {
   statusKey: FilingStatusKey;
   label: string;
   description: string;
-  /** 未確定→確定に切り替えた直後に呼ばれる（確定スナップショットの保存など）。 */
-  onConfirm?: () => Promise<void>;
+  /** 未確定→確定に切り替えた直後に呼ばれる（確定スナップショットの保存など）。できたか。 */
+  onConfirm?: () => Promise<boolean>;
   /** true のときはカードで囲まず、既存のカードの中にそのまま置ける形で出す。 */
   bare?: boolean;
 }
+
+const OUTCOME_ERRORS: Record<FilingStatusToggleOutcome, string | null> = {
+  saved: null,
+  statusFailed: "保存できませんでした。サーバーへの接続を確認してください。",
+  confirmFailed:
+    "確定しましたが、計算結果の控えを保存できませんでした。確定解除してから確定し直すと、控えを作り直します。",
+};
 
 /**
  * 「確定する／確定解除」のバー。そのタブの作業を終えたらその場で
@@ -30,13 +43,14 @@ export function FilingStatusToggle({
   bare = false,
 }: FilingStatusToggleProps) {
   const { status, loaded, available, savingKey, toggle } = useFilingStatus(year);
+  const [error, setError] = useState<string | null>(null);
   const done = status[statusKey];
   const doneAt = status[`${statusKey}_at`];
 
   const handlePress = async () => {
-    const turningOn = !done;
-    await toggle(statusKey);
-    if (turningOn && onConfirm) await onConfirm();
+    setError(null);
+    const outcome = await toggleFilingStatus(!done, () => toggle(statusKey), onConfirm);
+    setError(OUTCOME_ERRORS[outcome]);
   };
 
   const content = (
@@ -58,6 +72,7 @@ export function FilingStatusToggle({
           ステータスを保存するサーバーに接続できていません。「確定する」は接続時に使えます。
         </AppText>
       ) : null}
+      {error ? <AlertBox tone="error" message={error} /> : null}
       <AppButton
         label={done ? "確定解除" : "確定する"}
         variant={done ? "ghost" : "primary"}

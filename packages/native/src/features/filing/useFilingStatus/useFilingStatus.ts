@@ -34,8 +34,27 @@ export interface UseFilingStatusResult {
   available: boolean;
   /** 保存中の項目。保存していない間は null。 */
   savingKey: FilingStatusKey | null;
-  /** 項目の済/未を反転してサーバーへ保存する。 */
-  toggle: (key: FilingStatusKey) => Promise<void>;
+  /** 項目の済/未を反転してサーバーへ保存する。保存できなければ null。 */
+  toggle: (key: FilingStatusKey) => Promise<FilingStatus | null>;
+}
+
+/** 確定の切り替えの結果。 */
+export type FilingStatusToggleOutcome = "saved" | "statusFailed" | "confirmFailed";
+
+/**
+ * 済/未を切り替え、未→済にできたときだけ onConfirm（確定スナップショットの保存など）を
+ * 続けて行う。ステータスを保存できなかったときは onConfirm を呼ばない
+ * （確定していないのに「前回確定」の控えができてしまうため）。
+ */
+export async function toggleFilingStatus(
+  turningOn: boolean,
+  toggle: () => Promise<FilingStatus | null>,
+  onConfirm?: () => Promise<boolean>,
+): Promise<FilingStatusToggleOutcome> {
+  const updated = await toggle();
+  if (!updated) return "statusFailed";
+  if (turningOn && onConfirm && !(await onConfirm())) return "confirmFailed";
+  return "saved";
 }
 
 /**
@@ -80,6 +99,7 @@ export function useFilingStatus(year: number): UseFilingStatusResult {
       setStatus(updated);
       notifyStatusChanged();
     }
+    return updated;
   };
 
   return { status, loaded, available, savingKey, toggle };
