@@ -973,20 +973,6 @@ export async function fetchRecentTransactionHistory(
   }
 }
 
-/** 1年分の取引を丸ごと帳簿へ保存する（画面の確定状態で置き換える）。 */
-export async function replaceYearLedgerTransactions(
-  year: number,
-  inputs: LedgerTransactionInput[],
-): Promise<LedgerTransaction[]> {
-  const resp = await fetch("/api/transactions/replace-year", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ year, transactions: inputs }),
-  });
-  const data = await parseJson<ListLedgerTransactionsResponse>(resp);
-  return data.transactions;
-}
-
 /* ---------- 認証・課金 ---------- */
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {

@@ -4,7 +4,6 @@ import { AppView } from "@types";
 import {
   fetchLedgerTransactions,
   ledgerRowToTransaction,
-  replaceYearLedgerTransactions,
   transactionToLedgerInput,
   updateLedgerTransaction,
 } from "@utils/api";
@@ -46,24 +45,14 @@ export function useLedgerSync(options: {
     };
   }, [authChecked, authUserId]);
 
-  /** 確定した取引を帳簿へ保存する（年ごとに置き換え。失敗しても画面は継続）。 */
-  const saveTransactionsByYear = (next: Transaction[]) => {
-    const yearsToSave = [...new Set(next.map((tx) => tx.year))];
-    for (const saveYear of yearsToSave) {
-      const inputs = next
-        .filter((tx) => tx.year === saveYear)
-        .map(transactionToLedgerInput);
-      void replaceYearLedgerTransactions(saveYear, inputs).catch(() => {
-        // 帳簿が未接続の環境ではメモリ上のみで動く
-      });
-    }
-  };
-
-  const handleUseImported = (next: Transaction[]) => {
-    setTransactions(next);
+  /**
+   * DB に保存されなかった CSV 取込（DB 未接続・保存失敗）の「ダッシュボードで使う」。
+   * 帳簿へは書かず、画面の取引にだけ反映する（取込画面も「保存されていません」と出している）。
+   */
+  const handleUseImported = (imported: Transaction[]) => {
+    setTransactions((current) => mergeImportedPreview(current, imported));
     setDataSource("取込CSV");
     setActiveView(AppView.Dashboard);
-    saveTransactionsByYear(next);
   };
 
   /**
@@ -148,4 +137,13 @@ export function useLedgerSync(options: {
     handleLoadSample,
     reloadTransactions,
   };
+}
+
+/**
+ * 保存されなかった取込を画面の取引へ重ねる。取込に含まれる年度は取込分に差し替え、
+ * それ以外の年度は残す（同じ CSV を取り込み直しても重ならない）。
+ */
+export function mergeImportedPreview(current: Transaction[], imported: Transaction[]): Transaction[] {
+  const importedYears = new Set(imported.map((tx) => tx.year));
+  return [...current.filter((tx) => !importedYears.has(tx.year)), ...imported];
 }
