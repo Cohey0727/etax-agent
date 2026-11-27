@@ -1,7 +1,7 @@
 import { CategoryBreakdown, categoryBreakdown, filterYear, Transaction } from "@etax/shared";
 import { useMemo } from "react";
 import { Card, Col, Row, Text } from "@components/atoms";
-import { formatYen } from "@utils";
+import { formatCompactYen, formatYen } from "@utils";
 import styles from "./BreakdownPanel.css";
 
 export interface BreakdownPanelProps {
@@ -103,9 +103,3 @@ const BreakdownColumn = ({ title, breakdown }: BreakdownColumnProps) => {
     </Col>
   );
 };
-
-// 円グラフ中央用の短い金額（万円単位）。
-function formatCompactYen(amount: number): string {
-  if (Math.abs(amount) < 10000) return formatYen(amount);
-  return `¥${Math.round(amount / 10000).toLocaleString("ja-JP")}万`;
-}

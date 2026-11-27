@@ -5,6 +5,12 @@
 export const formatYen = (value: number): string =>
   `${Math.trunc(value).toLocaleString("ja-JP")}円`;
 
+/** グラフのラベル用の短い金額。1万円未満は「1,234円」、それ以上は万円単位に丸める。 */
+export const formatCompactYen = (value: number): string =>
+  Math.abs(value) < 10000
+    ? formatYen(value)
+    : `¥${Math.round(value / 10000).toLocaleString("ja-JP")}万`;
+
 /** 件数・金額を桁区切り文字列にする。表示直前（JSX の中）でのみ使う。 */
 export const formatNumber = (value: number): string =>
   Math.trunc(value).toLocaleString("ja-JP");

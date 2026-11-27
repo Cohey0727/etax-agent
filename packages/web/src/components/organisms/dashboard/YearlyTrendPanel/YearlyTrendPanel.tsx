@@ -1,7 +1,7 @@
 import { Transaction, yearlyIncomeTotals } from "@etax/shared";
 import { Fragment, useMemo } from "react";
 import { Card, Col, Row, Text } from "@components/atoms";
-import { formatYen } from "@utils";
+import { formatCompactYen, formatYen } from "@utils";
 import styles from "./YearlyTrendPanel.css";
 
 type SeriesKey = "revenue" | "expenses" | "balance";
@@ -144,9 +144,3 @@ export const YearlyTrendPanel = ({ transactions }: YearlyTrendPanelProps) => {
     </Card>
   );
 };
-
-// グラフのラベル用の短い金額（万円単位）。
-function formatCompactYen(amount: number): string {
-  if (Math.abs(amount) < 10000) return formatYen(amount);
-  return `¥${Math.round(amount / 10000).toLocaleString("ja-JP")}万`;
-}
