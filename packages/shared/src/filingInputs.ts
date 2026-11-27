@@ -632,6 +632,29 @@ export function specialRelativeInputApplies(year: number): boolean {
 }
 
 /**
+ * 「23歳未満の扶養親族がいる」を入力として受ける年分か。一般生命保険料の
+ * 控除の上限が上がる特例（税務パラメータの lifeInsuranceGeneralYoungDependentCap）が
+ * ある年分だけが対象。
+ */
+export function youngDependentInputApplies(year: number): boolean {
+  return (TAX_PARAMETERS[year]?.lifeInsuranceGeneralYoungDependentCap ?? null) !== null;
+}
+
+/** 定額減税（令和6年分特別税額控除）の入力を受ける年分か。 */
+export function flatReductionInputApplies(year: number): boolean {
+  return TAX_PARAMETERS[year]?.flatReductionApplies === true;
+}
+
+/**
+ * インボイス登録で課税事業者になった個人事業者の消費税の特例の名前（率が0.2なら
+ * 「2割特例」、0.3なら「3割特例」）。特例の無い年分は null。
+ */
+export function smallBusinessSpecialName(year: number): string | null {
+  const rate = TAX_PARAMETERS[year]?.smallBusinessSpecialRate ?? null;
+  return rate === null ? null : `${Math.round(rate * 10)}割特例`;
+}
+
+/**
  * 基準期間（2年前）の課税売上高（千円・税抜）を帳簿から出す。
  * 2年前の帳簿が無ければ 0（手入力で直す前提）。
  */

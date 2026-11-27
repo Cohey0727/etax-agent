@@ -7,7 +7,8 @@ import {
   IncomeDeductionBreakdown,
   LifeInsurancePremiums,
   SpouseCategory,
-  TAX_PARAMETERS,
+  specialRelativeInputApplies,
+  youngDependentInputApplies,
 } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { Card, SelectField, SwitchRow } from "@/components";
@@ -134,6 +135,14 @@ export function DeductionPanel({
           value={deductions.lifeInsurance.oldPension}
           onChange={(v) => setLife({ oldPension: v })}
         />
+        {youngDependentInputApplies(year) ? (
+          <SwitchRow
+            label="23歳未満の扶養親族がいる"
+            description="一般の生命保険料（新契約）の控除の上限が上がる特例の判定に使います。"
+            value={deductions.hasDependentUnder23 === true}
+            onChange={(v) => set({ hasDependentUnder23: v })}
+          />
+        ) : null}
         <AmountField
           label="地震保険料（地震部分）"
           value={deductions.earthquakeInsurance.earthquake}
@@ -240,7 +249,7 @@ export function DeductionPanel({
           value={deductions.isWorkingStudent}
           onChange={(v) => set({ isWorkingStudent: v })}
         />
-        {(TAX_PARAMETERS[year]?.specialRelativeTiers ?? null) !== null ? (
+        {specialRelativeInputApplies(year) ? (
           <NullableAmountField
             label="特定親族（19〜22歳）の合計所得金額"
             value={deductions.specialRelativeTotalIncome}

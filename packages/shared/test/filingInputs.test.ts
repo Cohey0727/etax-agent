@@ -11,8 +11,11 @@ import {
   deriveBasePeriodSalesThousands,
   freshDeductionState,
   parseDeductionState,
+  flatReductionInputApplies,
+  smallBusinessSpecialName,
   snapshotFiguresOf,
   specialRelativeInputApplies,
+  youngDependentInputApplies,
 } from "../src/filingInputs";
 import { computeIncomeTax, EMPTY_DEDUCTION_INPUTS, EMPTY_TAX_CREDIT_INPUTS } from "../src/deductions";
 import type { Transaction } from "../src/types";
@@ -268,6 +271,28 @@ describe("deriveBasePeriodSalesThousands", () => {
 
   test("2年前の帳簿が無ければ 0", () => {
     expect(deriveBasePeriodSalesThousands([tx("2025-01-01", 1_100_000, "売上高")], 2025)).toBe(0);
+  });
+});
+
+describe("年分によって出す入力欄・名前", () => {
+  test("23歳未満の扶養親族の有無は、生命保険料控除の特例がある年分（令和8年分以後）だけ受ける", () => {
+    expect(youngDependentInputApplies(2025)).toBe(false);
+    expect(youngDependentInputApplies(2026)).toBe(true);
+    expect(youngDependentInputApplies(2027)).toBe(true);
+    expect(youngDependentInputApplies(2030)).toBe(false);
+  });
+
+  test("定額減税の入力は対象の年分（令和6年分）だけ受ける", () => {
+    expect(flatReductionInputApplies(2023)).toBe(false);
+    expect(flatReductionInputApplies(2024)).toBe(true);
+    expect(flatReductionInputApplies(2025)).toBe(false);
+    expect(flatReductionInputApplies(2030)).toBe(false);
+  });
+
+  test("小規模事業者の消費税の特例は年分の率で名前を付け、特例の無い年分は null", () => {
+    expect(smallBusinessSpecialName(2025)).toBe("2割特例");
+    expect(smallBusinessSpecialName(2027)).toBe("3割特例");
+    expect(smallBusinessSpecialName(2030)).toBeNull();
   });
 });
 

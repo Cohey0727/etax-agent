@@ -364,7 +364,7 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
     }),
     set_deductions: tool({
       description:
-        "控除入力を変更する（画面側の保存値へ反映される）。deductions は DeductionInputs の部分JSON（例: {\"socialInsurancePaid\": 140080, \"donationsTotal\": 47000}。内訳がある控除は *_entries で明細を渡すと合計も自動で合う）。filing_type は blue65 / blue55 / blue10 / white。misc_income は雑所得（revenue / income / kubun）。expanded_income は配当・一時・株式等譲渡の入力。agriculture は農業所得の入力。",
+        "控除入力を変更する（画面側の保存値へ反映される）。deductions は DeductionInputs の部分JSON（例: {\"socialInsurancePaid\": 140080, \"donationsTotal\": 47000}。23歳未満の扶養親族がいる場合は {\"hasDependentUnder23\": true}。内訳がある控除は *_entries で明細を渡すと合計も自動で合う）。filing_type は blue65 / blue55 / blue10 / white。misc_income は雑所得（revenue / income / kubun）。expanded_income は配当・一時・株式等譲渡の入力。agriculture は農業所得の入力。",
       inputSchema: z.object({
         year: z.number().int().describe("対象年（西暦）"),
         deductions: z

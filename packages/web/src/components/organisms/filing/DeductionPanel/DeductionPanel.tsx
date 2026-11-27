@@ -8,6 +8,7 @@ import {
   LifeInsurancePremiums,
   SpouseCategory,
   specialRelativeInputApplies,
+  youngDependentInputApplies,
 } from "@etax/shared";
 import { Card, Col, Row, Select, Text } from "@components/atoms";
 import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
@@ -139,6 +140,20 @@ export const DeductionPanel = ({
           value={deductions.lifeInsurance.oldPension}
           onChange={(v) => setLife({ oldPension: v })}
         />
+        {youngDependentInputApplies(year) ? (
+          <Col gap="sm">
+            <Row gap="sm">
+              <ToggleButton
+                label="23歳未満の扶養親族がいる"
+                active={deductions.hasDependentUnder23 === true}
+                onClick={() => set({ hasDependentUnder23: deductions.hasDependentUnder23 !== true })}
+              />
+            </Row>
+            <Text variant="muted">
+              一般の生命保険料（新契約）の控除の上限が上がる特例の判定に使います。
+            </Text>
+          </Col>
+        ) : null}
         <LabeledAmountField
           label="地震保険料（地震部分）"
           value={deductions.earthquakeInsurance.earthquake}

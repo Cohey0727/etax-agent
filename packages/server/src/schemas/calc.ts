@@ -175,6 +175,8 @@ export const DeductionInputsSchema = z
     isSingleParent: z.boolean(),
     isWorkingStudent: z.boolean(),
     specialRelativeTotalIncome: z.number().nullable(),
+    // 生命保険料控除の特例（23歳未満の扶養親族がいる年分の上限）の判定。未指定は false
+    hasDependentUnder23: z.boolean().optional(),
   })
   .openapi("DeductionInputs");
 
