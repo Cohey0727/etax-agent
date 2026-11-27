@@ -26,17 +26,25 @@ interface SetupItem {
  * 全部そろったら表示しない。
  */
 export function SetupChecklistPanel({ transactions, year, onNavigate }: SetupChecklistPanelProps) {
-  const [profileDone, setProfileDone] = useState<boolean | null>(null);
-  const [inputsDone, setInputsDone] = useState<boolean | null>(null);
+  // 取得した設定状況は取得した年度と組にして持ち、表示中の年度のものだけを使う。
+  const [setupStatus, setSetupStatus] = useState<{
+    year: number;
+    profileDone: boolean;
+    inputsDone: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchTaxpayerProfile(year).then((result) => {
-      if (!cancelled) setProfileDone(Boolean(result?.taxpayer.name));
-    });
-    void fetchFilingInputs(year).then((result) => {
-      if (!cancelled) setInputsDone(result !== null);
-    });
+    void Promise.all([fetchTaxpayerProfile(year), fetchFilingInputs(year)]).then(
+      ([profile, inputs]) => {
+        if (cancelled) return;
+        setSetupStatus({
+          year,
+          profileDone: Boolean(profile?.taxpayer.name),
+          inputsDone: inputs !== null,
+        });
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -44,7 +52,8 @@ export function SetupChecklistPanel({ transactions, year, onNavigate }: SetupChe
 
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
 
-  if (profileDone === null || inputsDone === null) return null;
+  if (setupStatus === null || setupStatus.year !== year) return null;
+  const { profileDone, inputsDone } = setupStatus;
 
   const items: SetupItem[] = [
     {
