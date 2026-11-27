@@ -99,6 +99,23 @@ describe("配偶者控除・配偶者特別控除", () => {
   test("配偶者特別控除: 配偶者なし（null） → 0円", () => {
     expect(spouseSpecialDeduction(2024, null, 8_000_000)).toBe(0);
   });
+  test("合算: 配偶者の所得が要件を超えるなら、区分を選んでいても配偶者控除は付かず特別控除だけ", () => {
+    const inputs = { ...EMPTY_DEDUCTION_INPUTS, spouseCategory: "general" as const };
+    const special = computeIncomeDeductions(2025, 5_000_000, { ...inputs, spouseTotalIncome: 1_000_000 });
+    expect(special.spouse).toBe(0);
+    expect(special.spouseSpecial).toBe(360_000);
+    const over = computeIncomeDeductions(2025, 5_000_000, { ...inputs, spouseTotalIncome: 2_000_000 });
+    expect(over.spouse).toBe(0);
+    expect(over.spouseSpecial).toBe(0);
+  });
+  test("合算: 配偶者の所得が要件以下なら配偶者控除だけ（未入力は区分どおり）", () => {
+    const inputs = { ...EMPTY_DEDUCTION_INPUTS, spouseCategory: "general" as const };
+    const within = computeIncomeDeductions(2025, 5_000_000, { ...inputs, spouseTotalIncome: 580_000 });
+    expect(within.spouse).toBe(380_000);
+    expect(within.spouseSpecial).toBe(0);
+    const unknown = computeIncomeDeductions(2025, 5_000_000, { ...inputs, spouseTotalIncome: null });
+    expect(unknown.spouse).toBe(380_000);
+  });
 });
 
 describe("特定親族特別控除", () => {

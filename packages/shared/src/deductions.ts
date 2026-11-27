@@ -81,8 +81,9 @@ export type SpouseCategory = "none" | "general" | "elderly";
 
 /**
  * 配偶者控除。本人の合計所得金額で逓減する。
- * 配偶者の合計所得が要件（令和7年分: 58万円以下、令和6年分以前: 48万円以下）
- * を満たすことは呼び出し側の前提。
+ * 配偶者の合計所得が要件（年度パラメータの spouseIncomeLimit 以下）を満たす
+ * ことは呼び出し側の前提。computeIncomeDeductions は配偶者の合計所得が
+ * 入力されていればそれで判定する。
  */
 export function spouseDeduction(category: SpouseCategory, totalIncome: number): number {
   if (category === "none") return 0;
@@ -445,6 +446,11 @@ export function computeIncomeDeductions(
   // 勤労学生は合計所得金額が年度パラメータの上限以下が要件
   const workingStudent =
     inputs.isWorkingStudent && tg <= taxParametersFor(year).workingStudentLimit ? 270_000 : 0;
+  // 配偶者の合計所得が入力されていて要件を超えるなら、配偶者控除ではなく
+  // 配偶者特別控除の側（両者は併用できない）
+  const spouseOverLimit =
+    inputs.spouseTotalIncome !== null &&
+    amount(inputs.spouseTotalIncome) > taxParametersFor(year).spouseIncomeLimit;
   const breakdown: IncomeDeductionBreakdown = {
     casualtyLoss: inputs.casualtyLoss ? casualtyLossDeduction(inputs.casualtyLoss, totalIncome) : 0,
     medical: medicalDeduction(inputs.medicalExpensesPaid, inputs.medicalReimbursement, totalIncome),
@@ -457,7 +463,7 @@ export function computeIncomeDeductions(
     widow,
     singleParent,
     workingStudent,
-    spouse: spouseDeduction(inputs.spouseCategory, tg),
+    spouse: spouseOverLimit ? 0 : spouseDeduction(inputs.spouseCategory, tg),
     spouseSpecial: spouseSpecialDeduction(year, inputs.spouseTotalIncome, tg),
     dependents: dependentDeduction(inputs.dependents),
     specialRelative: specialRelativeDeduction(year, inputs.specialRelativeTotalIncome),
