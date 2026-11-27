@@ -9,7 +9,7 @@ import { MonthlyTable } from "./MonthlyTable";
 import { UpcomingSection } from "./UpcomingSection";
 
 /**
- * 資金繰りレポート（Issue #19）。帳簿の取引実績と、未入金の請求書が
+ * 資金繰りレポート。帳簿の取引実績と、未入金の請求書が
  * 支払期日どおりに入金される前提の試算で、月次の将来残高を表示する。
  * 集計はサーバー側の決定的な計算（GET /api/cash-flow）に寄せ、REST /
  * MCP と同じ結果を表示する。期首残高は表示窓の開始月初時点の残高で、

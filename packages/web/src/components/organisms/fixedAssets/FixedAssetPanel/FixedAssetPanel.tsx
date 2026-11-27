@@ -22,7 +22,7 @@ type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
  * 固定資産台帳の画面本体。ページはサマリ帯と資産一覧が主役で、詳細・登録・編集は1つの右 Drawer で切り替える
  * （編集は Drawer を重ねず、その場で詳細からフォームへ切り替わる）。
  * 一覧は選択年度の対象資産が既定で、対象外の資産は「過去の資産も表示」トグルで広げる。
- * サマリはフィルタと連動せず、全資産を対象に年度ベースで集計する（従来どおり）。
+ * サマリはフィルタと連動せず、全資産を対象に年度ベースで集計する。
  */
 export const FixedAssetPanel = ({ year }: FixedAssetPanelProps) => {
   const {

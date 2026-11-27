@@ -24,7 +24,7 @@ export interface TrialBalancePanelProps {
 }
 
 /**
- * 残高試算表レポート（Issue #18）。帳簿の取引から、XTXの青色申告
+ * 残高試算表レポート。帳簿の取引から、XTXの青色申告
  * 決算書と一致する損益計算書・月次推移・前年比較を表示する。
  * 集計はサーバー側の決定的な計算（POST /api/calc/trial-balance）に寄せ、
  * 申告種別と貸借対照表は申告入力（サーバー保存が正、localStorageは
