@@ -152,10 +152,6 @@ export const summarizeToolArgs = (args: Record<string, unknown>): string => {
   return parts.join("・");
 };
 
-export function formatSessionDate(iso: string): string {
-  return iso.slice(0, 16).replace("T", " ").replaceAll("-", "/");
-}
-
 /** 履歴一覧に出す、その会話の最初の質問の抜粋。 */
 export function sessionExcerpt(session: ChatSession): string {
   const first = session.messages.find((m) => m.role === ChatRole.User) ?? session.messages[0];

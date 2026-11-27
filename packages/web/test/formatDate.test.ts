@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatDate } from "../src/utils/format";
+import { formatDate, formatDateTime } from "../src/utils/format";
 
 process.env.TZ = "Asia/Tokyo";
 
@@ -16,5 +16,11 @@ describe("formatDate", () => {
     expect(formatDate(null)).toBe("");
     expect(formatDate("")).toBe("");
     expect(formatDate("不明な日付")).toBe("不明な日付");
+  });
+});
+
+describe("formatDateTime", () => {
+  test("UTC の日時を現地（日本時間）の日時にする（会話履歴の保存日時など）", () => {
+    expect(formatDateTime("2026-11-28T00:30:00.000Z")).toBe("2026/11/28 9:30:00");
   });
 });

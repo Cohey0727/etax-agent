@@ -16,6 +16,7 @@ import {
   enableTotp,
   fetchBillingPlan,
   fetchMe,
+  formatDate,
   logoutAccount,
   setStorageUserId,
   setupTotp,
@@ -244,7 +245,7 @@ export const AccountPanel = () => {
               {billing.current_period_end ? (
                 <Row gap="md">
                   <Text variant="statLabel">次回更新日</Text>
-                  <Text>{billing.current_period_end.slice(0, 10)}</Text>
+                  <Text>{formatDate(billing.current_period_end)}</Text>
                 </Row>
               ) : null}
               {!subscribed ? (

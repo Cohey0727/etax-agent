@@ -7,6 +7,7 @@ import { AgentConnectionConfig, ChatMessage, ChatRole, SendKeyMode } from "@type
 import {
   agentChat,
   ChatSession,
+  formatDateTime,
   loadCurrentMessages,
   saveCurrentMessages,
 } from "@utils";
@@ -15,7 +16,6 @@ import { PendingAttachmentChips } from "./PendingAttachmentChips";
 import {
   type AgentUiAction,
   deriveUiActions,
-  formatSessionDate,
   sessionExcerpt,
 } from "./agentChatHelpers";
 import { ATTACH_ACCEPT, toChatAttachmentUpload } from "./chatAttachments";
@@ -184,7 +184,7 @@ export const AgentChatPanel = ({
       {viewing ? (
         <div className={styles.chatLog} ref={logRef}>
           <Text variant="muted">
-            {formatSessionDate(viewing.savedAt)} の会話（保存済み・{viewing.messages.length}件）
+            {formatDateTime(viewing.savedAt)} の会話（保存済み・{viewing.messages.length}件）
           </Text>
           <MessageBubbles items={viewing.messages} />
         </div>
@@ -204,7 +204,7 @@ export const AgentChatPanel = ({
               >
                 <Col gap="none">
                   <Text variant="caption">
-                    {formatSessionDate(session.savedAt)} ・ {session.messages.length}件
+                    {formatDateTime(session.savedAt)} ・ {session.messages.length}件
                   </Text>
                   <Text>{sessionExcerpt(session)}</Text>
                 </Col>
