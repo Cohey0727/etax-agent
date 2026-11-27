@@ -286,6 +286,7 @@ export const AgentChatPanel = ({
               variant="ghost"
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
+              disabledReason="応答中です"
               aria-label="ファイルを添付"
             >
               <Icon name="paperclip" size={16} />

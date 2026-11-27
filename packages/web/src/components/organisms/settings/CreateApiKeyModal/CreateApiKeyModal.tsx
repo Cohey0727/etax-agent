@@ -14,13 +14,14 @@ export interface CreateApiKeyModalProps {
   onSubmit: (name: string, expiresAt: string | null) => void;
 }
 
+/** 有効期限の選択肢。days は発行日からの日数（無期限・日付指定は null）。 */
 const expiryOptions = [
-  { value: "never", label: "無期限" },
-  { value: "30", label: "30日" },
-  { value: "90", label: "90日" },
-  { value: "365", label: "1年" },
-  { value: "custom", label: "日付を指定" },
-] as const;
+  { value: "never", label: "無期限", days: null },
+  { value: "days30", label: "30日", days: 30 },
+  { value: "days90", label: "90日", days: 90 },
+  { value: "days365", label: "1年", days: 365 },
+  { value: "custom", label: "日付を指定", days: null },
+] as const satisfies readonly { value: string; label: string; days: number | null }[];
 
 type ExpiryChoice = (typeof expiryOptions)[number]["value"];
 
@@ -81,10 +82,22 @@ export const CreateApiKeyModal = ({ busy, onClose, onSubmit }: CreateApiKeyModal
         </Col>
         {error ? <Text variant="caption">⚠ {error}</Text> : null}
         <Row gap="sm" align="center">
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            disabled={busy}
+            disabledReason="処理中です"
+          >
             キャンセル
           </Button>
-          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={busy}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={busy}
+            disabledReason="処理中です"
+          >
             {busy ? "発行中…" : "発行する"}
           </Button>
         </Row>
@@ -98,9 +111,8 @@ function resolveExpiresAt(
   choice: ExpiryChoice,
   customDate: string,
 ): { ok: true; expiresAt: string | null } | { ok: false; error: string } {
-  if (choice === "never") return { ok: true, expiresAt: null };
   if (choice === "custom") {
-    if (customDate === "") return { ok: false, error: "有効期限の日付を指定してください" };
+    if (!customDate) return { ok: false, error: "有効期限の日付を指定してください" };
     const date = new Date(`${customDate}T23:59:59`);
     if (Number.isNaN(date.getTime())) return { ok: false, error: "有効期限の日付が不正です" };
     if (date.getTime() <= Date.now()) {
@@ -108,6 +120,7 @@ function resolveExpiresAt(
     }
     return { ok: true, expiresAt: date.toISOString() };
   }
-  const days = Number(choice);
+  const days = expiryOptions.find((option) => option.value === choice)?.days ?? null;
+  if (days === null) return { ok: true, expiresAt: null };
   return { ok: true, expiresAt: new Date(Date.now() + days * DAY_MS).toISOString() };
 }

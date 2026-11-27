@@ -22,7 +22,8 @@ export interface ReceiptPanelProps {
 
 interface ReceiptDraft {
   date: string;
-  amount: string;
+  /** 金額（税込・円）。空欄は null。 */
+  amount: number | null;
   description: string;
   account: string;
   classification: AccountClassification;
@@ -59,7 +60,7 @@ export const ReceiptPanel = ({ onAnalyzed, onRegistered }: ReceiptPanelProps) =>
       const description = [res.payee, res.description].filter(Boolean).join(" ");
       setDraft({
         date: res.date ?? "",
-        amount: res.amount !== null ? String(res.amount) : "",
+        amount: res.amount,
         description,
         account: res.classification.account,
         classification: res.classification,
@@ -75,8 +76,8 @@ export const ReceiptPanel = ({ onAnalyzed, onRegistered }: ReceiptPanelProps) =>
 
   const handleAdd = async () => {
     if (!draft || saving) return;
-    const amount = Number(draft.amount);
-    if (!draft.date || !Number.isFinite(amount) || amount === 0) {
+    const amount = draft.amount;
+    if (!draft.date || amount === null || !Number.isFinite(amount) || amount === 0) {
       setError("日付と金額を確認してください");
       return;
     }
@@ -190,8 +191,13 @@ export const ReceiptPanel = ({ onAnalyzed, onRegistered }: ReceiptPanelProps) =>
               <Text variant="statLabel">金額（税込・円）</Text>
               <Input
                 type="number"
-                value={draft.amount}
-                onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                value={draft.amount ?? ""}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    amount: Number.isNaN(e.target.valueAsNumber) ? null : e.target.valueAsNumber,
+                  })
+                }
               />
             </div>
             <div className={styles.fieldRow}>

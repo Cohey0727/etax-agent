@@ -184,6 +184,7 @@ export const AccountPanel = () => {
                   size="sm"
                   onClick={handleTotpDisable}
                   disabled={busy || totpDisableCode.length < 6}
+                  disabledReason={busy ? "処理中です" : "6桁のコードを入力してください"}
                 >
                   無効にする
                 </Button>
@@ -208,6 +209,7 @@ export const AccountPanel = () => {
                     size="sm"
                     onClick={handleTotpEnable}
                     disabled={busy || totpCode.length < 6}
+                    disabledReason={busy ? "処理中です" : "6桁のコードを入力してください"}
                   >
                     有効にする
                   </Button>
@@ -216,7 +218,13 @@ export const AccountPanel = () => {
             ) : (
               <Row gap="sm">
                 <Text variant="caption">未設定</Text>
-                <Button variant="ghost" size="sm" onClick={handleTotpSetup} disabled={busy}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleTotpSetup}
+                  disabled={busy}
+                  disabledReason="処理中です"
+                >
                   設定する
                 </Button>
               </Row>
@@ -253,7 +261,13 @@ export const AccountPanel = () => {
               ) : null}
               {!subscribed ? (
                 <Row gap="sm">
-                  <Button variant="primary" size="sm" onClick={handleCheckout} disabled={busy}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleCheckout}
+                    disabled={busy}
+                    disabledReason="処理中です"
+                  >
                     月額490円で始める
                   </Button>
                 </Row>

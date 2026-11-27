@@ -200,6 +200,7 @@ export const ApiKeysPanel = () => {
                             size="sm"
                             onClick={() => setRevokeTarget(key)}
                             disabled={busy}
+                            disabledReason="処理中です"
                             aria-label={`「${key.name}」を失効させる`}
                           >
                             <Icon name="trash" size={14} />

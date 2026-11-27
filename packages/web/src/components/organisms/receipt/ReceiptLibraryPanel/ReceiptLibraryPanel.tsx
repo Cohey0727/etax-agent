@@ -121,7 +121,11 @@ export const ReceiptLibraryPanel = ({ year }: ReceiptLibraryPanelProps) => {
                 {linked ? (
                   <Row gap="sm" align="center" wrap>
                     <Text variant="muted">紐付け先: {linked}</Text>
-                    <Button disabled={busy} onClick={() => void handleUnlink(receipt)}>
+                    <Button
+                      disabled={busy}
+                      disabledReason="処理中です"
+                      onClick={() => void handleUnlink(receipt)}
+                    >
                       紐付けを外す
                     </Button>
                   </Row>
@@ -140,7 +144,11 @@ export const ReceiptLibraryPanel = ({ year }: ReceiptLibraryPanelProps) => {
                         </option>
                       ))}
                     </Select>
-                    <Button disabled={busy} onClick={() => void handleLink(receipt)}>
+                    <Button
+                      disabled={busy}
+                      disabledReason="処理中です"
+                      onClick={() => void handleLink(receipt)}
+                    >
                       紐付ける
                     </Button>
                   </Row>
