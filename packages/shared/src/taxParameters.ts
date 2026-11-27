@@ -33,6 +33,16 @@ export interface SalaryDeductionTier {
   adjust?: number;
 }
 
+/**
+ * 別表第五（給与所得控除後の給与等の金額の表）で、定額控除帯の上端付近に
+ * 置かれた固定額の段。収入金額が from 以上 upTo 未満なら給与所得は income。
+ */
+export interface SalaryIncomeFixedBand {
+  from: number;
+  upTo: number;
+  income: number;
+}
+
 /** 1年分の税務パラメータ。 */
 export interface YearTaxParameters {
   /** 基礎控除の段階表（合計所得金額 → 控除額）。 */
@@ -50,6 +60,10 @@ export interface YearTaxParameters {
   workingStudentLimit: number;
   /** 給与所得控除の段階表（国税庁 No.1410 の速算表）。 */
   salaryDeductionTiers: readonly SalaryDeductionTier[];
+  /** 別表第五で給与所得が 0 になる収入金額の境（この額未満は 0）。 */
+  salaryIncomeZeroBelow: number;
+  /** 別表第五の定額控除帯の上端付近の固定額の段（No.1410 注2 など）。 */
+  salaryIncomeFixedBands: readonly SalaryIncomeFixedBand[];
   /**
    * 株式等に係る譲渡所得等の申告分離課税の所得税率（No.1463）。
    * 所得税15%＋住民税5%＝20.315% のうち、確定申告で計算するのは
@@ -91,6 +105,21 @@ const SALARY_TIERS_2026_2027: readonly SalaryDeductionTier[] = [
   { upTo: 6_600_000, rate: 0.2, adjust: 440_000 },
   { upTo: 8_500_000, rate: 0.1, adjust: 1_100_000 },
   { upTo: INF, amount: 1_950_000 },
+];
+
+/** 別表第五（令和2〜6年分）の 1,619,000円以上1,625,000円未満の段。 */
+const SALARY_FIXED_BANDS_2023_2024: readonly SalaryIncomeFixedBand[] = [
+  { from: 1_619_000, upTo: 1_620_000, income: 1_069_000 },
+  { from: 1_620_000, upTo: 1_622_000, income: 1_070_000 },
+  { from: 1_622_000, upTo: 1_624_000, income: 1_072_000 },
+  { from: 1_624_000, upTo: 1_625_000, income: 1_074_000 },
+];
+
+/** 令和8・9年分の 2,191,000円以上2,200,000円未満の段（No.1410 注2）。 */
+const SALARY_FIXED_BANDS_2026_2027: readonly SalaryIncomeFixedBand[] = [
+  { from: 2_191_000, upTo: 2_193_000, income: 1_451_000 },
+  { from: 2_193_000, upTo: 2_196_000, income: 1_453_000 },
+  { from: 2_196_000, upTo: 2_200_000, income: 1_456_000 },
 ];
 
 /** 令和5・6年分の基礎控除（48万円、本則）。 */
@@ -146,6 +175,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 480_000,
     workingStudentLimit: 750_000,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
+    salaryIncomeZeroBelow: 551_000,
+    salaryIncomeFixedBands: SALARY_FIXED_BANDS_2023_2024,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,
@@ -157,6 +188,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 480_000,
     workingStudentLimit: 750_000,
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
+    salaryIncomeZeroBelow: 551_000,
+    salaryIncomeFixedBands: SALARY_FIXED_BANDS_2023_2024,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: true,
@@ -179,6 +212,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 580_000,
     workingStudentLimit: 850_000,
     salaryDeductionTiers: SALARY_TIERS_2025,
+    salaryIncomeZeroBelow: 651_000,
+    salaryIncomeFixedBands: [],
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,
@@ -192,6 +227,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 620_000,
     workingStudentLimit: 890_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
+    salaryIncomeZeroBelow: 741_000,
+    salaryIncomeFixedBands: SALARY_FIXED_BANDS_2026_2027,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,
@@ -204,6 +241,8 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     specialRelativeLowerBound: 620_000,
     workingStudentLimit: 890_000,
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
+    salaryIncomeZeroBelow: 741_000,
+    salaryIncomeFixedBands: SALARY_FIXED_BANDS_2026_2027,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,

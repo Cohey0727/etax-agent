@@ -47,6 +47,46 @@ describe("給与所得の金額", () => {
     expect(salaryIncomeAmount(2027, 2_200_000)).toBe(1_460_000);
   });
 
+  test("令和2〜6年分: 定額帯の上端付近は別表第五の固定額（1,619,000円以上1,625,000円未満）", () => {
+    expect(salaryIncomeAmount(2024, 1_618_999)).toBe(1_068_999);
+    expect(salaryIncomeAmount(2024, 1_619_000)).toBe(1_069_000);
+    expect(salaryIncomeAmount(2024, 1_619_999)).toBe(1_069_000);
+    expect(salaryIncomeAmount(2024, 1_621_999)).toBe(1_070_000);
+    expect(salaryIncomeAmount(2024, 1_623_999)).toBe(1_072_000);
+    expect(salaryIncomeAmount(2024, 1_624_999)).toBe(1_074_000);
+    expect(salaryIncomeAmount(2023, 1_622_000)).toBe(1_072_000);
+  });
+
+  test("令和8・9年分: 2,191,000円以上2,200,000円未満は No.1410 注2 の固定額", () => {
+    expect(salaryIncomeAmount(2026, 2_190_999)).toBe(1_450_999);
+    expect(salaryIncomeAmount(2026, 2_191_000)).toBe(1_451_000);
+    expect(salaryIncomeAmount(2026, 2_192_999)).toBe(1_451_000);
+    expect(salaryIncomeAmount(2026, 2_193_000)).toBe(1_453_000);
+    expect(salaryIncomeAmount(2026, 2_195_999)).toBe(1_453_000);
+    expect(salaryIncomeAmount(2026, 2_196_000)).toBe(1_456_000);
+    expect(salaryIncomeAmount(2027, 2_199_999)).toBe(1_456_000);
+  });
+
+  test("最低保障額＋1,000円未満の収入は所得 0（別表第五の最初の行）", () => {
+    expect(salaryIncomeAmount(2024, 550_999)).toBe(0);
+    expect(salaryIncomeAmount(2024, 551_000)).toBe(1_000);
+    expect(salaryIncomeAmount(2025, 650_999)).toBe(0);
+    expect(salaryIncomeAmount(2025, 651_000)).toBe(1_000);
+    expect(salaryIncomeAmount(2026, 740_999)).toBe(0);
+    expect(salaryIncomeAmount(2026, 741_000)).toBe(1_000);
+  });
+
+  test("収入が増えて所得が減ることはない（各年分・定額帯の前後）", () => {
+    for (const year of [2023, 2024, 2025, 2026, 2027]) {
+      let previous = 0;
+      for (let revenue = 500_000; revenue <= 2_400_000; revenue += 500) {
+        const income = salaryIncomeAmount(year, revenue);
+        expect(income).toBeGreaterThanOrEqual(previous);
+        previous = income;
+      }
+    }
+  });
+
   test("660万円未満は別表第五の方式（4で割って千円未満切捨て→×4）", () => {
     // 5,001,000円は 5,000,000円の区分で計算する
     expect(salaryIncomeAmount(2025, 5_001_000)).toBe(3_560_000);

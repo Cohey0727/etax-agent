@@ -847,7 +847,10 @@ export const EMPTY_SALARY_INCOME: SalaryIncomeInput = { revenue: 0 };
 /**
  * 給与所得の金額（No.1410 / No.1400）。段階表は年度パラメータ
  * （taxParameters）が持つ。所得税法別表第五の方式:
- * - 最低保障帯（第一帯）では端数整理をせず、所得金額 = 収入金額 −
+ * - 収入金額が salaryIncomeZeroBelow 未満なら 0。
+ * - 定額控除帯の上端付近の固定額の段（salaryIncomeFixedBands）に入れば
+ *   その金額。
+ * - それ以外の最低保障帯（第一帯）では端数整理をせず、所得金額 = 収入金額 −
  *   控除額（定額）をそのまま使う（例: 令和7年分・収入1,899,999円 →
  *   所得 1,249,999円）。
  * - 率方式の帯で収入金額が660万円未満のときは、収入金額を4で割って
@@ -856,8 +859,11 @@ export const EMPTY_SALARY_INCOME: SalaryIncomeInput = { revenue: 0 };
  */
 export function salaryIncomeAmount(year: number, revenue: number): number {
   const r = amount(revenue);
-  if (r <= 0) return 0;
-  const tiers = taxParametersFor(year).salaryDeductionTiers;
+  const params = taxParametersFor(year);
+  if (r < params.salaryIncomeZeroBelow) return 0;
+  const band = params.salaryIncomeFixedBands.find((b) => r >= b.from && r < b.upTo);
+  if (band) return band.income;
+  const tiers = params.salaryDeductionTiers;
   const first = tiers[0];
   if (first && first.amount !== undefined && r < first.upTo) {
     return Math.max(r - first.amount, 0);
