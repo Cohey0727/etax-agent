@@ -14,6 +14,7 @@ import {
   getInvoiceRow,
   insertInvoice,
   InvoiceHeaderDraft,
+  invoiceTaxRoundingOf,
   InvoiceLineDraft,
   issueInvoiceRow,
   listInvoiceLines,
@@ -167,7 +168,7 @@ export async function createInvoiceCorrectionDraft(
     counterparty_name: source.counterpartyName,
     counterparty_address: source.counterpartyAddress,
     is_qualified: source.isQualified,
-    tax_rounding: source.taxRounding as InvoiceHeaderDraft["tax_rounding"],
+    tax_rounding: invoiceTaxRoundingOf(source.taxRounding),
     memo: source.memo,
   };
   const lines: InvoiceLineDraft[] = sourceLines.map((line) => ({

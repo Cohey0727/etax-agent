@@ -12,6 +12,7 @@ import {
   computeInvoiceTotals,
   invoiceLineAmount,
   InvoiceLineInput,
+  INVOICE_TAX_ROUNDINGS,
   InvoiceSettlement,
   InvoiceTaxRounding,
 } from "@etax/shared";
@@ -93,6 +94,14 @@ function lineToApi(row: DocumentLineRow): InvoiceLineResponse {
   };
 }
 
+/**
+ * DB の端数処理の値（text 列）を InvoiceTaxRounding にする。保存は入力スキーマで
+ * 検証済みの値だけだが、想定外の値は列の既定値（切捨て）として扱う。
+ */
+export function invoiceTaxRoundingOf(value: string): InvoiceTaxRounding {
+  return INVOICE_TAX_ROUNDINGS.find((rounding) => rounding === value) ?? "floor";
+}
+
 /** DB行＋明細を API レスポンス形式へ変換する。settlement は消込サマリ（発行済みのみ）。 */
 export function invoiceToApi(
   row: DocumentRow,
@@ -108,7 +117,7 @@ export function invoiceToApi(
     tax_rate_percent: line.taxRatePercent,
     is_reduced_rate: line.isReducedRate,
   }));
-  const rounding = row.taxRounding as InvoiceTaxRounding;
+  const rounding = invoiceTaxRoundingOf(row.taxRounding);
   const totals =
     (row.totalsSnapshot as InvoiceTotalsResponse | null) ?? totalsToApi(drafts, rounding);
   return {
