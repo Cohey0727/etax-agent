@@ -9,9 +9,10 @@ import { AppText } from "../AppText";
 import { LineIcon, LineIconName } from "../LineIcon";
 import { SelectField } from "../SelectField";
 import { SorobanMark } from "../SorobanMark";
+import { sidebarNavigation } from "./AppSidebar.utils";
 
 interface SidebarItem {
-  href: Href;
+  href: Href & string;
   label: string;
   icon: LineIconName;
 }
@@ -64,14 +65,18 @@ export function AppSidebar() {
 
   if (!mounted) return null;
 
-  const go = (href: Href) => {
+  const go = (href: Href & string) => {
     closeSidebar();
-    if (pathname !== href) router.navigate(href);
+    if (pathname === href) return;
+    if (sidebarNavigation(pathname, href) === "push") router.navigate(href);
+    else router.dismissTo(href);
   };
 
   const goFiling = (tab: string) => {
     closeSidebar();
-    router.navigate({ pathname: "/filing", params: { tab } });
+    const target = { pathname: "/filing", params: { tab } } as const;
+    if (sidebarNavigation(pathname, "/filing") === "push") router.navigate(target);
+    else router.dismissTo(target);
   };
 
   // 年度の追加はセレクタの中の選択肢で行う（最大年度+1 / 最小年度-1）。
