@@ -17,22 +17,16 @@ import {
   computeIncomeTax,
   computeManualIncomes,
   filterYear,
-  freshDeductionState,
   resolveTaxCreditInputs,
 } from "@etax/shared";
 import { useRouter } from "expo-router";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { AppText, Card, Tabs } from "@/components";
+import { AppText, Card, SkeletonCard, Tabs } from "@/components";
 import { createFilingSnapshot } from "@/api";
-import { useAuth } from "@/auth/AuthContext";
 import { useAppState } from "@/state/AppContext";
 import { space } from "@/theme";
-import {
-  hydrateDeductionStateFromServer,
-  loadDeductionState,
-  saveDeductionState,
-} from "../deductionState";
+import { filingInputsStore } from "../deductionState";
 import { AgriculturePanel } from "../AgriculturePanel";
 import { BalanceRecords } from "../BalanceRecords";
 import { BalanceSheetPanel } from "../BalanceSheetPanel";
@@ -46,11 +40,12 @@ import { FilingStatusToggle } from "../FilingStatusToggle";
 import { MiscIncomePanel } from "../MiscIncomePanel";
 import { MonthlyBalance } from "../MonthlyBalance";
 import { SalaryPanel } from "../SalaryPanel";
-import { SectionHead } from "../fields";
+import { LoadFailedNotice, SectionHead } from "../fields";
 import { SubmissionRecordPanel } from "../SubmissionRecordPanel";
 import { TaxCreditPanel } from "../TaxCreditPanel";
 import { TaxpayerPanel } from "../TaxpayerPanel";
 import { useFilingSnapshots } from "../useFilingSnapshots";
+import { useYearInput } from "../useYearInput";
 
 export type FilingTab = "overview" | "balance" | "deductions" | "consumption";
 
@@ -63,39 +58,51 @@ const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
 ];
 
 /**
- * 控除入力の状態を持つ作業領域。控除の入力は年度ごとに保存される。
- * 「控除・計算」を確定すると計算結果がスナップショットとして控えられ、
- * 差し戻して再確定するときに前回確定との比較に使う。
- * 申告入力の正はサーバーDB。表示時にサーバー値を取り込んでから編集を
- * 解放する（取り込み前に保存すると空状態がサーバーへ全体置換され、
- * 保存済みの控除等が消えてしまうため）。
+ * 確定申告の作業領域。申告入力（年度別）は納税者情報画面・エージェントと
+ * 同じストアの値を読み書きする。サーバーの値を読み込むまでは入力欄を出さず、
+ * 取得できなかったときは再読み込みだけを出す（空の入力から保存すると、
+ * サーバーの値を全体置換で消してしまうため）。
  */
 export function FilingWorkspace({ initialTab = "overview" }: { initialTab?: FilingTab }) {
+  const { year } = useAppState();
+  const { entry, update, reload } = useYearInput(filingInputsStore, year);
+  if (entry.status === "loading") {
+    return (
+      <View style={styles.wrap}>
+        <SkeletonCard />
+        <SkeletonCard />
+      </View>
+    );
+  }
+  if (entry.status === "failed") {
+    return (
+      <Card>
+        <LoadFailedNotice message="申告入力を取得できませんでした。" onRetry={reload} />
+      </Card>
+    );
+  }
+  return (
+    <FilingWorkspaceContent initialTab={initialTab} deductionState={entry.value} update={update} />
+  );
+}
+
+interface FilingWorkspaceContentProps {
+  initialTab: FilingTab;
+  deductionState: DeductionState;
+  update: (change: (current: DeductionState) => DeductionState) => void;
+}
+
+/**
+ * 控除入力の状態を使う作業領域の本体。
+ * 「控除・計算」を確定すると計算結果がスナップショットとして控えられ、
+ * 差し戻して再確定するときに前回確定との比較に使う。
+ */
+function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWorkspaceContentProps) {
   const router = useRouter();
-  const { user } = useAuth();
   const { year, transactions } = useAppState();
-  const userId = user?.id ?? null;
 
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const [tab, setTab] = useState<FilingTab>(initialTab);
-  const [deductionState, setDeductionState] = useState<DeductionState>(() => freshDeductionState());
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setHydrated(false);
-    void loadDeductionState(userId, year).then((local) => {
-      if (!cancelled) setDeductionState(local);
-    });
-    void hydrateDeductionStateFromServer(userId, year).then((remote) => {
-      if (cancelled) return;
-      setDeductionState(remote);
-      setHydrated(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, year]);
 
   const filingOptions: BlueDeductionOptions = {
     filingType: deductionState.filingType,
@@ -118,26 +125,18 @@ export function FilingWorkspace({ initialTab = "overview" }: { initialTab?: Fili
     [transactions, year, deductionState.filingType, deductionState.realEstateBusinessScale, deductionState.agriculture],
   );
 
-  const applyState = (state: DeductionState) => {
-    setDeductionState(state);
-    if (hydrated) saveDeductionState(userId, year, state);
-  };
-  const updateDeductions = (next: DeductionInputs) =>
-    applyState({ ...deductionState, deductions: next });
-  const updateTaxCredits = (next: TaxCreditInputs) =>
-    applyState({ ...deductionState, taxCredits: next });
-  const updateMiscIncome = (next: MiscIncomeInput) =>
-    applyState({ ...deductionState, miscIncome: next });
+  const updateDeductions = (next: DeductionInputs) => update((s) => ({ ...s, deductions: next }));
+  const updateTaxCredits = (next: TaxCreditInputs) => update((s) => ({ ...s, taxCredits: next }));
+  const updateMiscIncome = (next: MiscIncomeInput) => update((s) => ({ ...s, miscIncome: next }));
   const updateSalaryIncome = (next: SalaryIncomeInput) =>
-    applyState({ ...deductionState, salaryIncome: next });
+    update((s) => ({ ...s, salaryIncome: next }));
   const updateExpandedIncome = (next: ExpandedIncomeInput) =>
-    applyState({ ...deductionState, expandedIncome: next });
-  const updateAgriculture = (next: AgricultureInput) =>
-    applyState({ ...deductionState, agriculture: next });
+    update((s) => ({ ...s, expandedIncome: next }));
+  const updateAgriculture = (next: AgricultureInput) => update((s) => ({ ...s, agriculture: next }));
   const updateBalanceSheet = (next: XtxBalanceSheetInput | null) =>
-    applyState({ ...deductionState, balanceSheet: next });
+    update((s) => ({ ...s, balanceSheet: next }));
   const updateBreakdownEntries = (key: BreakdownEntriesKey, entries: BreakdownEntry[]) =>
-    applyState(applyBreakdownEntries(deductionState, key, entries));
+    update((s) => applyBreakdownEntries(s, key, entries));
 
   const manualIncomes = computeManualIncomes(
     year,

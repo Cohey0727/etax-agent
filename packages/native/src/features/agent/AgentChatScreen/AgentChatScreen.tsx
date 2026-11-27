@@ -1,11 +1,10 @@
-import { applyDeductionPatch } from "@etax/shared";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { AgentConnectionConfig } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 import { AgentChatPanel } from "../AgentChatPanel";
 import { AgentUiAction } from "../agentChatHelpers";
-import { loadDeductionState, saveDeductionState } from "@/features/filing/deductionState";
+import { applyFilingInputsPatch, loadDeductionState } from "@/features/filing/deductionState";
 import {
   EMPTY_AGENT_CONNECTION,
   loadAgentConnection,
@@ -54,14 +53,8 @@ export function AgentChatScreen({ onBeforeNavigate }: AgentChatScreenProps) {
       } else if (action.type === "reloadTransactions" || action.type === "reloadView") {
         void reloadLedger();
       } else if (action.type === "applyDeductions") {
-        void (async () => {
-          const current = await loadDeductionState(user?.id ?? null, action.year);
-          saveDeductionState(
-            user?.id ?? null,
-            action.year,
-            applyDeductionPatch(current, action.patch),
-          );
-        })();
+        // 開いている確定申告・納税者情報の画面は同じストアを読むので、そのまま反映される
+        void applyFilingInputsPatch(user?.id ?? null, action.year, action.patch);
       }
     },
     [router, setYear, reloadLedger, user?.id, onBeforeNavigate],

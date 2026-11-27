@@ -1,83 +1,99 @@
 /**
- * deductionState.ts — 申告入力（年度別の DeductionState）の保存と読み込み。
+ * deductionState.ts — 申告入力（年度別の DeductionState）の読み込みと保存。
  *
- * 保存先はサーバーのDB（filing_inputs）。端末の AsyncStorage は同期読み出し
- * 用のキャッシュとして併用する: 保存は両方へ書き、表示時はサーバーの値を
- * 取り込む。サーバーに無く端末にだけ値がある場合は取り込み時にサーバーへ送る。
+ * 正はサーバーのDB（filing_inputs）。確定申告画面・納税者情報画面・エージェントは
+ * filingInputsStore の1つの値を読み書きする。端末の AsyncStorage には最後に読んだ・
+ * 保存した値の写しを置き、サーバーが未保存のときはこの写しを送って使う。
  * 保存値の形と検証は @etax/shared の filingInputs が持つ。
  */
-import { DeductionState, freshDeductionState, parseDeductionState } from "@etax/shared";
+import {
+  DeductionPatch,
+  DeductionState,
+  applyDeductionPatch,
+  freshDeductionState,
+  parseDeductionState,
+} from "@etax/shared";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { fetchFilingInputs, saveFilingInputs } from "@/api";
+import { fetchFilingInputsResult, saveFilingInputs } from "@/api";
+import { YearInputLoadResult, createYearInputStore } from "./yearInputStore";
+
+/** 変更が止まってからサーバーへ保存するまでの待ち時間（ミリ秒）。 */
+const SAVE_DELAY_MS = 400;
 
 function storageKey(userId: number | null, year: number): string {
   return `etax-deductions-${userId ?? "anon"}-${year}`;
 }
 
-/** 端末キャッシュから同期的に近い形で読み込む（非同期）。 */
+async function readCachedState(userId: number | null, year: number): Promise<DeductionState | null> {
+  try {
+    const raw = await AsyncStorage.getItem(storageKey(userId, year));
+    return raw ? parseDeductionState(JSON.parse(raw) as Partial<DeductionState>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedState(userId: number | null, year: number, state: unknown): void {
+  AsyncStorage.setItem(storageKey(userId, year), JSON.stringify(state)).catch(() => undefined);
+}
+
+/** 端末の写しを読む（無い・壊れているときは空の入力）。 */
 export async function loadDeductionState(
   userId: number | null,
   year: number,
 ): Promise<DeductionState> {
-  try {
-    const raw = await AsyncStorage.getItem(storageKey(userId, year));
-    if (!raw) return freshDeductionState();
-    return parseDeductionState(JSON.parse(raw) as Partial<DeductionState>);
-  } catch {
-    return freshDeductionState();
+  return (await readCachedState(userId, year)) ?? freshDeductionState();
+}
+
+async function loadFromServer(
+  userId: number | null,
+  year: number,
+): Promise<YearInputLoadResult<DeductionState>> {
+  const remote = await fetchFilingInputsResult(year);
+  if (remote.kind === "failed") return { kind: "failed" };
+  if (remote.kind === "saved") {
+    writeCachedState(userId, year, remote.value);
+    return { kind: "loaded", value: parseDeductionState(remote.value as Partial<DeductionState>) };
   }
+  const cached = await readCachedState(userId, year);
+  if (!cached) return { kind: "loaded", value: freshDeductionState() };
+  // 送れなくても端末の値で編集は続けられ、次の保存でサーバーへ届く
+  await saveFilingInputs(year, cached);
+  return { kind: "loaded", value: cached };
 }
 
-const serverSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-/** サーバーへの保存（失敗しても編集は続けられる。連続保存はまとめる）。 */
-function saveDeductionStateToServer(year: number, state: DeductionState): void {
-  const key = String(year);
-  const existing = serverSaveTimers.get(key);
-  if (existing) clearTimeout(existing);
-  serverSaveTimers.set(
-    key,
-    setTimeout(() => {
-      serverSaveTimers.delete(key);
-      void saveFilingInputs(year, state);
-    }, 400),
-  );
-}
-
-/** キャッシュとサーバーの両方へ保存する。 */
-export function saveDeductionState(
+async function saveToServer(
   userId: number | null,
   year: number,
   state: DeductionState,
-): void {
-  AsyncStorage.setItem(storageKey(userId, year), JSON.stringify(state)).catch(() => undefined);
-  saveDeductionStateToServer(year, state);
+): Promise<boolean> {
+  writeCachedState(userId, year, state);
+  return saveFilingInputs(year, state);
 }
 
-/**
- * サーバーの保存値を正として取り込む。サーバーに値があればそれを返し、
- * 無ければ端末の値をサーバーへ送ってから返す。
- */
+export const filingInputsStore = createYearInputStore<DeductionState>({
+  load: loadFromServer,
+  save: saveToServer,
+  saveDelayMs: SAVE_DELAY_MS,
+});
+
+/** サーバーの値を読み直して返す。取得できなければ例外。 */
 export async function hydrateDeductionStateFromServer(
   userId: number | null,
   year: number,
 ): Promise<DeductionState> {
-  const remote = await fetchFilingInputs(year);
-  if (remote) {
-    const state = parseDeductionState(remote.state as Partial<DeductionState>);
-    AsyncStorage.setItem(storageKey(userId, year), JSON.stringify(remote.state)).catch(
-      () => undefined,
-    );
-    return state;
-  }
-  const local = await loadDeductionState(userId, year);
-  try {
-    const raw = await AsyncStorage.getItem(storageKey(userId, year));
-    if (raw) await saveFilingInputs(year, JSON.parse(raw) as unknown);
-  } catch {
-    // 送れなくても端末の値で編集は続けられる
-  }
-  return local;
+  const entry = await filingInputsStore.refresh(userId, year);
+  if (entry.status !== "ready") throw new Error("申告入力を取得できませんでした");
+  return entry.value;
+}
+
+/** エージェントの変更分を当て、待たずにサーバーへ保存する。保存できたか。 */
+export function applyFilingInputsPatch(
+  userId: number | null,
+  year: number,
+  patch: DeductionPatch,
+): Promise<boolean> {
+  return filingInputsStore.modify(userId, year, (current) => applyDeductionPatch(current, patch));
 }
 
 /** 内訳エントリの新規ID。 */
