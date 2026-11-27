@@ -16,6 +16,7 @@
  * classifyTransactionRow に一元化し、サーバー側も同じ関数を使う。
  */
 
+import { parseIsoDate } from "./inputValues";
 import { normalizeSearchText } from "./text";
 import { categoryIncomeLines, normalizeBusinessRatio, transactionBusinessAmount } from "./taxcalc";
 import { VALID_INCOME_TYPES, type IncomeType, type Transaction } from "./types";
@@ -291,10 +292,7 @@ export function importCsvText(text: string, rules: CategoryRule[] = CATEGORY_RUL
     if (!DATE_RE.test(dateRaw)) {
       throw new Error(`${lineNo}行目 date が YYYY-MM-DD 形式ではありません: ${dateRaw}`);
     }
-    // 形式だけでなく実在する日付かも検証する（2024-02-30 等を通さない）。
-    const [yy, mm, dd] = dateRaw.split("-").map(Number);
-    const probe = new Date(Date.UTC(yy!, mm! - 1, dd!));
-    if (probe.getUTCFullYear() !== yy || probe.getUTCMonth() !== mm! - 1 || probe.getUTCDate() !== dd) {
+    if (parseIsoDate(dateRaw) === null) {
       throw new Error(`${lineNo}行目 date が実在しない日付です: ${dateRaw}`);
     }
     // 金額: 全角数字・全角￥も除去/変換する。空欄は Number("") === 0 で

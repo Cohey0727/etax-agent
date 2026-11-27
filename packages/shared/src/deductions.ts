@@ -33,7 +33,7 @@
 import { lookupTier, taxParametersFor } from "./taxParameters";
 import { separateTaxAmount } from "./expandedIncome";
 
-/** 円未満を切り捨てる。浮動小数の誤差吸収つき（taxcalc.ts と同じ流儀）。 */
+/** 円未満を切り捨てる。浮動小数の誤差吸収つき。 */
 function floorYen(x: number): number {
   return Math.floor(x + 1e-9);
 }
@@ -43,14 +43,8 @@ function floor100(x: number): number {
   return Math.floor((x + 1e-9) / 100) * 100;
 }
 
-/** 金額入力を非負の整数に正規化する。 */
+/** 金額・人数の入力を非負の整数に正規化する。 */
 function amount(x: number): number {
-  const n = Math.trunc(x || 0);
-  return n > 0 ? n : 0;
-}
-
-/** 人数を非負の整数に正規化する。 */
-function count(x: number): number {
   const n = Math.trunc(x || 0);
   return n > 0 ? n : 0;
 }
@@ -178,10 +172,10 @@ export interface DependentCounts {
 /** 扶養控除。区分ごとの人数から計算する。 */
 export function dependentDeduction(counts: DependentCounts): number {
   return (
-    count(counts.general) * 380_000 +
-    count(counts.specific) * 630_000 +
-    count(counts.elderly) * 480_000 +
-    count(counts.elderlyCohabiting) * 580_000
+    amount(counts.general) * 380_000 +
+    amount(counts.specific) * 630_000 +
+    amount(counts.elderly) * 480_000 +
+    amount(counts.elderlyCohabiting) * 580_000
   );
 }
 
@@ -197,9 +191,9 @@ export interface DisabilityCounts {
 /** 障害者控除。区分ごとの人数から計算する（本人分も人数に含めて渡す）。 */
 export function disabilityDeduction(counts: DisabilityCounts): number {
   return (
-    count(counts.general) * 270_000 +
-    count(counts.special) * 400_000 +
-    count(counts.specialCohabiting) * 750_000
+    amount(counts.general) * 270_000 +
+    amount(counts.special) * 400_000 +
+    amount(counts.specialCohabiting) * 750_000
   );
 }
 

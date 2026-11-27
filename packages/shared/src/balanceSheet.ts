@@ -14,6 +14,7 @@ import {
   type BalanceSheetAccount,
   type XtxBalanceSheetInput,
 } from "./xtx";
+import { toInteger as sanitizeAmount } from "./inputValues";
 
 // ---------------------------------------------------------------------------
 // 型
@@ -87,10 +88,6 @@ export function isBalanceSheetEmpty(input: XtxBalanceSheetInput): boolean {
 // ---------------------------------------------------------------------------
 // 正規化（保存値の読み込み用）
 // ---------------------------------------------------------------------------
-
-function sanitizeAmount(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
-}
 
 function sanitizeRecord(raw: unknown): Partial<Record<BalanceSheetAccount, number>> {
   if (typeof raw !== "object" || raw === null) return {};

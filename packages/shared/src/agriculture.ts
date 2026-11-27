@@ -20,6 +20,8 @@
  * 所得金額の計算には影響させない。
  */
 
+import { toInteger as num } from "./inputValues";
+
 /** 農業所得の入力（内部形式・camelCase）。金額は円単位の整数。 */
 export interface AgricultureInput {
   /** 農園名（様式の「農園名」欄。空文字なら出力しない） */
@@ -136,10 +138,6 @@ export const AGRICULTURE_EXPENSE_CATEGORIES: readonly string[] = [
 
 /** 様式の追加科目の上限（青色・白色とも4行）。 */
 const MAX_EXTRA_EXPENSE_ROWS = 4;
-
-function num(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
-}
 
 /** 科目別合計を正規化する（名前の空白除去、0円と空名は捨てる）。 */
 function normalizeExpenseTotals(raw: unknown): Record<string, number> {

@@ -10,6 +10,7 @@
  * 恒常対策として追加）。
  */
 import { XtxTaxpayer } from "./xtx";
+import { parseIsoDate } from "./inputValues";
 
 /** XTX生成時に納税者情報とあわせて検証する、申告書ごとの日付・区分。 */
 export interface XtxFilingContext {
@@ -84,17 +85,7 @@ export function normalizePhoneNumber(value: string): string {
 
 /** "YYYY-MM-DD" 形式で、実在する日付か。 */
 function isValidIsoDate(value: string): boolean {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return false;
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
+  return parseIsoDate(value) !== null;
 }
 
 /**

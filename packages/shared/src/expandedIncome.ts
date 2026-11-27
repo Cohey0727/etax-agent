@@ -37,17 +37,7 @@
  */
 import { taxParametersFor } from "./taxParameters";
 import type { TaxCreditInputs } from "./deductions";
-
-/** 金額入力を非負の整数に正規化する（収入・経費などの入力値用）。 */
-function amount(x: number): number {
-  const n = typeof x === "number" && Number.isFinite(x) ? Math.trunc(x) : 0;
-  return n > 0 ? n : 0;
-}
-
-/** 符号つき金額を整数に正規化する（所得金額は赤字もあり得る）。 */
-function signed(x: number): number {
-  return typeof x === "number" && Number.isFinite(x) ? Math.trunc(x) : 0;
-}
+import { toNonNegativeInteger as amount, toInteger as signed } from "./inputValues";
 
 // ---------------------------------------------------------------------------
 // 一時所得（Phase A）
