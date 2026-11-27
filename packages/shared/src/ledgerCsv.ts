@@ -41,9 +41,15 @@ const CSV_HEADER: readonly string[] = [
   "出所",
 ];
 
+/**
+ * CSV の1セル。表計算ソフトが数式として評価する文字（= + - @ タブ CR）で始まる
+ * 文字列は先頭に「'」を付けて文字列のまま開かせる（取り込んだ明細の摘要などが
+ * 数式として実行されないようにする）。金額などの数値はそのまま書く。
+ */
 function csvCell(value: string | number): string {
-  const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  const text =
+    typeof value === "string" && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 /** 表示中の取引を CSV の文字列にする。Excel で開けるよう BOM を付け、改行は CRLF。 */

@@ -32,6 +32,20 @@ describe("buildLedgerCsv", () => {
     const csv = buildLedgerCsv([row({ description: 'A,"B"\nC' })]);
     expect(csv).toContain('"A,""B""\nC"');
   });
+
+  test("CR だけを含むセルも引用する", () => {
+    expect(buildLedgerCsv([row({ description: "A\rB" })])).toContain('"A\rB"');
+  });
+
+  test("数式として評価される文字で始まる文字列のセルは「'」を前に付ける。金額の数値はそのまま", () => {
+    const csv = buildLedgerCsv([
+      row({ description: '=HYPERLINK("http://example.com","x")', account: "@口座", category: "+科目" }),
+    ]);
+    const [, line] = lines(csv);
+    expect(line).toBe(
+      `2025-04-01,2025,"'=HYPERLINK(""http://example.com"",""x"")",-1200,'+科目,事業,課税仕入10%,'@口座`,
+    );
+  });
 });
 
 describe("ledgerIncomeTypeLabel", () => {
