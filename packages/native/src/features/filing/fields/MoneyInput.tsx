@@ -18,13 +18,14 @@ export function MoneyInput({ value, onChange, accessibilityLabel }: MoneyInputPr
       onChangeText={(text) => onChange(parseAmount(text))}
       placeholder="0"
       placeholderTextColor={colors.muted}
-      style={styles.input}
+      style={moneyInputStyles.input}
       value={value === 0 ? "" : formatNumber(value)}
     />
   );
 }
 
-const styles = StyleSheet.create({
+/** 表形式のセル内の金額入力の見た目（符号つきの入力と共有する）。 */
+export const moneyInputStyles = StyleSheet.create({
   input: {
     backgroundColor: colors.inputBg,
     borderColor: colors.border,

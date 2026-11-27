@@ -18,7 +18,7 @@ import { AlertBox, AppButton, AppText, Card } from "@/components";
 import { fetchFilingInputs } from "@/api";
 import { space } from "@/theme";
 import { formatYen } from "@/utils";
-import { MoneyInput, ResultRow, SectionHead } from "../fields";
+import { ResultRow, SectionHead, SignedMoneyInput } from "../fields";
 import { AccountRow, ClosingOnlyRow, ExtraRow } from "./BalanceSheetRows";
 
 type ExtraField = "extraAsset" | "extraLiability1" | "extraLiability2";
@@ -212,7 +212,7 @@ function BalanceSheetEditor({
             <AppText size="xs" tone="muted">
               期首（1月1日）
             </AppText>
-            <MoneyInput
+            <SignedMoneyInput
               accessibilityLabel="元入金（期首）"
               value={bs.opening.capital ?? 0}
               onChange={(v) => setAccount("opening", "capital", v)}

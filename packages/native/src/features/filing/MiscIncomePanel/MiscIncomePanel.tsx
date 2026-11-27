@@ -2,7 +2,7 @@ import { MiscIncomeInput } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { AppText, Card, SwitchRow } from "@/components";
 import { space } from "@/theme";
-import { AmountField, SectionHead } from "../fields";
+import { AmountField, SectionHead, SignedAmountField } from "../fields";
 
 export interface MiscIncomePanelProps {
   miscIncome: MiscIncomeInput;
@@ -47,8 +47,9 @@ export function MiscIncomePanel({ miscIncome, onChange }: MiscIncomePanelProps) 
           value={miscIncome.businessRevenue}
           onChange={(v) => set({ businessRevenue: v })}
         />
-        <AmountField
+        <SignedAmountField
           label="業務の所得金額（必要経費を引いた後）"
+          hint="赤字のときは先頭に「-」を付けて入力します。"
           value={miscIncome.businessIncome}
           onChange={(v) => set({ businessIncome: v })}
         />
@@ -66,8 +67,9 @@ export function MiscIncomePanel({ miscIncome, onChange }: MiscIncomePanelProps) 
           value={miscIncome.revenue}
           onChange={(v) => set({ revenue: v })}
         />
-        <AmountField
+        <SignedAmountField
           label="その他の所得金額（必要経費を引いた後）"
+          hint="赤字のときは先頭に「-」を付けて入力します。"
           value={miscIncome.income}
           onChange={(v) => set({ income: v })}
         />
