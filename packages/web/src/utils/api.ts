@@ -57,6 +57,7 @@ import {
   SystemOneTestResult,
   XtxTaxpayerInput,
 } from "@types";
+import { fileToBase64 } from "./file";
 
 /** サーバーAPIの型つきラッパー。 */
 
@@ -280,37 +281,38 @@ export interface AnalyzedReceipt {
 /**
  * 領収書画像を読み取り、科目判定まで済んだ帳簿ドラフトを返す。
  * 基本フロー: 受け口URLでサーバーへアップロードし、
- * ファイルIDで解析を依頼する（解析結果は証憑台帳に残る）。アップロードが
- * 使えない場合は、画像を Base64 で直接渡して解析する。
+ * ファイルIDで解析を依頼する（解析結果は証憑台帳に残る）。受け口URLを
+ * 発行できない（ストレージ未設定）ときだけ、画像を Base64 で直接渡して解析する。
+ * アップロードや解析の失敗では解析し直さない（同じ画像を AI に2回送らない）。
  */
 export async function analyzeReceiptImage(file: File): Promise<AnalyzedReceipt> {
   if (UPLOADABLE_IMAGE_TYPES.includes(file.type)) {
-    const viaStorage = await analyzeReceiptViaStorage(file).catch(() => null);
-    if (viaStorage) return viaStorage;
+    const presign = await requestReceiptUpload(file).catch(() => null);
+    if (presign) return analyzeUploadedReceipt(file, presign);
   }
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(new Error("画像ファイルを読み込めませんでした"));
-    reader.readAsDataURL(file);
-  });
-  const base64 = dataUrl.split(",")[1] ?? "";
   const resp = await fetch("/api/receipts/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
+    body: JSON.stringify({ imageBase64: await fileToBase64(file), mimeType: file.type }),
   });
   return { result: await parseJson<AnalyzeReceiptResponse>(resp), fileId: null };
 }
 
-/** 署名付きURLでアップロードし、ファイルIDで解析を依頼する経路。 */
-async function analyzeReceiptViaStorage(file: File): Promise<AnalyzedReceipt> {
+/** 領収書の受け口URLを発行する。 */
+async function requestReceiptUpload(file: File): Promise<PresignUploadFileResponse> {
   const presignResp = await fetch("/api/files/presign-upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contentType: file.type }),
   });
-  const presign = await parseJson<PresignUploadFileResponse>(presignResp);
+  return parseJson<PresignUploadFileResponse>(presignResp);
+}
+
+/** 受け口URLへアップロードし、ファイルIDで解析を依頼する。 */
+async function analyzeUploadedReceipt(
+  file: File,
+  presign: PresignUploadFileResponse,
+): Promise<AnalyzedReceipt> {
   const uploadResp = await fetch(presign.uploadUrl, {
     method: "PUT",
     headers: { "Content-Type": file.type },

@@ -1,4 +1,5 @@
 import { ChatAttachmentUpload } from "@types";
+import { fileToBase64 } from "@utils";
 
 /**
  * chatAttachments.ts — チャット添付の読み込みと検証（画面側）。
@@ -39,17 +40,6 @@ const kindOfFile = (file: File): AttachmentKind | null => {
   return file.name.toLowerCase().endsWith(".csv") ? "csv" : null;
 };
 
-/** バイナリを Base64 へ（大きなファイルでもスタックを溢れさせないよう分割する）。 */
-const readAsBase64 = async (file: File): Promise<string> => {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  const CHUNK_SIZE = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK_SIZE));
-  }
-  return btoa(binary);
-};
-
 /** ファイルを検証して添付データへ読み込む。不正なら理由を Error で投げる。 */
 export const readAttachment = async (file: File): Promise<PendingAttachment> => {
   const kind = kindOfFile(file);
@@ -69,7 +59,7 @@ export const readAttachment = async (file: File): Promise<PendingAttachment> => 
     id,
     name: file.name,
     mimeType: file.type,
-    dataBase64: await readAsBase64(file),
+    dataBase64: await fileToBase64(file),
   };
 };
 
