@@ -1,9 +1,10 @@
 /**
  * useAssetsData.ts — 固定資産台帳の読み込みと CRUD・画像の管理。
  * 台帳（DB）が正。サマリは対象年度ごとにサーバー集計を取り直す。
+ * 画像の一覧は一覧のサムネイルにも使うので、資産ごとに1回だけ取得する。
  */
 import { validateFixedAssetInput } from "@etax/shared";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DepreciationSummary,
   FixedAssetImageRecord,
@@ -30,49 +31,43 @@ export function useAssetsData(year: number) {
   const [images, setImages] = useState<Record<number, FixedAssetImageRecord[]>>({});
   const [imagesBusy, setImagesBusy] = useState(false);
 
-  const loadImages = useCallback(async (assetId: number) => {
-    setImagesBusy(true);
-    try {
-      const fetched = await fetchFixedAssetImages(assetId);
-      setImages((prev) => ({ ...prev, [assetId]: fetched }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "画像の取得に失敗しました");
-    } finally {
-      setImagesBusy(false);
+  // 最後に出した読み込みの番号。年度を切り替えた後に前の年度の応答が届いても反映しない。
+  const latestReloadRef = useRef(0);
+  // 画像一覧を取得済み・取得中の資産。
+  const imagesRequestedRef = useRef(new Set<number>());
+
+  const loadImagesOnce = useCallback((list: readonly FixedAssetRecord[]) => {
+    for (const asset of list) {
+      if (imagesRequestedRef.current.has(asset.id)) continue;
+      imagesRequestedRef.current.add(asset.id);
+      void fetchFixedAssetImages(asset.id).then(
+        (fetched) => setImages((prev) => ({ ...prev, [asset.id]: fetched })),
+        () => setImages((prev) => ({ ...prev, [asset.id]: [] })),
+      );
     }
   }, []);
 
-  const reload = useCallback(async (): Promise<boolean> => {
+  /** 台帳とサマリを読み直す。後から出した読み込みがあれば何も反映せず "stale" を返す。 */
+  const reload = useCallback(async (): Promise<LoadStatus | "stale"> => {
+    const request = ++latestReloadRef.current;
     const [fetchedAssets, fetchedSummary] = await Promise.all([
       fetchFixedAssets(),
       fetchDepreciationSummary(year),
     ]);
-    if (!fetchedAssets) return false;
+    if (request !== latestReloadRef.current) return "stale";
+    if (!fetchedAssets) return "unavailable";
     setAssets(fetchedAssets);
     setSummary(fetchedSummary);
-    // 一覧のサムネイル用に各資産の画像も取り込む（失敗した資産は空扱い）。
-    const entries = await Promise.all(
-      fetchedAssets.map(async (asset) => {
-        const list = await fetchFixedAssetImages(asset.id).catch(() => []);
-        return [asset.id, list] as const;
-      }),
-    );
-    setImages(Object.fromEntries(entries));
-    return true;
-  }, [year]);
+    loadImagesOnce(fetchedAssets);
+    return "ready";
+  }, [year, loadImagesOnce]);
 
   useEffect(() => {
-    let cancelled = false;
     setStatus("loading");
     setError(null);
-    void (async () => {
-      const ok = await reload();
-      if (cancelled) return;
-      setStatus(ok ? "ready" : "unavailable");
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void reload().then((result) => {
+      if (result !== "stale") setStatus(result);
+    });
   }, [reload]);
 
   const handleCreate = async (input: FixedAssetInput): Promise<FixedAssetRecord | null> => {
@@ -123,6 +118,7 @@ export function useAssetsData(year: number) {
     setError(null);
     try {
       await deleteFixedAsset(asset.id);
+      imagesRequestedRef.current.delete(asset.id);
       setImages((prev) => {
         const next = { ...prev };
         delete next[asset.id];
@@ -180,7 +176,6 @@ export function useAssetsData(year: number) {
     busy,
     images,
     imagesBusy,
-    loadImages,
     handleCreate,
     handleUpdate,
     handleDelete,
