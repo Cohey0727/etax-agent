@@ -1,4 +1,11 @@
-import { BalanceSheetWireInput, FilingType, Transaction } from "@etax/shared";
+import {
+  AgricultureWire,
+  BalanceSheetWireInput,
+  DepreciationMethod as SharedDepreciationMethod,
+  ExpandedIncomeWire,
+  FilingType,
+  Transaction,
+} from "@etax/shared";
 
 export interface CsvMapping {
   dateColumn: string | null;
@@ -362,11 +369,7 @@ export interface ReceiptListResponse {
 }
 
 /** 償却方法。サーバーAPI・共有エンジンと共通の値。 */
-export type DepreciationMethod =
-  | "straight_line"
-  | "declining_balance"
-  | "lump_sum"
-  | "small_special";
+export type DepreciationMethod = SharedDepreciationMethod;
 
 /** 固定資産レコード。サーバーAPIのワイヤ形式（snake_case）。 */
 export interface FixedAssetRecord {
@@ -629,69 +632,10 @@ export interface ExportXtxRequest {
   original_third_period_tax: number | null;
   /** 貸借対照表の入力（事業所得分。保存済みの申告入力からワイヤ形式で渡す）。 */
   balance_sheet?: BalanceSheetWireInput;
-  /** 配当・一時・株式等譲渡の入力（ワイヤ形式、Issue #27）。 */
-  expanded_income?: ExpandedIncomeWireInput;
-  /** 農業所得の入力（ワイヤ形式、Issue #24）。 */
-  agriculture?: AgricultureWireInput;
-}
-
-/** 農業所得のワイヤ形式（Issue #24）。shared の AgricultureWire と同じ形。 */
-export interface AgricultureWireInput {
-  farm_name: string;
-  sales_amount: number;
-  household_consumption: number;
-  misc_revenue: number;
-  produce_opening_inventory: number;
-  produce_closing_inventory: number;
-  other_opening_inventory: number;
-  other_closing_inventory: number;
-  expense_totals: Record<string, number>;
-  family_worker_salary: number;
-  family_worker_deduction: number;
-  bad_debt_provision_in: number;
-  bad_debt_provision_back: number;
-  cultivation_cost_deduction: number;
-  beef_cattle_exemption_amount: number;
-}
-
-/** 拡張所得のワイヤ形式（Issue #27）。shared の ExpandedIncomeWire と同じ形。 */
-export interface ExpandedIncomeWireInput {
-  temp: { revenue: number; expenses: number };
-  dividend: {
-    listed_revenue: number;
-    listed_trust_revenue: number;
-    listed_withholding: number;
-    listed_mode: "comprehensive" | "separate" | "none";
-    general_revenue: number;
-    general_trust_revenue: number;
-    general_withholding: number;
-    interest_expense: number;
-  };
-  stocks: {
-    general: {
-      revenue: number;
-      other_revenue: number;
-      acquisition_cost: number;
-      transfer_fees: number;
-      other_expenses: number;
-    };
-    listed: {
-      revenue: number;
-      other_revenue: number;
-      acquisition_cost: number;
-      transfer_fees: number;
-      other_expenses: number;
-    };
-    listed_withholding: number;
-    special_accounts: {
-      broker_name: string;
-      branch_name: string;
-      withholding_account: boolean;
-      revenue: number;
-      cost: number;
-      withholding: number;
-    }[];
-  };
+  /** 配当・一時・株式等譲渡の入力（ワイヤ形式）。 */
+  expanded_income?: ExpandedIncomeWire;
+  /** 農業所得の入力（ワイヤ形式）。 */
+  agriculture?: AgricultureWire;
 }
 
 /** e-Tax 申告等データ（XTX）出力のレスポンス。 */
