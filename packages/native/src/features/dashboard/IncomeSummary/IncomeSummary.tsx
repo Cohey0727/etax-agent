@@ -1,4 +1,4 @@
-import { BlueDeduction, FilingType, IncomeBreakdown, blueDeductionCaps } from "@etax/shared";
+import { BlueDeduction, IncomeBreakdown } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { AppText, Card, LabeledValue } from "@/components";
 import { space } from "@/theme";
@@ -7,8 +7,8 @@ import { formatYen } from "@/utils";
 export interface IncomeSummaryProps {
   breakdown: IncomeBreakdown;
   blue: BlueDeduction;
-  filingType: FilingType;
-  realEstateBusinessScale: boolean;
+  /** 青色申告特別控除の限度額（不動産・事業・農業を合わせた所得に対する額。白色は 0） */
+  blueDeductionLimit: number;
   /** 申告入力に農業所得があるか（青色申告特別控除の農業分を出す） */
   hasAgricultureIncome: boolean;
 }
@@ -17,15 +17,12 @@ export interface IncomeSummaryProps {
 export function IncomeSummary({
   breakdown,
   blue,
-  filingType,
-  realEstateBusinessScale,
+  blueDeductionLimit,
   hasAgricultureIncome,
 }: IncomeSummaryProps) {
-  const caps = blueDeductionCaps({ filingType, realEstateBusinessScale });
-  const pooled = filingType === "blue10" || realEstateBusinessScale || filingType === "white";
-  const realEstateLabel = pooled ? "不動産分" : `不動産分（上限${formatCap(caps.realEstate)}）`;
-  const businessLabel = pooled ? "事業分" : `事業分（上限${formatCap(caps.business)}）`;
-  const totalLabel = filingType === "white" ? "合計" : `合計（最大${formatCap(caps.total)}）`;
+  // 限度額は不動産・事業・農業を合わせた所得に対する1つの額なので、合計の行にだけ出す。
+  const totalLabel =
+    blueDeductionLimit > 0 ? `合計（最大${formatCap(blueDeductionLimit)}）` : "合計";
   return (
     <View style={styles.col}>
       <IncomeStatCard
@@ -46,8 +43,8 @@ export function IncomeSummary({
         <AppText size="lg" weight="bold">
           青色申告特別控除
         </AppText>
-        <LabeledValue label={realEstateLabel} value={formatYen(blue.realEstate)} />
-        <LabeledValue label={businessLabel} value={formatYen(blue.business)} />
+        <LabeledValue label="不動産分" value={formatYen(blue.realEstate)} />
+        <LabeledValue label="事業分" value={formatYen(blue.business)} />
         {hasAgricultureIncome ? (
           <LabeledValue label="農業分" value={formatYen(blue.agriculture)} />
         ) : null}

@@ -6,10 +6,12 @@
  * 集計範囲は確定申告画面と同じ事業＋不動産。資金の移動（その他区分）は
  * 収支ではないので内訳・推移に混ぜない。
  */
+import { isAgricultureEmpty } from "./agriculture";
 import { filterYear } from "./ledger";
 import {
   aggregateIncome,
   BlueDeduction,
+  blueDeduction,
   ComputeCorrectedFiguresOptions,
   computeCorrectedFigures,
   ConsumptionMethod,
@@ -19,64 +21,111 @@ import {
 } from "./taxcalc";
 import { Transaction } from "./types";
 
-/** 消費税の方式ごとの比較の1行。 */
+/** 消費税の方式ごとの比較の1行。売上税額・仕入税額は国税分。 */
 export interface ConsumptionComparisonRow {
   method: ConsumptionMethod;
+  /** 売上税額（国税分） */
   outputTax: number;
+  /** 控除する仕入税額（国税分。簡易課税・特例はみなしの額） */
   inputTax: number;
+  /** 差引税額（国税。マイナスは還付） */
+  nationalPayable: number;
+  /** 譲渡割額（地方消費税。マイナスは還付） */
+  localPayable: number;
+  /** 納付税額（国税＋地方消費税。マイナスは還付） */
   payable: number;
 }
 
 export interface DashboardFigures {
   breakdown: IncomeBreakdown;
   blue: BlueDeduction;
+  /** 青色申告特別控除の限度額（不動産・事業・農業を合わせた所得に対する額。白色は 0） */
+  blueDeductionLimit: number;
   /** 課税売上（税込） */
   taxableSalesIncl: number;
   /** 非課税売上（税込。住宅家賃） */
   nontaxableSalesIncl: number;
-  /** 仕入税額の概算 */
+  /** 仕入税額の概算（国税分。課税売上割合で按分する前の額） */
   inputTaxEstimate: number;
-  /** 本則課税・簡易課税・2割特例の順 */
+  /** 小規模事業者の特例の率（2割特例 0.2・3割特例 0.3）。特例の無い年分は null */
+  smallBusinessSpecialRate: number | null;
+  /** 本則課税・簡易課税・小規模事業者の特例の順。特例の無い年分は特例の行を持たない */
   consumption: ConsumptionComparisonRow[];
 }
 
-const CONSUMPTION_METHOD_ORDER: readonly ConsumptionMethod[] = ["standard", "simplified", "special20"];
-
 /**
  * 対象年の取引（割り当て年度で絞ったもの）から、ダッシュボードの数値一式を求める。
- * 青色申告特別控除と消費税の入力は確定申告画面と同じ computeCorrectedFigures から取る
- * （申告入力の農業所得も控除の配分に入る）。
+ * 青色申告特別控除と消費税は確定申告画面と同じ computeCorrectedFigures から取る
+ * （申告入力の農業所得も控除の配分に入り、消費税は年分の特例の率・課税売上割合の
+ * 按分で計算する）。方式ごとの売上税額・仕入税額の内訳は、同じ入力で consumptionTax
+ * を呼んで求める。
  */
 export function dashboardFigures(
   yearTransactions: Transaction[],
+  year: number,
   options: ComputeCorrectedFiguresOptions,
 ): DashboardFigures {
   const breakdown = aggregateIncome(yearTransactions);
-  const corrected = computeCorrectedFigures(yearTransactions, 0, options);
+  const corrected = computeCorrectedFigures(yearTransactions, year, options);
   const blue: BlueDeduction = {
     realEstate: corrected._detail.blue_deduction_real_estate,
     business: corrected._detail.blue_deduction_business,
     agriculture: corrected._detail.blue_deduction_agriculture,
     total: corrected.blue_deduction,
   };
-  const taxableSalesIncl = corrected.taxable_sales;
-  const nontaxableSalesIncl = corrected.nontaxable_sales;
-  const inputTaxEstimate = corrected.input_tax_estimate;
-  const consumption = CONSUMPTION_METHOD_ORDER.map((method) => {
+  const specialRate = corrected._detail.small_business_special_rate;
+  const methods: readonly ConsumptionMethod[] =
+    specialRate === null ? ["standard", "simplified"] : ["standard", "simplified", "special20"];
+  const consumption = methods.map((method) => {
     const result = consumptionTax({
-      taxableSalesIncl,
-      nontaxableSalesIncl,
-      inputTax: inputTaxEstimate,
+      taxableSalesIncl: corrected.taxable_sales,
+      nontaxableSalesIncl: corrected.nontaxable_sales,
+      inputTax: corrected.input_tax_estimate,
       method,
+      businessKind: options.businessKind,
+      specialRate: specialRate ?? undefined,
     });
     return {
       method,
       outputTax: result.outputTax,
       inputTax: result.inputTax,
+      nationalPayable: result.nationalPayable,
+      localPayable: result.localPayable,
       payable: result.payable,
     };
   });
-  return { breakdown, blue, taxableSalesIncl, nontaxableSalesIncl, inputTaxEstimate, consumption };
+  return {
+    breakdown,
+    blue,
+    blueDeductionLimit: blueDeductionLimit(yearTransactions, options),
+    taxableSalesIncl: corrected.taxable_sales,
+    nontaxableSalesIncl: corrected.nontaxable_sales,
+    inputTaxEstimate: corrected.input_tax_estimate,
+    smallBusinessSpecialRate: specialRate,
+    consumption,
+  };
+}
+
+/** 小規模事業者の特例の名前（率 0.2 は「2割特例」、0.3 は「3割特例」）。 */
+export function smallBusinessSpecialLabel(rate: number): string {
+  return `${Math.round(rate * 10)}割特例`;
+}
+
+/**
+ * 青色申告特別控除の限度額。事業（農業を含む）を営んでいるかの判定は
+ * computeCorrectedFigures と同じ（事業の取引か農業所得の入力があれば営んでいる）。
+ * 所得の制約を外したとき（不動産所得が十分に大きいとき）の控除額が限度額になるので、
+ * 規則は blueDeduction のものをそのまま使う。
+ */
+function blueDeductionLimit(
+  yearTransactions: Transaction[],
+  options: ComputeCorrectedFiguresOptions,
+): number {
+  const operatesBusiness =
+    options.operatesBusiness ??
+    ((options.agriculture !== undefined && !isAgricultureEmpty(options.agriculture)) ||
+      yearTransactions.some((t) => t.income_type === "business"));
+  return blueDeduction(Number.MAX_SAFE_INTEGER, 0, { ...options, operatesBusiness }).total;
 }
 
 // ---------------------------------------------------------------------------

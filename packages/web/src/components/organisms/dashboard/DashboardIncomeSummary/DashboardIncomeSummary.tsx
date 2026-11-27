@@ -1,4 +1,4 @@
-import { BlueDeduction, FilingType, IncomeBreakdown, blueDeductionCaps } from "@etax/shared";
+import { BlueDeduction, IncomeBreakdown } from "@etax/shared";
 import { Card, Col, Text } from "@components/atoms";
 import { formatYen } from "@utils";
 import styles from "./DashboardIncomeSummary.css";
@@ -6,10 +6,11 @@ import styles from "./DashboardIncomeSummary.css";
 export interface DashboardIncomeSummaryProps {
   breakdown: IncomeBreakdown;
   blue: BlueDeduction;
-  /** 申告の種類（青色申告特別控除の区分）。変更は納税者情報画面で行う。 */
-  filingType: FilingType;
-  /** 不動産貸付けが事業的規模か */
-  realEstateBusinessScale: boolean;
+  /**
+   * 青色申告特別控除の限度額（不動産・事業・農業を合わせた所得に対する額。白色は 0）。
+   * 申告の種類の変更は納税者情報画面で行う。
+   */
+  blueDeductionLimit: number;
   /** 申告入力に農業所得があるか（青色申告特別控除の農業分を出す） */
   hasAgricultureIncome: boolean;
 }
@@ -17,16 +18,12 @@ export interface DashboardIncomeSummaryProps {
 export const DashboardIncomeSummary = ({
   breakdown,
   blue,
-  filingType,
-  realEstateBusinessScale,
+  blueDeductionLimit,
   hasAgricultureIncome,
 }: DashboardIncomeSummaryProps) => {
-  const caps = blueDeductionCaps({ filingType, realEstateBusinessScale });
-  // 事業・不動産を合算して上限がかかる場合は、内訳ごとの上限は出さない。
-  const pooled = filingType === "blue10" || realEstateBusinessScale || filingType === "white";
-  const realEstateLabel = pooled ? "不動産分" : `不動産分（上限${formatCap(caps.realEstate)}）`;
-  const businessLabel = pooled ? "事業分" : `事業分（上限${formatCap(caps.business)}）`;
-  const totalLabel = filingType === "white" ? "合計" : `合計（最大${formatCap(caps.total)}）`;
+  // 限度額は不動産・事業・農業を合わせた所得に対する1つの額なので、合計の行にだけ出す。
+  const totalLabel =
+    blueDeductionLimit > 0 ? `合計（最大${formatCap(blueDeductionLimit)}）` : "合計";
   return (
     <div className={styles.grid}>
       <IncomeStatCard
@@ -47,11 +44,11 @@ export const DashboardIncomeSummary = ({
         <Col gap="sm">
           <Text variant="sectionTitle">青色申告特別控除</Text>
           <Col gap="none">
-            <Text variant="statLabel">{realEstateLabel}</Text>
+            <Text variant="statLabel">不動産分</Text>
             <Text>{formatYen(blue.realEstate)}</Text>
           </Col>
           <Col gap="none">
-            <Text variant="statLabel">{businessLabel}</Text>
+            <Text variant="statLabel">事業分</Text>
             <Text>{formatYen(blue.business)}</Text>
           </Col>
           {hasAgricultureIncome ? (

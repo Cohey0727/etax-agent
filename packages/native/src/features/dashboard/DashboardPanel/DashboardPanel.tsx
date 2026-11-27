@@ -49,13 +49,14 @@ export function DashboardPanel({ transactions, year }: DashboardPanelProps) {
   const tx = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(
     () =>
-      dashboardFigures(tx, {
+      dashboardFigures(tx, year, {
         filingType: deductionState.filingType,
         realEstateBusinessScale: deductionState.realEstateBusinessScale,
         agriculture: deductionState.agriculture,
       }),
     [
       tx,
+      year,
       deductionState.filingType,
       deductionState.realEstateBusinessScale,
       deductionState.agriculture,
@@ -70,8 +71,7 @@ export function DashboardPanel({ transactions, year }: DashboardPanelProps) {
       <IncomeSummary
         breakdown={figures.breakdown}
         blue={figures.blue}
-        filingType={deductionState.filingType}
-        realEstateBusinessScale={deductionState.realEstateBusinessScale}
+        blueDeductionLimit={figures.blueDeductionLimit}
         hasAgricultureIncome={!isAgricultureEmpty(deductionState.agriculture)}
       />
       <ConsumptionTaxComparison
@@ -79,6 +79,7 @@ export function DashboardPanel({ transactions, year }: DashboardPanelProps) {
         taxable={figures.taxableSalesIncl}
         nontaxable={figures.nontaxableSalesIncl}
         inputTax={figures.inputTaxEstimate}
+        specialRate={figures.smallBusinessSpecialRate}
         results={figures.consumption}
       />
     </View>
