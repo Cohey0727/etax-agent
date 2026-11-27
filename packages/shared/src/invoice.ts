@@ -13,6 +13,8 @@
 /** 消費税額の端数処理方法。 */
 export type InvoiceTaxRounding = "floor" | "round" | "ceil";
 
+export const INVOICE_TAX_ROUNDINGS: readonly InvoiceTaxRounding[] = ["floor", "round", "ceil"];
+
 /** 請求書の明細1行（計算入力）。金額はすべて number で持つ。 */
 export interface InvoiceLineInput {
   /** 取引内容（品目・サービス名） */
