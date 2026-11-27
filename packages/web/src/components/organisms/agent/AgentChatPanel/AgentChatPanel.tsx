@@ -47,6 +47,12 @@ export interface AgentChatPanelProps {
   onClearReady?: (handler: (() => void) | null) => void;
 }
 
+/**
+ * 応答を待つ上限。サーバーはツール呼び出しを挟んで AI を最大10回呼ぶ。これを超えて
+ * 返らないものは止まっているとみなし、チャットを使える状態に戻す。
+ */
+const AGENT_REPLY_TIMEOUT_MS = 5 * 60 * 1000;
+
 // 送信キーの修飾キー表示。Mac は ⌘、それ以外（Windows 等）は Ctrl。
 const MOD_KEY_LABEL =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform ?? "")
@@ -74,6 +80,8 @@ export const AgentChatPanel = ({
   const [dragging, setDragging] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 応答待ちの送信（中断ボタン・時間切れで止める）。送信と中断のイベントの中でだけ書く。
+  const pendingRequestRef = useRef<AbortController | null>(null);
   const { pending, addFiles, removeFile, clear: clearFiles } = useChatAttachments(setError);
   const inHistory = historyOpen || viewing !== null;
 
@@ -103,6 +111,9 @@ export const AgentChatPanel = ({
     clearFiles();
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    pendingRequestRef.current = controller;
+    const timer = setTimeout(() => controller.abort("timeout"), AGENT_REPLY_TIMEOUT_MS);
     try {
       const res = await agentChat(
         next,
@@ -110,6 +121,7 @@ export const AgentChatPanel = ({
         agentConnection,
         getDeductionsSnapshot?.() ?? undefined,
         sent.map(toChatAttachmentUpload),
+        controller.signal,
       );
       // 使ったツールは発言に添えて表示する（何をしたか分かるように）。
       const answered: ChatMessage[] = [
@@ -136,13 +148,30 @@ export const AgentChatPanel = ({
         }
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // 503（キー未設定）などは案内としてそのまま見せる
-      setError(msg);
+      if (controller.signal.aborted) {
+        // 画面が待つのをやめても、サーバー側の処理は続いて保存まで済む場合がある
+        setError(
+          controller.signal.reason === "timeout"
+            ? "応答がないため待つのをやめました。処理はサーバーで続いている場合があります。"
+            : "応答を待つのをやめました。処理はサーバーで続いている場合があります。",
+        );
+      } else {
+        // 503（キー未設定）などは案内としてそのまま見せる
+        setError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
+      clearTimeout(timer);
+      pendingRequestRef.current = null;
       setLoading(false);
     }
   };
+
+  const stopWaiting = () => {
+    pendingRequestRef.current?.abort("user");
+  };
+
+  // パネルが外れたら（ログアウト・ログイン切れなど）応答待ちをやめる。
+  useEffect(() => () => pendingRequestRef.current?.abort("user"), []);
 
   // クリア = いまの会話を履歴へ保存してから空にする（履歴から後で見返せる）。
   const clearChat = () => {
@@ -285,9 +314,13 @@ export const AgentChatPanel = ({
               rows={2}
               disabled={loading}
             />
-            <Button onClick={() => void send()} disabled={loading} disabledReason="応答中です">
-              送信
-            </Button>
+            {loading ? (
+              <Button variant="ghost" onClick={stopWaiting}>
+                中断
+              </Button>
+            ) : (
+              <Button onClick={() => void send()}>送信</Button>
+            )}
           </Row>
         </>
       )}

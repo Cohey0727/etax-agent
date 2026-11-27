@@ -192,6 +192,7 @@ export async function agentChat(
   connection?: AgentConnectionConfig,
   deductions?: { year: number; state: unknown },
   attachments?: ChatAttachmentUpload[],
+  signal?: AbortSignal,
 ): Promise<AgentChatResponse> {
   // 設定画面の外部接続は、入っている項目だけを上書きとして送る（空はサーバー設定）。
   const agentConfig = {
@@ -199,9 +200,8 @@ export async function agentChat(
     ...(connection?.model.trim() ? { model: connection.model.trim() } : {}),
     ...(connection?.apiKey.trim() ? { apiKey: connection.apiKey.trim() } : {}),
   };
-  return requestJson<AgentChatResponse>(
-    "/api/agent/chat",
-    jsonBody("POST", {
+  return requestJson<AgentChatResponse>("/api/agent/chat", {
+    ...jsonBody("POST", {
       // ツール実行ログは会話履歴として送らない（表示専用）。
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       transactions,
@@ -209,7 +209,8 @@ export async function agentChat(
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
       ...(Object.keys(agentConfig).length > 0 ? { agentConfig } : {}),
     }),
-  );
+    signal,
+  });
 }
 
 /** 勘定科目を1件判定する（履歴→SystemOne→ルール）。 */
