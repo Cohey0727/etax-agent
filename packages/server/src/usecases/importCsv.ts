@@ -21,11 +21,7 @@ import {
 } from "../schemas/importCsv";
 import { listTransactionFingerprintRows } from "../repositories/transactionRepository";
 import { decodeCsvBytes } from "../services/csvImport/csvDecoding";
-import {
-  buildFingerprintCounts,
-  excludeAlreadyImported,
-  transactionFingerprint,
-} from "../services/csvImport/importDedupe";
+import { excludeImportedTransactions } from "../services/csvImport/importDedupe";
 import { resolveMapping } from "../services/csvImport/csvMapping";
 import { ParseResult, parseWithMapping } from "../services/csvImport/csvParsing";
 
@@ -131,18 +127,7 @@ export const importCsvHandler: RouteHandler<typeof importCsvRoute> = async (c) =
   if (db) {
     try {
       const existing = await listTransactionFingerprintRows(db);
-      const deduped = excludeAlreadyImported(
-        parsed.transactions,
-        (t) =>
-          transactionFingerprint({
-            date: t.date,
-            amount: t.amount,
-            description: t.description,
-            account: t.account,
-            taxCategory: t.tax_category,
-          }),
-        buildFingerprintCounts(existing),
-      );
+      const deduped = excludeImportedTransactions(parsed.transactions, existing, mapping);
       importId = await createImportWithTransactions(db, {
         filename,
         sourceName,

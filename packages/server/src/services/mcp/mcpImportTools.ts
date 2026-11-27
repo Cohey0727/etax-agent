@@ -15,11 +15,7 @@ import {
 } from "../../repositories/importRepository";
 import { listTransactionFingerprintRows } from "../../repositories/transactionRepository";
 import { decodeCsvBytes } from "../csvImport/csvDecoding";
-import {
-  buildFingerprintCounts,
-  excludeAlreadyImported,
-  transactionFingerprint,
-} from "../csvImport/importDedupe";
+import { excludeImportedTransactions } from "../csvImport/importDedupe";
 import { resolveMapping } from "../csvImport/csvMapping";
 import { parseWithMapping } from "../csvImport/csvParsing";
 import { McpToolModule, requireDb, textResult } from "./mcpToolKit";
@@ -99,18 +95,7 @@ export const mcpImportTools: McpToolModule = {
       }
 
       const existing = await listTransactionFingerprintRows(db);
-      const deduped = excludeAlreadyImported(
-        parsed.transactions,
-        (t) =>
-          transactionFingerprint({
-            date: t.date,
-            amount: t.amount,
-            description: t.description,
-            account: t.account,
-            taxCategory: t.tax_category,
-          }),
-        buildFingerprintCounts(existing),
-      );
+      const deduped = excludeImportedTransactions(parsed.transactions, existing, mapping);
       const importId = await createImportWithTransactions(db, {
         filename,
         sourceName,

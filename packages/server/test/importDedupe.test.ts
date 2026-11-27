@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { parseCsv, Transaction } from "@etax/shared";
+import { heuristicMapping } from "../src/services/csvImport/csvMapping";
+import { parseWithMapping } from "../src/services/csvImport/csvParsing";
 import {
   buildFingerprintCounts,
   excludeAlreadyImported,
+  excludeImportedTransactions,
   FingerprintFields,
   transactionFingerprint,
 } from "../src/services/csvImport/importDedupe";
@@ -67,5 +71,47 @@ describe("excludeAlreadyImported", () => {
     const a = transactionFingerprint(fields());
     const b = transactionFingerprint(fields({ taxCategory: "" }));
     expect(a).toBe(b);
+  });
+});
+
+describe("excludeImportedTransactions", () => {
+  const csv = "日付,摘要,金額\n2025/01/05,AWS,-5000\n2025/01/06,売上,300000\n";
+  const parse = (sourceName: string) => {
+    const rows = parseCsv(csv);
+    const mapping = heuristicMapping(rows[0] ?? [], rows.slice(1));
+    return { mapping, transactions: parseWithMapping(rows, mapping, sourceName).transactions };
+  };
+  const asExisting = (transactions: readonly Transaction[]): FingerprintFields[] =>
+    transactions.map((t) => ({
+      date: t.date,
+      amount: t.amount,
+      description: t.description,
+      account: t.account,
+      taxCategory: t.tax_category,
+    }));
+
+  test("口座列の無いCSVは、ファイル名が変わっても同じ明細を重複として除く", () => {
+    const first = parse("meisai");
+    const second = parse("meisai (1)");
+    expect(first.mapping.accountColumn).toBeNull();
+    const { fresh, duplicates } = excludeImportedTransactions(
+      second.transactions,
+      asExisting(first.transactions),
+      second.mapping,
+    );
+    expect(fresh).toEqual([]);
+    expect(duplicates).toBe(2);
+  });
+
+  test("口座列のあるCSVは、口座が違えば重複にしない", () => {
+    const withAccount = "日付,摘要,金額,口座\n2025/01/05,AWS,-5000,三井住友カード\n";
+    const rows = parseCsv(withAccount);
+    const mapping = heuristicMapping(rows[0] ?? [], rows.slice(1));
+    expect(mapping.accountColumn).toBe("口座");
+    const incoming = parseWithMapping(rows, mapping, "card").transactions;
+    const existing = [fields({ date: "2025-01-05", amount: -5000, description: "AWS", account: "楽天カード" })];
+    const { fresh, duplicates } = excludeImportedTransactions(incoming, existing, mapping);
+    expect(fresh).toHaveLength(1);
+    expect(duplicates).toBe(0);
   });
 });
