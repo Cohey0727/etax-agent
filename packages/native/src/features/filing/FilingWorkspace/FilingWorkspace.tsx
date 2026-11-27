@@ -17,6 +17,7 @@ import {
   computeExpandedIncomes,
   computeIncomeTax,
   computeManualIncomes,
+  expandedWithholdingTotal,
   filterYear,
   resolveTaxCreditInputs,
 } from "@etax/shared";
@@ -245,6 +246,10 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
           filingType={deductionState.filingType}
           realEstateBusinessScale={deductionState.realEstateBusinessScale}
           balanceSheet={deductionState.balanceSheet}
+          taxResult={taxResult}
+          incomeTaxPayments={deductionState.incomeTaxPayments}
+          onIncomeTaxPaymentsChange={(next) => update((s) => ({ ...s, incomeTaxPayments: next }))}
+          expandedWithholding={expandedWithholdingTotal(expandedBreakdown)}
           originalIncomeTax={null}
           onOpenSection={openSection}
         />
@@ -333,7 +338,12 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
     ),
     consumption: (
       <>
-        <ConsumptionTaxPanel transactions={transactions} year={year} />
+        <ConsumptionTaxPanel
+          transactions={transactions}
+          year={year}
+          consumptionFiling={deductionState.consumptionFiling}
+          onConsumptionFilingChange={(next) => update((s) => ({ ...s, consumptionFiling: next }))}
+        />
         <SubmissionRecordPanel year={year} kind="consumption" />
       </>
     ),

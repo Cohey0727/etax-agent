@@ -3,6 +3,8 @@ import {
   DeductionInputs,
   ExpandedIncomeInput,
   FilingType,
+  IncomeTaxPaymentInputs,
+  IncomeTaxResult,
   MiscIncomeInput,
   SalaryIncomeInput,
   TaxCreditInputs,
@@ -41,7 +43,8 @@ import {
   shareFile,
 } from "@/api";
 import { space } from "@/theme";
-import { AmountField, LoadFailedNotice, SectionHead } from "../fields";
+import { declaredIncomeTax } from "../declaredIncomeTax";
+import { AmountField, LoadFailedNotice, ResultRow, SectionHead } from "../fields";
 import { EtaxImportGuide } from "../EtaxImportGuide";
 import { FilingSection } from "../FilingPanel";
 import { taxpayerProfileStore, todayIso } from "../taxpayerData";
@@ -70,6 +73,13 @@ export interface TaxpayerPanelProps {
   realEstateBusinessScale?: boolean;
   /** 貸借対照表の入力（申告入力に保存されたもの）。XTXの決算書4面に反映する。 */
   balanceSheet?: XtxBalanceSheetInput | null;
+  /** 所得税の計算結果。申告納税額の精算に使う。 */
+  taxResult: IncomeTaxResult;
+  /** 源泉徴収税額・予定納税額（申告入力として年度別に保存される） */
+  incomeTaxPayments: IncomeTaxPaymentInputs;
+  onIncomeTaxPaymentsChange: (next: IncomeTaxPaymentInputs) => void;
+  /** 配当・株式等譲渡の入力に含まれる源泉徴収税額（XTX でも源泉徴収税額へ加算される） */
+  expandedWithholding: number;
   /**
    * 申告済みの所得税額（過去に確定した分）。入っていれば、その確定分と
    * 比較する修正申告として出力する。null なら確定申告として出力する。
@@ -97,14 +107,18 @@ export function TaxpayerPanel({
   filingType,
   realEstateBusinessScale,
   balanceSheet,
+  taxResult,
+  incomeTaxPayments,
+  onIncomeTaxPaymentsChange,
+  expandedWithholding,
   originalIncomeTax,
   onOpenSection,
 }: TaxpayerPanelProps) {
   const { entry: profileEntry, reload: reloadProfile } = useYearInput(taxpayerProfileStore, year);
   const taxpayer = profileEntry.status === "ready" ? profileEntry.value.taxpayer : null;
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
-  const [withholdingTax, setWithholdingTax] = useState(0);
-  const [prepaidTax, setPrepaidTax] = useState(0);
+  const { withholdingTax, prepaidTax } = incomeTaxPayments;
+  const declared = declaredIncomeTax(taxResult, withholdingTax + expandedWithholding, prepaidTax);
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingDomicile, setExportingDomicile] = useState(false);
@@ -272,13 +286,33 @@ export function TaxpayerPanel({
         </AppText>
         <LabeledValue label="申告の種類" value={amendment ? "修正申告" : "確定申告"} />
         <DateField label="提出日" value={submissionDate} onChange={setSubmissionDate} />
-        <AmountField label="源泉徴収税額" value={withholdingTax} onChange={setWithholdingTax} />
+        <AmountField
+          label="源泉徴収税額"
+          value={withholdingTax}
+          onChange={(v) => onIncomeTaxPaymentsChange({ ...incomeTaxPayments, withholdingTax: v })}
+        />
         {expandedIncome && !isExpandedIncomeEmpty(expandedIncome) ? (
           <AppText size="sm" tone="muted">
             配当・株式等譲渡の源泉徴収税額は、各所得の入力欄で入れた金額が自動で加算されます（ここには含めないでください）。
           </AppText>
         ) : null}
-        <AmountField label="予定納税額" value={prepaidTax} onChange={setPrepaidTax} />
+        <AmountField
+          label="予定納税額"
+          value={prepaidTax}
+          onChange={(v) => onIncomeTaxPaymentsChange({ ...incomeTaxPayments, prepaidTax: v })}
+        />
+        <View>
+          <ResultRow label="申告納税額" value={declared.declaredTax} />
+          <ResultRow
+            label={
+              declared.thirdPeriodTax < 0
+                ? "第3期分の税額（還付される税金）"
+                : "第3期分の税額（納める税金）"
+            }
+            value={Math.abs(declared.thirdPeriodTax)}
+            strong
+          />
+        </View>
 
         <AppText size="sm" tone="muted">
           申告の種類は入力内容から決まります。申告済みの所得税額が入っている場合は

@@ -1,4 +1,5 @@
 import {
+  ConsumptionFilingInputs,
   Transaction,
   computeConsumptionReturn,
   computeCorrectedFigures,
@@ -23,9 +24,8 @@ import { taxpayerProfileStore, todayIso } from "../taxpayerData";
 import { useYearInput } from "../useYearInput";
 import {
   AMENDMENT_FIELDS,
-  EDITABLE_FIELDS,
-  EditableForm,
-  EditableKey,
+  ConsumptionAmountKey,
+  INTERIM_FIELDS,
   SUMMARY_ROWS,
 } from "./consumptionTaxFields";
 import { buildResultRows } from "./consumptionTaxHelpers";
@@ -33,6 +33,9 @@ import { buildResultRows } from "./consumptionTaxHelpers";
 export interface ConsumptionTaxPanelProps {
   transactions: Transaction[];
   year: number;
+  /** 帳簿の外にある数字の手入力（申告入力として年度別に保存される） */
+  consumptionFiling: ConsumptionFilingInputs;
+  onConsumptionFilingChange: (next: ConsumptionFilingInputs) => void;
 }
 
 const FILING_KIND_OPTIONS: readonly { value: string; label: string }[] = [
@@ -48,20 +51,25 @@ const FILING_KIND_OPTIONS: readonly { value: string; label: string }[] = [
  * 課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算される。
  * あわせて、帳簿ベースの3方式（本則・簡易・2割特例）の税額比較も出す。
  */
-export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelProps) {
+export function ConsumptionTaxPanel({
+  transactions,
+  year,
+  consumptionFiling,
+  onConsumptionFilingChange,
+}: ConsumptionTaxPanelProps) {
   // 納税者プロフィール（DB保存）。出力するXTXの見出しに使う。
   const { entry: profileEntry, reload: reloadProfile } = useYearInput(taxpayerProfileStore, year);
   const taxpayer = profileEntry.status === "ready" ? profileEntry.value.taxpayer : null;
 
   const summary = useMemo(() => summarizeConsumptionTax(transactions, year), [transactions, year]);
-  const [form, setForm] = useState<EditableForm>(() => ({
-    basePeriodSalesThousands: deriveBasePeriodSalesThousands(transactions, year),
-    interimNational: 0,
-    interimLocal: 0,
-    originalNational: 0,
-    originalLocal: 0,
-  }));
-  const [filingKind, setFilingKind] = useState<1 | 3>(1);
+  // 基準期間の課税売上高は、手で直すまでは帳簿（2年前）から求めた値を使う
+  const derivedBasePeriodSales = useMemo(
+    () => deriveBasePeriodSalesThousands(transactions, year),
+    [transactions, year],
+  );
+  const basePeriodSalesThousands =
+    consumptionFiling.basePeriodSalesThousands ?? derivedBasePeriodSales;
+  const { filingKind } = consumptionFiling;
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -79,14 +87,14 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
         exemptSales: summary.exemptSales,
         purchasesIncl10: summary.purchasesIncl10,
         purchasesIncl8: summary.purchasesIncl8,
-        interimNational: form.interimNational,
-        interimLocal: form.interimLocal,
+        interimNational: consumptionFiling.interimNational,
+        interimLocal: consumptionFiling.interimLocal,
       }),
-    [summary, form],
+    [summary, consumptionFiling.interimNational, consumptionFiling.interimLocal],
   );
 
   // 計算結果の各項目と、その裏付け（どう計算したか）を直下に並べる。
-  const resultRows = buildResultRows(preview, form);
+  const resultRows = buildResultRows(preview, consumptionFiling);
 
   // 3方式の比較（帳簿から計算した申告数値の消費税3方式）。
   const comparison = useMemo(() => {
@@ -98,9 +106,8 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
     ] as const;
   }, [transactions, year]);
 
-  const update = (key: EditableKey, value: number) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
+  const update = (key: ConsumptionAmountKey, value: number) =>
+    onConsumptionFilingChange({ ...consumptionFiling, [key]: value });
 
   const handleExport = async () => {
     if (!taxpayer) return;
@@ -116,17 +123,17 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
         period_to: `${year}-12-31`,
         submission_date: submissionDate,
         filing_kind: filingKind,
-        base_period_sales_thousands: form.basePeriodSalesThousands,
+        base_period_sales_thousands: basePeriodSalesThousands,
         sales_incl_10: summary.salesIncl10,
         sales_incl_8: summary.salesIncl8,
         nontaxable_sales: summary.nontaxableSales,
         exempt_sales: summary.exemptSales,
         purchases_incl_10: summary.purchasesIncl10,
         purchases_incl_8: summary.purchasesIncl8,
-        interim_national: form.interimNational,
-        interim_local: form.interimLocal,
-        original_national: filingKind === 3 ? form.originalNational : null,
-        original_local: filingKind === 3 ? form.originalLocal : null,
+        interim_national: consumptionFiling.interimNational,
+        interim_local: consumptionFiling.interimLocal,
+        original_national: filingKind === 3 ? consumptionFiling.originalNational : null,
+        original_local: filingKind === 3 ? consumptionFiling.originalLocal : null,
       };
       const result = await exportConsumptionXtxFile(request);
       const file = saveTextToCacheFile(result.filename, result.xtx);
@@ -163,7 +170,9 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
           label="申告の種類"
           value={String(filingKind)}
           options={FILING_KIND_OPTIONS}
-          onChange={(v) => setFilingKind(Number(v) === 3 ? 3 : 1)}
+          onChange={(v) =>
+            onConsumptionFilingChange({ ...consumptionFiling, filingKind: Number(v) === 3 ? 3 : 1 })
+          }
         />
         <DateField label="提出日" value={submissionDate} onChange={setSubmissionDate} />
 
@@ -187,11 +196,17 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
         ) : null}
 
         <SectionHead title="帳簿の外の数字（入力）" />
-        {EDITABLE_FIELDS.map((field) => (
+        <AmountField
+          label="基準期間の課税売上高（千円）"
+          hint="帳簿の2年前の課税売上（税抜）と免税売上から求めた値です。基準期間に免税事業者だった場合は、税込の金額で直してください。"
+          value={basePeriodSalesThousands}
+          onChange={(v) => onConsumptionFilingChange({ ...consumptionFiling, basePeriodSalesThousands: v })}
+        />
+        {INTERIM_FIELDS.map((field) => (
           <AmountField
             key={field.key}
             label={field.label}
-            value={form[field.key]}
+            value={consumptionFiling[field.key]}
             onChange={(v) => update(field.key, v)}
           />
         ))}
@@ -200,7 +215,7 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
               <AmountField
                 key={field.key}
                 label={field.label}
-                value={form[field.key]}
+                value={consumptionFiling[field.key]}
                 onChange={(v) => update(field.key, v)}
               />
             ))
