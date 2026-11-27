@@ -22,13 +22,24 @@ import { AgentConfig } from "../lib/config";
 
 const USER_AGENT = "etax-agent/0.1";
 
+/**
+ * リダイレクトを追わない fetch。接続先は利用者が指定できるため、検証済みの
+ * 宛先からリダイレクトで内部アドレスへ誘導されないよう、失敗にする。
+ */
+const fetchWithoutRedirect: typeof fetch = Object.assign(
+  (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+    fetch(input, { ...init, redirect: "error" }),
+  // AI SDK の fetch 型（Bun の fetch）に合わせるため、付随するプロパティを引き継ぐ
+  { preconnect: fetch.preconnect },
+);
+
 /** エージェント設定から AI SDK のモデルを生成する（gateways の入口）。 */
 export function createAgentModel(config: AgentConfig): LanguageModel {
   const apiKey = config.requireKey();
   if (config.schema === "claude") {
     // Anthropic プロバイダは /v1 まで含めたベースURLを期待する。
     const baseURL = config.baseUrl.endsWith("/v1") ? config.baseUrl : `${config.baseUrl}/v1`;
-    const provider = createAnthropic({ apiKey, baseURL });
+    const provider = createAnthropic({ apiKey, baseURL, fetch: fetchWithoutRedirect });
     return provider(config.model);
   }
   const provider = createOpenAICompatible({
@@ -39,6 +50,7 @@ export function createAgentModel(config: AgentConfig): LanguageModel {
       "x-opencode-session": crypto.randomUUID(),
       "User-Agent": USER_AGENT,
     },
+    fetch: fetchWithoutRedirect,
   });
   return provider(config.model);
 }

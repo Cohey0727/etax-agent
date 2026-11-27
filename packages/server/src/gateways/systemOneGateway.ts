@@ -145,6 +145,9 @@ class SystemOneHttpClient implements SystemOneClient {
           ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
         },
         body: JSON.stringify(payload),
+        // 接続先は利用者が指定できるため、リダイレクトで検証済みの宛先から
+        // 内部アドレスへ誘導されないよう、リダイレクトは追わずに失敗にする。
+        redirect: "error",
         // 判定モデル（Ollama の tev1 等）はアイドル後にアンロードされ、
         // 初回はモデルの読み込み＋24候補の推論で 30 秒を超えることがある。
         // コールドスタートでも失敗にしないよう長めに取る。

@@ -7,7 +7,11 @@
  *   内部アドレス拒否。
  */
 import { afterEach, describe, expect, test } from "bun:test";
-import { pairApiKeyWithBaseUrl } from "../src/lib/config";
+import { ACCOUNT_CRITERIA } from "@etax/shared";
+import { generateText } from "ai";
+import { createAgentModel } from "../src/gateways/agentModelGateway";
+import { createSystemOneClient } from "../src/gateways/systemOneGateway";
+import { loadAgentConfig, pairApiKeyWithBaseUrl } from "../src/lib/config";
 import { assertSafeUserBaseUrl, isPrivateIp, UnsafeUrlError } from "../src/lib/ssrfGuard";
 
 describe("pairApiKeyWithBaseUrl（キー漏洩防止）", () => {
@@ -143,5 +147,65 @@ describe("assertSafeUserBaseUrl", () => {
   test("ローカルモードではローカル接続先（Ollama）を許可する", async () => {
     delete process.env.ETAX_AUTH_MODE;
     await expect(assertSafeUserBaseUrl("http://127.0.0.1:11434")).resolves.toBeUndefined();
+  });
+});
+
+describe("接続先のリダイレクト", () => {
+  /** 別の宛先へ 307 を返すサーバーと、その転送先（届いた回数を数える）を立てる。 */
+  function startRedirectPair() {
+    let targetHits = 0;
+    const target = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: () => {
+        targetHits += 1;
+        return Response.json({ answers: { account: { probabilities: { 消耗品費: 1 } } } });
+      },
+    });
+    const redirector = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: (req) =>
+        new Response(null, {
+          status: 307,
+          headers: { Location: `http://127.0.0.1:${target.port}${new URL(req.url).pathname}` },
+        }),
+    });
+    return {
+      baseUrl: `http://127.0.0.1:${redirector.port}`,
+      targetHits: () => targetHits,
+      stop: () => {
+        redirector.stop(true);
+        target.stop(true);
+      },
+    };
+  }
+
+  test("SystemOne の判定はリダイレクトを追わない", async () => {
+    const pair = startRedirectPair();
+    try {
+      const client = createSystemOneClient({ baseUrl: pair.baseUrl, apiKey: null, model: null });
+      await expect(client.judgeAccount("コーヒー", ACCOUNT_CRITERIA)).rejects.toThrow();
+      expect(pair.targetHits()).toBe(0);
+    } finally {
+      pair.stop();
+    }
+  });
+
+  test("エージェントのモデル呼び出しはリダイレクトを追わない", async () => {
+    const pair = startRedirectPair();
+    try {
+      const model = createAgentModel({
+        ...loadAgentConfig(),
+        schema: "openai",
+        baseUrl: pair.baseUrl,
+        apiKey: "sk-test",
+        requireKey: () => "sk-test",
+      });
+      await expect(generateText({ model, prompt: "hello", maxRetries: 0 })).rejects.toThrow();
+      expect(pair.targetHits()).toBe(0);
+    } finally {
+      pair.stop();
+    }
   });
 });
