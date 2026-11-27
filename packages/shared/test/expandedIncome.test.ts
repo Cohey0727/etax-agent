@@ -12,6 +12,7 @@ import {
   computeIncomeTax,
   computeStockTransfer,
   computeTempIncome,
+  comprehensiveTotalIncome,
   normalizeExpandedIncomeInput,
   separateTaxAmount,
 } from "../src/index";
@@ -44,6 +45,26 @@ describe("一時所得（Phase A、No.1490）", () => {
     const r = computeTempIncome({ revenue: 500_001, expenses: 0 });
     expect(r.amount).toBe(1);
     expect(r.includedAmount).toBe(0);
+  });
+});
+
+describe("総所得金額（損益通算 → 一時所得の1/2）", () => {
+  test("経常所得が黒字なら、一時所得の金額の1/2を加える", () => {
+    expect(comprehensiveTotalIncome(1_000_000, 1_500_000)).toBe(1_750_000);
+  });
+
+  test("事業などの損失は一時所得と通算してから1/2にする", () => {
+    // 事業 −100万・一時所得の金額150万 → (150万 − 100万) × 1/2 = 25万
+    expect(comprehensiveTotalIncome(-1_000_000, 1_500_000)).toBe(250_000);
+  });
+
+  test("一時所得で引き切れない損失は負のまま残る", () => {
+    expect(comprehensiveTotalIncome(-2_000_000, 1_500_000)).toBe(-500_000);
+  });
+
+  test("1/2の円未満は切り捨てる", () => {
+    expect(comprehensiveTotalIncome(0, 1)).toBe(0);
+    expect(comprehensiveTotalIncome(-1, 4)).toBe(1);
   });
 });
 

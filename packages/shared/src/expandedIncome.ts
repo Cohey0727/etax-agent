@@ -76,6 +76,21 @@ export interface TempIncomeBreakdown {
   includedAmount: number;
 }
 
+/**
+ * 総所得金額（総合課税分）を求める。ordinaryIncome は経常所得（事業・不動産・
+ * 給与・雑・配当などの合計。事業・不動産の損失を含む符号つき）、
+ * tempIncomeAmount は一時所得の金額（特別控除後、computeTempIncome の amount）。
+ * 経常所得の損失は一時所得と通算し、その後の一時所得を1/2にする
+ * （所得税法22条2項2号・同法施行令198条）。引き切れない損失は負のまま返す。
+ */
+export function comprehensiveTotalIncome(ordinaryIncome: number, tempIncomeAmount: number): number {
+  const ordinary = signed(ordinaryIncome);
+  const temp = amount(tempIncomeAmount);
+  if (ordinary >= 0) return ordinary + Math.floor(temp / 2);
+  const tempAfterOffset = temp + ordinary;
+  return tempAfterOffset >= 0 ? Math.floor(tempAfterOffset / 2) : tempAfterOffset;
+}
+
 /** 一時所得の金額と1/2算入額を計算する。 */
 export function computeTempIncome(input: TempIncomeInput): TempIncomeBreakdown {
   const revenue = amount(input.revenue);
