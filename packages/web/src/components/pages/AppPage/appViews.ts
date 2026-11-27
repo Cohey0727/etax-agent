@@ -40,7 +40,7 @@ export const appViews = [
 }[];
 
 // サイドバーで確定申告にぶら下げる子項目（タブへの直接遷移）。総合は親そのものなので出さない。
-// 納税者情報は独立画面になったため、ここには含めない。
+// 納税者情報は独立した画面なので、ここには含めない。
 export const FILING_NAV_CHILDREN: readonly { view: AppView; key: FilingTab; label: string }[] = [
   { view: AppView.Filing, key: "balance", label: "収支" },
   { view: AppView.Filing, key: "deductions", label: "控除" },

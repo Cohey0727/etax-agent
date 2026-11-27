@@ -22,7 +22,7 @@ export interface LogoProps {
   className?: string;
 }
 
-// 珠の geometry は正本（files/logo/build_final.py）の 1024 グリッドそのまま。
+// 珠の geometry は public/ のロゴ資産と同じ 1024 グリッド。
 // 4つの珠（菱形・上下円錐）を市松 2 トーンで並べ、点で接する構成。
 type ConeFill = "coneTop" | "coneBottom" | "lavender" | "accentToOnNavy";
 

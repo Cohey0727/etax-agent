@@ -9,7 +9,7 @@ import { fetchAuthConfig, fetchMe, setUnauthorizedHandler } from "@utils/api";
  * 設定（必須かどうか）とログイン状態を確認する。メールリンク
  * （?magic=）や外部ログインの戻り（?auth_error=）のクエリは、URL同期
  * （パスだけの書き換え）で消える前に値ごと捕捉しておき、ログイン画面へ
- * 渡す（Issue #10-1）。
+ * 渡す。
  */
 export function useAuthGate(onUserResolved: () => void) {
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
@@ -36,7 +36,7 @@ export function useAuthGate(onUserResolved: () => void) {
     });
     signedInRef.current = me !== null;
     if (config) setAuthConfig(config);
-    // 端末保存の名前空間をログイン中ユーザーに合わせる（Issue #9）。
+    // 端末保存の名前空間をログイン中ユーザーに合わせる。
     // 画面の子コンポーネントが読み書きする前に、ここで同期的に設定する。
     setStorageUserId(me?.id ?? null);
     // 初期表示で読んだ会話履歴は名前空間が未確定だったため、確定後に読み直す

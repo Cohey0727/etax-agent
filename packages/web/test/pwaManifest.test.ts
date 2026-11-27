@@ -2,7 +2,7 @@
  * pwaManifest.test.ts — PWA マニフェストの検証。
  * インストール可能な形（standalone・アイコン一式）を保ち、ショートカットの
  * 着地先 URL がアプリのルーティングで実際に解釈できることを守る
- * （Issue #23 Phase 1: ホーム画面から撮影導線へ直接入れること）。
+ * （ホーム画面から撮影導線へ直接入れること）。
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";

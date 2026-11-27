@@ -1,6 +1,6 @@
 /**
  * userStorage.test.ts — 端末保存のユーザー分離と APIキーの
- * セッション保存の検証（Issue #9）。
+ * セッション保存の検証。
  */
 import { beforeEach, describe, expect, test } from "bun:test";
 
@@ -75,7 +75,7 @@ describe("userScopedKey とログアウト時のクリア", () => {
     expect(loadCurrentMessages()[0]?.content).toBe("Bの会話");
   });
 
-  test("ユーザー未確定（ローカル運用）では従来キーを使う", () => {
+  test("ユーザー未確定（ローカル運用）では名前空間を付けないキーを使う", () => {
     expect(userScopedKey("etax-agent-chat-current")).toBe("etax-agent-chat-current");
   });
 });
@@ -95,7 +95,7 @@ describe("APIキーの保存先", () => {
     expect(loadAgentConnection().apiKey).toBe("");
   });
 
-  test("旧形式（localStorage にキー入り）は読み込み時に移行して消す", () => {
+  test("localStorage にキーが入っていたら、読み込み時に sessionStorage へ移して消す", () => {
     local.setItem(
       "etax-agent-connection",
       JSON.stringify({ baseUrl: "https://example.com", model: "m2", apiKey: "sk-old" }),

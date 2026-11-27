@@ -68,7 +68,7 @@ export const AccountPanel = () => {
   const handleLogout = async () => {
     await logoutAccount();
     // このユーザーの端末キャッシュを消してから再読み込みする
-    // （別アカウントが同じブラウザで開いても前の値が残らない、Issue #9）
+    // （別アカウントが同じブラウザで開いても前の値が残らない）
     clearCurrentUserStorage();
     clearStoredAgentApiKey();
     setStorageUserId(null);

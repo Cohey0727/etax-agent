@@ -101,7 +101,7 @@ export interface AuthQuery {
 /**
  * URLクエリから認証系パラメータを取り出す。アプリのURL同期はパスだけを
  * 書き換えるため、起動直後にここで捕捉しておかないと、ログイン画面が
- * 読む前にトークンが消えてしまう（Issue #10-1）。
+ * 読む前にトークンが消えてしまう。
  */
 export const parseAuthQuery = (search: string): AuthQuery => {
   const params = new URLSearchParams(search);
@@ -147,7 +147,7 @@ export const parsePath = (pathname: string): ParsedRoute | null => {
   if (parts.length === 2) return { view: AppView.Dashboard, year, filingTab: null };
   const view = viewForSlug(parts[2]);
   if (!view) return null;
-  // 旧URL（確定申告の納税者情報タブ）は独立画面へ寄せる。
+  // 確定申告の下の taxpayer は、納税者情報の画面として読む。
   if (view === AppView.Filing && parts[3] === "taxpayer") {
     return { view: AppView.Taxpayer, year, filingTab: null };
   }

@@ -1,10 +1,10 @@
 /**
  * agentConnection.ts — エージェント接続設定（baseUrl / model / apiKey）の
- * 端末保存（utils）。
+ * 端末保存（utils）。アカウントごとに分けて保存する。
  *
- * APIキーは平文のまま localStorage に置かない（Issue #9）: 永続保存するのは
+ * APIキーは平文のまま localStorage に置かない: 永続保存するのは
  * baseUrl と model だけで、キーは sessionStorage（タブを閉じると消える）に
- * 保持する。従来 localStorage に入っていたキーは読み込み時に移行して消す。
+ * 保持する。localStorage にキーが入っていれば、読み込み時に sessionStorage へ移して消す。
  */
 import { AgentConnectionConfig } from "@types";
 import { userScopedKey } from "./userStorage";
@@ -23,7 +23,7 @@ export const loadAgentConnection = (): AgentConnectionConfig => {
       const parsed = JSON.parse(raw) as Partial<AgentConnectionConfig>;
       baseUrl = typeof parsed.baseUrl === "string" ? parsed.baseUrl : "";
       model = typeof parsed.model === "string" ? parsed.model : "";
-      // 旧形式（キーも localStorage）からの移行: 読んだら消す
+      // localStorage にキーが入っていたら sessionStorage へ移して消す
       if (typeof parsed.apiKey === "string" && parsed.apiKey !== "") {
         apiKey = parsed.apiKey;
         saveAgentConnection({ baseUrl, model, apiKey });

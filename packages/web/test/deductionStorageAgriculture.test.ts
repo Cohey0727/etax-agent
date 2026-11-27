@@ -1,11 +1,11 @@
 /**
- * deductionStorageAgriculture.test.ts — 申告入力の農業所得（Issue #24）の
+ * deductionStorageAgriculture.test.ts — 申告入力の農業所得の
  * 保存・復元の検証。
  *
  * 担保すること:
  * - 保存値の agriculture が parseDeductionState で保持される
  * - 壊れた値（数値でない科目・文字列の金額）でも落ちず正規化される
- * - agriculture が無い旧形式の保存値でも空の農業入力にフォールバックする
+ * - agriculture を含まない保存値でも空の農業入力にフォールバックする
  * - エージェントの部分パッチ（applyDeductionPatch）が農業へ適用される
  */
 import { describe, expect, test } from "bun:test";
@@ -50,7 +50,7 @@ describe("deductionStorage（農業所得）", () => {
     expect(state.agriculture.expenseTotals).toEqual({ 種苗費: 50_000 });
   });
 
-  test("agriculture の無い旧形式は空の農業入力になる", () => {
+  test("agriculture を含まない保存値は空の農業入力になる", () => {
     const state = parseDeductionState({});
     expect(state.agriculture.salesAmount).toBe(0);
     expect(state.agriculture.expenseTotals).toEqual({});

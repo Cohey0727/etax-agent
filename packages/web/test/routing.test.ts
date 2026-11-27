@@ -1,6 +1,6 @@
 /**
  * routing.test.ts — URLルーティングと認証クエリ捕捉の検証。
- * Issue #10-1 の再現テスト: メールリンク（?magic=）や外部ログインの
+ * メールリンク（?magic=）や外部ログインの
  * 戻り（?auth_error=）は、アプリのURL同期でクエリが消える前に
  * parseAuthQuery で捕捉できなければならない。
  */
@@ -48,7 +48,7 @@ describe("parseAuthQuery（認証クエリの捕捉）", () => {
   });
 });
 
-describe("pathForView / parsePath（従来のルーティング）", () => {
+describe("pathForView / parsePath", () => {
   test("画面と年度からパスを作り、読み戻せる", () => {
     const path = pathForView(AppView.Filing, 2025, "balance");
     expect(path).toBe("/accounts/2025/final-tax/balance");
@@ -63,7 +63,7 @@ describe("pathForView / parsePath（従来のルーティング）", () => {
     expect(parsePath("/receipt")).toEqual({ view: AppView.Receipt, year: null, filingTab: null });
   });
 
-  test("年度つきの領収書パスも従来どおり読める", () => {
+  test("年度つきの領収書パスも読める", () => {
     expect(parsePath("/accounts/2026/receipt")).toEqual({
       view: AppView.Receipt,
       year: 2026,

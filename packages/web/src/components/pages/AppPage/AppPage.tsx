@@ -46,7 +46,7 @@ export const AppPage = () => {
   // エージェント会話の履歴。見出し横の履歴ボタンとパネルで状態を共有する。
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
   // 認証ゲート: 設定（必須かどうか）とログイン状態を確認するまで待つ。
-  // 必須でないローカル運用では従来どおりそのまま使う。
+  // 必須でないローカル運用ではログインせずに使える。
   // 確認が終わったら、そのアカウントの端末保存（会話履歴・外部接続・年度）を読み直す。
   const { authConfig, authUser, authChecked, authQueryRef, refreshAuth, loginRequired } =
     useAuthGate(() => {
