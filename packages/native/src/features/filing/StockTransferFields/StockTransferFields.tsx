@@ -18,7 +18,7 @@ export interface StockTransferFieldsProps {
   onChange: (next: StockTransferInput) => void;
 }
 
-const EMPTY_ACCOUNT: SpecialAccountInput = {
+const emptyAccount: SpecialAccountInput = {
   brokerName: "",
   branchName: "",
   withholdingAccount: true,
@@ -47,7 +47,7 @@ export function StockTransferFields({
       specialAccounts: stocks.specialAccounts.map((a, i) => (i === index ? { ...a, ...patch } : a)),
     });
   const addAccount = () =>
-    onChange({ ...stocks, specialAccounts: [...stocks.specialAccounts, { ...EMPTY_ACCOUNT }] });
+    onChange({ ...stocks, specialAccounts: [...stocks.specialAccounts, { ...emptyAccount }] });
   const removeAccount = (index: number) =>
     onChange({ ...stocks, specialAccounts: stocks.specialAccounts.filter((_, i) => i !== index) });
 

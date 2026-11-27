@@ -7,7 +7,7 @@ import { taxpayerProfileStore } from "../taxpayerData";
 import { useYearInput } from "../useYearInput";
 
 /** テキスト入力の項目定義。 */
-const TEXT_FIELDS: readonly {
+const textFields: readonly {
   key: keyof XtxTaxpayerInput;
   label: string;
   placeholder?: string;
@@ -29,7 +29,7 @@ const TEXT_FIELDS: readonly {
 ];
 
 /** 異動・変更前の納税地（納税地の異動申出書の出力に使う）。 */
-const PREVIOUS_FIELDS: readonly {
+const previousFields: readonly {
   key: keyof XtxTaxpayerInput;
   label: string;
   placeholder?: string;
@@ -39,7 +39,7 @@ const PREVIOUS_FIELDS: readonly {
 ];
 
 /** 読み込み中にフォームの代わりへ出すスケルトンの行数。 */
-const SKELETON_ROWS: readonly number[] = [1, 2, 3, 4, 5, 6];
+const skeletonRows: readonly number[] = [1, 2, 3, 4, 5, 6];
 
 export interface TaxpayerProfilePanelProps {
   year: number;
@@ -69,7 +69,7 @@ export function TaxpayerProfilePanel({ year }: TaxpayerProfilePanelProps) {
           {entry.status === "failed" ? (
             <LoadFailedNotice message="納税者情報を取得できませんでした。" onRetry={reload} />
           ) : (
-            SKELETON_ROWS.map((row) => (
+            skeletonRows.map((row) => (
               <View key={row} style={styles.skeletonRow}>
                 <SkeletonBar width="30%" height={14} />
                 <SkeletonBar height={36} />
@@ -99,7 +99,7 @@ export function TaxpayerProfilePanel({ year }: TaxpayerProfilePanelProps) {
           </AppText>
         ) : null}
 
-        {TEXT_FIELDS.map((field) => (
+        {textFields.map((field) => (
           <Field
             key={field.key}
             label={field.label}
@@ -119,7 +119,7 @@ export function TaxpayerProfilePanel({ year }: TaxpayerProfilePanelProps) {
           異動・変更前の納税地は、納税地の異動申出書（印刷用PDF）の出力に使います。
           転居前の住所を入れておくと、提出パネルから記入済みの申出書を出力できます。
         </AppText>
-        {PREVIOUS_FIELDS.map((field) => (
+        {previousFields.map((field) => (
           <Field
             key={field.key}
             label={field.label}

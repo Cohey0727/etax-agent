@@ -51,8 +51,8 @@ interface Slot<T> {
   loading: Promise<YearInputEntry<T>> | null;
 }
 
-const LOADING_ENTRY: { status: "loading" } = { status: "loading" };
-const FAILED_ENTRY: { status: "failed" } = { status: "failed" };
+const loadingEntry: { status: "loading" } = { status: "loading" };
+const failedEntry: { status: "failed" } = { status: "failed" };
 
 export function createYearInputStore<T>(options: YearInputStoreOptions<T>): YearInputStore<T> {
   const slots = new Map<string, Slot<T>>();
@@ -67,7 +67,7 @@ export function createYearInputStore<T>(options: YearInputStoreOptions<T>): Year
     const slot: Slot<T> = {
       userId,
       year,
-      entry: LOADING_ENTRY,
+      entry: loadingEntry,
       revision: 0,
       savedRevision: 0,
       timer: null,
@@ -97,14 +97,14 @@ export function createYearInputStore<T>(options: YearInputStoreOptions<T>): Year
   const refresh = (userId: number | null, year: number): Promise<YearInputEntry<T>> => {
     const slot = slotOf(userId, year);
     if (slot.loading) return slot.loading;
-    if (slot.entry.status === "failed") setEntry(slot, LOADING_ENTRY);
+    if (slot.entry.status === "failed") setEntry(slot, loadingEntry);
     slot.loading = (async () => {
       const result = await options
         .load(userId, year)
         .catch((): YearInputLoadResult<T> => ({ kind: "failed" }));
       slot.loading = null;
       if (result.kind === "failed") {
-        if (slot.entry.status !== "ready") setEntry(slot, FAILED_ENTRY);
+        if (slot.entry.status !== "ready") setEntry(slot, failedEntry);
       } else if (slot.revision === slot.savedRevision) {
         setEntry(slot, { status: "ready", value: result.value });
       }
@@ -121,7 +121,7 @@ export function createYearInputStore<T>(options: YearInputStoreOptions<T>): Year
   };
 
   return {
-    get: (userId, year) => slots.get(keyOf(userId, year))?.entry ?? LOADING_ENTRY,
+    get: (userId, year) => slots.get(keyOf(userId, year))?.entry ?? loadingEntry,
     subscribe: (listener) => {
       listeners.add(listener);
       return () => {

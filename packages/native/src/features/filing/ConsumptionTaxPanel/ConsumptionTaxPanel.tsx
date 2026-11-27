@@ -23,10 +23,10 @@ import { EtaxImportGuide } from "../EtaxImportGuide";
 import { taxpayerProfileStore, todayIso } from "../taxpayerData";
 import { useYearInput } from "../useYearInput";
 import {
-  AMENDMENT_FIELDS,
+  amendmentFields,
   ConsumptionAmountKey,
-  INTERIM_FIELDS,
-  SUMMARY_ROWS,
+  interimFields,
+  summaryRows,
 } from "./consumptionTaxFields";
 import { buildResultRows } from "./consumptionTaxHelpers";
 
@@ -38,9 +38,10 @@ export interface ConsumptionTaxPanelProps {
   onConsumptionFilingChange: (next: ConsumptionFilingInputs) => void;
 }
 
-const FILING_KIND_OPTIONS: readonly { value: string; label: string }[] = [
-  { value: "1", label: "確定（期限後申告を含む）" },
-  { value: "3", label: "修正確定" },
+/** 申告の種類の選択肢（kind は XTX の申告の種類の番号）。 */
+const filingKindOptions: readonly { value: "final" | "amended"; label: string; kind: 1 | 3 }[] = [
+  { value: "final", label: "確定（期限後申告を含む）", kind: 1 },
+  { value: "amended", label: "修正確定", kind: 3 },
 ];
 
 /**
@@ -168,17 +169,20 @@ export function ConsumptionTaxPanel({
 
         <SelectField
           label="申告の種類"
-          value={String(filingKind)}
-          options={FILING_KIND_OPTIONS}
+          value={filingKindOptions.find((option) => option.kind === filingKind)?.value ?? "final"}
+          options={filingKindOptions}
           onChange={(v) =>
-            onConsumptionFilingChange({ ...consumptionFiling, filingKind: Number(v) === 3 ? 3 : 1 })
+            onConsumptionFilingChange({
+              ...consumptionFiling,
+              filingKind: filingKindOptions.find((option) => option.value === v)?.kind ?? 1,
+            })
           }
         />
         <DateField label="提出日" value={submissionDate} onChange={setSubmissionDate} />
 
         <SectionHead title="帳簿からの集計（自動）" />
         <View>
-          {SUMMARY_ROWS.map((row) => (
+          {summaryRows.map((row) => (
             <ResultRow key={row.key} label={row.label} value={summary[row.key]} />
           ))}
         </View>
@@ -202,7 +206,7 @@ export function ConsumptionTaxPanel({
           value={basePeriodSalesThousands}
           onChange={(v) => onConsumptionFilingChange({ ...consumptionFiling, basePeriodSalesThousands: v })}
         />
-        {INTERIM_FIELDS.map((field) => (
+        {interimFields.map((field) => (
           <AmountField
             key={field.key}
             label={field.label}
@@ -211,7 +215,7 @@ export function ConsumptionTaxPanel({
           />
         ))}
         {filingKind === 3
-          ? AMENDMENT_FIELDS.map((field) => (
+          ? amendmentFields.map((field) => (
               <AmountField
                 key={field.key}
                 label={field.label}

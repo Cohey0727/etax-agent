@@ -23,7 +23,7 @@ import { AccountRow, ClosingOnlyRow, ExtraRow } from "./BalanceSheetRows";
 
 type ExtraField = "extraAsset" | "extraLiability1" | "extraLiability2";
 
-const EMPTY_EXTRA: BalanceSheetWireExtra = { name: "", opening: 0, closing: 0 };
+const emptyExtra: BalanceSheetWireExtra = { name: "", opening: 0, closing: 0 };
 
 export interface BalanceSheetPanelProps {
   year: number;
@@ -159,7 +159,7 @@ function BalanceSheetEditor({
       ))}
       <ExtraRow
         nameLabel="その他の資産"
-        value={bs.extraAsset ?? EMPTY_EXTRA}
+        value={bs.extraAsset ?? emptyExtra}
         onChange={(next) => setExtra("extraAsset", next)}
       />
       <ClosingOnlyRow
@@ -190,12 +190,12 @@ function BalanceSheetEditor({
       />
       <ExtraRow
         nameLabel="その他の負債（1）"
-        value={bs.extraLiability1 ?? EMPTY_EXTRA}
+        value={bs.extraLiability1 ?? emptyExtra}
         onChange={(next) => setExtra("extraLiability1", next)}
       />
       <ExtraRow
         nameLabel="その他の負債（2）"
-        value={bs.extraLiability2 ?? EMPTY_EXTRA}
+        value={bs.extraLiability2 ?? emptyExtra}
         onChange={(next) => setExtra("extraLiability2", next)}
       />
       <ClosingOnlyRow

@@ -37,11 +37,11 @@ export interface BusinessStartPanelProps {
 }
 
 const SAVE_DELAY_MS = 600;
-const SKELETON_ROWS: readonly number[] = [1, 2, 3];
+const skeletonRows: readonly number[] = [1, 2, 3];
 
 type LoadStatus = "loading" | "failed" | "ready";
 
-const INCOME_TYPE_OPTIONS: readonly { key: BusinessStartIncomeType; label: string }[] = [
+const incomeTypeOptions: readonly { key: BusinessStartIncomeType; label: string }[] = [
   { key: "business", label: "事業（農業）所得" },
   { key: "real_estate", label: "不動産所得" },
   { key: "forest", label: "山林所得" },
@@ -156,7 +156,7 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
               onRetry={retryLoad}
             />
           ) : (
-            SKELETON_ROWS.map((row) => (
+            skeletonRows.map((row) => (
               <View key={row} style={styles.skeletonRow}>
                 <SkeletonBar width="30%" height={14} />
                 <SkeletonBar height={36} />
@@ -203,7 +203,7 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
         <AppText size="sm" weight="semibold" tone="subtle">
           所得の種類
         </AppText>
-        {INCOME_TYPE_OPTIONS.map((option) => (
+        {incomeTypeOptions.map((option) => (
           <SwitchRow
             key={option.key}
             label={option.label}

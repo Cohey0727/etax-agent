@@ -4,7 +4,7 @@ import { IncomeDeductionBreakdown } from "@etax/shared";
  * deductionFields.ts — 所得控除の内訳表示ラベル
  * （エンジンの内訳キー → 正式名称）。
  */
-export const DEDUCTION_LABELS: readonly { key: keyof IncomeDeductionBreakdown; label: string }[] = [
+export const deductionLabels: readonly { key: keyof IncomeDeductionBreakdown; label: string }[] = [
   { key: "casualtyLoss", label: "雑損控除" },
   { key: "medical", label: "医療費控除" },
   { key: "socialInsurance", label: "社会保険料控除" },

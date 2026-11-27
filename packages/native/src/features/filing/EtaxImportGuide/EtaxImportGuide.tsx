@@ -7,7 +7,7 @@ export interface EtaxImportGuideProps {
   filename?: string;
 }
 
-const STEPS_WITHOUT_FILE: readonly { title: string; body: string }[] = [
+const stepsWithoutFile: readonly { title: string; body: string }[] = [
   {
     title: "e-Taxソフト（WEB版）にログインする",
     body: "マイナンバーカード、またはスマホ用電子証明書でログインします。ID・パスワード方式は新規発行が停止されており、令和9年分から利用できなくなる予定のため使いません。",
@@ -29,7 +29,7 @@ const STEPS_WITHOUT_FILE: readonly { title: string; body: string }[] = [
  */
 export function EtaxImportGuide({ filename }: EtaxImportGuideProps) {
   const steps: readonly { title: string; body: string }[] = [
-    ...STEPS_WITHOUT_FILE,
+    ...stepsWithoutFile,
     {
       title: "保存したXTXファイルを選択する",
       body: filename

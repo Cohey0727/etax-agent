@@ -22,7 +22,7 @@ export interface FilingStatusToggleProps {
   bare?: boolean;
 }
 
-const OUTCOME_ERRORS: Record<FilingStatusToggleOutcome, string | null> = {
+const outcomeErrors: Record<FilingStatusToggleOutcome, string | null> = {
   saved: null,
   statusFailed: "保存できませんでした。サーバーへの接続を確認してください。",
   confirmFailed:
@@ -50,7 +50,7 @@ export function FilingStatusToggle({
   const handlePress = async () => {
     setError(null);
     const outcome = await toggleFilingStatus(!done, () => toggle(statusKey), onConfirm);
-    setError(OUTCOME_ERRORS[outcome]);
+    setError(outcomeErrors[outcome]);
   };
 
   const content = (

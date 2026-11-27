@@ -66,11 +66,11 @@ export function BalanceSummary({ transactions, figures, summary, filingType }: B
   }
 
   const suffix = filingType === "white" ? "" : "（青色控除後）";
-  const statCards: readonly { label: string; value: string }[] = [
-    { label: "収入合計", value: formatYen(summary.incomeTotal) },
-    { label: "支出合計", value: formatYen(summary.expenseTotal) },
-    { label: "収支（差引）", value: formatYen(summary.incomeTotal - summary.expenseTotal) },
-    { label: `所得合計${suffix}`, value: formatYen(summary.totalIncome) },
+  const statCards: readonly { label: string; value: number }[] = [
+    { label: "収入合計", value: summary.incomeTotal },
+    { label: "支出合計", value: summary.expenseTotal },
+    { label: "収支（差引）", value: summary.incomeTotal - summary.expenseTotal },
+    { label: `所得合計${suffix}`, value: summary.totalIncome },
   ];
 
   return (

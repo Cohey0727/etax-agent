@@ -9,7 +9,7 @@ import { SectionHead } from "../fields";
 /** 1ページの件数。帳簿と同じく100件（全件描画すると画面が重くなるため）。 */
 const PAGE_SIZE = 100;
 
-const INCOME_TYPE_LABELS: Record<IncomeType, string> = {
+const incomeTypeLabels: Record<IncomeType, string> = {
   business: "事業",
   real_estate: "不動産",
   other: "その他",
@@ -52,7 +52,7 @@ export function BalanceRecords({ transactions }: BalanceRecordsProps) {
               </AppText>
             </View>
             <View style={styles.recordSide}>
-              <Chip label={INCOME_TYPE_LABELS[t.income_type]} tone="muted" />
+              <Chip label={incomeTypeLabels[t.income_type]} tone="muted" />
               <AppText
                 size="sm"
                 weight="semibold"

@@ -1,7 +1,7 @@
 import { BLUE_BOOK_OPTIONS } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { AppText, DateField, Field, SelectField, SwitchRow } from "@/components";
-import { BusinessStartInputs } from "@/api";
+import { BookkeepingMethod, BusinessStartInputs, SalarySituationRow } from "@/api";
 import { space } from "@/theme";
 import { NullableBoolField, SalaryRowFields } from "./businessStartFields";
 
@@ -13,13 +13,13 @@ import { NullableBoolField, SalaryRowFields } from "./businessStartFields";
 
 type SalaryRowKey = "salary_family" | "salary_employee" | "salary_other";
 
-const SALARY_ROWS: readonly { key: SalaryRowKey; label: string }[] = [
+const salaryRows: readonly { key: SalaryRowKey; label: string }[] = [
   { key: "salary_family", label: "専従者" },
   { key: "salary_employee", label: "使用人" },
   { key: "salary_other", label: "その他" },
 ];
 
-const BOOKKEEPING_OPTIONS: readonly { value: string; label: string }[] = [
+const bookkeepingOptions: readonly { value: "" | BookkeepingMethod; label: string }[] = [
   { value: "", label: "未選択" },
   { value: "double", label: "複式簿記" },
   { value: "simple", label: "簡易簿記" },
@@ -66,7 +66,7 @@ export function OpeningNoticeFields({ inputs, update }: BusinessStartSectionsPro
         value={inputs.other_phone}
         onChangeText={(v) => update({ other_phone: v })}
       />
-      {SALARY_ROWS.map((row) => (
+      {salaryRows.map((row) => (
         <SalaryRowFields
           key={row.key}
           label={
@@ -75,7 +75,7 @@ export function OpeningNoticeFields({ inputs, update }: BusinessStartSectionsPro
               : row.label
           }
           row={inputs[row.key]}
-          onChange={(next) => update({ [row.key]: next } as Partial<BusinessStartInputs>)}
+          onChange={(next) => update(salaryRowPatch(row.key, next))}
         />
       ))}
       <Field
@@ -176,9 +176,9 @@ export function BlueReturnFields({ inputs, update }: BusinessStartSectionsProps)
       <SelectField
         label="簿記方式"
         value={inputs.bookkeeping ?? ""}
-        options={BOOKKEEPING_OPTIONS}
+        options={bookkeepingOptions}
         onChange={(v) =>
-          update({ bookkeeping: v === "" ? null : (v as BusinessStartInputs["bookkeeping"]) })
+          update({ bookkeeping: v === "" ? null : v })
         }
       />
       {inputs.bookkeeping === "other" ? (
@@ -206,6 +206,13 @@ export function BlueReturnFields({ inputs, update }: BusinessStartSectionsProps)
       />
     </>
   );
+}
+
+/** 給与等の支払の状況の1行を差し替える変更分。 */
+function salaryRowPatch(key: SalaryRowKey, row: SalarySituationRow): Partial<BusinessStartInputs> {
+  const patch: Partial<BusinessStartInputs> = {};
+  patch[key] = row;
+  return patch;
 }
 
 const styles = StyleSheet.create({

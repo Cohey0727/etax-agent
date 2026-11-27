@@ -24,12 +24,12 @@ type LoadState =
   | { status: "unavailable" }
   | { status: "ready"; entries: FilingSubmissionHistoryEntry[] };
 
-const KIND_LABELS: Record<FilingSubmissionKind, string> = {
+const kindLabels: Record<FilingSubmissionKind, string> = {
   income: "所得税",
   consumption: "消費税",
 };
 
-const ACTION_LABELS: Record<string, string> = {
+const actionLabels: Record<string, string> = {
   created: "登録",
   updated: "訂正",
   deleted: "削除",
@@ -67,7 +67,7 @@ export function SubmissionHistorySheet({
   return (
     <Sheet
       visible={visible}
-      title={`提出の記録の変更履歴（${KIND_LABELS[kind]}）`}
+      title={`提出の記録の変更履歴（${kindLabels[kind]}）`}
       onClose={onClose}
       scroll
     >
@@ -101,7 +101,7 @@ function HistoryEntry({ entry }: { entry: FilingSubmissionHistoryEntry }) {
     <View style={styles.entry}>
       <View style={styles.entryHead}>
         <AppText size="md" weight="semibold">
-          {ACTION_LABELS[entry.action] ?? entry.action}
+          {actionLabels[entry.action] ?? entry.action}
         </AppText>
         <AppText size="sm" tone="muted">
           {formatDate(entry.created_at)}

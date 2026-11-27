@@ -22,7 +22,7 @@ export interface ExpandedIncomePanelProps {
 }
 
 /** 上場配当等の課税方式の選択肢（値は shared の ListedDividendMode）。 */
-const LISTED_MODE_OPTIONS: { value: ListedDividendMode; label: string }[] = [
+const listedModeOptions: { value: ListedDividendMode; label: string }[] = [
   { value: "comprehensive", label: "総合課税（配当控除あり）" },
   { value: "separate", label: "申告分離課税（上場の譲渡損失と損益通算可）" },
   { value: "none", label: "申告不要（源泉徴収のみで完結）" },
@@ -76,7 +76,7 @@ export function ExpandedIncomePanel({
           <SelectField
             label="上場株式等の配当等の課税方式"
             value={expandedIncome.dividend.listedMode}
-            options={LISTED_MODE_OPTIONS}
+            options={listedModeOptions}
             onChange={(v) => setDividend({ listedMode: v })}
             hint="課税方式は上場配当等の全額に適用します（口座ごとの選択はできません）。配当控除は、配当を入力した場合はこの内訳から自動で計算し、税額控除パネルの配当控除の手入力より優先します。源泉徴収税額は提出パネルの源泉徴収税額へ自動で加算されます。"
           />

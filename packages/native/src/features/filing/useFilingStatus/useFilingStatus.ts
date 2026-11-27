@@ -4,7 +4,7 @@ import { FilingStatus, fetchFilingStatuses, updateFilingStatus } from "@/api";
 /** 手動で「確定」を付けられる申告ステータスの項目。 */
 export type FilingStatusKey = "confirmed" | "calculated" | "submitted";
 
-const EMPTY_STATUS: FilingStatus = {
+const emptyStatus: FilingStatus = {
   year: 0,
   confirmed: false,
   confirmed_at: null,
@@ -63,7 +63,7 @@ export async function toggleFilingStatus(
  * ステータスはダッシュボードの表示ともサーバー保存を共有する。
  */
 export function useFilingStatus(year: number): UseFilingStatusResult {
-  const [status, setStatus] = useState<FilingStatus>(EMPTY_STATUS);
+  const [status, setStatus] = useState<FilingStatus>(emptyStatus);
   const [loaded, setLoaded] = useState(false);
   const [available, setAvailable] = useState(false);
   const [savingKey, setSavingKey] = useState<FilingStatusKey | null>(null);
@@ -75,7 +75,7 @@ export function useFilingStatus(year: number): UseFilingStatusResult {
       setAvailable(false);
       return;
     }
-    setStatus(result.find((s) => s.year === year) ?? EMPTY_STATUS);
+    setStatus(result.find((s) => s.year === year) ?? emptyStatus);
     setAvailable(true);
   }, [year]);
 

@@ -5,7 +5,7 @@ import { space } from "@/theme";
 import { AmountField, ResultRow, SectionHead } from "../fields";
 
 /** 税額控除の内訳表示ラベル（エンジンの内訳キー → 正式名称）。 */
-const CREDIT_LABELS: readonly { key: keyof TaxCreditBreakdown; label: string }[] = [
+const creditLabels: readonly { key: keyof TaxCreditBreakdown; label: string }[] = [
   { key: "housingLoan", label: "住宅借入金等特別控除" },
   { key: "flatReduction", label: "定額減税（令和6年分）" },
   { key: "dividend", label: "配当控除" },
@@ -15,9 +15,10 @@ const CREDIT_LABELS: readonly { key: keyof TaxCreditBreakdown; label: string }[]
   { key: "foreignTax", label: "外国税額控除" },
 ];
 
-const RATE_OPTIONS: readonly { value: string; label: string }[] = [
-  { value: "0.007", label: "0.7%（2022年以降に居住）" },
-  { value: "0.01", label: "1%（2021年以前に居住）" },
+/** 住宅借入金等特別控除の控除率の選択肢（居住年で決まる）。 */
+const rateOptions: readonly { value: "rate07" | "rate10"; label: string; rate: number }[] = [
+  { value: "rate07", label: "0.7%（2022年以降に居住）", rate: 0.007 },
+  { value: "rate10", label: "1%（2021年以前に居住）", rate: 0.01 },
 ];
 
 export interface TaxCreditPanelProps {
@@ -60,9 +61,14 @@ export function TaxCreditPanel({
         />
         <SelectField
           label="控除率（居住年で決まります）"
-          value={String(taxCredits.housingLoanRate)}
-          options={RATE_OPTIONS}
-          onChange={(v) => set({ housingLoanRate: Number(v) })}
+          value={
+            rateOptions.find((option) => option.rate === taxCredits.housingLoanRate)?.value ??
+            "rate07"
+          }
+          options={rateOptions}
+          onChange={(v) =>
+            set({ housingLoanRate: rateOptions.find((option) => option.value === v)?.rate ?? 0.007 })
+          }
         />
 
         <SectionHead title="定額減税（令和6年分のみ）" />
@@ -132,7 +138,7 @@ export function TaxCreditPanel({
           <ResultRow label="所得控除の合計" value={result.deductionsTotal} />
           <ResultRow label="課税所得金額（1,000円未満切捨て）" value={result.taxableIncome} />
           <ResultRow label="所得税額（税額控除前）" value={result.incomeTaxBase} />
-          {CREDIT_LABELS.filter(({ key }) => credits[key] > 0).map(({ key, label }) => (
+          {creditLabels.filter(({ key }) => credits[key] > 0).map(({ key, label }) => (
             <ResultRow key={key} label={label} value={credits[key]} />
           ))}
           <ResultRow label="税額控除の合計" value={result.taxCreditsTotal} />

@@ -17,7 +17,7 @@ import { FilingStatusKey } from "../useFilingStatus";
  */
 export type FilingSection = "balance" | "deductions" | "consumption" | "taxpayer";
 
-const SECTION_OPEN_LABELS: Record<FilingSection, string> = {
+const sectionOpenLabels: Record<FilingSection, string> = {
   balance: "収支タブを開く",
   deductions: "控除タブを開く",
   consumption: "消費税タブを開く",
@@ -63,7 +63,7 @@ function CalculationItemSummary({
  * 項目には含めない。提出の動線（XTX出力と e-Tax へのリンク）は下の
  * 提出パネル（TaxpayerPanel）のカードにだけ置く（重複させない）。
  */
-const MANUAL_ITEMS = [
+const manualItems = [
   {
     key: "confirmed",
     label: "収支",
@@ -120,7 +120,7 @@ export function FilingPanel({ onConfirmCalculation, onOpenSection, ...summaryPro
           </AppText>
         </View>
 
-        {MANUAL_ITEMS.map(({ key, label, description, section, confirmsCalculation, Summary }) => (
+        {manualItems.map(({ key, label, description, section, confirmsCalculation, Summary }) => (
           <View key={key} style={styles.item}>
             <FilingStatusToggle
               bare
@@ -132,7 +132,7 @@ export function FilingPanel({ onConfirmCalculation, onOpenSection, ...summaryPro
             />
             <View style={styles.actions}>
               <AppButton
-                label={SECTION_OPEN_LABELS[section]}
+                label={sectionOpenLabels[section]}
                 variant="ghost"
                 size="sm"
                 onPress={() => onOpenSection(section)}
@@ -152,7 +152,7 @@ export function FilingPanel({ onConfirmCalculation, onOpenSection, ...summaryPro
           </AppText>
           <View style={styles.actions}>
             <AppButton
-              label={SECTION_OPEN_LABELS.consumption}
+              label={sectionOpenLabels.consumption}
               variant="ghost"
               size="sm"
               onPress={() => onOpenSection("consumption")}

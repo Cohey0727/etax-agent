@@ -23,7 +23,7 @@ export interface SubmissionRecordPanelProps {
   kind: FilingSubmissionKind;
 }
 
-const KIND_LABELS: Record<FilingSubmissionKind, string> = {
+const kindLabels: Record<FilingSubmissionKind, string> = {
   income: "所得税",
   consumption: "消費税",
 };
@@ -34,7 +34,7 @@ const KIND_LABELS: Record<FilingSubmissionKind, string> = {
  * 申告ステータスの「提出済み」と連動する（サーバー側）。
  */
 export function SubmissionRecordPanel({ year, kind }: SubmissionRecordPanelProps) {
-  const label = KIND_LABELS[kind];
+  const label = kindLabels[kind];
   const [submission, setSubmission] = useState<FilingSubmission | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [available, setAvailable] = useState(true);

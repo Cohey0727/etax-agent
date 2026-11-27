@@ -14,7 +14,7 @@ import { Card, SelectField, SwitchRow } from "@/components";
 import { space } from "@/theme";
 import { BreakdownEntriesFields } from "../BreakdownEntriesFields";
 import { AmountField, NullableAmountField, ResultRow, SectionHead } from "../fields";
-import { DEDUCTION_LABELS } from "./deductionFields";
+import { deductionLabels } from "./deductionFields";
 
 export interface DeductionPanelProps {
   year: number;
@@ -27,7 +27,7 @@ export interface DeductionPanelProps {
   onBreakdownEntriesChange: (key: BreakdownEntriesKey, entries: BreakdownEntry[]) => void;
 }
 
-const SPOUSE_OPTIONS: readonly { value: SpouseCategory; label: string }[] = [
+const spouseOptions: readonly { value: SpouseCategory; label: string }[] = [
   { value: "none", label: "なし" },
   { value: "general", label: "一般の配偶者" },
   { value: "elderly", label: "老人控除対象配偶者" },
@@ -171,7 +171,7 @@ export function DeductionPanel({
         <SelectField
           label="配偶者控除"
           value={deductions.spouseCategory}
-          options={SPOUSE_OPTIONS}
+          options={spouseOptions}
           onChange={(v) => set({ spouseCategory: v })}
         />
         <NullableAmountField
@@ -250,7 +250,7 @@ export function DeductionPanel({
 
         <SectionHead title="所得控除の内訳（自動計算）" />
         <View>
-          {DEDUCTION_LABELS.filter(({ key }) => breakdown[key] > 0).map(({ key, label }) => (
+          {deductionLabels.filter(({ key }) => breakdown[key] > 0).map(({ key, label }) => (
             <ResultRow key={key} label={label} value={breakdown[key]} />
           ))}
           <ResultRow label="所得控除の合計" value={breakdown.total} strong />

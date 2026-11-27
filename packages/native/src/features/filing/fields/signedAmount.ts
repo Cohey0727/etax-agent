@@ -2,8 +2,8 @@
  * signedAmount.ts — 符号を取りうる金額欄（雑所得の赤字・元入金など）の読み取り。
  */
 
-const FULL_WIDTH_DIGIT = /[０-９]/g;
-const MINUS_SIGNS = /[－−‐]/g;
+const fullWidthDigit = /[０-９]/g;
+const minusSigns = /[－−‐]/g;
 
 /**
  * 入力欄の文字列を金額にする。全角の数字・マイナスは半角として読み、
@@ -12,8 +12,8 @@ const MINUS_SIGNS = /[－−‐]/g;
  */
 export function parseSignedAmount(input: string): number {
   const text = input
-    .replace(FULL_WIDTH_DIGIT, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0))
-    .replace(MINUS_SIGNS, "-")
+    .replace(fullWidthDigit, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0))
+    .replace(minusSigns, "-")
     .replace(/[．。]/g, ".")
     .trim();
   const negative = text.startsWith("-");

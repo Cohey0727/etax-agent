@@ -38,7 +38,8 @@ export function SectionHead({ title, description }: SectionHeadProps) {
 
 export interface StatBlockProps {
   label: string;
-  value: string;
+  /** 金額（円）。 */
+  value: number;
 }
 
 /** 見出し数字のブロック（収入合計・所得合計など）。 */
@@ -49,7 +50,7 @@ export function StatBlock({ label, value }: StatBlockProps) {
         {label}
       </AppText>
       <AppText size="lg" weight="bold">
-        {value}
+        {formatYen(value)}
       </AppText>
     </View>
   );

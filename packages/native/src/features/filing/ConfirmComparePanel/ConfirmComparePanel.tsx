@@ -5,7 +5,7 @@ import { formatDate, formatYen } from "@/utils";
 import { FilingSnapshot, FilingSnapshotFigures } from "@/api";
 import { useFilingStatus } from "../useFilingStatus";
 
-const COMPARE_ROWS: readonly { key: keyof FilingSnapshotFigures; label: string }[] = [
+const compareRows: readonly { key: keyof FilingSnapshotFigures; label: string }[] = [
   { key: "business_income", label: "事業所得" },
   { key: "real_estate_income", label: "不動産所得" },
   { key: "misc_income", label: "雑所得" },
@@ -64,7 +64,7 @@ export function ConfirmComparePanel({
     return null;
   }
 
-  const hasChange = COMPARE_ROWS.some((row) => target[row.key] !== base[row.key]);
+  const hasChange = compareRows.some((row) => target[row.key] !== base[row.key]);
 
   const content = (
     <View style={styles.wrap}>
@@ -72,7 +72,7 @@ export function ConfirmComparePanel({
         {title}
       </AppText>
       {hasChange ? (
-        COMPARE_ROWS.map((row) => {
+        compareRows.map((row) => {
           const delta = target[row.key] - base[row.key];
           return (
             <View key={row.key} style={styles.row}>

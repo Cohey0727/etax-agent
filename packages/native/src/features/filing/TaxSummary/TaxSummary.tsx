@@ -2,7 +2,6 @@ import { IncomeTaxResult } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components";
 import { space } from "@/theme";
-import { formatYen } from "@/utils";
 import { ResultRow, StatBlock } from "../fields";
 
 export interface TaxSummaryProps {
@@ -26,7 +25,7 @@ export function TaxSummary({ taxResult }: TaxSummaryProps) {
   return (
     <View style={styles.wrap}>
       <View style={styles.statGrid}>
-        <StatBlock label="所得税額（確定税額）" value={formatYen(taxResult.finalTax)} />
+        <StatBlock label="所得税額（確定税額）" value={taxResult.finalTax} />
       </View>
       <View>
         {taxRows.map((row) => (

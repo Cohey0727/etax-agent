@@ -40,7 +40,7 @@ export interface NullableBoolFieldProps {
   onChange: (value: boolean | null) => void;
 }
 
-const NULLABLE_BOOL_OPTIONS: readonly { value: string; label: string }[] = [
+const nullableBoolOptions: readonly { value: "" | "yes" | "no"; label: string }[] = [
   { value: "", label: "未選択" },
   { value: "yes", label: "有" },
   { value: "no", label: "無" },
@@ -52,7 +52,7 @@ export function NullableBoolField({ label, value, onChange }: NullableBoolFieldP
     <SelectField
       label={label}
       value={value === null ? "" : value ? "yes" : "no"}
-      options={NULLABLE_BOOL_OPTIONS}
+      options={nullableBoolOptions}
       onChange={(v) => onChange(v === "" ? null : v === "yes")}
     />
   );
@@ -64,7 +64,7 @@ export interface SalaryRowFieldsProps {
   onChange: (row: SalarySituationRow) => void;
 }
 
-const HAS_TAX_OPTIONS: readonly { value: string; label: string }[] = [
+const hasTaxOptions: readonly { value: "" | "yes" | "no"; label: string }[] = [
   { value: "", label: "税額の有無" },
   { value: "yes", label: "有" },
   { value: "no", label: "無" },
@@ -94,7 +94,7 @@ export function SalaryRowFields({ label, row, onChange }: SalaryRowFieldsProps) 
       <SelectField
         label="税額の有無"
         value={row.has_tax === null ? "" : row.has_tax ? "yes" : "no"}
-        options={HAS_TAX_OPTIONS}
+        options={hasTaxOptions}
         onChange={(v) => onChange({ ...row, has_tax: v === "" ? null : v === "yes" })}
       />
     </View>
