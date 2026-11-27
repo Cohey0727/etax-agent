@@ -1,19 +1,22 @@
 /**
  * authTotp.ts — TOTP 2要素認証の設定とログイン2段階目（usecases）。
- * 設定（setup → enable）はログイン済みセッションが前提。ログイン時は
- * パスワード確認後に短期チャレンジを返し、コード検証でセッションを発行する。
+ * 設定（setup → enable）はログイン済みセッションが前提で、有効なまま設定し
+ * 直すことはできない（解除してから行う）。ログイン時はパスワード確認後に
+ * 短期チャレンジを返し、コード検証でセッションを発行する。一度通ったコードは
+ * 再利用できない。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
+import { Db, getDb } from "../lib/db";
 import { beginChallengeUse, burnChallenge, verifyChallenge } from "../lib/loginChallenge";
 import { enforceAccountRateLimit } from "../lib/rateLimit";
 import { currentUserId } from "../lib/tenantContext";
-import { generateTotpSecret, totpOtpauthUrl, verifyTotpCode } from "../lib/totp";
+import { generateTotpSecret, matchTotpCounter, totpOtpauthUrl } from "../lib/totp";
 import { usersTable } from "../repositories/schema";
 import {
+  acceptTotpCounter,
   readUserTotpSecret,
   setUserTotpEnabled,
   setUserTotpSecret,
@@ -43,6 +46,21 @@ async function requireUser(c: Context) {
   return { db, user };
 }
 
+/**
+ * コードを検証し、受け入れた時間カウンタを記録する。前回受け入れた
+ * カウンタ以前のコード（一度通ったコード）は通さない。
+ */
+async function consumeTotpCode(
+  db: Db,
+  userId: number,
+  secret: string | null,
+  code: string,
+): Promise<boolean> {
+  if (!secret) return false;
+  const counter = matchTotpCounter(secret, code);
+  return counter !== null && (await acceptTotpCounter(db, userId, counter));
+}
+
 async function readCode(c: Context): Promise<string> {
   const body = (await c.req.json().catch(() => null)) as { code?: unknown } | null;
   return typeof body?.code === "string" ? body.code : "";
@@ -62,15 +80,11 @@ export const totpSetupRoute = createRoute({
 export const totpSetupHandler: RouteHandler<typeof totpSetupRoute> = async (c) => {
   const { db, user } = await requireUser(c);
   if (user.totpEnabled) {
-    // 有効化済みの秘密の上書きは、現在のコード確認を必須にする。
-    // セッションを奪われただけでは 2FA を差し替えられないようにするため。
-    const currentSecret = readUserTotpSecret(user);
-    const code = await readCode(c);
-    if (!currentSecret || !verifyTotpCode(currentSecret, code)) {
-      throw new HTTPException(400, {
-        message: "TOTP を設定し直すには現在のコードが必要です",
-      });
-    }
+    // 有効なまま秘密を差し替えると、新しい秘密の登録を確かめる前に
+    // 古いコードが使えなくなり、ログインできなくなる。解除してから設定し直す。
+    throw new HTTPException(409, {
+      message: "TOTP 2要素認証は有効です。設定し直すには先に解除してください",
+    });
   }
   const secret = generateTotpSecret();
   await setUserTotpSecret(db, user.id, secret);
@@ -98,7 +112,7 @@ export const totpEnableHandler: RouteHandler<typeof totpEnableRoute> = async (c)
     throw new HTTPException(400, { message: "先に TOTP の設定を開始してください" });
   }
   const code = await readCode(c);
-  if (!verifyTotpCode(secret, code)) {
+  if (!(await consumeTotpCode(db, user.id, secret, code))) {
     throw new HTTPException(400, { message: "コードが違います" });
   }
   await setUserTotpEnabled(db, user.id, true);
@@ -121,9 +135,8 @@ export const totpDisableRoute = createRoute({
 
 export const totpDisableHandler: RouteHandler<typeof totpDisableRoute> = async (c) => {
   const { db, user } = await requireUser(c);
-  const secret = readUserTotpSecret(user);
   const code = await readCode(c);
-  if (!secret || !verifyTotpCode(secret, code)) {
+  if (!(await consumeTotpCode(db, user.id, readUserTotpSecret(user), code))) {
     throw new HTTPException(400, { message: "コードが違います" });
   }
   await setUserTotpEnabled(db, user.id, false);
@@ -170,8 +183,7 @@ export const loginTotpHandler: RouteHandler<typeof loginTotpRoute> = async (c) =
     throw new HTTPException(401, { message: "チャレンジが無効か期限切れです。ログインし直してください" });
   }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-  const secret = user ? readUserTotpSecret(user) : null;
-  if (!user || !secret || !verifyTotpCode(secret, code)) {
+  if (!user || !(await consumeTotpCode(db, user.id, readUserTotpSecret(user), code))) {
     throw new HTTPException(401, { message: "コードが違います" });
   }
   burnChallenge(challenge, "totp-login");

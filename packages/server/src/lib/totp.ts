@@ -70,24 +70,28 @@ export function currentTotpCode(secretBase32: string, nowMs: number = Date.now()
   return totpCode(secretBase32, Math.floor(nowMs / 30_000));
 }
 
-/** TOTP コードを検証する（前後1周期の時計ズレを許容）。 */
-export function verifyTotpCode(
+/**
+ * TOTP コードを検証し、一致した時間カウンタを返す（前後1周期の時計ズレを許容）。
+ * 一致しなければ null。同じコードの再利用を拒むため、呼び出し側は
+ * 受け入れたカウンタを記録し、それ以前のカウンタを通さない。
+ */
+export function matchTotpCounter(
   secretBase32: string,
   code: string,
   nowMs: number = Date.now(),
-): boolean {
+): number | null {
   const normalized = code.replace(/\s/g, "");
-  if (!/^\d{6}$/.test(normalized)) return false;
+  if (!/^\d{6}$/.test(normalized)) return null;
   const counter = Math.floor(nowMs / 30_000);
   for (const delta of [-1, 0, 1]) {
     const expected = totpCode(secretBase32, counter + delta);
     if (
       timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(normalized, "utf8"))
     ) {
-      return true;
+      return counter + delta;
     }
   }
-  return false;
+  return null;
 }
 
 /** Authenticator アプリ登録用の otpauth URL。 */

@@ -12,12 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createTestDb } from "./testDb";
 import { issueChallenge } from "../src/lib/loginChallenge";
-import { generateTotpSecret } from "../src/lib/totp";
-import {
-  createUser,
-  setUserTotpEnabled,
-  setUserTotpSecret,
-} from "../src/repositories/userRepository";
+import { createUser } from "../src/repositories/userRepository";
 
 const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ?? "postgres://etax:etax@127.0.0.1:5432/etaxagent_test";
@@ -78,15 +73,15 @@ describe("認証のレート制限（HTTP）", () => {
   });
 
   test("チャレンジを取り直しても、同じユーザーへの TOTP 試行は上限で止まる", async () => {
-    const db = await createTestDb();
-    const user = await createUser(db, "target-totp@example.com", "password-123");
-    await setUserTotpSecret(db, user.id, generateTotpSecret());
-    await setUserTotpEnabled(db, user.id, true);
+    await createTestDb();
+    // 制限の記録はプロセス内に残り、テスト DB のユーザー ID は毎回 1 から振り直される。
+    // 他のテストのユーザーと数え合わないよう、使われない ID のチャレンジで試す。
+    const userId = 900_001;
     const statuses: number[] = [];
     for (let i = 0; i < 11; i++) {
       const res = await postJson(
         "/api/auth/login/totp",
-        { challenge: issueChallenge(user.id, "totp-login"), code: "abcdef" },
+        { challenge: issueChallenge(userId, "totp-login"), code: "abcdef" },
         { "CF-Connecting-IP": `198.51.100.${150 + i}` },
       );
       statuses.push(res.status);

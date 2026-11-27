@@ -82,12 +82,29 @@ export async function clearUserPassword(db: Db, userId: number): Promise<void> {
   await db.update(usersTable).set({ passwordHash: "" }).where(eq(usersTable.id, userId));
 }
 
-/** TOTP 秘密を保存する（保存時暗号化）。有効化は別途 setUserTotpEnabled で行う。 */
+/**
+ * TOTP 秘密を保存する（保存時暗号化）。有効化は別途 setUserTotpEnabled で行う。
+ * 新しい秘密のコードは受け入れ記録と無関係なので、カウンタの記録も戻す。
+ */
 export async function setUserTotpSecret(db: Db, userId: number, secretBase32: string): Promise<void> {
   await db
     .update(usersTable)
-    .set({ totpSecret: encryptField(secretBase32) })
+    .set({ totpSecret: encryptField(secretBase32), totpLastCounter: 0 })
     .where(eq(usersTable.id, userId));
+}
+
+/**
+ * TOTP の時間カウンタを受け入れ済みとして記録する。前回受け入れた
+ * カウンタ以前なら記録せず false を返す（同じコードの再利用を拒否する）。
+ * 判定と記録を1つの UPDATE で行い、並行した同じコードの提出も片方だけ通す。
+ */
+export async function acceptTotpCounter(db: Db, userId: number, counter: number): Promise<boolean> {
+  const updated = await db
+    .update(usersTable)
+    .set({ totpLastCounter: counter })
+    .where(and(eq(usersTable.id, userId), lt(usersTable.totpLastCounter, counter)))
+    .returning({ id: usersTable.id });
+  return updated.length === 1;
 }
 
 /** 保存済みの TOTP 秘密を復号して返す。未設定は null。 */

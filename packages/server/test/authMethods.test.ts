@@ -11,7 +11,7 @@ import {
   currentTotpCode,
   generateTotpSecret,
   totpCode,
-  verifyTotpCode,
+  matchTotpCounter,
 } from "../src/lib/totp";
 import {
   consumeMagicLinkToken,
@@ -39,10 +39,11 @@ describe("TOTP（RFC 6238）", () => {
     const secret = generateTotpSecret();
     const now = 1_700_000_000_000;
     const code = currentTotpCode(secret, now);
-    expect(verifyTotpCode(secret, code, now)).toBe(true);
-    expect(verifyTotpCode(secret, code, now + 30_000)).toBe(true);
-    expect(verifyTotpCode(secret, code, now + 120_000)).toBe(false);
-    expect(verifyTotpCode(secret, "abcdef", now)).toBe(false);
+    const counter = Math.floor(now / 30_000);
+    expect(matchTotpCounter(secret, code, now)).toBe(counter);
+    expect(matchTotpCounter(secret, code, now + 30_000)).toBe(counter);
+    expect(matchTotpCounter(secret, code, now + 120_000)).toBeNull();
+    expect(matchTotpCounter(secret, "abcdef", now)).toBeNull();
   });
 });
 

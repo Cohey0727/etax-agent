@@ -315,6 +315,8 @@ export const usersTable = pgTable("users", {
   totpSecret: text("totp_secret").notNull().default(""),
   /** TOTP 2要素認証が有効か */
   totpEnabled: boolean("totp_enabled").notNull().default(false),
+  /** 最後に受け入れた TOTP の時間カウンタ。これ以前のコードは再利用として拒否する */
+  totpLastCounter: integer("totp_last_counter").notNull().default(0),
   /**
    * メールアドレスの所有確認が済んでいるか。パスワード登録だけでは
    * 他人のメールでも登録できてしまう（Pre-Account Takeover）ため、

@@ -277,6 +277,7 @@ const schemaDdl: string[] = [
   )`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret text NOT NULL DEFAULT ''`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_last_counter integer NOT NULL DEFAULT 0`,
   // 既存ユーザーは確認済みとして移行する（DEFAULT true）。未確認にするのは
   // 導入後のパスワード新規登録だけで、登録ハンドラが明示的に false を書く。
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT true`,
