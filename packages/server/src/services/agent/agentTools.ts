@@ -15,6 +15,7 @@
 import {
   aggregateIncome,
   amendmentDelta,
+  BlueDeductionOptions,
   blueDeduction,
   consumptionTax,
   estimateInputTax,
@@ -26,6 +27,7 @@ import {
   ConsumptionMethod,
   Transaction,
 } from "@etax/shared";
+import { filingOptionsArg } from "../mcp/mcpToolKit";
 
 export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリーランス）向けの確定申告「準備」アシスタントです。
 
@@ -76,6 +78,28 @@ function yearTransactions(ctx: AgentContext, year: number): Transaction[] {
     );
   }
   return filterYear(ctx.transactions, year);
+}
+
+/**
+ * 青色申告特別控除の計算条件（申告の種類・不動産の事業的規模）。
+ * 引数を優先し、無ければ会話に添付された同じ年の申告入力の値を使う。
+ */
+function filingOptionsForYear(
+  args: Record<string, unknown>,
+  ctx: AgentContext,
+  year: number,
+): BlueDeductionOptions {
+  const state =
+    ctx.deductions?.year === year &&
+    typeof ctx.deductions.state === "object" &&
+    ctx.deductions.state !== null
+      ? (ctx.deductions.state as Record<string, unknown>)
+      : {};
+  return filingOptionsArg({
+    filing_type: args["filing_type"] ?? state["filingType"],
+    real_estate_business_scale:
+      args["real_estate_business_scale"] ?? state["realEstateBusinessScale"],
+  });
 }
 
 /** ツール実行のディスパッチ。 */
@@ -174,7 +198,11 @@ export function dispatchTool(
         const year = Number(args["year"]);
         const tx = yearTransactions(ctx, year);
         const b = aggregateIncome(tx);
-        const blue = blueDeduction(b.realEstateIncome, b.businessIncome);
+        const blue = blueDeduction(
+          b.realEstateIncome,
+          b.businessIncome,
+          filingOptionsForYear(args, ctx, year),
+        );
         return {
           year,
           business_revenue: b.businessRevenue,

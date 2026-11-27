@@ -89,11 +89,21 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
         run("search_transactions", { keyword, year, direction }),
     }),
     aggregate_year: tool({
-      description: "指定年の事業所得・不動産所得を集計し、青色申告特別控除も計算する。",
+      description:
+        "指定年の事業所得・不動産所得を集計し、青色申告特別控除も計算する。控除は申告の種類と不動産の事業的規模で変わり、省略時は画面の申告入力（無ければ青色65万円・事業的規模でない）を使う。",
       inputSchema: z.object({
         year: z.number().int().describe("対象年（西暦）"),
+        filing_type: z
+          .enum(["blue65", "blue55", "blue10", "white"])
+          .optional()
+          .describe("申告の種類（省略時は画面の申告入力）"),
+        real_estate_business_scale: z
+          .boolean()
+          .optional()
+          .describe("不動産貸付けが事業的規模か（省略時は画面の申告入力）"),
       }),
-      execute: async ({ year }) => run("aggregate_year", { year }),
+      execute: async ({ year, filing_type, real_estate_business_scale }) =>
+        run("aggregate_year", { year, filing_type, real_estate_business_scale }),
     }),
     consumption_tax: tool({
       description:
