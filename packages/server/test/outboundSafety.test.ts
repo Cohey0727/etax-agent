@@ -1,5 +1,5 @@
 /**
- * outboundSafety.test.ts — Issue #5（baseUrl 経由のキー漏洩・SSRF）の再現テスト。
+ * outboundSafety.test.ts — baseUrl 経由のキー漏洩・SSRF の防止の検証。
  *
  * - pairApiKeyWithBaseUrl: カスタム baseUrl に環境変数のキーが
  *   組み合わさらないこと。
@@ -116,6 +116,28 @@ describe("assertSafeUserBaseUrl", () => {
       UnsafeUrlError,
     );
     await expect(assertSafeUserBaseUrl("https://openrouter.ai/api/v1")).resolves.toBeUndefined();
+  });
+
+  test("SaaS モードでは IPv4 を埋め込んだ IPv6 リテラル（URL 上で16進表記に正規化される）も拒否する", async () => {
+    process.env.ETAX_AUTH_MODE = "required";
+    for (const url of [
+      "http://[::ffff:127.0.0.1]:11434/",
+      "http://[::ffff:169.254.169.254]/",
+      "http://[::ffff:10.0.0.1]/",
+      "http://[::ffff:0:192.168.0.1]/",
+      "http://[::127.0.0.1]/",
+      "http://[64:ff9b::a9fe:a9fe]/",
+      "http://[2002:a9fe:a9fe::]/",
+      "http://[fec0::1]/",
+      "http://[ff02::1]/",
+      "http://198.18.0.1/",
+      "http://224.0.0.1/",
+    ]) {
+      await expect(assertSafeUserBaseUrl(url)).rejects.toBeInstanceOf(UnsafeUrlError);
+    }
+    await expect(assertSafeUserBaseUrl("http://[2606:4700:4700::1111]/")).resolves.toBeUndefined();
+    await expect(assertSafeUserBaseUrl("http://[64:ff9b::808:808]/")).resolves.toBeUndefined();
+    await expect(assertSafeUserBaseUrl("http://[::ffff:8.8.8.8]/")).resolves.toBeUndefined();
   });
 
   test("ローカルモードではローカル接続先（Ollama）を許可する", async () => {
