@@ -1,12 +1,14 @@
-import { Href, usePathname, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { Href, useLocalSearchParams, usePathname, useRouter } from "expo-router";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Animated, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppText } from "../AppText";
-import { LineIcon, LineIconName } from "../LineIcon";
-import { SorobanMark } from "../SorobanMark";
+import { useAppState } from "@/state/AppContext";
 import { useSidebar } from "@/state/SidebarContext";
 import { colors, radius, space } from "@/theme";
+import { AppText } from "../AppText";
+import { LineIcon, LineIconName } from "../LineIcon";
+import { SelectField } from "../SelectField";
+import { SorobanMark } from "../SorobanMark";
 
 interface SidebarItem {
   href: Href;
@@ -14,7 +16,6 @@ interface SidebarItem {
   icon: LineIconName;
 }
 
-// Web版サイドバーと同じ構成・順序。
 const ITEMS: readonly SidebarItem[] = [
   { href: "/", label: "ダッシュボード", icon: "grid" },
   { href: "/ledger", label: "帳簿", icon: "book" },
@@ -24,9 +25,15 @@ const ITEMS: readonly SidebarItem[] = [
   { href: "/invoices", label: "請求書", icon: "receipt" },
   { href: "/taxpayer", label: "納税者情報", icon: "user" },
   { href: "/filing", label: "確定申告", icon: "fileCheck" },
-  { href: "/agent", label: "チャット", icon: "agent" },
   { href: "/mcp-settings", label: "MCP設定", icon: "settings" },
   { href: "/settings", label: "設定", icon: "settings" },
+];
+
+// 確定申告にぶら下がる子項目（タブへの直接遷移）。総合は親そのものなので出さない。
+const FILING_CHILDREN: readonly { key: string; label: string }[] = [
+  { key: "balance", label: "収支" },
+  { key: "deductions", label: "控除" },
+  { key: "consumption", label: "消費税" },
 ];
 
 const PANEL_WIDTH = 284;
@@ -34,8 +41,10 @@ const PANEL_WIDTH = 284;
 /** 左からスライドインするサイドバーメニュー。 */
 export function AppSidebar() {
   const { sidebarOpen, closeSidebar } = useSidebar();
+  const { year, years, setYear, transactions } = useAppState();
   const router = useRouter();
   const pathname = usePathname();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
@@ -59,6 +68,25 @@ export function AppSidebar() {
     closeSidebar();
     if (pathname !== href) router.navigate(href);
   };
+
+  const goFiling = (tab: string) => {
+    closeSidebar();
+    router.navigate({ pathname: "/filing", params: { tab } });
+  };
+
+  // 年度の追加はセレクタの中の選択肢で行う（最大年度+1 / 最小年度-1）。
+  const nextYear = (years[0] ?? new Date().getFullYear()) + 1;
+  const prevYear = years.length > 0 ? years[years.length - 1] - 1 : null;
+  const yearOptions = [
+    { value: `add:${nextYear}`, label: `${nextYear}年度を追加` },
+    ...years.map((y) => ({ value: String(y), label: `${y}年度` })),
+    ...(prevYear !== null ? [{ value: `add:${prevYear}`, label: `${prevYear}年度を追加` }] : []),
+  ];
+  const handleYearSelect = (raw: string) => {
+    setYear(Number(raw.startsWith("add:") ? raw.slice("add:".length) : raw));
+  };
+
+  const filingTab = pathname === "/filing" ? (tabParam ?? "overview") : null;
 
   return (
     <View style={styles.root} pointerEvents="box-none">
@@ -91,35 +119,85 @@ export function AppSidebar() {
           <View style={styles.logoTile}>
             <SorobanMark width={26} />
           </View>
-          <AppText size="lg" weight="bold">
-            eTaxAgent
-          </AppText>
+          <View>
+            <AppText size="lg" weight="bold">
+              eTaxAgent
+            </AppText>
+            <AppText size="xs" tone="muted">
+              確定申告 準備ツール
+            </AppText>
+          </View>
         </View>
-        <View style={styles.list}>
+        <ScrollView style={styles.listScroll} contentContainerStyle={styles.list}>
           {ITEMS.map((item) => {
             const active = pathname === item.href;
             const tint = active ? colors.accent : colors.muted;
             return (
-              <Pressable
-                key={item.label}
-                accessibilityRole="button"
-                accessibilityLabel={item.label}
-                onPress={() => go(item.href)}
-                style={({ pressed }) => [
-                  styles.row,
-                  active ? styles.rowActive : null,
-                  pressed ? styles.rowPressed : null,
-                ]}
-              >
-                <View style={[styles.iconTile, active ? styles.iconTileActive : null]}>
-                  <LineIcon name={item.icon} size={19} color={tint} />
-                </View>
-                <AppText size="md" weight={active ? "bold" : "medium"} style={{ color: active ? colors.accent : colors.text }}>
-                  {item.label}
-                </AppText>
-              </Pressable>
+              <Fragment key={item.label}>
+                {item.href === "/filing" ? (
+                  <View style={styles.yearBlock}>
+                    <SelectField
+                      label="年度"
+                      value={String(year)}
+                      options={yearOptions}
+                      onChange={handleYearSelect}
+                    />
+                  </View>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  onPress={() =>
+                    item.href === "/filing" ? goFiling("overview") : go(item.href)
+                  }
+                  style={({ pressed }) => [
+                    styles.row,
+                    active ? styles.rowActive : null,
+                    pressed ? styles.rowPressed : null,
+                  ]}
+                >
+                  <View style={[styles.iconTile, active ? styles.iconTileActive : null]}>
+                    <LineIcon name={item.icon} size={19} color={tint} />
+                  </View>
+                  <AppText size="md" weight={active ? "bold" : "medium"} style={{ color: active ? colors.accent : colors.text }}>
+                    {item.label}
+                  </AppText>
+                </Pressable>
+                {item.href === "/filing"
+                  ? FILING_CHILDREN.map((child) => {
+                      const childActive = filingTab === child.key;
+                      return (
+                        <Pressable
+                          key={child.key}
+                          accessibilityRole="button"
+                          accessibilityLabel={child.label}
+                          onPress={() => goFiling(child.key)}
+                          style={({ pressed }) => [
+                            styles.childRow,
+                            childActive ? styles.rowActive : null,
+                            pressed ? styles.rowPressed : null,
+                          ]}
+                        >
+                          <AppText
+                            size="sm"
+                            weight={childActive ? "bold" : "medium"}
+                            style={{ color: childActive ? colors.accent : colors.text }}
+                          >
+                            {child.label}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })
+                  : null}
+              </Fragment>
             );
           })}
+        </ScrollView>
+        <View style={styles.dataPanel}>
+          <AppText size="xs" weight="semibold" tone="subtle">
+            表示中のデータ
+          </AppText>
+          <AppText size="sm">帳簿（{transactions.length}件）</AppText>
         </View>
       </Animated.View>
     </View>
@@ -152,6 +230,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  listScroll: { flex: 1 },
   list: { gap: 2 },
   row: {
     flexDirection: "row",
@@ -159,6 +238,12 @@ const styles = StyleSheet.create({
     gap: space.sm,
     paddingVertical: space.sm,
     paddingHorizontal: space.sm,
+    borderRadius: radius.md,
+  },
+  childRow: {
+    paddingVertical: space.sm,
+    paddingLeft: 58,
+    paddingRight: space.sm,
     borderRadius: radius.md,
   },
   rowActive: { backgroundColor: colors.accentSoft },
@@ -172,4 +257,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   iconTileActive: { backgroundColor: colors.surface },
+  yearBlock: { paddingHorizontal: space.sm, paddingVertical: space.sm },
+  dataPanel: {
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft,
+    paddingHorizontal: space.sm,
+    paddingTop: space.sm,
+    gap: 2,
+  },
 });

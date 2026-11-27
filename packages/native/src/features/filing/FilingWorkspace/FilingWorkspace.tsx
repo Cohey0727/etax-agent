@@ -69,14 +69,14 @@ const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
  * 解放する（取り込み前に保存すると空状態がサーバーへ全体置換され、
  * 保存済みの控除等が消えてしまうため）。
  */
-export function FilingWorkspace() {
+export function FilingWorkspace({ initialTab = "overview" }: { initialTab?: FilingTab }) {
   const router = useRouter();
   const { user } = useAuth();
   const { year, transactions } = useAppState();
   const userId = user?.id ?? null;
 
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const [tab, setTab] = useState<FilingTab>("overview");
+  const [tab, setTab] = useState<FilingTab>(initialTab);
   const [deductionState, setDeductionState] = useState<DeductionState>(() => freshDeductionState());
   const [hydrated, setHydrated] = useState(false);
 
