@@ -11,7 +11,8 @@
  * 置かれていればコピーしておく（様式は無ければ取得して forms へ保存
  * されるので、コピー先に置いて実運用側へは書かせない）。
  */
-import { cpSync, existsSync, mkdtempSync } from "node:fs";
+import { afterAll } from "bun:test";
+import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -24,3 +25,6 @@ for (const name of ["fonts", "forms"]) {
 }
 
 process.env.ETAX_DATA_DIR = testDataDir;
+// フォントと様式のコピーで1回あたり数 MB になるので、全テストの後に消す
+// （preload で登録したフックは全テストファイル共通の後処理になる）。
+afterAll(() => rmSync(testDataDir, { recursive: true, force: true }));
