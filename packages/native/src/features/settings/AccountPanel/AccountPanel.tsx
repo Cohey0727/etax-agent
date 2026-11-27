@@ -50,12 +50,19 @@ export function AccountPanel() {
   const [busy, setBusy] = useState<BusyKind>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  useEffect(() => {
-    fetchBillingPlan()
-      .then(setBilling)
-      .catch(() => setBilling(null))
-      .finally(() => setBillingLoaded(true));
+  const loadBilling = useCallback(async () => {
+    try {
+      setBilling(await fetchBillingPlan());
+    } catch {
+      setBilling(null);
+    } finally {
+      setBillingLoaded(true);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadBilling();
+  }, [loadBilling]);
 
   const run = useCallback(
     async (kind: Exclude<BusyKind, null>, action: () => Promise<string>) => {
@@ -103,6 +110,8 @@ export function AccountPanel() {
         cancel_url: "etaxagent://settings",
       });
       await WebBrowser.openBrowserAsync(url);
+      // 決済ページから戻ったら、申込の結果を課金状態へ反映する
+      await loadBilling();
       return "決済ページを開きました。";
     });
 
