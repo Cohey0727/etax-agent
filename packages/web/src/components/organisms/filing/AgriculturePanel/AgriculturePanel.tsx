@@ -20,6 +20,11 @@ export interface AgriculturePanelProps {
   onChange: (next: AgricultureInput) => void;
 }
 
+/** 白色申告（収支内訳書）で科目名の表記が変わる科目。 */
+const WHITE_EXPENSE_LABELS: Readonly<Record<string, string>> = {
+  地代賃借料: "小作料・賃借料",
+};
+
 /**
  * 農業所得の入力。帳簿の取引とは混ぜず申告入力として
  * 保持し、農業所得用の決算書（青色は青色申告決算書（農業所得用）、白色は
@@ -103,7 +108,7 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
         {AGRICULTURE_EXPENSE_CATEGORIES.map((category) => (
           <LabeledAmountField
             key={category}
-            label={category === "地代賃借料" && white ? "小作料・賃借料" : category}
+            label={white ? (WHITE_EXPENSE_LABELS[category] ?? category) : category}
             value={agriculture.expenseTotals[category] ?? 0}
             onChange={(v) => setExpense(category, v)}
           />

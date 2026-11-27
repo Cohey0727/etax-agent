@@ -6,6 +6,13 @@ import { Col, Input, Row, Select, Text } from "@components/atoms";
 import { SalarySituationRow } from "@types";
 import styles from "./BusinessStartPanel.css";
 
+/** 有・無・未選択の選択肢の値 → 様式の「有無」欄の値。 */
+const NULLABLE_BOOL_BY_OPTION: Readonly<Record<string, boolean | null>> = {
+  "": null,
+  yes: true,
+  no: false,
+};
+
 /** YYYY-MM-DD を「YYYY年M月D日」へ整形する。 */
 export function formatJapaneseDate(iso: string): string {
   const [year, month, day] = iso.split("-").map(Number);
@@ -89,13 +96,13 @@ interface NullableBoolFieldProps {
 export const NullableBoolField = ({ label, value, onChange }: NullableBoolFieldProps) => (
   <SelectField
     label={label}
-    value={value === null ? "" : value ? "yes" : "no"}
+    value={optionOfNullableBool(value)}
     options={[
       { value: "", label: "未選択" },
       { value: "yes", label: "有" },
       { value: "no", label: "無" },
     ]}
-    onChange={(v) => onChange(v === "" ? null : v === "yes")}
+    onChange={(v) => onChange(NULLABLE_BOOL_BY_OPTION[v] ?? null)}
   />
 );
 
@@ -159,9 +166,9 @@ export const SalaryRowFields = ({ label, row, onChange }: SalaryRowFieldsProps) 
       aria-label={`${label}の給与の定め方`}
     />
     <Select
-      value={row.has_tax === null ? "" : row.has_tax ? "yes" : "no"}
+      value={optionOfNullableBool(row.has_tax)}
       onChange={(e) =>
-        onChange({ ...row, has_tax: e.target.value === "" ? null : e.target.value === "yes" })
+        onChange({ ...row, has_tax: NULLABLE_BOOL_BY_OPTION[e.target.value] ?? null })
       }
       aria-label={`${label}の税額の有無`}
     >
@@ -189,3 +196,9 @@ export const SubmissionGuide = () => (
     </Text>
   </Col>
 );
+
+/** 様式の「有無」欄の値 → 選択肢の値。 */
+function optionOfNullableBool(value: boolean | null): string {
+  if (value === null) return "";
+  return value ? "yes" : "no";
+}

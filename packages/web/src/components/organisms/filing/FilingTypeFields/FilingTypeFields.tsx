@@ -21,6 +21,12 @@ const FILING_TYPE_NOTES: Partial<Record<FilingType, string>> = {
   white: "白色申告では青色申告特別控除はありません。",
 };
 
+/** 不動産貸付けの規模の選択肢の値 → 事業的規模か。 */
+const SCALE_BY_OPTION: Readonly<Record<string, boolean>> = {
+  "non-scale": false,
+  scale: true,
+};
+
 /**
  * 申告の種類（青色申告特別控除の区分）と不動産貸付けの規模の選択。
  * 納税者情報画面で管理する（保存先は確定申告・ダッシュボードと共有）。
@@ -55,7 +61,7 @@ export const FilingTypeFields = ({
           <Select
             className={styles.select}
             value={realEstateBusinessScale ? "scale" : "non-scale"}
-            onChange={(e) => onChange(filingType, e.target.value === "scale")}
+            onChange={(e) => onChange(filingType, SCALE_BY_OPTION[e.target.value] ?? false)}
             aria-label="不動産貸付けの規模"
           >
             <option value="non-scale">事業的規模でない（事業所得が無ければ10万円まで）</option>
