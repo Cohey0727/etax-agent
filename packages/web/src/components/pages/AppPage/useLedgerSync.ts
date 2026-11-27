@@ -1,4 +1,4 @@
-import { Transaction } from "@etax/shared";
+import { applyCsvClassificationEdits, Transaction } from "@etax/shared";
 import { useEffect, useState } from "react";
 import { AppView } from "@types";
 import {
@@ -6,8 +6,8 @@ import {
   ledgerRowToTransaction,
   replaceYearLedgerTransactions,
   transactionToLedgerInput,
+  updateLedgerTransaction,
 } from "@utils/api";
-import { applyCsvClassificationEdits } from "./appPageHelpers";
 
 /**
  * useLedgerSync.ts — 帳簿（DB）と画面の取引状態の同期（AppPage 用フック）。
@@ -90,13 +90,13 @@ export function useLedgerSync(options: {
       for (const importYear of importedYears) {
         const rows = await fetchLedgerTransactions(importYear);
         if (!rows) continue;
-        fetchedByYear.set(
-          importYear,
-          await applyCsvClassificationEdits(
-            rows,
-            imported.filter((tx) => tx.year === importYear),
-          ),
+        const edited = await applyCsvClassificationEdits(
+          rows,
+          imported.filter((tx) => tx.year === importYear),
+          (row) =>
+            updateLedgerTransaction(row.id, transactionToLedgerInput(ledgerRowToTransaction(row))),
         );
+        fetchedByYear.set(importYear, edited.map(ledgerRowToTransaction));
       }
       setTransactions((current) => {
         const merged = current.filter((tx) => !importedYears.includes(tx.year));
