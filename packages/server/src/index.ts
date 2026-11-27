@@ -97,34 +97,55 @@ import transactionsRoutes from "./routes/transactions";
 const app = new OpenAPIHono({ defaultHook: defaultValidationHook });
 
 /**
- * CORS はワイルドカードにせず、許可オリジンを設定ベースにする（Issue #7）。
- * 画面は同一オリジン配信が前提なので、通常は CORS 自体が不要。許可するのは
- * 公開オリジン（ETAX_PUBLIC_URL）と ETAX_CORS_ORIGINS（カンマ区切り）だけで、
- * 認証オフのローカル運用に限って localhost の開発オリジンも許可する。
- * セッション Cookie を使うため credentials は true（ワイルドカードとは併用不可）。
+ * 他オリジンから API を使ってよいオリジン。画面は同一オリジン配信が前提なので、
+ * 通常は不要。許可するのは公開オリジン（ETAX_PUBLIC_URL）と ETAX_CORS_ORIGINS
+ * （カンマ区切り）だけで、認証オフのローカル運用に限って localhost の開発
+ * オリジン（Vite の開発サーバーなど）も許可する。
  */
-function allowedCorsOrigins(): string[] {
+function isAllowedOrigin(origin: string): boolean {
   const fromEnv = (process.env.ETAX_CORS_ORIGINS ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter((value) => value !== "");
-  const publicUrl = publicBaseUrl();
-  return publicUrl ? [...fromEnv, publicUrl] : fromEnv;
+  if (fromEnv.includes(origin) || publicBaseUrl() === origin) return true;
+  return !authRequired() && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
+// セッション Cookie を使うため credentials は true（ワイルドカードとは併用不可）。
 app.use(
   "/api/*",
   cors({
-    origin: (origin) => {
-      if (allowedCorsOrigins().includes(origin)) return origin;
-      if (!authRequired() && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-        return origin;
-      }
-      return undefined;
-    },
+    origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined),
     credentials: true,
   }),
 );
+
+/**
+ * 更新系リクエストの送信元検査（CSRF 対策）。CORS は他オリジンに応答を
+ * 読ませないだけで処理は止めないため、プリフライトの要らない単純リクエスト
+ * （text/plain の POST など）が他サイトから届くと、認証の無いローカル運用では
+ * 帳簿を書き換えられてしまう。ブラウザが付ける Origin を見て、同一オリジン
+ * （Sec-Fetch-Site か Host との一致）と許可オリジンだけを通す。Origin を付けない
+ * クライアント（native アプリ・CLI・サーバー間の呼び出し）はそのまま通す。
+ */
+const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function isSameOriginRequest(c: Context, origin: string): boolean {
+  const fetchSite = c.req.header("sec-fetch-site");
+  if (fetchSite === "same-origin" || fetchSite === "none") return true;
+  try {
+    return new URL(origin).host === c.req.header("host");
+  } catch {
+    return false;
+  }
+}
+
+app.use("/api/*", async (c, next) => {
+  const origin = c.req.header("origin");
+  if (safeMethods.has(c.req.method) || origin === undefined) return next();
+  if (isSameOriginRequest(c, origin) || isAllowedOrigin(origin)) return next();
+  return c.json({ error: "許可されていない送信元からのリクエストです" }, 403);
+});
 
 // リクエストボディの上限（巨大ボディでのメモリ枯渇を防ぐ、Issue #7）。
 // CSV 取込・領収書画像の PUT もこの範囲に収まる大きさにしている。

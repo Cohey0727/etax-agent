@@ -170,3 +170,82 @@ describe("税務パラメータの無い年分は 400", () => {
     expect(String(r.body["error"])).toContain("対応年分");
   });
 });
+
+describe("更新系リクエストの送信元検査", () => {
+  const replaceBody = JSON.stringify({ year: 2025, transactions: [] });
+
+  async function seedOne(): Promise<void> {
+    await createTestDb();
+    const created = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-02-01", amount: 5000, description: "売上" },
+    });
+    expect(created.status).toBe(201);
+  }
+
+  async function ledgerCount(): Promise<unknown> {
+    return (await req("/api/transactions?year=2025")).body["count"];
+  }
+
+  test("他サイトからの text/plain の POST は処理しない", async () => {
+    await seedOne();
+    const r = await req("/api/transactions/replace-year", {
+      method: "POST",
+      body: replaceBody,
+      headers: { "Content-Type": "text/plain;charset=UTF-8", Origin: "https://evil.example" },
+    });
+    expect(r.status).toBe(403);
+    expect(typeof r.body["error"]).toBe("string");
+    expect(await ledgerCount()).toBe(1);
+  });
+
+  test("他サイトからは JSON の POST・ボディ無しの POST も処理しない", async () => {
+    await seedOne();
+    const json = await req("/api/transactions/replace-year", {
+      method: "POST",
+      body: replaceBody,
+      headers: { "Content-Type": "application/json", Origin: "https://evil.example" },
+    });
+    expect(json.status).toBe(403);
+    const bodiless = await req("/api/invoices/1/issue", {
+      method: "POST",
+      headers: { Origin: "https://evil.example" },
+    });
+    expect(bodiless.status).toBe(403);
+    expect(await ledgerCount()).toBe(1);
+  });
+
+  test("同一オリジン（Host と一致・Sec-Fetch-Site）と Origin 無しは通す", async () => {
+    await seedOne();
+    const sameHost = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-02-02", amount: 1000, description: "a" },
+      headers: { Origin: "https://app.example", Host: "app.example" },
+    });
+    expect(sameHost.status).toBe(201);
+    const fetchSite = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-02-03", amount: 1000, description: "b" },
+      headers: { Origin: "https://app.example", "Sec-Fetch-Site": "same-origin" },
+    });
+    expect(fetchSite.status).toBe(201);
+    const noOrigin = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-02-04", amount: 1000, description: "c" },
+    });
+    expect(noOrigin.status).toBe(201);
+    expect(await ledgerCount()).toBe(4);
+  });
+
+  test("JSON 以外の Content-Type のボディは JSON として読まない", async () => {
+    await seedOne();
+    const r = await req("/api/transactions/replace-year", {
+      method: "POST",
+      body: replaceBody,
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+    });
+    expect(r.status).toBe(400);
+    expect(r.body["error"]).toBe("JSONボディが必要です");
+    expect(await ledgerCount()).toBe(1);
+  });
+});
