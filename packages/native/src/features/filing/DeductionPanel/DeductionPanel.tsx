@@ -7,6 +7,7 @@ import {
   IncomeDeductionBreakdown,
   LifeInsurancePremiums,
   SpouseCategory,
+  TAX_PARAMETERS,
 } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { Card, SelectField, SwitchRow } from "@/components";
@@ -239,7 +240,7 @@ export function DeductionPanel({
           value={deductions.isWorkingStudent}
           onChange={(v) => set({ isWorkingStudent: v })}
         />
-        {year === 2025 ? (
+        {(TAX_PARAMETERS[year]?.specialRelativeTiers ?? null) !== null ? (
           <NullableAmountField
             label="特定親族（19〜22歳）の合計所得金額"
             value={deductions.specialRelativeTotalIncome}
