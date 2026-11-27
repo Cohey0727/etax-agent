@@ -4,7 +4,8 @@
  * 行 → API 形式（snake_case）への変換と、shared の減価償却エンジンの
  * 入力形式（FixedAssetInput）への変換もここで行う。
  * 除却済み資産の扱い: 除却年の翌年以降は償却対象から外す。除却年の償却は
- * エンジンの通年計算のまま（月割の厳密化はしていない）。
+ * 除却日をエンジンに渡して除却月までの月割にする（除却時の未償却残高の
+ * 必要経費算入は扱わない）。
  */
 import { and, asc, eq } from "drizzle-orm";
 import { DepreciationDetailRow, DepreciationMethod, FixedAssetInput, depreciationDetailRow } from "@etax/shared";
@@ -41,6 +42,7 @@ export function fixedAssetToInput(row: FixedAssetRow): FixedAssetInput {
     usefulLifeYears: row.usefulLifeYears,
     method: row.method as DepreciationMethod,
     businessRatioPercent: row.businessRatioPercent,
+    disposalDate: row.disposedDate ?? undefined,
   };
 }
 

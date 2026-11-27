@@ -39,6 +39,12 @@ export interface FixedAssetInput {
   method: DepreciationMethod;
   /** 事業専用割合（不動産は貸付割合）0〜100 */
   businessRatioPercent: number;
+  /**
+   * 除却年月日 "YYYY-MM-DD"。定額法・定率法は除却した年を除却月までの月割で
+   * 償却し、翌年以後は償却しない。一括償却資産は除却しても3年均等で償却を
+   * 続ける（所得税法施行令139条）。除却時の未償却残高の必要経費算入は扱わない。
+   */
+  disposalDate?: string;
 }
 
 export interface DepreciationYear {
@@ -277,6 +283,14 @@ export function depreciationSchedule(
   const start = serviceStart(asset);
   if (targetYear < start.year) return [];
   const firstYearMonths = 12 - start.month + 1;
+  const disposal = asset.disposalDate ? parseYearMonth(asset.disposalDate) : null;
+  /** 定額法・定率法でその年に償却する月数（供用開始年は供用月から、除却年は除却月まで）。 */
+  const monthsInYear = (year: number): number => {
+    const from = year === start.year ? start.month : 1;
+    const to = disposal !== null && year === disposal.year ? disposal.month : 12;
+    return Math.max(to - from + 1, 0);
+  };
+  const lastYear = disposal !== null ? Math.min(targetYear, disposal.year) : targetYear;
 
   if (asset.method === "small_special") {
     // 取得年に全額償却し、未償却残高は0になる（備忘価額の対象外）
@@ -302,12 +316,9 @@ export function depreciationSchedule(
     const fullYearAmount = mulRate(asset.cost, rate);
     const years: DepreciationYear[] = [];
     let opening = asset.cost;
-    for (let year = start.year; year <= targetYear && opening > 1; year++) {
-      const months = year === start.year ? firstYearMonths : 12;
-      let ordinary =
-        year === start.year
-          ? mulRateMonths(asset.cost, rate, months)
-          : fullYearAmount;
+    for (let year = start.year; year <= lastYear && opening > 1; year++) {
+      const months = monthsInYear(year);
+      let ordinary = months === 12 ? fullYearAmount : mulRateMonths(asset.cost, rate, months);
       if (opening - ordinary < 1) ordinary = opening - 1;
       years.push(makeYear(asset, year, months, opening, asset.cost, rate, null, ordinary));
       opening -= ordinary;
@@ -322,28 +333,23 @@ export function depreciationSchedule(
   const years: DepreciationYear[] = [];
   let opening = asset.cost;
   let revisedBase: number | null = null;
-  for (let year = start.year; year <= targetYear && opening > 1; year++) {
-    const months = year === start.year ? firstYearMonths : 12;
+  for (let year = start.year; year <= lastYear && opening > 1; year++) {
+    const months = monthsInYear(year);
     if (revisedBase === null && guaranteeAmount !== null && rates.revisedRate !== null) {
       const adjusted = mulRate(opening, rates.rate);
       if (adjusted < guaranteeAmount) revisedBase = opening;
     }
-    let ordinary: number;
     let basis: number;
     let usedRate: number;
     if (revisedBase !== null && rates.revisedRate !== null) {
       basis = revisedBase;
       usedRate = rates.revisedRate;
-      ordinary = mulRate(revisedBase, rates.revisedRate);
     } else {
       basis = opening;
       usedRate = rates.rate;
-      // 初年度の月割は定額法と同じく「基礎金額 × 率 × 月数/12」を1回で切り捨てる
-      ordinary =
-        year === start.year
-          ? mulRateMonths(opening, rates.rate, months)
-          : mulRate(opening, rates.rate);
     }
+    // 供用開始年・除却年の月割は定額法と同じく「基礎金額 × 率 × 月数/12」を1回で切り捨てる
+    let ordinary = months === 12 ? mulRate(basis, usedRate) : mulRateMonths(basis, usedRate, months);
     if (opening - ordinary < 1) ordinary = opening - 1;
     years.push(makeYear(asset, year, months, opening, basis, usedRate, guaranteeAmount, ordinary));
     opening -= ordinary;

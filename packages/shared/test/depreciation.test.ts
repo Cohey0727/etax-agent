@@ -157,3 +157,38 @@ describe("整数演算と入力検証", () => {
     expect(() => depreciationSchedule(a, 2025)).toThrow(/取得価額/);
   });
 });
+
+describe("除却した年の月割", () => {
+  test("定額法は除却した年を除却月までの月割にし、翌年以後は償却しない", () => {
+    // 取得100万・4年・2024年1月供用・2025年3月除却 → 2025年は3か月分
+    const a = asset({ acquisitionDate: "2024-01-15", cost: 1_000_000, usefulLifeYears: 4, disposalDate: "2025-03-31" });
+    expect(depreciationForYear(a, 2024)?.ordinary).toBe(250_000);
+    const y2025 = depreciationForYear(a, 2025);
+    expect(y2025?.months).toBe(3);
+    expect(y2025?.ordinary).toBe(62_500);
+    expect(y2025?.closingBookValue).toBe(687_500);
+    expect(depreciationForYear(a, 2026)).toBeNull();
+  });
+
+  test("供用した年に除却したら、供用月から除却月までの月割", () => {
+    const a = asset({ acquisitionDate: "2025-04-01", cost: 1_000_000, usefulLifeYears: 4, disposalDate: "2025-09-30" });
+    const y2025 = depreciationForYear(a, 2025);
+    expect(y2025?.months).toBe(6);
+    expect(y2025?.ordinary).toBe(125_000);
+  });
+
+  test("定率法も除却した年は月割にする", () => {
+    // 5年（償却率0.4）・2024年1月供用: 2024年 400,000、2025年6月除却 → 600,000 × 0.4 × 6/12
+    const a = asset({ acquisitionDate: "2024-01-10", method: "declining_balance", disposalDate: "2025-06-30" });
+    expect(depreciationForYear(a, 2024)?.ordinary).toBe(400_000);
+    const y2025 = depreciationForYear(a, 2025);
+    expect(y2025?.months).toBe(6);
+    expect(y2025?.ordinary).toBe(120_000);
+    expect(depreciationForYear(a, 2026)).toBeNull();
+  });
+
+  test("一括償却資産は除却しても3年均等の償却を続ける", () => {
+    const a = asset({ acquisitionDate: "2025-04-01", cost: 150_000, method: "lump_sum", disposalDate: "2025-12-31" });
+    expect(depreciationSchedule(a, 2027).map((y) => y.ordinary)).toEqual([50_000, 50_000, 50_000]);
+  });
+});

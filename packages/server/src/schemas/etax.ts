@@ -166,6 +166,8 @@ export const XtxFixedAssetSchema = z
     useful_life_years: z.number(),
     method: z.enum(["straight_line", "declining_balance", "lump_sum", "small_special"]),
     business_ratio_percent: z.number(),
+    /** 除却日（YYYY-MM-DD）。除却した年は除却月までの月割で償却する */
+    disposed_date: z.string().nullable().optional(),
   })
   .openapi("XtxFixedAsset");
 

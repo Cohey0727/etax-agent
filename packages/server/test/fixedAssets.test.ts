@@ -69,6 +69,9 @@ describe("固定資産台帳リポジトリ", () => {
     expect(rows2025.business[0].ordinary).toBe(112_500);
     expect(rows2025.business[0].methodLabel).toBe("定額法");
     expect(rows2025.realEstate.length).toBe(1);
+    // 除却した2026年は除却月（6月）までの6か月分
+    const rows2026 = depreciationDetailRowsForYear(await listFixedAssetRows(db), 2026);
+    expect(rows2026.realEstate[0].months).toBe(6);
     // 除却は2026年なので2027年の明細には出ない
     const rows2027 = depreciationDetailRowsForYear(await listFixedAssetRows(db), 2027);
     expect(rows2027.realEstate.length).toBe(0);

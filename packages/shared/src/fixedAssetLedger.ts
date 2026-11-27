@@ -65,6 +65,7 @@ function toEngineInput(asset: FixedAssetLedgerEntry): FixedAssetInput {
     usefulLifeYears: asset.useful_life_years,
     method: asset.method,
     businessRatioPercent: asset.business_ratio_percent,
+    disposalDate: asset.disposed_date ?? undefined,
   };
 }
 

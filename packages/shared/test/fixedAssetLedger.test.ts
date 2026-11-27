@@ -43,15 +43,16 @@ describe("fixedAssetYearFigures", () => {
     });
   });
 
-  test("除却の翌年以降は償却費 0、残高は除却年の残高で止まる", () => {
+  test("除却した年は除却月までの月割、翌年以降は償却費 0、残高は除却年の残高で止まる", () => {
     const disposed = asset({ disposed_date: "2024-06-30" });
+    // 400,000 × 0.25 × 6/12
     expect(fixedAssetYearFigures(disposed, 2024)).toMatchObject({
-      deductible: 100_000,
-      bookValue: 200_000,
+      deductible: 50_000,
+      bookValue: 250_000,
     });
     expect(fixedAssetYearFigures(disposed, 2025)).toMatchObject({
       deductible: 0,
-      bookValue: 200_000,
+      bookValue: 250_000,
     });
   });
 });
@@ -60,7 +61,7 @@ describe("fixedAssetSchedule", () => {
   test("除却した資産は除却した年までのスケジュールにする", () => {
     const schedule = fixedAssetSchedule(asset({ disposed_date: "2024-06-30" }));
     expect(schedule.map((row) => row.year)).toEqual([2023, 2024]);
-    expect(schedule.reduce((sum, row) => sum + row.deductible, 0)).toBe(200_000);
+    expect(schedule.reduce((sum, row) => sum + row.deductible, 0)).toBe(150_000);
   });
 });
 
