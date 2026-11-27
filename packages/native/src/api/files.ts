@@ -17,7 +17,7 @@ export const UPLOADABLE_IMAGE_TYPES: readonly string[] = [
 ];
 
 /** 端末上のファイル（file:// URI）のバイト列を読む。 */
-export async function readLocalFileBytes(uri: string): Promise<Uint8Array> {
+export async function readLocalFileBytes(uri: string): Promise<Uint8Array<ArrayBuffer>> {
   const file = new File(uri);
   return file.bytes();
 }
@@ -27,7 +27,7 @@ export async function readLocalFileBytes(uri: string): Promise<Uint8Array> {
  * APIサーバーはバイト列を経由しない。
  */
 export async function uploadViaPresignedUrl(
-  bytes: Uint8Array,
+  bytes: Uint8Array<ArrayBuffer>,
   contentType: string,
   purpose?: string,
 ): Promise<string> {
@@ -47,7 +47,7 @@ export async function uploadViaPresignedUrl(
   const resp = await rawFetch(uploadUrl, {
     method: "PUT",
     headers,
-    body: bytes as unknown as BodyInit,
+    body: bytes,
   });
   if (!resp.ok) {
     throw new ApiError(resp.status, `ファイルのアップロードに失敗しました (HTTP ${resp.status})`);

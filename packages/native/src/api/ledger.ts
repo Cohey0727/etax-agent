@@ -124,12 +124,12 @@ export async function replaceYearLedgerTransactions(
 
 /** CSVファイルを生バイトのまま送る（文字コードのデコードはサーバー側）。 */
 export async function importCsvBytes(
-  bytes: Uint8Array,
+  bytes: Uint8Array<ArrayBuffer>,
   filename: string,
 ): Promise<ImportCsvResponse> {
   return apiJson<ImportCsvResponse>("/api/import/csv", {
     method: "POST",
-    rawBody: bytes as unknown as BodyInit,
+    rawBody: bytes,
     contentType: "text/csv",
     headers: { "X-Filename": encodeURIComponent(filename) },
     timeoutMs: LONG_TIMEOUT_MS,
