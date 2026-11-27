@@ -2,7 +2,7 @@
  * auth.ts — 認証・課金まわりのAPI。ログイン応答の token がセッションの実体で、
  * 呼び出し側（AuthContext）が session.ts へ保存する。
  */
-import { apiJson, apiJsonOrNull } from "./client";
+import { ApiError, apiJson, apiJsonOrNull } from "./client";
 import {
   AuthConfig,
   AuthUser,
@@ -16,10 +16,18 @@ export async function fetchAuthConfig(): Promise<AuthConfig> {
   return apiJson<AuthConfig>("/api/auth/config", { anonymous: true });
 }
 
-/** ログイン中のユーザー。未ログインなら null。 */
+/**
+ * ログイン中のユーザー。未ログイン（401）なら null。
+ * 通信できない・サーバーが失敗した場合は ApiError を投げる（未ログインと区別する）。
+ */
 export async function fetchMe(): Promise<AuthUser | null> {
-  const data = await apiJsonOrNull<{ user: AuthUser }>("/api/auth/me");
-  return data?.user ?? null;
+  try {
+    const data = await apiJson<{ user: AuthUser }>("/api/auth/me");
+    return data.user;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return null;
+    throw e;
+  }
 }
 
 /** メールアドレスとパスワードでログインする。 */

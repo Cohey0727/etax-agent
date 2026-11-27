@@ -12,16 +12,16 @@ import {
   useState,
 } from "react";
 import {
+  ApiError,
   AuthConfig,
   AuthUser,
   LoginResponse,
   clearSessionToken,
-  fetchAuthConfig,
   fetchMe,
-  loadSessionToken,
   logoutAccount,
   saveSessionToken,
 } from "@/api";
+import { bootstrapAuth } from "./bootstrapAuth";
 
 export type LoginOutcome =
   | { kind: "signedIn"; user: AuthUser }
@@ -31,6 +31,10 @@ export type LoginOutcome =
 export interface AuthContextValue {
   /** 起動時の確認（設定・セッション）が終わったか。 */
   ready: boolean;
+  /** 起動時の確認に失敗した理由（通信できない・サーバーの失敗）。成功していれば null。 */
+  loadError: string | null;
+  /** 起動時の確認をやり直す。 */
+  reloadAuth: () => Promise<void>;
   config: AuthConfig | null;
   user: AuthUser | null;
   /** ログイン必須の構成か。 */
@@ -47,32 +51,26 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [config, setConfig] = useState<AuthConfig | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const token = await loadSessionToken();
-      const cfg = await fetchAuthConfig().catch(() => null);
-      if (cancelled) return;
-      setConfig(cfg);
-      if (token) {
-        const me = await fetchMe().catch(() => null);
-        if (cancelled) return;
-        if (me) {
-          setUser(me);
-        } else {
-          // 失効したトークンは破棄する
-          await clearSessionToken();
-        }
-      }
+  const reloadAuth = useCallback(async () => {
+    try {
+      const result = await bootstrapAuth();
+      setConfig(result.config);
+      setUser(result.user);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof ApiError ? e.message : "ネットワークに接続できませんでした");
+    } finally {
       setReady(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    }
   }, []);
+
+  useEffect(() => {
+    void reloadAuth();
+  }, [reloadAuth]);
 
   const applyLoginResponse = useCallback(
     async (response: LoginResponse): Promise<LoginOutcome> => {
@@ -85,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.token) {
         await saveSessionToken(response.token);
       }
-      const me = response.user ?? (await fetchMe().catch(() => null));
+      const me = response.user ?? (await fetchMe());
       if (me) setUser(me);
       if (me) return { kind: "signedIn", user: me };
       return { kind: "verificationRequired" };
@@ -107,6 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       ready,
+      loadError,
+      reloadAuth,
       config,
       user,
       loginRequired: config?.required === true,
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       refreshUser,
     }),
-    [ready, config, user, applyLoginResponse, signOut, refreshUser],
+    [ready, loadError, reloadAuth, config, user, applyLoginResponse, signOut, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

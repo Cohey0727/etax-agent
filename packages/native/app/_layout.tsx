@@ -3,13 +3,14 @@ import { Redirect, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { AuthProvider, useAuth } from "@/auth/AuthContext";
 import { AnimatedSplash } from "@/components/AnimatedSplash";
 import { AppBottomBar } from "@/components/AppBottomBar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ChatSheet } from "@/components/ChatSheet";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthLoadError } from "@/features/auth/AuthLoadError";
 import { AppProvider } from "@/state/AppContext";
 import { ChatSheetProvider } from "@/state/ChatSheetContext";
 import { SidebarProvider } from "@/state/SidebarContext";
@@ -18,7 +19,7 @@ import { colors } from "@/theme";
 void SplashScreen.preventAutoHideAsync();
 
 function AppStack() {
-  const { ready, user, loginRequired } = useAuth();
+  const { ready, loadError, reloadAuth, user, loginRequired } = useAuth();
   const segments = useSegments();
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
@@ -27,6 +28,8 @@ function AppStack() {
   const onLoginScreen = segments[0] === "login";
   const onAuthCallback = segments[0] === "auth-callback";
   const mustLogin = ready && loginRequired && !user && !onLoginScreen;
+
+  const authFailed = ready && loadError !== null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -54,10 +57,15 @@ function AppStack() {
           <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
         </Stack>
       </ErrorBoundary>
-      {!onLoginScreen && !onAuthCallback ? <AppBottomBar /> : null}
+      {!onLoginScreen && !onAuthCallback && !authFailed ? <AppBottomBar /> : null}
       <AppSidebar />
       <ChatSheet />
       {mustLogin ? <Redirect href="/login" /> : null}
+      {ready && loadError !== null ? (
+        <View style={styles.overlay}>
+          <AuthLoadError message={loadError} onRetry={reloadAuth} />
+        </View>
+      ) : null}
       {!splashDone ? <AnimatedSplash ready={ready} onFinish={handleSplashFinish} /> : null}
     </View>
   );
@@ -94,3 +102,8 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  // 起動時の確認に失敗したら、画面・ボトムバー・サイドバーより手前に出す
+  overlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 90 },
+});

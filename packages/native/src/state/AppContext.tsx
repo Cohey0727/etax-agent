@@ -38,7 +38,7 @@ function currentYear(): number {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { user, ready } = useAuth();
+  const { user, ready, loadError } = useAuth();
   const [year, setYearState] = useState<number>(currentYear());
   const [ledgerRows, setLedgerRows] = useState<LedgerTransaction[] | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(true);
@@ -67,11 +67,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLedgerLoading(false);
   }, []);
 
-  // 認証が確定したら帳簿を読み込む（ユーザー切替時も読み直す）
+  // 認証が確定したら帳簿を読み込む（ユーザー切替時と、起動時の確認をやり直して成功したときも読み直す）
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || loadError !== null) return;
     void reloadLedger();
-  }, [ready, user?.id, reloadLedger]);
+  }, [ready, loadError, user?.id, reloadLedger]);
 
   const setYear = useCallback((next: number) => {
     setYearState(next);
