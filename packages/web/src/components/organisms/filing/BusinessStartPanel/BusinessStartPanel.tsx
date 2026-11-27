@@ -24,7 +24,7 @@ import {
 } from "@utils/api";
 import { downloadPdfFile } from "@utils/fileDownload";
 import { todayIso } from "@utils/localDate";
-import { loadTaxpayer } from "@components/organisms/filing/TaxpayerProfilePanel/taxpayerStorage";
+import { loadTaxpayer } from "@components/organisms/filing/TaxpayerProfilePanel";
 import {
   emptyBusinessStartInputs,
   loadBusinessStartInputs,

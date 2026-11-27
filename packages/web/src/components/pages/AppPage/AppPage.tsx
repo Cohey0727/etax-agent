@@ -12,7 +12,7 @@ import {
   applyDeductionPatchToSaved,
   hydrateDeductionStateFromServer,
   loadDeductionState,
-} from "@components/organisms/filing/DeductionPanel/deductionStorage";
+} from "@components/organisms/filing";
 import { AppTemplate } from "@components/templates";
 import {
   AgentConnectionConfig,

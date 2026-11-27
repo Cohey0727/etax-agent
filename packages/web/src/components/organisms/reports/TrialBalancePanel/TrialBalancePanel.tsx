@@ -9,7 +9,7 @@ import { Card, Col, Text } from "@components/atoms";
 import {
   hydrateDeductionStateFromServer,
   loadDeductionState,
-} from "@components/organisms/filing/DeductionPanel/deductionStorage";
+} from "@components/organisms/filing";
 import { AppView, TrialBalanceResponse } from "@types";
 import { fetchTrialBalance } from "@utils";
 import { ReportSkeleton } from "../ReportSkeleton";

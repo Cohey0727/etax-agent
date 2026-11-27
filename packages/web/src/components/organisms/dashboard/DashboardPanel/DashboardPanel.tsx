@@ -1,10 +1,7 @@
 import { dashboardFigures, DeductionState, filterYear, isAgricultureEmpty, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Col, Text } from "@components/atoms";
-import {
-  hydrateDeductionStateFromServer,
-  loadDeductionState,
-} from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import { hydrateDeductionStateFromServer, loadDeductionState } from "@components/organisms/filing";
 import { ConsumptionTaxComparison } from "../ConsumptionTaxComparison";
 import { DashboardIncomeSummary } from "../DashboardIncomeSummary";
 

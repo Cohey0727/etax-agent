@@ -1,3 +1,5 @@
+// 部品の index から読むとスタイル（.css.ts）まで読み込み、bun test で使えなくなるため、
+// 変換関数のファイルから直接読む。
 import {
   buildHistoryChanges,
   formatHistoryDateTime,

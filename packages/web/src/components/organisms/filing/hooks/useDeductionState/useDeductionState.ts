@@ -4,7 +4,7 @@ import {
   hydrateDeductionStateFromServer,
   loadDeductionState,
   saveDeductionState,
-} from "../../DeductionPanel/deductionStorage";
+} from "../../DeductionPanel";
 
 /** 申告入力を読み込めなかったときに出す文言。 */
 export const DEDUCTION_STATE_LOAD_FAILED =
