@@ -10,6 +10,7 @@ import { Db, DbOrTx } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import { AnalyzeReceiptResponse, ReceiptResponse } from "../schemas/receipt";
 import { ReceiptRow, receiptsTable } from "./schema";
+import { getTransactionRow } from "./transactionRepository";
 
 /** DB行を API レスポンス形式（snake_case）に変換する。 */
 export function receiptToApi(row: ReceiptRow): ReceiptResponse {
@@ -99,12 +100,14 @@ export async function listReceiptRowsForTransaction(
 /**
  * 証憑を取引へ紐付ける。証憑レコードが無ければ作る
  * （Base64 経路など解析を経ていない fileId でも紐付けられるように）。
+ * 紐付け先は現在のテナントの削除されていない取引に限り、それ以外は null。
  */
 export async function linkReceiptRow(
   db: DbOrTx,
   fileId: string,
   transactionId: number,
 ): Promise<ReceiptRow | null> {
+  if (!(await getTransactionRow(db, transactionId))) return null;
   const existing = await getReceiptRowByFileIdUnscoped(db, fileId);
   if (!existing) {
     const inserted = await db

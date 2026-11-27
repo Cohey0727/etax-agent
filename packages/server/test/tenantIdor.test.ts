@@ -1,5 +1,5 @@
 /**
- * tenantIdor.test.ts — Issue #4（テナント分離 IDOR）の再現テスト。
+ * tenantIdor.test.ts — テナント分離（IDOR）の検証。
  *
  * 固定資産・証憑・取引履歴・CSV指紋について、別テナントからは
  * 「存在しない」として扱われること（取得 null / 更新 null / 削除 false /
@@ -22,6 +22,7 @@ import {
   upsertReceiptExtraction,
 } from "../src/repositories/receiptRepository";
 import {
+  deleteTransactionRow,
   insertTransactionRow,
   listTransactionFingerprintRows,
   listTransactionHistoryRows,
@@ -144,6 +145,36 @@ describe("証憑の所有者分離（IDOR）", () => {
       listReceiptRowsForTransaction(db, txA!.id),
     );
     expect(listForA.length).toBe(1);
+  });
+
+  test("自分の証憑でも、別テナントの取引・削除済みの取引には紐付けられない", async () => {
+    const db = await createTestDb();
+    const userA = await createUser(db, "a@example.com", "password-123");
+    const userB = await createUser(db, "b@example.com", "password-456");
+    const fileId = "123e4567-e89b-12d3-a456-426614174002";
+    const txA = await runWithTenant(userA.id, () => insertTransactionRow(db, txValues));
+
+    // 証憑レコードが無い fileId でも、別テナントの取引への紐付けは作らない
+    const linkedToForeign = await runWithTenant(userB.id, () =>
+      linkReceiptRow(db, fileId, txA!.id),
+    );
+    expect(linkedToForeign).toBeNull();
+    expect(await runWithTenant(userB.id, () => getReceiptRowByFileId(db, fileId))).toBeNull();
+
+    // 自分の証憑を別テナントの取引へ付け替えることもできない
+    const txB = await runWithTenant(userB.id, () => insertTransactionRow(db, txValues));
+    await runWithTenant(userB.id, () => linkReceiptRow(db, fileId, txB!.id));
+    const relinked = await runWithTenant(userB.id, () => linkReceiptRow(db, fileId, txA!.id));
+    expect(relinked).toBeNull();
+    const ownRow = await runWithTenant(userB.id, () => getReceiptRowByFileId(db, fileId));
+    expect(ownRow?.transactionId).toBe(txB!.id);
+
+    // 削除済みの取引には紐付けない
+    await runWithTenant(userB.id, () => deleteTransactionRow(db, txB!.id));
+    const txB2 = await runWithTenant(userB.id, () => insertTransactionRow(db, txValues));
+    await runWithTenant(userB.id, () => linkReceiptRow(db, fileId, txB2!.id));
+    const toDeleted = await runWithTenant(userB.id, () => linkReceiptRow(db, fileId, txB!.id));
+    expect(toDeleted).toBeNull();
   });
 });
 

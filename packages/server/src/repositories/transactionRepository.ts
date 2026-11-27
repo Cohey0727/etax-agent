@@ -111,7 +111,7 @@ async function getActiveTransactionRow(
 }
 
 /** 削除されていない取引を1件取得する（他リポジトリ・ユースケース用）。無ければ null。 */
-export async function getTransactionRow(db: Db, id: number): Promise<TransactionRow | null> {
+export async function getTransactionRow(db: DbOrTx, id: number): Promise<TransactionRow | null> {
   return (await getActiveTransactionRow(db, id)) ?? null;
 }
 
