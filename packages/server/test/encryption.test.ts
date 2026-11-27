@@ -26,18 +26,27 @@ describe("encryptField / decryptField", () => {
     expect(encryptField("123456789012")).not.toBe(encrypted);
   });
 
-  test("鍵が無いと平文のまま（従来のローカル運用）", () => {
+  test("鍵が無いと平文のまま保存・読み出しする", () => {
     delete process.env.ETAX_ENCRYPTION_KEY;
     expect(encryptionEnabled()).toBe(false);
     expect(encryptField("123456789012")).toBe("123456789012");
     expect(decryptField("123456789012")).toBe("123456789012");
   });
 
-  test("既存の平文データは鍵があってもそのまま読める（移行互換）", () => {
+  test("プレフィックスの無い値は鍵があっても平文として読む", () => {
     process.env.ETAX_ENCRYPTION_KEY = KEY;
     expect(decryptField("1234567890123456")).toBe("1234567890123456");
     expect(decryptField("")).toBe("");
     expect(encryptField("")).toBe("");
+  });
+
+  test("暗号文の形をした入力も暗号化され、読み出しで元の値に戻る", () => {
+    process.env.ETAX_ENCRYPTION_KEY = KEY;
+    for (const input of ["enc:v1:1234", "enc:v1:a:b:c"]) {
+      const stored = encryptField(input);
+      expect(stored).not.toBe(input);
+      expect(decryptField(stored)).toBe(input);
+    }
   });
 
   test("鍵が違うと復号に失敗する（改ざん検知）", () => {

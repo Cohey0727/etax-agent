@@ -3,13 +3,12 @@
  *
  * 方式: AES-256-GCM。鍵はサーバー側の環境変数 ETAX_ENCRYPTION_KEY
  * （Base64 の 32 バイト）で管理する（SaaS 運用ではデプロイ基盤の
- * シークレット管理から注入する前提）。鍵が未設定の環境（従来の
- * ローカル運用）では暗号化せず平文のまま読み書きする。
+ * シークレット管理から注入する前提）。鍵が未設定の環境（ローカル運用）
+ * では暗号化せず平文のまま読み書きする。
  *
  * 保存形式: "enc:v1:<iv>:<認証タグ>:<暗号文>"（各 Base64）。
- * プレフィックスの無い値は平文としてそのまま返すため、暗号化を
- * 有効化する前に保存された既存データも読み続けられる（書き込みは
- * 常に暗号化されるので、再保存された行から順に移行する）。
+ * プレフィックスの無い値は平文としてそのまま返す（鍵を設定する前に
+ * 保存された値も読める）。書き込みは鍵があれば常に暗号化する。
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
@@ -31,12 +30,14 @@ export function encryptionEnabled(): boolean {
   return Boolean(process.env.ETAX_ENCRYPTION_KEY);
 }
 
-/** 値を暗号化する。空文字はそのまま、鍵未設定なら平文のまま返す。 */
+/**
+ * 値を暗号化する。空文字はそのまま、鍵未設定なら平文のまま返す。
+ * 入力は利用者の値で、暗号文の形をしていても平文として暗号化する。
+ */
 export function encryptField(plain: string): string {
   if (plain === "") return plain;
   const key = loadKey();
   if (!key) return plain;
-  if (plain.startsWith(PREFIX)) return plain;
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
