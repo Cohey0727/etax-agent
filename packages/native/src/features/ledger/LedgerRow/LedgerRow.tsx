@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { StyleSheet, View } from "react-native";
 import { LedgerTransaction } from "@/api";
 import { AppText, BouncePressable, Chip } from "@/components";
@@ -10,8 +11,8 @@ export interface LedgerRowProps {
   onPress: (row: LedgerTransaction) => void;
 }
 
-/** 帳簿の取引1行。タップで詳細シートを開く。 */
-export function LedgerRow({ row, onPress }: LedgerRowProps) {
+/** 帳簿の取引1行。タップで詳細シートを開く。行が多い帳簿でも再描画を抑えるためメモ化する。 */
+export const LedgerRow = memo(function LedgerRow({ row, onPress }: LedgerRowProps) {
   return (
     <BouncePressable onPress={() => onPress(row)} style={styles.row} pressScale={0.98}>
       <View style={styles.main}>
@@ -28,7 +29,7 @@ export function LedgerRow({ row, onPress }: LedgerRowProps) {
       </AppText>
     </BouncePressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {
