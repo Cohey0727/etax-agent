@@ -53,7 +53,7 @@ export function SelectField<T extends string>({
           {hint}
         </AppText>
       ) : null}
-      <Sheet entry="slide" onClose={() => setOpen(false)} title={label} visible={open}>
+      <Sheet onClose={() => setOpen(false)} title={label} visible={open}>
         <FlatList
           data={[...options]}
           keyExtractor={(item) => item.value}

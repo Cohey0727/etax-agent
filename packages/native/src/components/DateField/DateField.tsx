@@ -78,7 +78,7 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
           {hint}
         </AppText>
       ) : null}
-      <Sheet entry="slide" onClose={() => setOpen(false)} title={label} visible={open}>
+      <Sheet onClose={() => setOpen(false)} title={label} visible={open}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
