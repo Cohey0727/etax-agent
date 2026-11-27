@@ -80,17 +80,37 @@ export function trialBalancePlRows(
   return rows;
 }
 
+/**
+ * 当年と前年の科目の行を合わせる。前年にだけある科目も行に出し（当年は 0）、
+ * 前年の並びでの直前の科目の後ろに置く（決算書の固定行の順を崩さない）。
+ */
 function lineRows(
   section: "revenue" | "expense",
   current: readonly TrialBalanceLine[],
   previous: readonly TrialBalanceLine[],
 ): TrialBalanceComparisonRow[] {
-  return current.map((line) => ({
+  const row = (line: TrialBalanceLine, amounts: { current: number; previous: number }) => ({
     key: `${section}:${line.category}`,
     label: line.category,
-    current: line.amount,
-    previous: previous.find((p) => p.category === line.category)?.amount ?? 0,
-    kind: "line",
+    ...amounts,
+    kind: "line" as const,
     categories: line.categories,
-  }));
+  });
+  const rows: TrialBalanceComparisonRow[] = current.map((line) =>
+    row(line, {
+      current: line.amount,
+      previous: previous.find((p) => p.category === line.category)?.amount ?? 0,
+    }),
+  );
+  let insertAt = 0;
+  for (const line of previous) {
+    const index = rows.findIndex((r) => r.label === line.category);
+    if (index >= 0) {
+      insertAt = index + 1;
+      continue;
+    }
+    rows.splice(insertAt, 0, row(line, { current: 0, previous: line.amount }));
+    insertAt += 1;
+  }
+  return rows;
 }

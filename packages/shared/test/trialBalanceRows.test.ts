@@ -35,4 +35,27 @@ describe("trialBalancePlRows", () => {
     ]);
     expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length);
   });
+
+  test("前年にだけある科目も行に出し、前年の明細の合計が前年の経費計と一致する", () => {
+    const withAd = importCsvText(
+      [
+        "date,description,amount,account,category,income_type",
+        "2024-03-01,開発費用,1000000,事業口座,売上高,business",
+        "2024-04-01,広告出稿,-50000,事業口座,広告宣伝費,business",
+        "2024-05-01,AWS,-20000,事業口座,通信費,business",
+        "2025-03-01,開発費用,1200000,事業口座,売上高,business",
+        "2025-05-01,AWS,-30000,事業口座,通信費,business",
+      ].join("\n"),
+    );
+    const current = buildTrialBalance(withAd, 2025).business;
+    const previous = buildTrialBalance(withAd, 2024).business;
+    const rows = trialBalancePlRows(current, previous);
+    const expenseLines = rows.filter((row) => row.key.startsWith("expense:"));
+    expect(expenseLines.map((row) => [row.label, row.current, row.previous])).toEqual([
+      ["通信費", 30_000, 20_000],
+      ["広告宣伝費", 0, 50_000],
+    ]);
+    expect(expenseLines.reduce((sum, row) => sum + row.previous, 0)).toBe(previous.expenses);
+    expect(expenseLines[1]?.categories).toEqual(["広告宣伝費"]);
+  });
 });
