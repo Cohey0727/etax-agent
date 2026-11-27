@@ -318,7 +318,7 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
     }),
     get_taxpayer_profile: tool({
       description:
-        "指定年の納税者情報（氏名・住所・税務署・インボイス番号など）を返す。対象年に保存が無ければ過去年からの引き継ぎ（carried_from に年が入る）。マイナンバーは外部へ出さない方針のため値は返らず、my_number_registered で登録有無だけが分かる。",
+        "指定年の納税者情報（氏名・住所・税務署・インボイス番号など）を返す。対象年に保存が無ければ過去年からの引き継ぎ（carried_from に年が入る）。マイナンバーと利用者識別番号は外部へ出さない方針のため値は返らず、my_number_registered / user_id_registered で登録有無だけが分かる。",
       inputSchema: z.object({
         year: z.number().int().describe("対象年（西暦）"),
       }),
@@ -327,7 +327,7 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
     }),
     update_taxpayer_profile: tool({
       description:
-        "指定年の納税者情報を更新する。profile には変更する項目だけを snake_case のキーで渡す（name / name_kana / zip_code / address / address_line2 / birth_date / phone / tax_office_name / tax_office_code / my_number / occupation / shop_name / jan1_address / invoice_number / previous_zip_code / previous_address）。未指定の項目は現在の値を維持する。結果の my_number はマスクされ、登録有無だけが返る。",
+        "指定年の納税者情報を更新する。profile には変更する項目だけを snake_case のキーで渡す（name / name_kana / zip_code / address / address_line2 / birth_date / phone / tax_office_name / tax_office_code / my_number / user_id / occupation / shop_name / jan1_address / invoice_number / previous_zip_code / previous_address）。未指定の項目は現在の値を維持する。my_number / user_id は空文字を渡しても消えない。結果の my_number / user_id はマスクされ、登録有無だけが返る。",
       inputSchema: z.object({
         year: z.number().int().describe("対象年（西暦）"),
         profile: z
@@ -335,7 +335,7 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
           .describe("変更する項目（snake_case のキーと値）"),
       }),
       execute: async ({ year, profile }) =>
-        // ログにはマイナンバーの値を残さない（登録有無だけに丸める）
+        // ログにはマイナンバー・利用者識別番号の値を残さない（登録有無だけに丸める）
         runSettings(
           "update_taxpayer_profile",
           {
@@ -344,6 +344,9 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
               ...profile,
               ...(profile.my_number !== undefined
                 ? { my_number: profile.my_number ? "（値あり・マスク）" : "" }
+                : {}),
+              ...(profile.user_id !== undefined
+                ? { user_id: profile.user_id ? "（値あり・マスク）" : "" }
                 : {}),
             },
           },

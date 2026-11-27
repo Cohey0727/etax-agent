@@ -127,16 +127,22 @@ export async function setFilingStatusForAgent(
 }
 
 /**
+ * 外部 LLM へ値を渡さない識別番号（マイナンバーと e-Tax の利用者識別番号）。
+ * アプリの DB 内だけに置き、エージェントには登録有無だけを伝える。
+ */
+const MASKED_TAXPAYER_KEYS = ["my_number", "user_id"] as const;
+
+/**
  * エージェント（外部 LLM）へ返す形に納税者プロフィールを整える。
- * マイナンバーは設計方針どおりアプリの DB 内だけに置き、外部 LLM へは
- * 値そのものを渡さない（登録有無だけを伝える）。ツール結果は呼び出し
- * ログにも残るため、ここで落とすことでログへの混入も防ぐ（Issue #7）。
+ * ツール結果は呼び出しログにも残るため、ここで落とすことでログへの混入も防ぐ。
  */
 export function taxpayerProfileForAgent(profile: TaxpayerProfile) {
   return {
     ...profile,
     my_number: "",
     my_number_registered: profile.my_number !== "",
+    user_id: "",
+    user_id_registered: profile.user_id !== "",
   };
 }
 
@@ -164,11 +170,13 @@ export async function updateTaxpayerProfileForAgent(year: number, patch: Partial
       ? taxpayerProfileToApi(carry)
       : emptyTaxpayerProfile();
   const allowed = new Set(Object.keys(emptyTaxpayerProfile()) as (keyof TaxpayerProfile)[]);
+  const masked: ReadonlySet<string> = new Set(MASKED_TAXPAYER_KEYS);
   const merged: TaxpayerProfile = { ...current };
   for (const [key, value] of Object.entries(patch)) {
-    if (allowed.has(key as keyof TaxpayerProfile) && value !== undefined) {
-      (merged as Record<string, unknown>)[key] = value;
-    }
+    if (!allowed.has(key as keyof TaxpayerProfile) || value === undefined) continue;
+    // マスクした値（空文字）を LLM がそのまま書き戻しても保存値を消さない。
+    if (masked.has(key) && value === "") continue;
+    (merged as Record<string, unknown>)[key] = value;
   }
   const row = await upsertTaxpayerProfileRow(db, year, merged);
   return row
