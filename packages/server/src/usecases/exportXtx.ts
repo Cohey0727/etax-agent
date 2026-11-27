@@ -1,14 +1,20 @@
 /**
  * exportXtx.ts — e-Tax 申告等データ（XTX）出力ユースケース（usecases）。
- * DB不要・ステートレス。計算・組み立て・公式 XSD 検証は
- * services/etax/generateIncomeTaxXtx が行い、入力の不備とスキーマ違反は
- * 400 で返す（検証できない場合は xsd_warning として理由を返す）。
+ * 計算・組み立て・公式 XSD 検証は services/etax/generateIncomeTaxXtx が行い、
+ * 入力の不備とスキーマ違反は 400 で返す（検証できない場合は xsd_warning として
+ * 理由を返す）。DB は必須でなく、fixed_assets を省いたときだけ、DB があれば
+ * 固定資産台帳から減価償却明細を載せる（MCP の export_xtx と同じ）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { GeneratedXtx, generateIncomeTaxXtx } from "../services/etax/generateIncomeTaxXtx";
 import { XtxXsdInvalidError } from "../services/etax/xsdValidator";
-import { XtxInputError, incomeTaxXtxRequestFromWire } from "../services/etax/xtxInputs";
+import { getDb } from "../lib/db";
+import {
+  XtxInputError,
+  depreciationFromLedger,
+  incomeTaxXtxRequestFromWire,
+} from "../services/etax/xtxInputs";
 import {
   ExportXtxRequestSchema,
   ExportXtxResponse,
@@ -21,7 +27,7 @@ export const exportXtxRoute = createRoute({
   path: "/api/etax/export-xtx",
   operationId: "exportXtx",
   tags: ["Etax"],
-  summary: "e-Tax 申告等データ（XTX）の出力（DB不要）",
+  summary: "e-Tax 申告等データ（XTX）の出力（DB不要。fixed_assets を省くと DB の固定資産台帳を使う）",
   request: {
     body: {
       required: true,
@@ -44,7 +50,11 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
   const body = c.req.valid("json");
   let generated: GeneratedXtx;
   try {
-    generated = await generateIncomeTaxXtx(incomeTaxXtxRequestFromWire(body));
+    const request = incomeTaxXtxRequestFromWire(body);
+    const db = body.fixed_assets === undefined ? getDb() : null;
+    generated = await generateIncomeTaxXtx(
+      db ? { ...request, depreciation: await depreciationFromLedger(db, request.filing.year) } : request,
+    );
   } catch (e) {
     if (e instanceof XtxInputError || e instanceof XtxXsdInvalidError) {
       throw new HTTPException(400, { message: e.message });

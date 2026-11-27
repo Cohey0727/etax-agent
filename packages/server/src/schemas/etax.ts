@@ -214,7 +214,10 @@ export const ExportXtxRequestSchema = z
     withholding_tax: z.number(),
     prepaid_tax: z.number(),
     original_third_period_tax: z.number().nullable(),
-    /** 固定資産台帳の資産。決算書・収支内訳書の減価償却明細に反映する */
+    /**
+     * 固定資産台帳の資産。決算書・収支内訳書の減価償却明細に反映する。省略すると、
+     * DB があれば保存済みの固定資産台帳の資産を使う
+     */
     fixed_assets: z.array(XtxFixedAssetSchema).optional(),
     /** 貸借対照表の入力（事業所得分） */
     balance_sheet: BalanceSheetInputSchema.optional(),

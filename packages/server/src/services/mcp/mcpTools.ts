@@ -15,13 +15,10 @@ import { billingEnabled } from "../../gateways/stripeGateway";
 import { errorMessage } from "../../lib/errors";
 import { authRequired } from "../../lib/tenantContext";
 import { hasActivePlan } from "../../repositories/subscriptionRepository";
-import {
-  depreciationDetailRowsForYear,
-  listFixedAssetRows,
-} from "../../repositories/fixedAssetRepository";
 import { ExportConsumptionXtxRequestSchema } from "../../schemas/etax";
 import { generateConsumptionTaxXtx } from "../etax/generateConsumptionTaxXtx";
 import { generateIncomeTaxXtx } from "../etax/generateIncomeTaxXtx";
+import { depreciationFromLedger } from "../etax/xtxInputs";
 import { mcpAssetTools } from "./mcpAssetTools";
 import { mcpBusinessStartTools, savedTaxpayerProfile } from "./mcpBusinessStartTools";
 import { incomeTaxReturnFromArgs, mcpCalcTools } from "./mcpCalcTools";
@@ -215,15 +212,9 @@ export async function dispatchMcpTool(
       case "export_xtx": {
         const db = requireDb();
         const request = await incomeTaxReturnFromArgs(db, args);
-        const depreciation = depreciationDetailRowsForYear(await listFixedAssetRows(db), request.filing.year);
         const generated = await generateIncomeTaxXtx({
           ...request,
-          depreciation:
-            depreciation.business.length > 0 ||
-            depreciation.realEstate.length > 0 ||
-            depreciation.agriculture.length > 0
-              ? depreciation
-              : undefined,
+          depreciation: await depreciationFromLedger(db, request.filing.year),
         });
         return textResult({
           filename: generated.filename,

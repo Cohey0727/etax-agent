@@ -19,6 +19,8 @@ import {
   normalizeSalaryIncomeInput,
   normalizeTransactions,
 } from "@etax/shared";
+import { Db } from "../../lib/db";
+import { depreciationDetailRowsForYear, listFixedAssetRows } from "../../repositories/fixedAssetRepository";
 import { ExportXtxRequest } from "../../schemas/etax";
 
 /** 入力が原因で XTX を組み立てられなかったことを表すエラー（呼び出し側で 400 にする）。 */
@@ -136,6 +138,27 @@ export function depreciationFromWire(
     else business.push(row);
   }
   return { business, realEstate, agriculture };
+}
+
+/**
+ * 固定資産台帳（DB）から対象年の減価償却明細行を組み立てる。その年に償却する
+ * 資産が無ければ undefined。償却計算の失敗は XtxInputError にする。
+ */
+export async function depreciationFromLedger(
+  db: Db,
+  year: number,
+): Promise<IncomeTaxXtxRequest["depreciation"]> {
+  const rows = await listFixedAssetRows(db);
+  let detail: ReturnType<typeof depreciationDetailRowsForYear>;
+  try {
+    detail = depreciationDetailRowsForYear(rows, year);
+  } catch (e) {
+    throw new XtxInputError(
+      `固定資産台帳の減価償却計算に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+  const count = detail.business.length + detail.realEstate.length + detail.agriculture.length;
+  return count > 0 ? detail : undefined;
 }
 
 const BALANCE_SHEET_ACCOUNTS: ReadonlySet<string> = new Set([

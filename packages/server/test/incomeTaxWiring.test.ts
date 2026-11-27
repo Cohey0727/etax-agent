@@ -223,3 +223,71 @@ describe("MCP の XTX 出力は REST と同じ生成・XSD 検証を使う", () 
     expect(result.content[0]?.text).toContain("period_from");
   });
 });
+
+describe("REST の XTX 出力の減価償却明細", () => {
+  const body = (extra: Record<string, unknown>) => ({
+    year: 2025,
+    amendment: false,
+    submission_date: "2026-03-10",
+    taxpayer: TAXPAYER,
+    transactions: [
+      {
+        date: "2025-03-01",
+        year: 2025,
+        description: "売上",
+        amount: 3_000_000,
+        account: "普通預金",
+        category: "売上高",
+        income_type: "business",
+        tax_category: "",
+      },
+    ],
+    deductions: EMPTY_DEDUCTION_INPUTS,
+    tax_credits: EMPTY_TAX_CREDIT_INPUTS,
+    filing_type: "blue65",
+    withholding_tax: 0,
+    prepaid_tax: 0,
+    original_third_period_tax: null,
+    ...extra,
+  });
+
+  beforeEach(async () => {
+    const registered = await call("register_fixed_asset", {
+      name: "台帳のノートPC",
+      acquisition_date: "2025-04-01",
+      cost: 300_000,
+      useful_life_years: 4,
+    });
+    expect(registered.isError).toBeUndefined();
+  });
+
+  test("fixed_assets を送らなければ、MCP と同じく固定資産台帳から明細を載せる", async () => {
+    const r = await requestJson("/api/etax/export-xtx", body({}));
+    expect(r.status).toBe(200);
+    expect(String(r.body.xtx)).toContain("台帳のノートPC");
+    const mcp = await call("export_xtx", { year: 2025, taxpayer: TAXPAYER });
+    expect(String(json(mcp).xtx)).toContain("台帳のノートPC");
+  }, 30_000);
+
+  test("fixed_assets を送ったら、その資産だけを載せる", async () => {
+    const r = await requestJson(
+      "/api/etax/export-xtx",
+      body({
+        fixed_assets: [
+          {
+            name: "送ったカメラ",
+            income_type: "business",
+            acquisition_date: "2025-01-10",
+            cost: 200_000,
+            useful_life_years: 5,
+            method: "straight_line",
+            business_ratio_percent: 100,
+          },
+        ],
+      }),
+    );
+    expect(r.status).toBe(200);
+    expect(String(r.body.xtx)).toContain("送ったカメラ");
+    expect(String(r.body.xtx)).not.toContain("台帳のノートPC");
+  }, 30_000);
+});
