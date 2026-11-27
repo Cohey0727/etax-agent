@@ -9,7 +9,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ACCOUNT_CRITERIA, aggregateIncome, buildTrialBalance, FilingType, XtxBalanceSheetInput } from "@etax/shared";
+import { ACCOUNT_CRITERIA, aggregateIncome, buildTrialBalance, XtxBalanceSheetInput } from "@etax/shared";
 import { billingEnabled } from "../../gateways/stripeGateway";
 import {
   getJevPromptOverride,
@@ -38,6 +38,7 @@ import { buildRegexRulesView } from "../classification/regexRulesView";
 import { validateRegexRules } from "../classification/validateRegexRules";
 import {
   McpToolModule,
+  filingOptionsArg,
   filingTypeProperty,
   ledgerTransactions,
   realEstateScaleProperty,
@@ -341,14 +342,6 @@ export const mcpMetaTools: McpToolModule = {
     get_trial_balance: async (args) => {
       const db = requireDb();
       const year = yearArg(args);
-      const filingType =
-        typeof args["filing_type"] === "string"
-          ? (args["filing_type"] as FilingType)
-          : undefined;
-      const realEstateBusinessScale =
-        typeof args["real_estate_business_scale"] === "boolean"
-          ? args["real_estate_business_scale"]
-          : undefined;
       let balanceSheet: XtxBalanceSheetInput | undefined;
       if (args["balance_sheet"] !== undefined) {
         const parsed = BalanceSheetInputSchema.safeParse(args["balance_sheet"]);
@@ -361,7 +354,7 @@ export const mcpMetaTools: McpToolModule = {
         ...rowsToTransactions(currentRows, year),
         ...rowsToTransactions(previousRows, year - 1),
       ];
-      const options = { filingType, realEstateBusinessScale };
+      const options = filingOptionsArg(args);
       const current = buildTrialBalance(transactions, year, { ...options, balanceSheet });
       const previous = buildTrialBalance(transactions, year - 1, options);
       return textResult({ ...current, previous });

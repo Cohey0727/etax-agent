@@ -141,3 +141,19 @@ describe("XTX・PDF 出力の taxpayer", () => {
     expect(text(result)).toContain("taxpayer");
   });
 });
+
+describe("get_trial_balance の申告の種類", () => {
+  test("不正な filing_type は既定（青色65万円）として扱い、控除と所得を数値で返す", async () => {
+    await call("add_transaction", {
+      date: "2025-02-01",
+      description: "売上 A社",
+      amount: 2_000_000,
+      category: "売上高",
+      income_type: "business",
+    });
+    const result = json(await call("get_trial_balance", { year: 2025, filing_type: "blue_65" }));
+    const business = result["business"] as { blue_deduction: unknown; income: unknown };
+    expect(business.blue_deduction).toBe(650_000);
+    expect(business.income).toBe(1_350_000);
+  });
+});
