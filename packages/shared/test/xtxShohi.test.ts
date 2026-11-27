@@ -263,7 +263,5 @@ describe("summarizeConsumptionTax", () => {
     expect(summary.purchasesIncl8).toBe(54_000);
     expect(summary.unsetCount).toBe(2);
     expect(summary.unsetAmount).toBe(999 + 777);
-    expect(summary.excludedCount).toBe(0);
-    expect(summary.excludedAmount).toBe(0);
   });
 });

@@ -125,13 +125,6 @@ export interface ConsumptionTaxSummary {
   unsetCount: number;
   /** 税区分が未設定の取引の金額合計（符号つき）。 */
   unsetAmount: number;
-  /**
-   * 集計から外した取引の件数。符号が逆の取引（売上の返品・仕入の返金）も
-   * 同じ区分の中で差し引くため、外す取引はなく常に 0。
-   */
-  excludedCount: number;
-  /** 集計から外した取引の金額合計。常に 0。 */
-  excludedAmount: number;
 }
 
 type ConsumptionBucket =
@@ -186,8 +179,6 @@ export function summarizeConsumptionTax(
     purchasesIncl8: 0,
     unsetCount: 0,
     unsetAmount: 0,
-    excludedCount: 0,
-    excludedAmount: 0,
   };
   for (const t of transactions) {
     if (t.year !== year) continue;
