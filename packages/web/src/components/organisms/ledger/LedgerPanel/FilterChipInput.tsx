@@ -1,3 +1,4 @@
+import { isIncomeType } from "@etax/shared";
 import { Input, Select, Text } from "@components/atoms";
 import { MultiSelectFilter } from "@components/molecules";
 import { LedgerFilter } from "./ledgerFilters";
@@ -107,7 +108,7 @@ export const FilterChipInput = ({ filter, years, categories, onChange }: FilterC
           ariaLabel="区分で絞り込み"
           options={INCOME_TYPE_OPTIONS}
           values={filter.values}
-          onChange={(values) => onChange({ ...filter, values })}
+          onChange={(values) => onChange({ ...filter, values: values.filter(isIncomeType) })}
         />
       );
     case "taxCategory":

@@ -1,17 +1,32 @@
-import { normalizeSearchText, taxCategorySignMismatch } from "@etax/shared";
+import { IncomeType, isIncomeType, normalizeSearchText, taxCategorySignMismatch } from "@etax/shared";
 import { useState } from "react";
 import { LedgerTransaction } from "@/api";
-import { INCOME_TYPE_OPTIONS } from "../options";
+
+/** 収支の絞り込み。 */
+export const LedgerSignFilter = {
+  All: "all",
+  Income: "income",
+  Expense: "expense",
+} as const;
+
+export type LedgerSignFilter = (typeof LedgerSignFilter)[keyof typeof LedgerSignFilter];
+
+/** 収支の絞り込みごとの、残す取引の金額の条件。 */
+const signMatches: Record<LedgerSignFilter, (amount: number) => boolean> = {
+  all: () => true,
+  income: (amount) => amount > 0,
+  expense: (amount) => amount < 0,
+};
 
 /** 帳簿の絞り込み条件一式。 */
 export interface LedgerFilters {
   query: string;
   /** 勘定科目（複数選択、空なら絞らない）。 */
   categories: string[];
-  /** 所得区分（"すべて" は絞らない）。 */
-  incomeType: string;
-  /** 収支（"すべて" / "収入" / "支出"）。 */
-  sign: string;
+  /** 所得区分（null は絞らない）。 */
+  incomeType: IncomeType | null;
+  /** 収支。 */
+  sign: LedgerSignFilter;
   periodFrom: string;
   periodTo: string;
   amountMin: string;
@@ -22,17 +37,13 @@ export interface LedgerFilters {
   mismatchOnly: boolean;
 }
 
-const VALID_INCOME_TYPES: readonly string[] = INCOME_TYPE_OPTIONS.map((o) => o.value);
-
 export function useLedgerFilters(initialCategories?: string[], initialIncomeType?: string) {
   const [filters, setFilters] = useState<LedgerFilters>(() => ({
     query: "",
     categories: (initialCategories ?? []).filter((c) => c !== ""),
     incomeType:
-      initialIncomeType && VALID_INCOME_TYPES.includes(initialIncomeType)
-        ? initialIncomeType
-        : "すべて",
-    sign: "すべて",
+      initialIncomeType !== undefined && isIncomeType(initialIncomeType) ? initialIncomeType : null,
+    sign: LedgerSignFilter.All,
     periodFrom: "",
     periodTo: "",
     amountMin: "",
@@ -55,9 +66,8 @@ export function applyLedgerFilters(
   const max = filters.amountMax.trim() === "" ? null : Number(filters.amountMax);
   return rows.filter((row) => {
     if (filters.categories.length > 0 && !filters.categories.includes(row.category)) return false;
-    if (filters.incomeType !== "すべて" && row.income_type !== filters.incomeType) return false;
-    if (filters.sign === "収入" && row.amount <= 0) return false;
-    if (filters.sign === "支出" && row.amount >= 0) return false;
+    if (filters.incomeType !== null && row.income_type !== filters.incomeType) return false;
+    if (!signMatches[filters.sign](row.amount)) return false;
     if (filters.periodFrom && row.date < filters.periodFrom) return false;
     if (filters.periodTo && row.date > filters.periodTo) return false;
     if (min !== null && Number.isFinite(min) && row.amount < min) return false;

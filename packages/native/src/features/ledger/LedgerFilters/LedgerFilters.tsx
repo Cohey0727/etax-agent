@@ -2,7 +2,17 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { AppText, BouncePressable, DateField, Field } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { INCOME_TYPE_OPTIONS } from "../options";
-import { LedgerFilters as LedgerFilterState } from "../LedgerScreen/useLedgerFilters";
+import {
+  LedgerFilters as LedgerFilterState,
+  LedgerSignFilter,
+} from "../LedgerScreen/useLedgerFilters";
+
+/** 収支の絞り込みのチップ（並びは表示順）。 */
+const signFilterChips: readonly { value: LedgerSignFilter; label: string }[] = [
+  { value: LedgerSignFilter.All, label: "収支すべて" },
+  { value: LedgerSignFilter.Income, label: "収入" },
+  { value: LedgerSignFilter.Expense, label: "支出" },
+];
 
 function FilterChip({
   label,
@@ -83,8 +93,8 @@ export function LedgerFilters({ filters, onPatch, categories, taxCategories }: L
           <View style={styles.chipRow}>
             <FilterChip
               label="すべての区分"
-              active={filters.incomeType === "すべて"}
-              onPress={() => onPatch({ incomeType: "すべて" })}
+              active={filters.incomeType === null}
+              onPress={() => onPatch({ incomeType: null })}
             />
             {INCOME_TYPE_OPTIONS.map((o) => (
               <FilterChip
@@ -94,12 +104,12 @@ export function LedgerFilters({ filters, onPatch, categories, taxCategories }: L
                 onPress={() => onPatch({ incomeType: o.value })}
               />
             ))}
-            {["すべて", "収入", "支出"].map((s) => (
+            {signFilterChips.map((chip) => (
               <FilterChip
-                key={s}
-                label={s === "すべて" ? "収支すべて" : s}
-                active={filters.sign === s}
-                onPress={() => onPatch({ sign: s })}
+                key={chip.value}
+                label={chip.label}
+                active={filters.sign === chip.value}
+                onPress={() => onPatch({ sign: chip.value })}
               />
             ))}
           </View>

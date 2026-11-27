@@ -1,4 +1,4 @@
-import { normalizeSearchText, taxCategorySignMismatch } from "@etax/shared";
+import { IncomeType, isIncomeType, normalizeSearchText, taxCategorySignMismatch } from "@etax/shared";
 import { LedgerTransaction } from "@types";
 
 /**
@@ -13,7 +13,7 @@ export type LedgerFilter =
   | { field: "period"; from: string; to: string }
   | { field: "amount"; min: number | null; max: number | null }
   | { field: "category"; values: string[] }
-  | { field: "incomeType"; values: string[] }
+  | { field: "incomeType"; values: IncomeType[] }
   | { field: "taxCategory"; values: string[] }
   | { field: "mismatch" };
 
@@ -138,7 +138,7 @@ export function parseFiltersFromSearch(search: string): { query: string; filters
       case "category":
         return { field, values: params.getAll("cat") };
       case "incomeType":
-        return { field, values: params.getAll("itype") };
+        return { field, values: params.getAll("itype").filter(isIncomeType) };
       case "taxCategory":
         return { field, values: params.getAll("tax") };
       case "mismatch":
