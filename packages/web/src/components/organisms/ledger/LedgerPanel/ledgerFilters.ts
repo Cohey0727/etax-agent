@@ -5,13 +5,13 @@ import { LedgerTransaction } from "@types";
  * ledgerFilters.ts — 帳簿画面のフィルター定義と、URLクエリとの変換。
  *
  * Notion式フィルター1件。項目は1つずつ選んで追加し、同じ項目は1つだけ。
- * 条件の値はすべて文字列で持ち、URLクエリへそのまま出し入れする。
+ * 年度・金額は数値で持ち、指定なしは null。URLクエリとは読み書きのときに変換する。
  * 勘定科目・区分・税区分は複数選択（values が空なら「すべて」）。
  */
 export type LedgerFilter =
-  | { field: "year"; value: string }
+  | { field: "year"; value: number | null }
   | { field: "period"; from: string; to: string }
-  | { field: "amount"; min: string; max: string }
+  | { field: "amount"; min: number | null; max: number | null }
   | { field: "category"; values: string[] }
   | { field: "incomeType"; values: string[] }
   | { field: "taxCategory"; values: string[] }
@@ -42,11 +42,11 @@ export const FILTER_FIELD_LABELS: Record<LedgerFilterField, string> = {
 export const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
   switch (field) {
     case "year":
-      return { field, value: "" };
+      return { field, value: null };
     case "period":
       return { field, from: "", to: "" };
     case "amount":
-      return { field, min: "", max: "" };
+      return { field, min: null, max: null };
     case "category":
       return { field, values: ["未分類"] };
     case "incomeType":
@@ -61,9 +61,7 @@ export const emptyFilter = (field: LedgerFilterField): LedgerFilter => {
 /** 年度フィルターで選ばれている年度（未選択・全年度なら null）。 */
 export const activeYearOf = (filters: readonly LedgerFilter[]): number | null => {
   const yearFilter = filters.find((f) => f.field === "year");
-  if (!yearFilter || yearFilter.field !== "year" || !yearFilter.value) return null;
-  const year = Number(yearFilter.value);
-  return Number.isInteger(year) ? year : null;
+  return yearFilter?.field === "year" ? yearFilter.value : null;
 };
 
 /** 検索・フィルターを適用した表示用の行を作る。 */
@@ -87,16 +85,14 @@ export const filterRows = (
 export function matchesFilter(row: LedgerTransaction, filter: LedgerFilter): boolean {
   switch (filter.field) {
     case "year":
-      return filter.value === "" || row.fiscal_year === Number(filter.value);
+      return filter.value === null || row.fiscal_year === filter.value;
     case "period":
       return (!filter.from || row.date >= filter.from) && (!filter.to || row.date <= filter.to);
-    case "amount": {
-      const min = filter.min.trim() === "" ? null : Number(filter.min);
-      const max = filter.max.trim() === "" ? null : Number(filter.max);
-      if (min !== null && Number.isFinite(min) && row.amount < min) return false;
-      if (max !== null && Number.isFinite(max) && row.amount > max) return false;
-      return true;
-    }
+    case "amount":
+      return (
+        (filter.min === null || row.amount >= filter.min) &&
+        (filter.max === null || row.amount <= filter.max)
+      );
     case "category":
       return filter.values.length === 0 || filter.values.includes(row.category);
     case "incomeType":
@@ -126,7 +122,7 @@ export function parseFiltersFromSearch(search: string): { query: string; filters
     switch (field) {
       case "year": {
         const value = params.get("year") ?? "";
-        return { field, value: /^\d{4}$/.test(value) ? value : "" };
+        return { field, value: /^\d{4}$/.test(value) ? Number(value) : null };
       }
       case "period": {
         const from = params.get("from") ?? "";
@@ -138,7 +134,7 @@ export function parseFiltersFromSearch(search: string): { query: string; filters
         };
       }
       case "amount":
-        return { field, min: params.get("amin") ?? "", max: params.get("amax") ?? "" };
+        return { field, min: amountParam(params, "amin"), max: amountParam(params, "amax") };
       case "category":
         return { field, values: params.getAll("cat") };
       case "incomeType":
@@ -164,15 +160,15 @@ export function buildFilterSearch(query: string, filters: LedgerFilter[]): strin
     for (const filter of filters) {
       switch (filter.field) {
         case "year":
-          if (filter.value) params.set("year", filter.value);
+          if (filter.value !== null) params.set("year", String(filter.value));
           break;
         case "period":
           if (filter.from) params.set("from", filter.from);
           if (filter.to) params.set("to", filter.to);
           break;
         case "amount":
-          if (filter.min) params.set("amin", filter.min);
-          if (filter.max) params.set("amax", filter.max);
+          if (filter.min !== null) params.set("amin", String(filter.min));
+          if (filter.max !== null) params.set("amax", String(filter.max));
           break;
         case "category":
           for (const value of filter.values) params.append("cat", value);
@@ -189,4 +185,11 @@ export function buildFilterSearch(query: string, filters: LedgerFilter[]): strin
     }
   }
   return params.toString();
+}
+
+/** URLクエリの金額の条件。空・数として読めない値は指定なし（null）。 */
+function amountParam(params: URLSearchParams, key: string): number | null {
+  const raw = params.get(key)?.trim() ?? "";
+  const value = Number(raw);
+  return raw === "" || !Number.isFinite(value) ? null : value;
 }

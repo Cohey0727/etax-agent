@@ -28,12 +28,9 @@ export interface InvoiceReconciliationProps {
   onChanged: () => void;
 }
 
-/** 金額入力欄の文字列を整数に読む。空欄は undefined（サーバーの既定値を使う）。 */
-const parseAmount = (text: string): number | undefined => {
-  if (text.trim() === "") return undefined;
-  const value = Number(text);
-  return Number.isFinite(value) ? Math.trunc(value) : undefined;
-};
+/** 金額の入力欄の値（valueAsNumber）。数として読めない入力・空欄は null。 */
+const amountInput = (valueAsNumber: number): number | null =>
+  Number.isNaN(valueAsNumber) ? null : Math.trunc(valueAsNumber);
 
 /**
  * 発行済み請求書の入金消込セクション。
@@ -52,10 +49,11 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
     applyPayment,
     releasePayment,
   } = useReconciliationData(invoice, onChanged);
-  const [selectedTxId, setSelectedTxId] = useState("");
-  const [amountText, setAmountText] = useState("");
-  const [feeText, setFeeText] = useState("");
-  const [discountText, setDiscountText] = useState("");
+  const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
+  // 空欄（null）はサーバーの既定値を使う。
+  const [amount, setAmount] = useState<number | null>(null);
+  const [fee, setFee] = useState<number | null>(null);
+  const [discount, setDiscount] = useState<number | null>(null);
   const [excessAsDeposit, setExcessAsDeposit] = useState(false);
 
   if (loading) {
@@ -68,21 +66,21 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
   const remaining = settlement.remaining_amount;
 
   const submitManual = () => {
-    const transactionId = Number(selectedTxId);
-    if (!Number.isInteger(transactionId) || transactionId <= 0) return;
+    if (selectedTxId === null) return;
+    const transactionId = selectedTxId;
     void (async () => {
       const ok = await applyPayment({
         transaction_id: transactionId,
-        amount: parseAmount(amountText),
-        fee_amount: parseAmount(feeText),
-        discount_amount: parseAmount(discountText),
+        amount: amount ?? undefined,
+        fee_amount: fee ?? undefined,
+        discount_amount: discount ?? undefined,
         treat_excess_as_deposit: excessAsDeposit || undefined,
       });
       if (ok) {
-        setSelectedTxId("");
-        setAmountText("");
-        setFeeText("");
-        setDiscountText("");
+        setSelectedTxId(null);
+        setAmount(null);
+        setFee(null);
+        setDiscount(null);
         setExcessAsDeposit(false);
       }
     })();
@@ -202,8 +200,10 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
             <label className={styles.fieldLabel} htmlFor="recon-transaction">入金取引</label>
             <Select
               id="recon-transaction"
-              value={selectedTxId}
-              onChange={(e) => setSelectedTxId(e.target.value)}
+              value={selectedTxId ?? ""}
+              onChange={(e) =>
+                setSelectedTxId(e.target.value === "" ? null : Number(e.target.value))
+              }
             >
               <option value="">選択してください</option>
               {incomeTransactions.map((tx) => (
@@ -221,8 +221,8 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
               <Input
                 id="recon-amount"
                 type="number"
-                value={amountText}
-                onChange={(e) => setAmountText(e.target.value)}
+                value={amount ?? ""}
+                onChange={(e) => setAmount(amountInput(e.target.valueAsNumber))}
               />
             </div>
             <div>
@@ -232,8 +232,8 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
               <Input
                 id="recon-fee"
                 type="number"
-                value={feeText}
-                onChange={(e) => setFeeText(e.target.value)}
+                value={fee ?? ""}
+                onChange={(e) => setFee(amountInput(e.target.valueAsNumber))}
               />
             </div>
             <div>
@@ -243,8 +243,8 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
               <Input
                 id="recon-discount"
                 type="number"
-                value={discountText}
-                onChange={(e) => setDiscountText(e.target.value)}
+                value={discount ?? ""}
+                onChange={(e) => setDiscount(amountInput(e.target.valueAsNumber))}
               />
             </div>
           </div>
@@ -257,7 +257,7 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
             充当しきれない入金の残りは過入金として預り金にする
           </label>
           <Row justify="end">
-            <Button onClick={submitManual} disabled={busy || selectedTxId === ""}>
+            <Button onClick={submitManual} disabled={busy || selectedTxId === null}>
               消し込む
             </Button>
           </Row>

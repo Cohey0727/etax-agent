@@ -4,7 +4,6 @@ import { Col, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { AppView } from "@types";
 import { downloadLedgerPdf } from "@utils/api";
-import { formatYen } from "@utils/format";
 import { TransactionHistoryDrawer } from "../TransactionHistoryDrawer";
 import { LedgerAddForm } from "./LedgerAddForm";
 import { LedgerSkeleton } from "./LedgerSkeleton";
@@ -181,18 +180,13 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
     0,
   );
 
-  const stats: readonly { label: string; value: string }[] = [
-    { label: "取引件数", value: `${visibleRows.length}件` },
-    { label: "収入", value: formatYen(incomeTotal) },
-    { label: "支出", value: formatYen(expenseTotal) },
-    { label: "差引", value: formatYen(incomeTotal - expenseTotal) },
-  ];
+  const summary = { count: visibleRows.length, income: incomeTotal, expense: expenseTotal };
 
   return (
     <Col gap="lg">
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
       <LedgerToolbar
-        stats={stats}
+        summary={summary}
         downloading={downloading}
         query={query}
         filters={filters}

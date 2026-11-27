@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { Button, Card, Col, Icon, Input, Row, Text } from "@components/atoms";
 import { AppView } from "@types";
+import { formatYen } from "@utils/format";
 import { FilterChip } from "./FilterChip";
 import { FilterChipInput } from "./FilterChipInput";
 import {
@@ -12,7 +13,8 @@ import {
 import styles from "./LedgerPanel.css";
 
 export interface LedgerToolbarProps {
-  stats: readonly { label: string; value: string }[];
+  /** 表示中（絞り込み後）の取引の件数と、収入・支出の合計 */
+  summary: { count: number; income: number; expense: number };
   downloading: boolean;
   query: string;
   filters: readonly LedgerFilter[];
@@ -37,7 +39,7 @@ export interface LedgerToolbarProps {
  * ドロップダウンメニューの開閉はこの部品の中で閉じる（表示だけの状態）。
  */
 export const LedgerToolbar = ({
-  stats,
+  summary,
   downloading,
   query,
   filters,
@@ -169,14 +171,10 @@ export const LedgerToolbar = ({
         </Row>
       </Row>
       <div className={styles.statGrid}>
-        {stats.map((stat) => (
-          <Card key={stat.label}>
-            <Col gap="none">
-              <Text variant="statLabel">{stat.label}</Text>
-              <Text variant="statValue">{stat.value}</Text>
-            </Col>
-          </Card>
-        ))}
+        <LedgerStatCard label="取引件数">{summary.count}件</LedgerStatCard>
+        <LedgerStatCard label="収入">{formatYen(summary.income)}</LedgerStatCard>
+        <LedgerStatCard label="支出">{formatYen(summary.expense)}</LedgerStatCard>
+        <LedgerStatCard label="差引">{formatYen(summary.income - summary.expense)}</LedgerStatCard>
       </div>
       <Row gap="sm" align="center" justify="spaceBetween" wrap>
         <Row gap="sm" align="center" wrap>
@@ -261,3 +259,12 @@ export const LedgerToolbar = ({
     </Col>
   );
 };
+
+const LedgerStatCard = ({ label, children }: { label: string; children: ReactNode }) => (
+  <Card>
+    <Col gap="none">
+      <Text variant="statLabel">{label}</Text>
+      <Text variant="statValue">{children}</Text>
+    </Col>
+  </Card>
+);

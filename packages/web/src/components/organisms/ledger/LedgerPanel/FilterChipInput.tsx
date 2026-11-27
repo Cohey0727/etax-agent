@@ -1,7 +1,12 @@
 import { Input, Select, Text } from "@components/atoms";
 import { MultiSelectFilter } from "@components/molecules";
 import { LedgerFilter } from "./ledgerFilters";
-import { categoryOptionsWith, INCOME_TYPE_OPTIONS, TAX_CATEGORY_OPTIONS } from "./ledgerOptions";
+import {
+  categoryOptionsWith,
+  INCOME_TYPE_OPTIONS,
+  inputNumberOrNull,
+  TAX_CATEGORY_OPTIONS,
+} from "./ledgerOptions";
 import styles from "./LedgerPanel.css";
 
 export interface FilterChipInputProps {
@@ -20,8 +25,10 @@ export const FilterChipInput = ({ filter, years, categories, onChange }: FilterC
       return (
         <Select
           className={styles.chipSelect}
-          value={filter.value}
-          onChange={(e) => onChange({ ...filter, value: e.target.value })}
+          value={filter.value ?? ""}
+          onChange={(e) =>
+            onChange({ ...filter, value: e.target.value === "" ? null : Number(e.target.value) })
+          }
           aria-label="年度で絞り込み"
         >
           <option value="">全年度</option>
@@ -30,7 +37,7 @@ export const FilterChipInput = ({ filter, years, categories, onChange }: FilterC
               {optionYear}年
             </option>
           ))}
-          {filter.value && !years.includes(Number(filter.value)) ? (
+          {filter.value !== null && !years.includes(filter.value) ? (
             <option value={filter.value}>{filter.value}年</option>
           ) : null}
         </Select>
@@ -61,8 +68,10 @@ export const FilterChipInput = ({ filter, years, categories, onChange }: FilterC
           <Input
             type="number"
             className={styles.chipNumber}
-            value={filter.min}
-            onChange={(e) => onChange({ ...filter, min: e.target.value })}
+            value={filter.min ?? ""}
+            onChange={(e) =>
+              onChange({ ...filter, min: inputNumberOrNull(e.target.valueAsNumber) })
+            }
             placeholder="最小"
             aria-label="金額（最小・符号付き）"
           />
@@ -70,8 +79,10 @@ export const FilterChipInput = ({ filter, years, categories, onChange }: FilterC
           <Input
             type="number"
             className={styles.chipNumber}
-            value={filter.max}
-            onChange={(e) => onChange({ ...filter, max: e.target.value })}
+            value={filter.max ?? ""}
+            onChange={(e) =>
+              onChange({ ...filter, max: inputNumberOrNull(e.target.valueAsNumber) })
+            }
             placeholder="最大"
             aria-label="金額（最大・符号付き）"
           />
