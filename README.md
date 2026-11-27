@@ -98,8 +98,8 @@ packages/
   shared/   計算エンジン（taxcalc / ledger / サンプルデータ）と共通型。サーバーと画面の両方が使う
     src/taxcalc.ts   所得集計・青色控除・消費税3方式・修正パイプライン／差分の純粋関数
     src/ledger.ts    内部形式CSV取込・科目推定ルール・集計ヘルパー
-    src/sample.ts    サンプル取引CSV（ Python版 examples と同一内容）と申告JSON
-    test/            bun test（Python版テストの移植）
+    src/sample.ts    サンプル取引CSV（examples/ と同一内容）と申告JSON
+    test/            bun test
   server/   Hono API（CODING_CONVENTIONS_BACKEND.md のレイヤー構成）
     src/index.ts     エントリーポイント（ルート合成・CORS・エラー形式の統一）
     src/routes/      ルート登録のみ（health / calc / transactions / imports / agent /
