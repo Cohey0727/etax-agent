@@ -228,6 +228,8 @@ export interface FetchTrialBalanceRequest {
   real_estate_business_scale?: boolean;
   /** 貸借対照表の入力（保存済みの申告入力からワイヤ形式で渡す）。 */
   balance_sheet?: BalanceSheetWireInput;
+  /** 農業所得の入力（保存済みの申告入力からワイヤ形式で渡す）。 */
+  agriculture?: AgricultureWire;
 }
 
 /* ---------- 資金繰りレポート（GET /api/cash-flow） ---------- */

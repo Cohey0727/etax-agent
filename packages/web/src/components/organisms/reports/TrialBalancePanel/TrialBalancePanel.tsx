@@ -1,7 +1,9 @@
 import {
   IncomeType,
   Transaction,
+  agricultureToWire,
   balanceSheetToWire,
+  isAgricultureEmpty,
   isBalanceSheetEmpty,
 } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
@@ -28,7 +30,7 @@ export interface TrialBalancePanelProps {
  * 残高試算表レポート。帳簿の取引から、XTXの青色申告
  * 決算書と一致する損益計算書・月次推移・前年比較を表示する。
  * 集計はサーバー側の決定的な計算（POST /api/calc/trial-balance）に寄せ、
- * 申告種別と貸借対照表は申告入力（サーバー保存が正、localStorageは
+ * 申告種別・貸借対照表・農業所得は申告入力（サーバー保存が正、localStorageは
  * キャッシュ）を渡して決算書と揃える。
  */
 export const TrialBalancePanel = ({ transactions, year, onNavigate }: TrialBalancePanelProps) => {
@@ -54,6 +56,9 @@ export const TrialBalancePanel = ({ transactions, year, onNavigate }: TrialBalan
             filing.balanceSheet && !isBalanceSheetEmpty(filing.balanceSheet)
               ? balanceSheetToWire(filing.balanceSheet)
               : undefined,
+          agriculture: isAgricultureEmpty(filing.agriculture)
+            ? undefined
+            : agricultureToWire(filing.agriculture),
         });
         if (!cancelled) setReport(result);
       } catch {

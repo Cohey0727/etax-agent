@@ -165,6 +165,22 @@ describe("get_trial_balance の申告の種類", () => {
     expect(business.blue_deduction).toBe(650_000);
     expect(business.income).toBe(1_350_000);
   });
+
+  test("保存済みの申告入力の農業所得を使い、青色申告特別控除を XTX（決算書）と同じに配分する", async () => {
+    await call("add_transaction", {
+      date: "2025-04-01",
+      description: "家賃",
+      amount: 1_200_000,
+      category: "家賃収入",
+      income_type: "real_estate",
+    });
+    const before = json(await call("get_trial_balance", { year: 2025 }));
+    expect((before["real_estate"] as { blue_deduction: unknown }).blue_deduction).toBe(100_000);
+    const saved = await call("save_filing_inputs", { year: 2025, state: { agriculture: { salesAmount: 1_500_000 } } });
+    expect(saved.isError).toBeUndefined();
+    const after = json(await call("get_trial_balance", { year: 2025 }));
+    expect((after["real_estate"] as { blue_deduction: unknown }).blue_deduction).toBe(650_000);
+  });
 });
 
 describe("中核ツールの引数検証", () => {

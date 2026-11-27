@@ -8,7 +8,16 @@
  * /api/agent/chat・/api/classify 系・/api/freee/trial-balance と同じ部品を使う。
  */
 import { readFile } from "node:fs/promises";
-import { ACCOUNT_CRITERIA, aggregateIncome, buildTrialBalance, XtxBalanceSheetInput } from "@etax/shared";
+import {
+  ACCOUNT_CRITERIA,
+  AgricultureInput,
+  DeductionState,
+  aggregateIncome,
+  buildTrialBalance,
+  isAgricultureEmpty,
+  parseDeductionState,
+  XtxBalanceSheetInput,
+} from "@etax/shared";
 import { billingEnabled } from "../../gateways/stripeGateway";
 import {
   getSystemOneOverrides,
@@ -16,12 +25,13 @@ import {
   loadStorageConfig,
   loadSystemOneConfig,
 } from "../../lib/config";
-import { isDatabaseConfigured } from "../../lib/db";
+import { Db, isDatabaseConfigured } from "../../lib/db";
 import { ownerIdForWrite } from "../../lib/tenantContext";
 import { saveJevPromptOverride } from "../../repositories/jevPromptRepository";
 import { saveRegexRulesOverride } from "../../repositories/regexRulesRepository";
 import { settingsFilePath } from "../../repositories/settingsFiles";
 import { getSubscriptionRow } from "../../repositories/subscriptionRepository";
+import { getFilingInputRow } from "../../repositories/filingInputRepository";
 import { listTransactionRows } from "../../repositories/transactionRepository";
 import { BalanceSheetInputSchema } from "../../schemas/etax";
 import { balanceSheetFromWire } from "../etax/xtxInputs";
@@ -47,6 +57,21 @@ import {
   yearArg,
   yearProperty,
 } from "./mcpToolKit";
+
+/** 対象年の保存済みの申告入力にある農業所得の入力。無い・空なら undefined。 */
+async function savedAgriculture(db: Db, year: number): Promise<AgricultureInput | undefined> {
+  const row = await getFilingInputRow(db, year);
+  if (!row) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.state);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null) return undefined;
+  const { agriculture } = parseDeductionState(parsed as Partial<DeductionState>);
+  return isAgricultureEmpty(agriculture) ? undefined : agriculture;
+}
 
 export const mcpMetaTools: McpToolModule = {
   tools: [
@@ -149,7 +174,7 @@ export const mcpMetaTools: McpToolModule = {
     {
       name: "get_trial_balance",
       description:
-        "帳簿の取引から残高試算表（損益計算書＋貸借対照表）を組み立てて返す。前年分も previous に含む（レポート画面の試算表と同じ集計）。貸借対照表セクションは balance_sheet（期首・期末の残高入力）を渡したときだけ付く。",
+        "帳簿の取引から残高試算表（損益計算書＋貸借対照表）を組み立てて返す。前年分も previous に含む（レポート画面の試算表と同じ集計）。当年の青色申告特別控除の配分には、保存済みの申告入力の農業所得を使う。貸借対照表セクションは balance_sheet（期首・期末の残高入力）を渡したときだけ付く。",
       inputSchema: {
         type: "object",
         properties: {
@@ -341,7 +366,11 @@ export const mcpMetaTools: McpToolModule = {
         ...rowsToTransactions(previousRows, year - 1),
       ];
       const options = filingOptionsArg(args);
-      const current = buildTrialBalance(transactions, year, { ...options, balanceSheet });
+      const current = buildTrialBalance(transactions, year, {
+        ...options,
+        balanceSheet,
+        agriculture: await savedAgriculture(db, year),
+      });
       const previous = buildTrialBalance(transactions, year - 1, options);
       return textResult({ ...current, previous });
     },

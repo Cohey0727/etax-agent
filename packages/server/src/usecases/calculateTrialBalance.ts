@@ -1,10 +1,10 @@
 /**
  * calculateTrialBalance.ts — 試算表レポートのユースケース（usecases）。
  * DB不要・ステートレス。帳簿の取引から、XTX の青色申告決算書と数値が一致する
- * 損益計算書・月次推移を返す。前年比較用に前年分も同梱する（貸借対照表は
- * 当年の入力分のみ）。集計そのものは shared の buildTrialBalance が担う。
+ * 損益計算書・月次推移を返す。前年比較用に前年分も同梱する（貸借対照表と
+ * 農業所得は当年の入力分のみ）。集計そのものは shared の buildTrialBalance が担う。
  */
-import { buildTrialBalance, normalizeTransactions, TrialBalance } from "@etax/shared";
+import { agricultureFromWire, buildTrialBalance, normalizeTransactions, TrialBalance } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { ErrorSchema } from "../schemas/common";
 import { CalculateTrialBalanceRequestSchema } from "../schemas/trialBalance";
@@ -55,6 +55,7 @@ export const calculateTrialBalanceHandler: RouteHandler<typeof calculateTrialBal
   const current = buildTrialBalance(transactions, year, {
     ...options,
     balanceSheet: balanceSheetFromWire(body),
+    agriculture: body.agriculture ? agricultureFromWire(body.agriculture) : undefined,
   });
   const previous = buildTrialBalance(transactions, year - 1, options);
   const response: TrialBalanceResponse = { ...current, previous };

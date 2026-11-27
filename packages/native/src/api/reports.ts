@@ -1,7 +1,7 @@
 /**
  * reports.ts — 試算表・資金繰り・freee試算表（実績）のAPI。
  */
-import { BalanceSheetWireInput, FilingType, Transaction } from "@etax/shared";
+import { AgricultureWire, BalanceSheetWireInput, FilingType, Transaction } from "@etax/shared";
 import { apiJson, apiJsonOrNull } from "./client";
 import { CashFlowReport, FreeeTrialBalance, TrialBalanceResponse } from "./types";
 
@@ -11,6 +11,7 @@ export interface FetchTrialBalanceRequest {
   filing_type?: FilingType;
   real_estate_business_scale?: boolean;
   balance_sheet?: BalanceSheetWireInput;
+  agriculture?: AgricultureWire;
 }
 
 /** 試算表レポート（当年＋前年）を計算系APIから取得する。 */

@@ -1,4 +1,10 @@
-import { balanceSheetToWire, IncomeType, isBalanceSheetEmpty } from "@etax/shared";
+import {
+  agricultureToWire,
+  balanceSheetToWire,
+  IncomeType,
+  isAgricultureEmpty,
+  isBalanceSheetEmpty,
+} from "@etax/shared";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { TrialBalanceResponse, fetchTrialBalance } from "@/api";
@@ -43,6 +49,10 @@ export default function ReportsScreen() {
           balance_sheet:
             filing?.balanceSheet && !isBalanceSheetEmpty(filing.balanceSheet)
               ? balanceSheetToWire(filing.balanceSheet)
+              : undefined,
+          agriculture:
+            filing && !isAgricultureEmpty(filing.agriculture)
+              ? agricultureToWire(filing.agriculture)
               : undefined,
         });
         if (!cancelled) setReport(result);
