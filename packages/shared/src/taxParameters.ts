@@ -59,6 +59,8 @@ export interface YearTaxParameters {
   stockSeparateTaxRate: number;
   /** 上場株式等の配当等の申告分離課税の所得税率（No.1330）。株式等と同じ 15%。 */
   listedDividendSeparateTaxRate: number;
+  /** 定額減税（措法41条の3の3）の対象年分か。対象外の年分では入力があっても控除しない。 */
+  flatReductionApplies: boolean;
 }
 
 const INF = Number.POSITIVE_INFINITY;
@@ -146,6 +148,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
+    flatReductionApplies: false,
   },
   2024: {
     basicDeductionTiers: BASIC_TIERS_2023_2024,
@@ -156,6 +159,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     salaryDeductionTiers: SALARY_TIERS_2023_2024,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
+    flatReductionApplies: true,
   },
   2025: {
     // 本則58万円＋令和7・8年分限りの上乗せ特例（措法41条の16の2）
@@ -177,6 +181,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     salaryDeductionTiers: SALARY_TIERS_2025,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
+    flatReductionApplies: false,
   },
   2026: {
     // 令和8年度税制改正後の本則（No.1199）。令和9年分と同額
@@ -189,6 +194,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
+    flatReductionApplies: false,
   },
   2027: {
     // 令和9年分も令和8年分と同額（No.1199）
@@ -200,6 +206,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     salaryDeductionTiers: SALARY_TIERS_2026_2027,
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
+    flatReductionApplies: false,
   },
 };
 

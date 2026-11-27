@@ -511,7 +511,7 @@ export interface TaxCreditInputs {
   foreignTaxPaid: number;
   /** 調整国外所得金額 */
   foreignIncome: number;
-  /** 定額減税額（令和6年分のみ。本人と同一生計配偶者・扶養親族の人数 × ¥30,000） */
+  /** 定額減税額（本人と同一生計配偶者・扶養親族の人数 × ¥30,000）。対象年分以外は控除しない */
   flatReduction: number;
 }
 
@@ -645,7 +645,7 @@ export function foreignTaxCredit(
 
 export interface TaxCreditBreakdown {
   housingLoan: number;
-  /** 定額減税（令和6年分のみ） */
+  /** 定額減税（対象年分以外は 0） */
   flatReduction: number;
   dividend: number;
   politicalDonations: number;
@@ -669,19 +669,23 @@ export interface TaxCreditBreakdown {
  * 外国税額控除の所得税分の限度額は再差引所得税額（定額減税・外国税額控除
  * 以外の税額控除を引いた後）を、復興税分の限度額は基準所得税額（さらに
  * 定額減税を引いた後）の2.1%を基に按分する。
+ * year を渡すと、定額減税は年度パラメータで対象年分の場合だけ控除する。
  */
 export function computeTaxCredits(
   inputs: TaxCreditInputs,
   baseIncomeTax: number,
   taxableIncome: number,
   totalIncome: number,
+  year?: number,
 ): TaxCreditBreakdown {
   const housingLoan = housingLoanCredit(
     inputs.housingLoanBalance,
     inputs.housingLoanLimit,
     inputs.housingLoanRate,
   );
-  const flatReduction = amount(inputs.flatReduction);
+  const flatReductionApplies =
+    year === undefined || taxParametersFor(year).flatReductionApplies;
+  const flatReduction = flatReductionApplies ? amount(inputs.flatReduction) : 0;
   const dividend = dividendCredit(inputs.dividendCorporate, inputs.dividendTrust, taxableIncome);
   let politicalDonations = politicalDonationCredit(inputs.politicalDonations, totalIncome);
   let certifiedNpoDonations = certifiedNpoDonationCredit(inputs.certifiedNpoDonations, totalIncome);
@@ -1118,7 +1122,13 @@ export function computeIncomeTax(options: IncomeTaxOptions): IncomeTaxResult {
   // 配当控除の1,000万円枠の判定に使う課税総所得金額等には、申告分離課税の
   // 課税所得金額も含める（No.1250 の「課税総所得金額等」）。
   const taxableForCredits = taxableIncome + taxableSeparateStocks + taxableSeparateDividends;
-  const taxCredits = computeTaxCredits(options.taxCredits, incomeTaxBase, taxableForCredits, totalIncome);
+  const taxCredits = computeTaxCredits(
+    options.taxCredits,
+    incomeTaxBase,
+    taxableForCredits,
+    totalIncome,
+    year,
+  );
   const taxAfterOtherCredits = Math.max(
     incomeTaxBase - (taxCredits.total - taxCredits.foreignTax),
     0,

@@ -238,6 +238,21 @@ describe("税額控除", () => {
     expect(result.taxCredits.flatReduction).toBe(30_000);
     expect(result.taxCreditsTotal).toBe(30_000);
   });
+  test("定額減税: 対象年分（令和6年分）以外では入力があっても 0", () => {
+    const options = {
+      year: 2025,
+      totalIncome: 5_446_922,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    };
+    const without = computeIncomeTax(options);
+    const withInput = computeIncomeTax({
+      ...options,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS, flatReduction: 30_000 },
+    });
+    expect(withInput.taxCredits.flatReduction).toBe(0);
+    expect(withInput.finalTax).toBe(without.finalTax);
+  });
   test("配当控除: 課税総所得1,000万円以下なら配当20万円 → 2万円", () => {
     expect(dividendCredit(200_000, 0, 7_854_000)).toBe(20_000);
   });
