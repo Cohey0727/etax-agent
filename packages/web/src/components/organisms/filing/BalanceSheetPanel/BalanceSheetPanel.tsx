@@ -57,7 +57,6 @@ export const BalanceSheetPanel = ({
   // 前年の貸借対照表（繰越の提案用）。サーバーの申告入力から読む。
   useEffect(() => {
     let cancelled = false;
-    setPrevious(null);
     void fetchFilingInputs(year - 1).then((res) => {
       if (cancelled || res.status !== "loaded") return;
       const prev = parseDeductionState(res.value as Partial<DeductionState>).balanceSheet;

@@ -45,7 +45,6 @@ export const SubmissionRecordPanel = ({ year, kind }: SubmissionRecordPanelProps
 
   useEffect(() => {
     let cancelled = false;
-    setLoaded(false);
     void fetchFilingSubmissions(year).then((list) => {
       if (cancelled) return;
       if (!list) {
