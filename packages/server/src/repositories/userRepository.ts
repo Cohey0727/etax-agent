@@ -49,9 +49,23 @@ export async function createUser(
   return row;
 }
 
-/** パスワードを照合する。パスワード未設定（OAuth等のみ）のユーザーは常に false。 */
-export async function verifyUserPassword(user: UserRow, password: string): Promise<boolean> {
-  if (!user.passwordHash) return false;
+/** 照合相手がいないときに検証するハッシュ（プロセスで1回だけ作る）。 */
+let dummyPasswordHash: Promise<string> | null = null;
+
+/**
+ * パスワードを照合する。ユーザーが無い・パスワード未設定（OAuth等のみ）の
+ * ときは常に false。その場合も同じハッシュ検証を行い、応答時間の差から
+ * 登録の有無やパスワードの有無が分からないようにする。
+ */
+export async function verifyUserPassword(
+  user: UserRow | undefined,
+  password: string,
+): Promise<boolean> {
+  if (!user?.passwordHash) {
+    dummyPasswordHash ??= Bun.password.hash(randomBytes(16).toString("hex"));
+    await Bun.password.verify(password, await dummyPasswordHash);
+    return false;
+  }
   return Bun.password.verify(password, user.passwordHash);
 }
 

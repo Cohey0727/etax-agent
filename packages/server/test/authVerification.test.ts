@@ -1,15 +1,16 @@
 /**
  * authVerification.test.ts — メール確認基盤と Pre-Account Takeover 対策の検証。
- * Issue #6: 未確認のパスワード登録アカウントへ OAuth/マジックリンクを
- * 統合しても、先行登録者のパスワードで乗っ取れないことを確認する。
+ * 未確認のパスワード登録アカウントへ OAuth/マジックリンクを統合しても、
+ * 先行登録者のパスワードで乗っ取れないことを確認する。
  */
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { createTestDb } from "./testDb";
 import {
   consumeEmailVerificationToken,
   consumeMagicLinkToken,
   createEmailVerificationToken,
   createMagicLinkToken,
+  createPasswordlessUser,
   createUser,
   findOrCreateOAuthUser,
   getUserByEmail,
@@ -63,5 +64,20 @@ describe("マジックリンクの二重消費", () => {
       consumeMagicLinkToken(db, token),
     ]);
     expect(results.filter((r) => r === "race@example.com")).toHaveLength(1);
+  });
+});
+
+describe("パスワード照合の応答時間", () => {
+  test("ユーザーが無い・パスワード未設定でも、照合と同じハッシュ検証を行う", async () => {
+    const db = await createTestDb();
+    const passwordless = await createPasswordlessUser(db, "passwordless@example.com");
+    const verify = spyOn(Bun.password, "verify");
+    try {
+      expect(await verifyUserPassword(undefined, "guess-pass")).toBe(false);
+      expect(await verifyUserPassword(passwordless, "guess-pass")).toBe(false);
+      expect(verify).toHaveBeenCalledTimes(2);
+    } finally {
+      verify.mockRestore();
+    }
   });
 });

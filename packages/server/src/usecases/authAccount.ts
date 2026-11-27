@@ -127,7 +127,7 @@ export const loginHandler: RouteHandler<typeof loginRoute> = async (c) => {
     enforceAccountRateLimit(`login-account:${email}`, ACCOUNT_LOGIN_LIMIT, ACCOUNT_LOGIN_WINDOW_MS);
   }
   const user = email ? await getUserByEmail(db, email) : undefined;
-  if (!user || !(await verifyUserPassword(user, password))) {
+  if (!(await verifyUserPassword(user, password)) || !user) {
     throw new HTTPException(401, { message: "メールアドレスまたはパスワードが違います" });
   }
   // SaaS 運用では、メール確認が済んでいないパスワードアカウントに
