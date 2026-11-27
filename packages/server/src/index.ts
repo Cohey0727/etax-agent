@@ -1,7 +1,7 @@
 /**
  * index.ts — eTaxAgent サーバー（Hono / Bun）のエントリーポイント。
  *
- * 構成（CODING_CONVENTIONS_BACKEND 準拠）:
+ * 構成:
  *   routes/       ルート登録のみ（usecases を組み合わせる）
  *   usecases/     ルート定義＋ハンドラ（1ファイル1ユースケース）
  *   schemas/      Zod スキーマ（@hono/zod-openapi の .openapi 名つき）
@@ -34,7 +34,7 @@
  *   ALL    /mcp                     MCP（外部エージェント連携。認証はユーザーごとの
  *                                   APIトークン（設定画面で発行、Bearer）。認証フロー
  *                                   自体は対象外でトークンが代替する。MCP_TOKEN は
- *                                   従来互換のマスタートークン）
+ *                                   単一テナントのローカル運用向けのマスタートークン）
  *
  * DB は PostgreSQL（DATABASE_URL）で、起動時にテーブルを自己修復する。
  * 起動時は packages/web のビルド成果物（dist）も同一ポートで配信する
@@ -159,7 +159,7 @@ app.use("/api/*", async (c, next) => {
   return c.json({ error: "許可されていない送信元からのリクエストです" }, 403);
 });
 
-// リクエストボディの上限（巨大ボディでのメモリ枯渇を防ぐ、Issue #7）。
+// リクエストボディの上限（巨大ボディでのメモリ枯渇を防ぐ）。
 // CSV 取込・領収書画像の PUT もこの範囲に収まる大きさにしている。
 app.use(
   "/api/*",
@@ -170,7 +170,7 @@ app.use(
 );
 
 // 起動時初期化（テーブル自己修復）はバックグラウンドで進むため、
-// DB を使う初回リクエストが初期化完了前に走ると失敗する（Issue #11）。
+// DB を使う初回リクエストが初期化完了前に走ると失敗する。
 // 完了を短時間だけ待ってから処理する（DB 未設定・疎通確認は待たない）。
 app.use("/api/*", async (c, next) => {
   if (c.req.path !== "/api/health" && isDatabaseConfigured()) {
@@ -295,7 +295,7 @@ app.onError((err, c) => {
   return c.json({ error: "Internal Server Error" }, 500);
 });
 
-// 未マッチ: /api/* は従来どおり JSON 404、それ以外の GET は画面の index.html
+// 未マッチ: /api/* は JSON の 404、それ以外の GET は画面の index.html
 // （SPA フォールバック。dist が無い環境では JSON 404 のまま）。
 app.notFound(async (c) => {
   if (!c.req.path.startsWith("/api/") && c.req.method === "GET") {
@@ -312,9 +312,9 @@ app.notFound(async (c) => {
 const port = Number(process.env.PORT ?? 3001);
 console.log(`eTaxAgent server listening on http://localhost:${port}`);
 
-// 暗号化ガード（Issue #7）: SaaS 運用（認証必須）では機微項目
-// （マイナンバー・TOTP 秘密）を平文で保存しないため、鍵が無ければ
-// 起動を止める。単一ユーザーのローカル運用では従来互換のため警告に留める。
+// 暗号化ガード: SaaS 運用（認証必須）では機微項目（マイナンバー・TOTP 秘密）を
+// 平文で保存しないため、鍵が無ければ起動を止める。単一ユーザーのローカル運用は
+// 鍵なしでも動かせるよう、警告に留める。
 if (!encryptionEnabled()) {
   if (authRequired()) {
     console.error(
@@ -339,7 +339,7 @@ void (async () => {
       console.log("帳簿DBのテーブルを確認しました");
       const knowledgeCount = await seedTaxKnowledge();
       console.log(`税務知識ベースを準備しました（${knowledgeCount}件）`);
-      // 期限切れセッション/トークンの掃除（起動時＋1時間ごと。Issue #11）。
+      // 期限切れセッション/トークンの掃除（起動時＋1時間ごと）。
       const db = getDb();
       if (db) {
         await deleteExpiredAuthRows(db).catch(() => 0);

@@ -1,6 +1,5 @@
 /**
  * getFilingReceiptContent.ts — 受信通知PDFの取得ユースケース（usecases）。
- * Issue #28 Phase 1。
  *
  * 提出の記録に紐づくファイルだけを配信する（台帳に無いファイルIDは
  * 引けない構造で、他テナントの受信通知も存在しないものとして扱う）。

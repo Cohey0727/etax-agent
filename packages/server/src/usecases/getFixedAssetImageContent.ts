@@ -42,7 +42,7 @@ export const getFixedAssetImageContentHandler: RouteHandler<
 > = async (c) => {
   const { fileId } = c.req.valid("param");
   // テナント文脈がある場合は、台帳で所有者を確認できたファイルだけを
-  // 配信する（画像の IDOR を塞ぐ）。文脈が無いローカル運用では従来どおり。
+  // 配信する（画像の IDOR を塞ぐ）。文脈が無いローカル運用では確かめない。
   if (currentUserId() !== undefined) {
     const db = getDb();
     const row = db ? await getFixedAssetImageRowByFileId(db, fileId) : null;
@@ -52,7 +52,7 @@ export const getFixedAssetImageContentHandler: RouteHandler<
   const downloaded = await storage.download(fixedAssetObjectKey(fileId));
   const bytes = Buffer.from(downloaded.dataBase64, "base64");
   // 配信タイプはホワイトリストで検証し、nosniff と CSP sandbox で
-  // ブラウザ側の解釈を封じる（Stored XSS 対策、Issue #7）。
+  // ブラウザ側の解釈を封じる（Stored XSS 対策）。
   return c.body(bytes, 200, {
     "Content-Type": servedContentType(downloaded.mimeType),
     "X-Content-Type-Options": "nosniff",

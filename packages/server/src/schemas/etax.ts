@@ -64,7 +64,7 @@ export const SalaryIncomeSchema = z
 
 export type SalaryIncomeRequest = z.infer<typeof SalaryIncomeSchema>;
 
-/** 一時所得の入力（ワイヤ形式、Issue #27 Phase A） */
+/** 一時所得の入力（ワイヤ形式） */
 export const TempIncomeWireSchema = z
   .object({
     revenue: z.number(),
@@ -72,7 +72,7 @@ export const TempIncomeWireSchema = z
   })
   .openapi("TempIncomeWire");
 
-/** 配当所得の入力（ワイヤ形式、Issue #27 Phase B）。listed_mode は上場配当等全体の課税方式。 */
+/** 配当所得の入力（ワイヤ形式）。listed_mode は上場配当等全体の課税方式。 */
 export const DividendIncomeWireSchema = z
   .object({
     listed_revenue: z.number(),
@@ -86,7 +86,7 @@ export const DividendIncomeWireSchema = z
   })
   .openapi("DividendIncomeWire");
 
-/** 株式等譲渡の区分（一般／上場）入力（ワイヤ形式、Issue #27 Phase C） */
+/** 株式等譲渡の区分（一般／上場）入力（ワイヤ形式） */
 export const StockTransferCategoryWireSchema = z
   .object({
     revenue: z.number(),
@@ -97,7 +97,7 @@ export const StockTransferCategoryWireSchema = z
   })
   .openapi("StockTransferCategoryWire");
 
-/** 特定口座（源泉徴収口座）の明細行（ワイヤ形式、Issue #27 Phase C） */
+/** 特定口座（源泉徴収口座）の明細行（ワイヤ形式） */
 export const SpecialAccountWireSchema = z
   .object({
     broker_name: z.string(),
@@ -109,7 +109,7 @@ export const SpecialAccountWireSchema = z
   })
   .openapi("SpecialAccountWire");
 
-/** 株式等譲渡の入力（ワイヤ形式、Issue #27 Phase C） */
+/** 株式等譲渡の入力（ワイヤ形式） */
 export const StockTransferWireSchema = z
   .object({
     general: StockTransferCategoryWireSchema,
@@ -119,7 +119,7 @@ export const StockTransferWireSchema = z
   })
   .openapi("StockTransferWire");
 
-/** 拡張所得の入力（配当・一時・株式等譲渡、ワイヤ形式、Issue #27） */
+/** 拡張所得の入力（配当・一時・株式等譲渡、ワイヤ形式） */
 export const ExpandedIncomeWireSchema = z
   .object({
     temp: TempIncomeWireSchema,
@@ -130,7 +130,7 @@ export const ExpandedIncomeWireSchema = z
 
 export type ExpandedIncomeWireRequest = z.infer<typeof ExpandedIncomeWireSchema>;
 
-/** 農業所得の入力（ワイヤ形式、Issue #24） */
+/** 農業所得の入力（ワイヤ形式） */
 export const AgricultureWireSchema = z
   .object({
     farm_name: z.string(),
@@ -203,9 +203,9 @@ export const ExportXtxRequestSchema = z
     tax_credits: TaxCreditInputsSchema,
     misc_income: MiscIncomeSchema.optional(),
     salary_income: SalaryIncomeSchema.optional(),
-    /** 配当・一時・株式等譲渡の入力（Issue #27）。源泉徴収税額は拡張分を自動加算する */
+    /** 配当・一時・株式等譲渡の入力。源泉徴収税額は拡張分を自動加算する */
     expanded_income: ExpandedIncomeWireSchema.optional(),
-    /** 農業所得の入力（Issue #24）。農業様式（KOA240/KOA120）を添付する */
+    /** 農業所得の入力。農業様式（KOA240/KOA120）を添付する */
     agriculture: AgricultureWireSchema.optional(),
     filing_type: z.enum(["blue65", "blue55", "blue10", "white"]).optional(),
     real_estate_business_scale: z.boolean().optional(),

@@ -1,6 +1,5 @@
 /**
  * deleteFilingSubmission.ts — 提出の記録を削除する（usecases）。DB必須。
- * Issue #28 Phase 1。
  *
  * 記録の行と受信通知PDFの実体を消す。変更履歴（filing_submission_history）
  * には削除前後のスナップショットが残るため、消した事実と内容は後から

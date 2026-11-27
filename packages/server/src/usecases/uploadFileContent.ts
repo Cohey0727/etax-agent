@@ -27,7 +27,7 @@ export const uploadFileContentHandler = async (c: Context) => {
     return c.json({ error: "ファイルキーが指定されていません" }, 400);
   }
   // 実際に送られた Content-Type を検証する。presign の申告だけを信じると、
-  // 画像と偽って HTML を置き、自オリジン配信で Stored XSS になる（Issue #7）。
+  // 画像と偽って HTML を置き、自オリジン配信で Stored XSS になる。
   // PDF は受信通知のキー配下に限って許可する（他の配下では画像のみ）。
   const contentType = normalizeContentType(c.req.header("content-type"));
   const allowed =

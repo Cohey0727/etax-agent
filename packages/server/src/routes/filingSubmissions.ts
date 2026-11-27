@@ -1,6 +1,6 @@
 /**
  * filingSubmissions.ts — 提出の記録ルートの登録（routes: 登録のみ、
- * ロジックは持たない）。Issue #28 Phase 1。
+ * ロジックは持たない）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {

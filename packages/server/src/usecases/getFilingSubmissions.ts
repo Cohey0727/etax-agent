@@ -1,6 +1,6 @@
 /**
  * getFilingSubmissions.ts — 対象年の提出の記録を取得する（usecases）。
- * DB必須。Issue #28 Phase 1。
+ * DB必須。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { requireDb } from "../lib/errors";

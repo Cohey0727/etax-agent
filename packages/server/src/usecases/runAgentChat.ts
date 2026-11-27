@@ -3,9 +3,8 @@
  *
  * 処理の本体は services/agent/executeAgentChat（MCP の agent_chat ツールと
  * 共用）。ボディ検証は本体側で行う: 設定読込（500）とキー未設定（503）を
- * バリデーションの 400 より先に返す従来順序を保つため（ルート定義に
- * ボディは置かない）。ここはルート定義と、本体の失敗を HTTP ステータスへ
- * 変換する薄いハンドラだけを持つ。
+ * バリデーションの 400 より先に返すため（ルート定義にボディは置かない）。
+ * 本体の失敗（AgentChatError）は app.onError が HTTP ステータスへ変換する。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { readJsonBody } from "../lib/readJsonBody";

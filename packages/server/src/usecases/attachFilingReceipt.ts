@@ -1,6 +1,6 @@
 /**
  * attachFilingReceipt.ts — 受信通知PDFを提出の記録へ添付する（usecases）。
- * DB必須。Issue #28 Phase 1。
+ * DB必須。
  *
  * PDFの実体は署名付きURLでブラウザからストレージへ直接アップロード済み。
  * ここでは実在を HEAD で確認し、形式が PDF であることを検証してから

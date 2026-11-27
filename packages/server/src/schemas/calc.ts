@@ -1,7 +1,7 @@
 /**
  * calc.ts — 計算系エンドポイント（集計・消費税・修正申告の差分）のスキーマ（schemas）。
  *
- * リクエストの transactions / year は、従来どおり寛容に受ける
+ * リクエストの transactions / year は寛容に受ける
  * （正規化は @etax/shared の normalizeTransactions が担い、year は
  * 数値のときだけ採用する）。そのため該当フィールドは z.unknown() とし、
  * 検証で弾くのは「JSONオブジェクトでないボディ」だけに留める。
@@ -195,7 +195,7 @@ export const TaxCreditInputsSchema = z
   })
   .openapi("TaxCreditInputs");
 
-/** 一時所得の入力（Issue #27 Phase A） */
+/** 一時所得の入力 */
 export const TempIncomeInputSchema = z
   .object({
     revenue: z.number(),
@@ -203,7 +203,7 @@ export const TempIncomeInputSchema = z
   })
   .openapi("TempIncomeInput");
 
-/** 配当所得の入力（Issue #27 Phase B）。listedMode は上場配当等全体の課税方式。 */
+/** 配当所得の入力。listedMode は上場配当等全体の課税方式。 */
 export const DividendIncomeInputSchema = z
   .object({
     listedRevenue: z.number(),
@@ -217,7 +217,7 @@ export const DividendIncomeInputSchema = z
   })
   .openapi("DividendIncomeInput");
 
-/** 株式等譲渡の区分（一般／上場）入力（Issue #27 Phase C） */
+/** 株式等譲渡の区分（一般／上場）入力 */
 export const StockTransferCategoryInputSchema = z
   .object({
     revenue: z.number(),
@@ -228,7 +228,7 @@ export const StockTransferCategoryInputSchema = z
   })
   .openapi("StockTransferCategoryInput");
 
-/** 特定口座（源泉徴収口座）の明細行（Issue #27 Phase C） */
+/** 特定口座（源泉徴収口座）の明細行 */
 export const SpecialAccountInputSchema = z
   .object({
     brokerName: z.string(),
@@ -240,7 +240,7 @@ export const SpecialAccountInputSchema = z
   })
   .openapi("SpecialAccountInput");
 
-/** 株式等譲渡の入力（Issue #27 Phase C） */
+/** 株式等譲渡の入力 */
 export const StockTransferInputSchema = z
   .object({
     general: StockTransferCategoryInputSchema,
@@ -250,7 +250,7 @@ export const StockTransferInputSchema = z
   })
   .openapi("StockTransferInput");
 
-/** 拡張所得の入力（配当・一時・株式等譲渡、Issue #27） */
+/** 拡張所得の入力（配当・一時・株式等譲渡） */
 export const ExpandedIncomeInputSchema = z
   .object({
     temp: TempIncomeInputSchema,
@@ -259,7 +259,7 @@ export const ExpandedIncomeInputSchema = z
   })
   .openapi("ExpandedIncomeInput");
 
-/** 農業所得の入力（内部形式・camelCase、Issue #24） */
+/** 農業所得の入力（内部形式・camelCase） */
 export const AgricultureInputSchema = z
   .object({
     farmName: z.string(),
@@ -412,7 +412,7 @@ export const AgricultureExpenseRowSchema = z
   })
   .openapi("AgricultureExpenseRow");
 
-/** 農業所得の決算書計算内訳（Issue #24） */
+/** 農業所得の決算書計算内訳 */
 export const AgricultureStatementSchema = z
   .object({
     farmName: z.string(),

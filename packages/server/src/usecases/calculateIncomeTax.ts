@@ -50,7 +50,7 @@ export const calculateIncomeTaxHandler: RouteHandler<typeof calculateIncomeTaxRo
   const expanded = body.expandedIncome
     ? computeExpandedIncomes(normalizeExpandedIncomeInput(body.expandedIncome))
     : undefined;
-  // 農業所得（Issue #24）: 決算書の計算内訳を返す。農業所得そのものは
+  // 農業所得: 決算書の計算内訳を返す。農業所得そのものは
   // 事業所得の一部として totalIncome に含めて渡される前提（青色申告
   // 特別控除の配分は申告数値の計算側で行う）。
   const agriculture = body.agriculture

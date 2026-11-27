@@ -38,7 +38,7 @@ export const getReceiptContentHandler: RouteHandler<typeof getReceiptContentRout
   // テナント文脈がある場合（SaaS）は、証憑台帳で所有者を確認できた
   // ファイルだけを配信する。他テナントの証憑・台帳に無いファイルは
   // 存在しないものとして 404 にする（画像の IDOR を塞ぐ）。
-  // 文脈が無いローカル運用では従来どおり配信する。
+  // 文脈が無いローカル運用では所有者を確かめずに配信する。
   if (currentUserId() !== undefined) {
     const db = getDb();
     const row = db ? await getReceiptRowByFileId(db, fileId) : null;
@@ -48,7 +48,7 @@ export const getReceiptContentHandler: RouteHandler<typeof getReceiptContentRout
   const downloaded = await storage.download(receiptObjectKey(fileId));
   const bytes = Buffer.from(downloaded.dataBase64, "base64");
   // 配信タイプはホワイトリストで検証し、nosniff と CSP sandbox で
-  // ブラウザ側の解釈を封じる（Stored XSS 対策、Issue #7）。
+  // ブラウザ側の解釈を封じる（Stored XSS 対策）。
   return c.body(bytes, 200, {
     "Content-Type": servedContentType(downloaded.mimeType),
     "X-Content-Type-Options": "nosniff",

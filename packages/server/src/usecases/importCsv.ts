@@ -2,8 +2,8 @@
  * importCsv.ts — CSV取込ユースケース（usecases）。
  *
  * リクエストは生バイト（text/csv 等）または JSON（content / contentBase64）の
- * 2形式を受けるため、ルート定義にボディスキーマは置かず、従来どおり
- * ハンドラで読み取る。列マッピングは自動判定（services/csvImport）。
+ * 2形式を受けるため、ルート定義にボディスキーマは置かず、ハンドラで
+ * 読み取る。列マッピングは自動判定（services/csvImport）。
  * DBがあれば取込履歴と取引を保存し、無ければプレビューとして返す。
  */
 import { parseCsv } from "@etax/shared";

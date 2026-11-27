@@ -1,6 +1,6 @@
 /**
  * getFilingSubmissionHistory.ts — 対象年の提出の記録の変更履歴を取得する
- * （usecases）。DB必須。Issue #20 Phase 0（JIIMA 自己点検対応）。
+ * （usecases）。DB必須。
  *
  * 電子帳簿保存法の訂正・削除履歴を画面から参照するための読み取り専用
  * エンドポイント。履歴は新しい順に返す。

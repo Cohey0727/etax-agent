@@ -1,6 +1,6 @@
 /**
  * filingSubmission.ts — 提出の記録（受付番号・受信通知PDF）エンドポイントの
- * スキーマ（schemas）。Issue #28 Phase 1。
+ * スキーマ（schemas）。
  *
  * 記録は年度×税目（income = 所得税 / consumption = 消費税）ごとに1件。
  * 受付番号が記録されると申告ステータスの「提出済み」と連動する。

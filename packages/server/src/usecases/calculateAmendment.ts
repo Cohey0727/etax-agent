@@ -36,7 +36,7 @@ export const calculateAmendmentRoute = createRoute({
 });
 
 /**
- * バリデーション失敗時の文言を従来どおりに決める。
+ * バリデーション失敗時の文言を決める。
  * original / corrected の不備はその旨、それ以外（JSONとして読めない等）はボディ不備。
  */
 export function calculateAmendmentValidationMessage(issuePaths: string[]): string {

@@ -2,7 +2,7 @@
  * createTransaction.ts — 取引登録ユースケース（usecases）。DB必須。
  *
  * ボディ検証はハンドラ側で行う: DB未設定時の 503 を、バリデーションの
- * 400 より先に返す従来順序を保つため（ルート定義にボディは置かない）。
+ * 400 より先に返すため（ルート定義にボディは置かない）。
  * スキーマ自体は schemas/transaction.ts の CreateTransactionRequestSchema。
  */
 import { normalizeBusinessRatio } from "@etax/shared";
@@ -73,7 +73,7 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
       ? body.fiscal_year
       : Number(date.slice(0, 4));
   // 取引の登録と証憑の同時紐付けは1トランザクションで行う
-  // （紐付けだけ失敗して取引が残る不整合を防ぐ。Issue #11）。
+  // （紐付けだけ失敗して取引が残る不整合を防ぐ）。
   const amount = Math.trunc(body.amount);
   const row = await db.transaction(async (tx) => {
     const inserted = await insertTransactionRowWith(tx, {

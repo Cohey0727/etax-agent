@@ -73,7 +73,7 @@ export const InvoiceSchema = z
     issuer: InvoiceIssuerSchema.nullable(),
     lines: z.array(InvoiceLineSchema),
     totals: InvoiceTotalsSchema,
-    /** 入金消込の状態（Issue #17）。下書きは null */
+    /** 入金消込の状態。下書きは null */
     payment_status: z.enum(["unpaid", "partial", "paid"]).nullable(),
     /** 消込済み額（差額調整を含む）。 */
     settled_amount: z.number(),

@@ -6,7 +6,7 @@
  * 画像の受け取りは2経路:
  *   1. fileId: アップロード受け口URLでローカル保存済みのもの。
  *      サーバーが内部エンドポイントから取得する。
- *   2. imageBase64 + mimeType: 従来経路（ストレージ未設定時のフォールバック）。
+ *   2. imageBase64 + mimeType: 画像を直接渡す（ストレージ未設定時のフォールバック）。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { getDb } from "../lib/db";

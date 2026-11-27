@@ -1,9 +1,9 @@
 /**
  * updateTransaction.ts — 取引更新ユースケース（usecases）。DB必須。
  *
- * ボディ検証はハンドラ側で行う: DB未設定時の 503 と id 不正の 400 を
- * 従来順序で返すため（ルート定義にボディは置かない）。
- * 指定されたフィールドだけを更新する（従来どおりの部分更新）。
+ * ボディ検証はハンドラ側で行う: DB未設定時の 503 をボディ不正の 400 より
+ * 先に返すため（ルート定義にボディは置かない）。
+ * 指定されたフィールドだけを更新する（部分更新）。
  */
 import { normalizeBusinessRatio } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";

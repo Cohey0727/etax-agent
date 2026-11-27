@@ -6,7 +6,7 @@
  * スペックを GET /openapi.json で返す（「全 API = OpenAPI = MCP」の
  * OpenAPI 側の公開口）。スキーマ定義そのものが正本で、ここは写すだけ。
  * 認証は付けない: スペックは API の形だけを公開し、実データは含まない
- * （各 API の認証は従来どおり）。
+ * （各 API の認証はそれぞれのミドルウェアが行う）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Context } from "hono";

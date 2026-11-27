@@ -1,6 +1,6 @@
 /**
  * saveFilingSubmission.ts — 提出の記録（受付番号・提出日）を保存する
- * （usecases）。DB必須。Issue #28 Phase 1。
+ * （usecases）。DB必須。
  *
  * 受付番号が記録されたら、申告ステータスの「提出済み（submitted）」を
  * 立てる（表示との連動）。受付番号を空にしても提出済みは自動では
