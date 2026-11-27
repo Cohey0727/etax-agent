@@ -66,3 +66,34 @@ describe("add_transaction / update_transaction の学習の記録", () => {
     expect(rows[0]?.category).toBe("雑費");
   });
 });
+
+describe("register_fixed_asset の入力検証", () => {
+  const base = {
+    name: "PC",
+    acquisition_date: "2024-01-10",
+    cost: 300_000,
+    useful_life_years: 4,
+  };
+
+  test("REST と同じく範囲外・小数の事業専用割合や不正な日付は登録しない", async () => {
+    for (const extra of [
+      { business_ratio_percent: 150 },
+      { business_ratio_percent: 50.5 },
+      { service_start_date: "abc" },
+      { income_type: "other" },
+    ]) {
+      const result = await call("register_fixed_asset", { ...base, ...extra });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain("固定資産の入力が不正です");
+    }
+    const listed = json(await call("list_fixed_assets", {}));
+    expect(listed["assets"]).toEqual([]);
+  });
+
+  test("正しい入力は登録でき、減価償却も計算できる", async () => {
+    const result = await call("register_fixed_asset", { ...base, business_ratio_percent: 60 });
+    expect(result.isError).toBeUndefined();
+    const depreciation = await call("get_depreciation", { year: 2025 });
+    expect(depreciation.isError).toBeUndefined();
+  });
+});

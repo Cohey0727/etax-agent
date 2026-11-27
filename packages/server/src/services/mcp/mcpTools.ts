@@ -87,6 +87,7 @@ import { mcpProfileTools } from "./mcpProfileTools";
 import { mcpSubmissionTools } from "./mcpSubmissionTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { ExportXtxRequest } from "../../schemas/etax";
+import { CreateFixedAssetRequestSchema } from "../../schemas/fixedAsset";
 
 export type { McpToolDef, McpToolResult } from "./mcpToolKit";
 import type { McpToolDef, McpToolHandler, McpToolModule, McpToolResult } from "./mcpToolKit";
@@ -405,14 +406,19 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
         income_type: { type: "string", enum: ["business", "real_estate", "agriculture"], description: "所得区分（既定 business）" },
         acquisition_date: { type: "string", description: "取得年月日（YYYY-MM-DD）" },
         service_start_date: { type: "string", description: "事業供用年月日（任意、省略時は取得日）" },
-        cost: { type: "number", description: "取得価額（円）" },
-        useful_life_years: { type: "number", description: "耐用年数（年）" },
+        cost: { type: "integer", description: "取得価額（円、正の整数）" },
+        useful_life_years: { type: "integer", description: "耐用年数（年、1以上の整数）" },
         method: {
           type: "string",
           enum: ["straight_line", "declining_balance", "lump_sum", "small_special"],
           description: "償却方法（既定 straight_line）",
         },
-        business_ratio_percent: { type: "number", description: "事業専用割合 0〜100（既定100）" },
+        business_ratio_percent: {
+          type: "integer",
+          minimum: 0,
+          maximum: 100,
+          description: "事業専用割合 0〜100の整数（既定100）",
+        },
       },
       required: ["name", "acquisition_date", "cost", "useful_life_years"],
     },
@@ -997,39 +1003,24 @@ export async function dispatchMcpTool(
       }
       case "register_fixed_asset": {
         const db = requireDb();
-        const name = args["name"];
-        const acquisitionDate = args["acquisition_date"];
-        const cost = args["cost"];
-        const life = args["useful_life_years"];
-        if (typeof name !== "string" || !name) throw new Error("name（資産の名称）が必要です");
-        if (typeof acquisitionDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(acquisitionDate)) {
-          throw new Error("acquisition_date は YYYY-MM-DD 形式で指定してください");
+        const parsed = CreateFixedAssetRequestSchema.safeParse(args);
+        if (!parsed.success) {
+          throw new Error(
+            "固定資産の入力が不正です（取得価額・耐用年数は正の整数、事業専用割合は0〜100の整数、日付は YYYY-MM-DD）",
+          );
         }
-        if (typeof cost !== "number" || !(cost > 0)) throw new Error("cost（取得価額）が必要です");
-        if (typeof life !== "number" || !(life >= 1)) throw new Error("useful_life_years（耐用年数）が必要です");
-        const method =
-          typeof args["method"] === "string" ? args["method"] : "straight_line";
-        if (!["straight_line", "declining_balance", "lump_sum", "small_special"].includes(method)) {
-          throw new Error("method が不正です");
-        }
+        const body = parsed.data;
         const row = await insertFixedAssetRow(db, {
-          name,
-          quantity: typeof args["quantity"] === "string" ? args["quantity"] : "",
-          incomeType:
-            args["income_type"] === "real_estate"
-              ? "real_estate"
-              : args["income_type"] === "agriculture"
-                ? "agriculture"
-                : "business",
-          acquisitionDate,
-          serviceStartDate:
-            typeof args["service_start_date"] === "string" ? args["service_start_date"] : null,
-          cost: Math.trunc(cost),
-          usefulLifeYears: Math.trunc(life),
-          method,
-          businessRatioPercent:
-            typeof args["business_ratio_percent"] === "number" ? args["business_ratio_percent"] : 100,
-          disposedDate: null,
+          name: body.name,
+          quantity: body.quantity ?? "",
+          incomeType: body.income_type ?? "business",
+          acquisitionDate: body.acquisition_date,
+          serviceStartDate: body.service_start_date ?? null,
+          cost: body.cost,
+          usefulLifeYears: body.useful_life_years,
+          method: body.method ?? "straight_line",
+          businessRatioPercent: body.business_ratio_percent ?? 100,
+          disposedDate: body.disposed_date ?? null,
         });
         return textResult({ asset: row ? fixedAssetToApi(row) : null });
       }
