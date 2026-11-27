@@ -16,7 +16,7 @@ export interface RevokeApiKeyModalProps {
 
 export const RevokeApiKeyModal = ({ target, busy, onClose, onConfirm }: RevokeApiKeyModalProps) => {
   return (
-    <Modal open title="APIキーを失効させる" onClose={onClose}>
+    <Modal title="APIキーを失効させる" onClose={onClose}>
       <Col gap="md">
         <Text variant="body">
           「{target.name !== "" ? target.name : "（名前なし）"}」（{maskApiKey(target.key_prefix)}

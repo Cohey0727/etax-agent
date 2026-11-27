@@ -42,7 +42,7 @@ export const CreateApiKeyModal = ({ busy, onClose, onSubmit }: CreateApiKeyModal
   };
 
   return (
-    <Modal open title="APIキーを発行" onClose={onClose}>
+    <Modal title="APIキーを発行" onClose={onClose}>
       <Col gap="md">
         <Col gap="sm">
           <Text variant="statLabel">名前</Text>

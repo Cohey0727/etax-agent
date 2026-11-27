@@ -4,8 +4,6 @@ import { Button, Icon, Text } from "@components/atoms";
 import styles from "./Modal.css";
 
 export interface ModalProps {
-  /** 開いているかどうか。閉じている間は何も描かない。 */
-  open: boolean;
   /** ヘッダーに出す見出し。 */
   title?: ReactNode;
   /** 背景クリック・Esc・閉じるボタンで呼ばれる。 */
@@ -14,13 +12,12 @@ export interface ModalProps {
 }
 
 /**
- * 中央にバウンスして現れる共通モーダル。
+ * 中央にバウンスして現れる共通モーダル。開くかどうかは呼び出し元が描くかどうかで決める。
  * 背景クリックと Esc で閉じる。開いている間は背面のスクロールを止める。
  */
-export const Modal = ({ open, title, onClose, children }: ModalProps) => {
+export const Modal = ({ title, onClose, children }: ModalProps) => {
   // Esc で閉じ、開いている間だけ背面スクロールを固定する。
   useEffect(() => {
-    if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -31,9 +28,7 @@ export const Modal = ({ open, title, onClose, children }: ModalProps) => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onClose]);
-
-  if (!open) return null;
+  }, [onClose]);
 
   // 祖先の transform があると position: fixed がずれるため body 直下へ描く（Drawer と同じ）。
   return createPortal(
