@@ -121,8 +121,11 @@ export const AppPage = () => {
   };
 
   // 画面・年度（と確定申告タブ）の状態をURLへ反映する。初回だけ履歴を汚さず置き換える。
+  // 帳簿を読み終えるまでは年度が決まらない（取引のある年度から選び直される）ので反映しない。
+  // 読み込み中に反映すると、仮の年度の履歴が積まれ、「戻る」でその年度が保存されてしまう。
   const firstUrlSyncRef = useRef(true);
   useEffect(() => {
+    if (ledgerLoading) return;
     const path = pathForView(activeView, year, filingTab);
     if (window.location.pathname !== path) {
       if (firstUrlSyncRef.current) {
@@ -132,7 +135,7 @@ export const AppPage = () => {
       }
     }
     firstUrlSyncRef.current = false;
-  }, [activeView, year, filingTab]);
+  }, [activeView, year, filingTab, ledgerLoading]);
 
   // ブラウザの戻る/進むに合わせて画面・年度を復元する。
   useEffect(() => {
