@@ -127,7 +127,12 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
   // 災害減免額は扱わないため、基準所得税額は差引所得税額と同額になる。
   const standardTax = tax.taxAfterOtherCredits;
   const taxTotal = standardTax + tax.reconstructionTaxGross;
-  const declaredRaw = taxTotal - c.foreignTax - source.withholdingTax;
+  // 外国税額控除等は実際に控除できた額: 所得税分は基準所得税額で止める
+  // （定額減税と併用すると、所得税分の限度額が定額減税後の基準所得税額を
+  // 上回ることがある）。これで「計 − 外国税額控除等」が確定税額の元と一致する。
+  const foreignCredit =
+    Math.min(c.foreignTaxIncomePart, standardTax) + c.foreignTaxReconstructionPart;
+  const declaredRaw = taxTotal - foreignCredit - source.withholdingTax;
   const declaredTax = declaredRaw > 0 ? Math.floor(declaredRaw / 100) * 100 : declaredRaw;
   const thirdPeriod = declaredTax - source.prepaidTax;
   const increase =
@@ -178,7 +183,7 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
     taxAfterCredits2: standardTax,
     taxReconstruction: tax.reconstructionTaxGross,
     taxTotal,
-    creditForeign: c.foreignTax,
+    creditForeign: foreignCredit,
     withholding: source.withholdingTax,
     declaredTax,
     prepaid: source.prepaidTax,

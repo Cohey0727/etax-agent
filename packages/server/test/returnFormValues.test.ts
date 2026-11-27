@@ -33,10 +33,12 @@ function formValues(options: {
   credits?: Partial<TaxCreditInputs>;
   withholding?: number;
   separateStockIncome?: number;
+  /** 計算エンジンの結果の一部を差し替える（エンジンでは作りにくい組み合わせの検証用） */
+  overrideTax?: (tax: IncomeTaxResult) => IncomeTaxResult;
 }): { values: ReturnFormValues; tax: IncomeTaxResult } {
   const figures = computeCorrectedFigures(businessTransactions(12_000_000, 2_000_000), YEAR, {});
   const manual = computeManualIncomes(YEAR, { revenue: 0 }, EMPTY_MISC_INCOME, figures._detail.business_income);
-  const tax = computeIncomeTax({
+  const computed = computeIncomeTax({
     year: YEAR,
     totalIncome: figures._detail.business_income + manual.total,
     deductions: EMPTY_DEDUCTION_INPUTS,
@@ -45,6 +47,7 @@ function formValues(options: {
       ? { stockIncome: options.separateStockIncome, dividendIncome: 0 }
       : undefined,
   });
+  const tax = options.overrideTax ? options.overrideTax(computed) : computed;
   const values = buildReturnFormValues({
     year: YEAR,
     amendment: false,
@@ -83,6 +86,28 @@ describe("buildReturnFormValues の税金の計算", () => {
     expect((a.taxAfterCredits2 ?? 0) + (a.taxReconstruction ?? 0)).toBe(a.taxTotal ?? 0);
     expect(a.creditForeign).toBe(tax.taxCredits.foreignTax);
     expect(Math.floor(((a.taxTotal ?? 0) - (a.creditForeign ?? 0)) / 100) * 100).toBe(a.declaredTax ?? 0);
+  });
+
+  test("外国税額控除の所得税分が基準所得税額を超えても、所得税部分は0で止め、外国税額控除等は実際に控除できた額にする", () => {
+    // 定額減税と併用した令和6年分などで、外国税額控除の所得税分の限度額が
+    // 定額減税後の基準所得税額を上回る場合を、エンジンの結果を差し替えて作る。
+    const { values, tax } = formValues({
+      credits: { foreignTaxPaid: 600_000, foreignIncome: 3_000_000 },
+      overrideTax: (t) => ({
+        ...t,
+        taxCredits: {
+          ...t.taxCredits,
+          foreignTaxIncomePart: t.taxAfterOtherCredits + 50_000,
+          foreignTax: t.taxAfterOtherCredits + 50_000 + t.taxCredits.foreignTaxReconstructionPart,
+        },
+      }),
+    });
+    const a = values.amounts;
+    const reconstructionPart = tax.taxCredits.foreignTaxReconstructionPart;
+    expect(a.creditForeign).toBe(tax.taxAfterOtherCredits + reconstructionPart);
+    const expected = tax.reconstructionTaxGross - reconstructionPart;
+    expect(a.declaredTax).toBe(Math.floor(expected / 100) * 100);
+    expect((a.taxTotal ?? 0) - (a.creditForeign ?? 0)).toBe(expected);
   });
 
   test("還付になる場合、申告納税額は切り捨てずに負数のまま、還付される税金と対応する", () => {
