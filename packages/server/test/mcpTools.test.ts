@@ -157,3 +157,50 @@ describe("get_trial_balance の申告の種類", () => {
     expect(business.income).toBe(1_350_000);
   });
 });
+
+describe("中核ツールの引数検証", () => {
+  test("add_transaction は amount・description が無ければ登録しない", async () => {
+    const noAmount = await call("add_transaction", { date: "2025-02-01", description: "摘要" });
+    expect(noAmount.isError).toBe(true);
+    expect(text(noAmount)).toContain("amount");
+    const noDescription = await call("add_transaction", { date: "2025-02-01", amount: -1000 });
+    expect(noDescription.isError).toBe(true);
+    expect(text(noDescription)).toContain("description");
+    const rows = await runWithTenant(userId, () => listTransactionRows(db));
+    expect(rows).toEqual([]);
+  });
+
+  test("year が無い・不正なら、SQL を投げずに引数のエラーを返す", async () => {
+    for (const name of ["aggregate_year", "consumption_tax", "income_tax", "get_depreciation", "set_filing_status"]) {
+      const result = await call(name, {});
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain("year が不正です");
+    }
+  });
+
+  test("list_transactions は文字列の year でも絞り込む", async () => {
+    await call("add_transaction", { date: "2024-05-01", description: "2024年分", amount: -1000 });
+    await call("add_transaction", { date: "2025-05-01", description: "2025年分", amount: -1000 });
+    const listed = json(await call("list_transactions", { year: "2024" }));
+    expect(listed["count"]).toBe(1);
+  });
+
+  test("ID の引数は正の整数だけを受け付ける", async () => {
+    for (const [name, args] of [
+      ["update_transaction", { id: 1.5, category: "雑費" }],
+      ["delete_transaction", { id: "abc" }],
+      ["link_receipt", { file_id: "11111111-1111-1111-1111-111111111111", transaction_id: 1.5 }],
+    ] as const) {
+      const result = await call(name, args);
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain("正の整数");
+    }
+  });
+
+  test("DB のエラーは SQL 文を含めずに返す", async () => {
+    const result = await call("update_transaction", { id: 10_000_000_000, category: "雑費" });
+    expect(result.isError).toBe(true);
+    expect(text(result)).not.toContain("Failed query");
+    expect(text(result)).toContain("データベース");
+  });
+});

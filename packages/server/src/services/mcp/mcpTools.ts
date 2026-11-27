@@ -38,6 +38,7 @@ import {
   taxableSalesFromBreakdown,
   xtxSupportedYears,
 } from "@etax/shared";
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { billingEnabled } from "../../gateways/stripeGateway";
 import { createSystemOneClient } from "../../gateways/systemOneGateway";
 import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
@@ -95,6 +96,7 @@ import {
   expandedIncomeArg,
   filingOptionsArg,
   filingTypeProperty,
+  idArg,
   ledgerTransactions,
   mergeDeductionInputs,
   mergeTaxCreditInputs,
@@ -108,6 +110,7 @@ import {
   taxpayerArg,
   textResult,
   todayInTokyo,
+  yearArg,
   yearProperty,
 } from "./mcpToolKit";
 
@@ -552,7 +555,7 @@ export async function dispatchMcpTool(
     switch (name) {
       case "aggregate_year": {
         const db = requireDb();
-        const year = Number(args["year"]);
+        const year = yearArg(args);
         const tx = await ledgerTransactions(db, year);
         const b = aggregateIncome(tx);
         const blue = blueDeduction(b.realEstateIncome, b.businessIncome, filingOptionsArg(args));
@@ -575,7 +578,7 @@ export async function dispatchMcpTool(
       }
       case "consumption_tax": {
         const db = requireDb();
-        const year = Number(args["year"]);
+        const year = yearArg(args);
         const tx = await ledgerTransactions(db, year);
         const b = aggregateIncome(tx);
         const rent = residentialRentTotal(tx);
@@ -605,7 +608,7 @@ export async function dispatchMcpTool(
       }
       case "income_tax": {
         const db = requireDb();
-        const year = Number(args["year"]);
+        const year = yearArg(args);
         const tx = await ledgerTransactions(db, year);
         const agricultureInput = agricultureArg(args);
         const agriculture =
@@ -664,7 +667,7 @@ export async function dispatchMcpTool(
       }
       case "list_transactions": {
         const db = requireDb();
-        const year = typeof args["year"] === "number" ? args["year"] : undefined;
+        const year = args["year"] === undefined ? undefined : yearArg(args);
         const rows = await listTransactionRows(db, undefined, year);
         return textResult({
           count: rows.length,
@@ -682,6 +685,12 @@ export async function dispatchMcpTool(
         if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           throw new Error("date は YYYY-MM-DD 形式で渡してください");
         }
+        if (typeof args["description"] !== "string") {
+          throw new Error("description（摘要）は文字列で渡してください");
+        }
+        if (args["amount"] === undefined || args["amount"] === null) {
+          throw new Error("amount（符号つき税込金額）が必要です");
+        }
         const fiscalYearArg = args["fiscal_year"];
         const row = await insertTransactionRow(db, {
           date,
@@ -692,7 +701,7 @@ export async function dispatchMcpTool(
             fiscalYearArg <= 2100
               ? fiscalYearArg
               : Number(date.slice(0, 4)),
-          description: typeof args["description"] === "string" ? args["description"] : "",
+          description: args["description"],
           amount: numArg(args, "amount"),
           account: typeof args["account"] === "string" ? args["account"] : "",
           category,
@@ -709,8 +718,7 @@ export async function dispatchMcpTool(
       }
       case "update_transaction": {
         const db = requireDb();
-        const id = Number(args["id"]);
-        if (!Number.isInteger(id)) throw new Error("id は整数で渡してください");
+        const id = idArg(args, "id");
         const patch: Partial<TransactionRow> = {};
         if (typeof args["date"] === "string") {
           if (!/^\d{4}-\d{2}-\d{2}$/.test(args["date"])) {
@@ -748,8 +756,7 @@ export async function dispatchMcpTool(
       }
       case "delete_transaction": {
         const db = requireDb();
-        const id = Number(args["id"]);
-        if (!Number.isInteger(id)) throw new Error("id は整数で渡してください");
+        const id = idArg(args, "id");
         const row = await deleteTransactionRow(db, id);
         if (!row) throw new Error(`取引が見つかりません: id=${id}`);
         return textResult({ deleted: transactionToApi(row) });
@@ -775,7 +782,7 @@ export async function dispatchMcpTool(
       }
       case "export_xtx": {
         const db = requireDb();
-        const year = Number(args["year"]);
+        const year = yearArg(args);
         if (typeof args["taxpayer"] !== "object" || args["taxpayer"] === null) {
           throw new Error("taxpayer（納税者情報）が必要です");
         }
@@ -1029,7 +1036,7 @@ export async function dispatchMcpTool(
       }
       case "get_depreciation": {
         const db = requireDb();
-        const year = Number(args["year"]);
+        const year = yearArg(args);
         const rows = (await listFixedAssetRows(db)).filter((row) => isActiveInYear(row, year));
         const detail = [];
         const totals = { business: 0, real_estate: 0, agriculture: 0 };
@@ -1068,10 +1075,8 @@ export async function dispatchMcpTool(
       case "link_receipt": {
         const db = requireDb();
         const fileId = args["file_id"];
-        const transactionId = args["transaction_id"];
         if (typeof fileId !== "string" || !fileId) throw new Error("file_id が必要です");
-        if (typeof transactionId !== "number") throw new Error("transaction_id が必要です");
-        const row = await linkReceiptRow(db, fileId, transactionId);
+        const row = await linkReceiptRow(db, fileId, idArg(args, "transaction_id"));
         return textResult({ receipt: row ? receiptToApi(row) : null });
       }
       case "get_filing_status": {
@@ -1081,7 +1086,7 @@ export async function dispatchMcpTool(
       }
       case "set_filing_status": {
         const db = requireDb();
-        const year = Number(args["year"]);
+        const year = yearArg(args);
         const row = await upsertFilingStatusRow(db, year, {
           confirmed: typeof args["confirmed"] === "boolean" ? args["confirmed"] : undefined,
           calculated: typeof args["calculated"] === "boolean" ? args["calculated"] : undefined,
@@ -1100,14 +1105,18 @@ export async function dispatchMcpTool(
       }
     }
   } catch (e) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `${e instanceof Error ? e.name : "Error"}: ${e instanceof Error ? e.message : String(e)}`,
-        },
-      ],
-      isError: true,
-    };
+    return { content: [{ type: "text", text: toolErrorText(e) }], isError: true };
   }
+}
+
+/**
+ * ツールの例外をクライアントへ返す文言にする。DB の例外は SQL 文とパラメータを
+ * 含むため、クライアントへは返さずサーバーログにだけ残す。
+ */
+function toolErrorText(e: unknown): string {
+  if (e instanceof DrizzleQueryError) {
+    console.warn(`[mcp] DB の操作に失敗しました: ${e.message}`, e.cause);
+    return "Error: データベースの操作に失敗しました（入力値が範囲外か、データベースに接続できません）";
+  }
+  return `${e instanceof Error ? e.name : "Error"}: ${errorMessage(e)}`;
 }
