@@ -1,5 +1,5 @@
 import { validateFixedAssetInput } from "@etax/shared";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DepreciationSummary,
   FixedAssetImageRecord,
@@ -22,6 +22,7 @@ export type LoadStatus = "loading" | "ready" | "unavailable";
 /**
  * useFixedAssetsData.ts — 固定資産台帳の読み込みと CRUD・画像の管理。
  * 台帳（DB）が正。サマリは対象年度ごとにサーバー集計を取り直す。
+ * 画像の一覧は一覧のサムネイルにも使うので、資産ごとに1回だけ取得する。
  */
 export function useFixedAssetsData(year: number) {
   const [status, setStatus] = useState<LoadStatus>("loading");
@@ -34,12 +35,34 @@ export function useFixedAssetsData(year: number) {
   const [imagesBusy, setImagesBusy] = useState(false);
   const [deleteArmedId, setDeleteArmedId] = useState<number | null>(null);
 
-  const reload = useCallback(async (): Promise<boolean> => {
+  // 最後に出した読み込みの番号。年度を切り替えた後に前の年度の応答が届いても反映しない。
+  const latestReloadRef = useRef(0);
+  // 画像一覧を取得済み・取得中の資産。
+  const imagesRequestedRef = useRef(new Set<number>());
+
+  const loadImagesOnce = useCallback((list: readonly FixedAssetRecord[]) => {
+    for (const asset of list) {
+      if (imagesRequestedRef.current.has(asset.id)) continue;
+      imagesRequestedRef.current.add(asset.id);
+      void fetchFixedAssetImages(asset.id).then(
+        (fetched) => setImages((prev) => ({ ...prev, [asset.id]: fetched })),
+        (e: unknown) => {
+          setImages((prev) => ({ ...prev, [asset.id]: [] }));
+          setError(e instanceof Error ? e.message : "画像の取得に失敗しました");
+        },
+      );
+    }
+  }, []);
+
+  /** 台帳とサマリを読み直す。後から出した読み込みがあれば何も反映せず "stale" を返す。 */
+  const reload = useCallback(async (): Promise<LoadStatus | "stale"> => {
+    const request = ++latestReloadRef.current;
     const [fetchedAssets, fetchedSummary] = await Promise.all([
       fetchFixedAssets(),
       fetchDepreciationSummary(year),
     ]);
-    if (!fetchedAssets) return false;
+    if (request !== latestReloadRef.current) return "stale";
+    if (!fetchedAssets) return "unavailable";
     setAssets(fetchedAssets);
     setSummary(fetchedSummary);
     setSelectedId((prev) =>
@@ -47,53 +70,22 @@ export function useFixedAssetsData(year: number) {
         ? prev
         : (fetchedAssets[0]?.id ?? null),
     );
-    return true;
-  }, [year]);
+    loadImagesOnce(fetchedAssets);
+    return "ready";
+  }, [year, loadImagesOnce]);
 
   useEffect(() => {
-    let cancelled = false;
     setStatus("loading");
     setError(null);
-    void (async () => {
-      const ok = await reload();
-      if (cancelled) return;
-      setStatus(ok ? "ready" : "unavailable");
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void reload().then((result) => {
+      if (result !== "stale") setStatus(result);
+    });
   }, [reload]);
 
-  const loadImages = useCallback(async (assetId: number) => {
-    setImagesBusy(true);
-    try {
-      const fetched = await fetchFixedAssetImages(assetId);
-      setImages((prev) => ({ ...prev, [assetId]: fetched }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "画像の取得に失敗しました");
-    } finally {
-      setImagesBusy(false);
-    }
-  }, []);
-
-  const select = useCallback(
-    (assetId: number) => {
-      setSelectedId(assetId);
-      setDeleteArmedId(null);
-      setImages((prev) => {
-        if (prev[assetId] === undefined) void loadImages(assetId);
-        return prev;
-      });
-    },
-    [loadImages],
-  );
-
-  // 初回表示や年度切替で選択中資産の画像が未取得なら取りに行く。
-  useEffect(() => {
-    if (selectedId !== null && images[selectedId] === undefined && status === "ready") {
-      void loadImages(selectedId);
-    }
-  }, [selectedId, images, status, loadImages]);
+  const select = (assetId: number) => {
+    setSelectedId(assetId);
+    setDeleteArmedId(null);
+  };
 
   const handleCreate = async (input: FixedAssetInput): Promise<boolean> => {
     const problem = validateFixedAssetInput(input);
@@ -148,6 +140,7 @@ export function useFixedAssetsData(year: number) {
     setError(null);
     try {
       await deleteFixedAsset(asset.id);
+      imagesRequestedRef.current.delete(asset.id);
       setImages((prev) => {
         const next = { ...prev };
         delete next[asset.id];
