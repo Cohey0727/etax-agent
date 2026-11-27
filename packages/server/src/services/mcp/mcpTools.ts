@@ -41,6 +41,7 @@ import {
 import { billingEnabled } from "../../gateways/stripeGateway";
 import { createSystemOneClient } from "../../gateways/systemOneGateway";
 import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
+import { errorMessage } from "../../lib/errors";
 import { authRequired } from "../../lib/tenantContext";
 import { hasActivePlan } from "../../repositories/subscriptionRepository";
 import {
@@ -517,6 +518,24 @@ async function assertPlanForGatedTool(name: string): Promise<void> {
   throw new Error("この機能は有料プラン（月額490円）への加入が必要です");
 }
 
+/**
+ * 保存済みの取引の科目を学習履歴に記録する。取引はすでに確定しているため、
+ * 記録の失敗でツール全体を失敗にすると、クライアントの再実行で取引が
+ * 二重に登録される。失敗は警告文として返す（成功なら null）。
+ */
+async function recordClassificationAfterSave(
+  description: string,
+  category: string,
+): Promise<string | null> {
+  try {
+    await recordClassification(description, category);
+    return null;
+  } catch (e) {
+    console.warn(`[mcp] 分類の学習履歴に記録できませんでした: ${errorMessage(e)}`);
+    return `取引は保存しましたが、分類の学習履歴には記録できませんでした: ${errorMessage(e)}`;
+  }
+}
+
 /** MCP ツールの実行。例外は isError の結果として返す（呼び出し側で判断できるように）。 */
 export async function dispatchMcpTool(
   name: string,
@@ -678,10 +697,9 @@ export async function dispatchMcpTool(
             typeof args["business_ratio_basis"] === "string" ? args["business_ratio_basis"] : "",
         });
         if (!row) throw new Error("取引の登録に失敗しました");
-        if (category !== "未分類") {
-          await recordClassification(row.description, category);
-        }
-        return textResult({ transaction: transactionToApi(row) });
+        const warning =
+          category !== "未分類" ? await recordClassificationAfterSave(row.description, category) : null;
+        return textResult({ transaction: transactionToApi(row), ...(warning ? { warning } : {}) });
       }
       case "update_transaction": {
         const db = requireDb();
@@ -716,10 +734,11 @@ export async function dispatchMcpTool(
         }
         const row = await updateTransactionRow(db, id, patch);
         if (!row) throw new Error(`取引が見つかりません: id=${id}`);
-        if (patch.category !== undefined && patch.category !== "未分類") {
-          await recordClassification(row.description, patch.category);
-        }
-        return textResult({ transaction: transactionToApi(row) });
+        const warning =
+          patch.category !== undefined && patch.category !== "未分類"
+            ? await recordClassificationAfterSave(row.description, patch.category)
+            : null;
+        return textResult({ transaction: transactionToApi(row), ...(warning ? { warning } : {}) });
       }
       case "delete_transaction": {
         const db = requireDb();
