@@ -5,6 +5,7 @@ import { LedgerTransaction, ReceiptRecord } from "@types";
 import {
   fetchLedgerTransactions,
   fetchReceipts,
+  formatYen,
   linkReceipt,
   receiptContentUrl,
   unlinkReceipt,
@@ -17,7 +18,7 @@ export interface ReceiptLibraryPanelProps {
 }
 
 const formatAmount = (value: number | null | undefined): string =>
-  value === null || value === undefined ? "—" : `¥${Math.abs(value).toLocaleString("ja-JP")}`;
+  value === null || value === undefined ? "—" : formatYen(Math.abs(value));
 
 const transactionLabel = (tx: LedgerTransaction): string =>
   `${tx.date} ${tx.description || "（摘要なし）"} ${formatAmount(tx.amount)}`;

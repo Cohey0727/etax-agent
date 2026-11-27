@@ -21,7 +21,7 @@ import {
   TableHeaderCell,
   Text,
 } from "@components/atoms";
-import { ApiKeyItem, ApiKeyStatus, CreatedApiKey } from "@types";
+import { ApiKeyItem, ApiKeyStatus, CreatedApiKey, StatusMessage } from "@types";
 import {
   ApiError,
   createApiKey,
@@ -37,11 +37,6 @@ import styles from "./ApiKeysPanel.css";
 
 /** anonymous は未ログイン（401）、failed はそれ以外の理由で一覧を読めなかったとき。 */
 type LoadState = "loading" | "anonymous" | "failed" | "ready";
-
-interface StatusMessage {
-  ok: boolean;
-  text: string;
-}
 
 /** ステータスの表示ラベル（列挙分岐はマッピング表で持つ）。 */
 const STATUS_LABELS: Record<ApiKeyStatus, string> = {

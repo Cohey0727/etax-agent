@@ -1,9 +1,15 @@
-import { ACCOUNT_NAMES, guessIncomeType, Transaction } from "@etax/shared";
+import { guessIncomeType, Transaction } from "@etax/shared";
 import { useState } from "react";
 import { Button, Card, Col, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { AccountClassification, ClassificationSource } from "@types";
-import { classifyAccountsBatch, recordClassificationFeedback, withCurrentOption } from "@utils";
+import { AccountClassification } from "@types";
+import {
+  accountChoices,
+  classificationSourceLabels,
+  classifyAccountsBatch,
+  recordClassificationFeedback,
+  withCurrentOption,
+} from "@utils";
 import styles from "./AccountClassificationPanel.css";
 
 export interface AccountClassificationPanelProps {
@@ -11,13 +17,6 @@ export interface AccountClassificationPanelProps {
   /** 科目を反映した取引リストで差し替える。 */
   onApply: (transactions: Transaction[]) => void;
 }
-
-const sourceLabels = {
-  generated: "生成ルール",
-  systemone: "AI判定",
-  rules: "キーワードルール",
-  none: "判定なし",
-} as const satisfies Record<ClassificationSource, string>;
 
 interface Suggestion {
   index: number;
@@ -112,7 +111,7 @@ export const AccountClassificationPanel = ({
                     {transactions[s.index]?.description}
                   </span>{" "}
                   <Text variant="caption">
-                    （{sourceLabels[s.classification.source]}
+                    （{classificationSourceLabels[s.classification.source]}
                     {s.classification.confidence !== null &&
                       ` ${Math.round(s.classification.confidence * 100)}%`}
                     ）
@@ -131,7 +130,7 @@ export const AccountClassificationPanel = ({
                     )
                   }
                 >
-                  {withCurrentOption([...ACCOUNT_NAMES, "未分類"], s.account).map((name) => (
+                  {withCurrentOption(accountChoices, s.account).map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>

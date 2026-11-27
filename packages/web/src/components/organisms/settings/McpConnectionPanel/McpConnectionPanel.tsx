@@ -19,41 +19,24 @@ import {
   Text,
 } from "@components/atoms";
 import { Tabs } from "@components/molecules";
-import { McpInfo } from "@types";
+import { McpInfo, StatusMessage } from "@types";
 import { fetchMcpInfo } from "@utils";
 import styles from "./McpConnectionPanel.css";
 
 type LoadState = "loading" | "anonymous" | "ready";
 
-type ClientId = "claudeCode" | "codex" | "muse";
-
-interface ClientSnippet {
-  /** スニペットを貼る場所の案内。 */
-  hint: string;
-  build: (endpoint: string) => string;
-}
-
-/** クライアント別の設定スニペット（列挙分岐はマッピング表で持つ）。 */
-const CLIENT_SNIPPETS: Record<ClientId, ClientSnippet> = {
-  claudeCode: {
+/** クライアントごとのタブの名前と、設定スニペットを貼る場所の案内。スニペット自体は共通。 */
+const clientTabs = [
+  {
+    id: "claudeCode",
+    label: "Claude Code",
     hint: "プロジェクト直下の .mcp.json（または ~/.claude.json）の mcpServers に追加します。コマンドなら: claude mcp add --transport http etax-agent <URL> --header \"Authorization: Bearer YOUR_API_KEY\"",
-    build: (endpoint) => buildSnippetJson(endpoint),
   },
-  codex: {
-    hint: "Codex の MCP 設定の mcpServers に追加します。",
-    build: (endpoint) => buildSnippetJson(endpoint),
-  },
-  muse: {
-    hint: "Muse の MCP 設定の mcpServers に追加します。",
-    build: (endpoint) => buildSnippetJson(endpoint),
-  },
-};
+  { id: "codex", label: "Codex", hint: "Codex の MCP 設定の mcpServers に追加します。" },
+  { id: "muse", label: "Muse", hint: "Muse の MCP 設定の mcpServers に追加します。" },
+] as const satisfies readonly { id: string; label: string; hint: string }[];
 
-const CLIENT_TABS: readonly { id: ClientId; label: string }[] = [
-  { id: "claudeCode", label: "Claude Code" },
-  { id: "codex", label: "Codex" },
-  { id: "muse", label: "Muse" },
-];
+type ClientId = (typeof clientTabs)[number]["id"];
 
 /** 読み込み中に代わりへ出すスケルトンの行数。 */
 const SKELETON_ROWS: readonly number[] = [1, 2, 3];
@@ -62,7 +45,7 @@ export const McpConnectionPanel = () => {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [info, setInfo] = useState<McpInfo | null>(null);
   const [clientId, setClientId] = useState<ClientId>("claudeCode");
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [message, setMessage] = useState<StatusMessage | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -79,7 +62,8 @@ export const McpConnectionPanel = () => {
   }, [reload]);
 
   const endpoint = info ? `${window.location.origin}${info.endpoint_path}` : "";
-  const snippet = CLIENT_SNIPPETS[clientId];
+  const client = clientTabs.find((tab) => tab.id === clientId) ?? clientTabs[0];
+  const snippet = buildSnippetJson(endpoint);
 
   const handleCopy = async (text: string, doneText: string) => {
     try {
@@ -143,20 +127,20 @@ export const McpConnectionPanel = () => {
               <Text variant="caption">3. クライアントを再起動すると、ツールが使えるようになります。</Text>
             </Col>
             <Col gap="sm">
-              <Tabs items={CLIENT_TABS} activeId={clientId} onChange={setClientId} />
-              <pre className={styles.codeBlock}>{snippet.build(endpoint)}</pre>
+              <Tabs items={clientTabs} activeId={clientId} onChange={setClientId} />
+              <pre className={styles.codeBlock}>{snippet}</pre>
               <Row gap="sm" align="center">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() =>
-                    void handleCopy(snippet.build(endpoint), "設定スニペットをコピーしました")
+                    void handleCopy(snippet, "設定スニペットをコピーしました")
                   }
                 >
                   スニペットをコピー
                 </Button>
               </Row>
-              <Text variant="caption">{snippet.hint}</Text>
+              <Text variant="caption">{client.hint}</Text>
             </Col>
             <Col gap="sm">
               <Text variant="statLabel">利用できるツール（全{info.tool_count}件）</Text>

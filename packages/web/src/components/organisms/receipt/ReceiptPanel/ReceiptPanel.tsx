@@ -1,9 +1,15 @@
-import { ACCOUNT_NAMES, guessIncomeType, Transaction } from "@etax/shared";
+import { guessIncomeType, Transaction } from "@etax/shared";
 import { ChangeEvent, useRef, useState } from "react";
 import { Button, Card, Col, Icon, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { AccountClassification, ClassificationSource } from "@types";
-import { analyzeReceiptImage, recordClassificationFeedback, withCurrentOption } from "@utils";
+import { AccountClassification } from "@types";
+import {
+  accountChoices,
+  analyzeReceiptImage,
+  classificationSourceLabels,
+  recordClassificationFeedback,
+  withCurrentOption,
+} from "@utils";
 import styles from "./ReceiptPanel.css";
 import { registerReceiptTransaction } from "./ReceiptPanel.utils";
 
@@ -13,13 +19,6 @@ export interface ReceiptPanelProps {
   /** 帳簿へ登録した取引を画面の取引へ加える。 */
   onRegistered: (transaction: Transaction) => void;
 }
-
-const sourceLabels = {
-  generated: "生成ルール",
-  systemone: "AI判定",
-  rules: "キーワードルール",
-  none: "判定なし",
-} as const satisfies Record<ClassificationSource, string>;
 
 interface ReceiptDraft {
   date: string;
@@ -209,7 +208,7 @@ export const ReceiptPanel = ({ onAnalyzed, onRegistered }: ReceiptPanelProps) =>
                 onChange={(e) => setDraft({ ...draft, account: e.target.value })}
                 aria-label="勘定科目"
               >
-                {withCurrentOption([...ACCOUNT_NAMES, "未分類"], draft.account).map((name) => (
+                {withCurrentOption(accountChoices, draft.account).map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
@@ -217,7 +216,7 @@ export const ReceiptPanel = ({ onAnalyzed, onRegistered }: ReceiptPanelProps) =>
               </Select>
             </div>
             <Text variant="muted">
-              科目の根拠: {sourceLabels[draft.classification.source]}
+              科目の根拠: {classificationSourceLabels[draft.classification.source]}
               {draft.classification.confidence !== null &&
                 `（確信度 ${Math.round(draft.classification.confidence * 100)}%）`}
               {draft.classification.candidates.length > 1 &&

@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Row, SkeletonBar, Text } from "@components/atoms";
-import { SystemOneSettings } from "@types";
+import { StatusMessage, SystemOneSettings } from "@types";
 import { fetchSystemOneSettings, testSystemOneSettings, updateSystemOneSettings } from "@utils";
 
 type BusyKind = "save" | "test" | null;
-
-interface StatusMessage {
-  ok: boolean;
-  text: string;
-}
 
 /** 読み込み中にフォームの代わりへ出すスケルトンの行数。 */
 const SKELETON_ROWS: readonly number[] = [1, 2, 3];

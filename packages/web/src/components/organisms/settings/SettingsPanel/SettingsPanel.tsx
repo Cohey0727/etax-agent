@@ -1,16 +1,11 @@
 import { useState } from "react";
 import { Button, Card, Col, Icon, IconName, Input, Row, Text } from "@components/atoms";
-import { AgentConnectionConfig, SendKeyMode, ThemeMode } from "@types";
+import { AgentConnectionConfig, SendKeyMode, StatusMessage, ThemeMode } from "@types";
 import { testAgentSettings } from "@utils";
 import { AiMemoryPanel } from "../AiMemoryPanel";
 import { AccountPanel } from "../AccountPanel";
 import { SystemOneSettingsPanel } from "../SystemOneSettingsPanel";
 import styles from "./SettingsPanel.css";
-
-interface StatusMessage {
-  ok: boolean;
-  text: string;
-}
 
 export interface SettingsPanelProps {
   themeMode: ThemeMode;

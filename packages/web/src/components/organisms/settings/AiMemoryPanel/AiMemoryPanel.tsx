@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ACCOUNT_NAMES } from "@etax/shared";
 import { Button, Card, Col, Input, Row, Select, Text, Textarea } from "@components/atoms";
-import { JevPromptInfo, RegexRuleItem, RegexRulesInfo } from "@types";
+import { JevPromptInfo, RegexRuleItem, RegexRulesInfo, StatusMessage } from "@types";
 import {
   fetchJevPrompt,
   fetchRegexRules,
@@ -14,11 +14,6 @@ import styles from "./AiMemoryPanel.css";
 interface AiMemoryData {
   rules: RegexRulesInfo;
   prompt: JevPromptInfo;
-}
-
-interface StatusMessage {
-  ok: boolean;
-  text: string;
 }
 
 /** 正規表現として成立するか（保存前の画面側チェック）。 */
