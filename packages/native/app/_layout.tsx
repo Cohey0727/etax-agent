@@ -25,9 +25,10 @@ function AppStack() {
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
 
   // 認証ガード: ログイン必須の構成で未ログインなら、ログイン画面以外へは進ませない。
+  // OAuth の戻り（auth-callback）は自分で結果に応じた画面へ振り分けるので、ここでは送らない。
   const onLoginScreen = segments[0] === "login";
   const onAuthCallback = segments[0] === "auth-callback";
-  const mustLogin = ready && loginRequired && !user && !onLoginScreen;
+  const mustLogin = ready && loginRequired && !user && !onLoginScreen && !onAuthCallback;
 
   const authFailed = ready && loadError !== null;
 
