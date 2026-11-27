@@ -200,6 +200,7 @@ describe("1行の欄は枠の幅に収める", () => {
       settled_amount: 0,
       remaining_amount: 0,
       created_at: "2026-04-01T00:00:00.000Z",
+      updated_at: "2026-04-01T00:00:00.000Z",
     };
     await buildInvoicePdf(invoice, font);
     const left = callFor(`${counterparty} 御中`);

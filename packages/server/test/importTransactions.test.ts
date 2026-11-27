@@ -55,6 +55,8 @@ const existingValues = {
   category: "消耗品費",
   incomeType: "business",
   taxCategory: "",
+  businessRatioPercent: 100,
+  businessRatioBasis: "",
 };
 
 describe("CSV取込の保存と割り当て年度", () => {
@@ -104,6 +106,8 @@ describe("CSV取込の保存と割り当て年度", () => {
         category: r.category,
         incomeType: r.incomeType,
         taxCategory: r.taxCategory,
+        businessRatioPercent: r.businessRatioPercent,
+        businessRatioBasis: r.businessRatioBasis,
       })),
     );
     const after = await listTransactionRows(db);

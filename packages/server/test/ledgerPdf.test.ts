@@ -111,6 +111,7 @@ describe("表の行は1行で描く", () => {
       settled_amount: 0,
       remaining_amount: 110000,
       created_at: "2026-04-01T00:00:00.000Z",
+      updated_at: "2026-04-01T00:00:00.000Z",
     };
     const pdf = await buildInvoicePdf(invoice, font);
     expect(countMultiLineTexts(pdf)).toBe(0);

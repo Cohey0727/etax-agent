@@ -15,12 +15,11 @@ import {
   InvoiceLineDraft,
   markInvoiceIssued,
 } from "../src/repositories/invoiceRepository";
-import { DocumentRow } from "../src/repositories/schema";
+import { DocumentRow, TransactionRow } from "../src/repositories/schema";
 import { fetchPaymentsResponse } from "../src/repositories/reconciliationRepository";
 import {
   insertTransactionRow,
   listTransactionRows,
-  TransactionRow,
   updateTransactionRow,
 } from "../src/repositories/transactionRepository";
 import { createUser } from "../src/repositories/userRepository";
@@ -73,7 +72,7 @@ async function makeInvoice(db: Db, totalAmount: number, issue = true): Promise<D
 }
 
 async function makeTx(db: Db, amount: number, description = "入金"): Promise<TransactionRow> {
-  return insertTransactionRow(db, {
+  const row = await insertTransactionRow(db, {
     date: "2026-03-15",
     fiscalYear: 2026,
     description,
@@ -82,7 +81,11 @@ async function makeTx(db: Db, amount: number, description = "入金"): Promise<T
     category: amount > 0 ? "売上高" : "支払手数料",
     incomeType: "business",
     taxCategory: "",
+    businessRatioPercent: 100,
+    businessRatioBasis: "",
   });
+  if (!row) throw new Error("取引の登録に失敗");
+  return row;
 }
 
 /** ReconciliationError の status を取り出す（投げられなければ null）。 */

@@ -51,6 +51,8 @@ const txValues = {
   category: "売上高",
   incomeType: "business",
   taxCategory: "",
+  businessRatioPercent: 100,
+  businessRatioBasis: "",
 };
 
 const EXTRACTED = {

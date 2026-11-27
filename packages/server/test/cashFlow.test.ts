@@ -103,6 +103,8 @@ async function seedTransaction(
       category: input.amount >= 0 ? "売上高" : "消耗品費",
       incomeType: "business",
       taxCategory: "",
+      businessRatioPercent: 100,
+      businessRatioBasis: "",
     }),
   );
 }

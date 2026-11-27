@@ -17,6 +17,7 @@ const transactions: Transaction[] = [
     account: "",
     category: "売上高",
     income_type: "business",
+    tax_category: "",
   },
   {
     date: "2025-03-02",
@@ -26,6 +27,7 @@ const transactions: Transaction[] = [
     account: "",
     category: "雑費",
     income_type: "business",
+    tax_category: "",
   },
 ];
 

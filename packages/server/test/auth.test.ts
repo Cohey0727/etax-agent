@@ -54,6 +54,8 @@ describe("マルチテナント分離", () => {
       category: "income",
       incomeType: "business",
       taxCategory: "taxable_10",
+      businessRatioPercent: 100,
+      businessRatioBasis: "",
     };
     await runWithTenant(userA.id, async () => {
       await insertTransactionRow(db, values);

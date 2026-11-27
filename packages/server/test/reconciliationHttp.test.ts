@@ -87,7 +87,10 @@ describe("入金消込エンドポイント", () => {
       category: "売上高",
       incomeType: "business",
       taxCategory: "",
+      businessRatioPercent: 100,
+      businessRatioBasis: "",
     });
+    if (!income) throw new Error("入金取引の登録に失敗");
 
     const before = await req(`/api/invoices/${invoice.id}/payments`);
     expect(before.status).toBe(200);

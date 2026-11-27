@@ -39,15 +39,17 @@ describe("classifyAccount の regexRulesOverride", () => {
       history: [
         {
           description: "ヨドバシカメラ キーボード購入",
-          normalizedKey: "よどばしかめら きーぼーど購入",
+          key: "よどばしかめら きーぼーど購入",
           account: "消耗品費",
           count: 3,
+          updatedAt: "2026-11-15T00:00:00.000Z",
         },
         {
           description: "ヨドバシカメラ マウス購入",
-          normalizedKey: "よどばしかめら まうす購入",
+          key: "よどばしかめら まうす購入",
           account: "消耗品費",
           count: 3,
+          updatedAt: "2026-11-15T00:00:00.000Z",
         },
       ],
       systemOne: null,

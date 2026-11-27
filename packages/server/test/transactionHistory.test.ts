@@ -24,6 +24,8 @@ const values = {
   category: "通信費",
   incomeType: "business",
   taxCategory: "",
+  businessRatioPercent: 100,
+  businessRatioBasis: "",
 };
 
 describe("取引の変更履歴と論理削除", () => {

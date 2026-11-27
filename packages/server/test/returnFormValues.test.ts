@@ -22,7 +22,7 @@ import { buildReturnFormValues, ReturnFormValues } from "../src/services/pdf/ret
 const YEAR = 2025;
 
 function businessTransactions(revenue: number, expenses: number): Transaction[] {
-  const base = { year: YEAR, account: "普通預金", income_type: "business", tax_category: "" };
+  const base = { year: YEAR, account: "普通預金", income_type: "business" as const, tax_category: "" };
   return [
     { ...base, date: `${YEAR}-03-01`, description: "売上", amount: revenue, category: "売上高" },
     { ...base, date: `${YEAR}-03-02`, description: "通信費", amount: -expenses, category: "通信費" },

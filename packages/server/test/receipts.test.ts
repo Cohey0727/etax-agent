@@ -26,6 +26,8 @@ async function createTransactionId(db: Db): Promise<number> {
     category: "消耗品費",
     incomeType: "business",
     taxCategory: "",
+    businessRatioPercent: 100,
+    businessRatioBasis: "",
   });
   return row!.id;
 }
