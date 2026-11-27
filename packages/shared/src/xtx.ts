@@ -1048,8 +1048,9 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
   parts.push(`<ANF00000><ANF00010>${pl.join("")}</ANF00010></ANF00000>`);
 
   const depDetail220 = buildDepreciationDetail(data.depreciation?.realEstate ?? [], DEP_TAGS_KOA220);
-  const page2_220 = depDetail220 ? `<KOA220-2 page="2">${depDetail220}</KOA220-2>` : "";
-  return `<KOA220 VR="${vr}" id="KOA220" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA220-1 page="1">${parts.join("")}</KOA220-1>${page2_220}</KOA220>`;
+  // 減価償却費の計算（ANF00880）は KOA220 の3ページ目の要素
+  const page3_220 = depDetail220 ? `<KOA220-3 page="3">${depDetail220}</KOA220-3>` : "";
+  return `<KOA220 VR="${vr}" id="KOA220" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA220-1 page="1">${parts.join("")}</KOA220-1>${page3_220}</KOA220>`;
 }
 
 // ---------------------------------------------------------------------------

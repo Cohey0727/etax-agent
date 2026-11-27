@@ -286,7 +286,8 @@ function depBsSample(year: number): string {
     withholdingTax: 0,
     prepaidTax: 0,
     originalThirdPeriodTax: null,
-    depreciation: { business: depRow ? [depRow] : [], realEstate: [] },
+    // 不動産所得用（KOA220）の減価償却明細は3ページ目に置く様式
+    depreciation: { business: depRow ? [depRow] : [], realEstate: depRow ? [depRow] : [] },
     balanceSheet: {
       opening: { cash: 1_000_000, capital: 1_000_000 },
       closing: { cash: 1_000_000 + incomeBeforeBlue },
