@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  EMPTY_AGRICULTURE_INPUT,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_MISC_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
   Transaction,
   buildXtxFiling,
+  computeAgricultureStatement,
   computeCorrectedFigures,
   computeIncomeTax,
   computeManualIncomes,
@@ -503,6 +505,49 @@ describe("buildXtxFiling", () => {
     expect(xtx).toContain("<ABB01130>2750000</ABB01130>");
     // 合計⑫ = 事業所得 11,350,000 + 給与 6,900,000 + 雑計 2,750,000
     expect(xtx).toContain("<ABB00410>21000000</ABB00410>");
+  });
+
+  test("公的年金等控除の判定に使う他の所得には農業所得も含める", () => {
+    const agriculture = { ...EMPTY_AGRICULTURE_INPUT, salesAmount: 15_000_000 };
+    const figures = computeCorrectedFigures([], 2025, { agriculture });
+    const miscIncome = { ...EMPTY_MISC_INCOME, pensionRevenue: 3_000_000, pensionOver65: true };
+    const ledgerIncome =
+      figures._detail.business_income + figures._detail.real_estate_income + figures._detail.agriculture_income;
+    const manual = computeManualIncomes(2025, { revenue: 0 }, miscIncome, ledgerIncome);
+    // 公的年金等以外の合計所得金額が1,000万円超なので控除は 110万 − 10万
+    expect(manual.pension).toBe(2_000_000);
+    const tax = computeIncomeTax({
+      year: 2025,
+      totalIncome: ledgerIncome + manual.total,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    });
+    const xtx = buildXtxFiling({
+      year: 2025,
+      amendment: false,
+      submissionDate: "2026-03-10",
+      taxpayer: {
+        name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+        address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1950-04-01",
+        phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+        myNumber: "", userId: "1234567890123456", occupation: "農業", shopName: "", jan1Address: "",
+      },
+      figures,
+      deductionInputs: EMPTY_DEDUCTION_INPUTS,
+      miscIncome,
+      agriculture: {
+        statement: computeAgricultureStatement(agriculture),
+        blueDeduction: figures._detail.blue_deduction_agriculture,
+      },
+      tax,
+      categoryTotals: { business: {}, realEstate: {} },
+      withholdingTax: 0,
+      prepaidTax: 0,
+      originalThirdPeriodTax: null,
+    });
+    expect(xtx).toContain("<ABB01060>2000000</ABB01060>");
+    expect(xtx).toContain("<ABB01130>2000000</ABB01130>");
+    expect(xtx).toContain(`<ABB00410>${ledgerIncome + 2_000_000}</ABB00410>`);
   });
 });
 

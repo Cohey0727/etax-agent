@@ -440,12 +440,13 @@ function buildKoa020Face1(data: XtxFilingData): string {
   // --- 申告内容 ---
   const body: string[] = [];
 
-  // 給与・雑所得の最終金額（調整控除・公的年金等控除を含む決定的計算）
+  // 給与・雑所得の最終金額（調整控除・公的年金等控除を含む決定的計算）。
+  // 公的年金等控除の判定に使う他の所得は、税額計算と同じく農業所得を含める
   const manual = computeManualIncomes(
     data.year,
     data.salaryIncome ?? { revenue: 0 },
     data.miscIncome,
-    f._detail.business_income + f._detail.real_estate_income,
+    f._detail.business_income + f._detail.real_estate_income + f._detail.agriculture_income,
   );
 
   // 収入金額等
