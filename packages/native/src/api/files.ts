@@ -4,7 +4,9 @@
  */
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { apiJson, ApiError, rawFetch } from "./client";
+import { API_URL } from "../config";
+import { absoluteApiUrl, apiJson, ApiError, rawFetch } from "./client";
+import { currentSessionToken } from "./session";
 import { PresignUploadFileResponse } from "./types";
 
 export const UPLOADABLE_IMAGE_TYPES: readonly string[] = [
@@ -33,15 +35,38 @@ export async function uploadViaPresignedUrl(
     method: "POST",
     body: { contentType, ...(purpose ? { purpose } : {}) },
   });
-  const resp = await rawFetch(presign.uploadUrl, {
+  // ストレージが同一オリジン配信のとき uploadUrl は相対パスで返る。
+  // その場合は API オリジンへ解決し、認証ヘッダも付ける（外部ストレージの
+  // 署名付きURLには付けない）。
+  const uploadUrl = absoluteApiUrl(presign.uploadUrl);
+  const headers: Record<string, string> = { "Content-Type": contentType };
+  if (uploadUrl.startsWith(`${API_URL}/`)) {
+    const token = currentSessionToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+  const resp = await rawFetch(uploadUrl, {
     method: "PUT",
-    headers: { "Content-Type": contentType },
+    headers,
     body: bytes as unknown as BodyInit,
   });
   if (!resp.ok) {
     throw new ApiError(resp.status, `ファイルのアップロードに失敗しました (HTTP ${resp.status})`);
   }
   return presign.fileId;
+}
+
+/**
+ * サーバーが返した画像URLから Image の source を作る。API が同一オリジンで
+ * 配信する画像は絶対URLへ解決し、認証ヘッダを付ける。外部ストレージの
+ * 署名付きURLはそのまま使う。
+ */
+export function imageSource(url: string): { uri: string; headers?: Record<string, string> } {
+  const uri = absoluteApiUrl(url);
+  if (uri.startsWith(`${API_URL}/`)) {
+    const token = currentSessionToken();
+    if (token) return { uri, headers: { Authorization: `Bearer ${token}` } };
+  }
+  return { uri };
 }
 
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

@@ -98,3 +98,12 @@ export async function rawFetch(
     throw new ApiError(0, "ネットワークに接続できませんでした");
   }
 }
+
+/**
+ * サーバーが返したURLを絶対URLへ解決する。ストレージが同一オリジン配信の
+ * ときは相対パスで返るため、API のオリジンを補う。絶対URLはそのまま返す。
+ */
+export function absoluteApiUrl(url: string): string {
+  if (/^https?:\/\//.test(url)) return url;
+  return `${API_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
