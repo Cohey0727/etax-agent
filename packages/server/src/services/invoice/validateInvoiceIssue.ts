@@ -12,6 +12,9 @@ import { TaxpayerProfile } from "../../schemas/taxpayer";
 /** 適格請求書発行事業者の登録番号の形式（T＋数字13桁）。 */
 export const INVOICE_NUMBER_PATTERN = /^T\d{13}$/;
 
+/** 適格請求書に記載できる税率（標準10%・軽減8%・対象外0%）。 */
+const QUALIFIED_TAX_RATES: readonly number[] = [10, 8, 0];
+
 /** 発行者スナップショットをプロフィールから作る。屋号があれば屋号を名称にする。 */
 export function buildIssuerSnapshot(profile: TaxpayerProfile, isQualified: boolean): InvoiceIssuer {
   const address = [profile.address, profile.address_line2].filter((part) => part !== "").join(" ");
@@ -66,10 +69,16 @@ export function validateInvoiceIssue(
   } else if (!INVOICE_NUMBER_PATTERN.test(profile.invoice_number)) {
     problems.push("インボイス登録番号の形式が正しくありません（T＋数字13桁）");
   }
+  if (target.lines.some((line) => !QUALIFIED_TAX_RATES.includes(line.tax_rate_percent))) {
+    problems.push("税率は 10%・8%（軽減）・対象外（0%）のいずれかにしてください");
+  }
   if (
     target.lines.some((line) => line.tax_rate_percent === 8 && !line.is_reduced_rate)
   ) {
     problems.push("税率8%の明細は軽減税率の対象として明示してください（取引内容への記載が必要です）");
+  }
+  if (target.lines.some((line) => line.tax_rate_percent !== 8 && line.is_reduced_rate)) {
+    problems.push("軽減税率の対象にできるのは税率8%の明細だけです");
   }
   return problems;
 }

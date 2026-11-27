@@ -175,6 +175,29 @@ describe("発行バリデーション（適格請求書の記載事項）", () =
     expect(validateInvoiceIssue(marked, dummyProfile())).toEqual([]);
   });
 
+  test("軽減税率の印は8%の明細にだけ付けられる", () => {
+    for (const rate of [10, 0]) {
+      const marked = {
+        ...target,
+        lines: [{ item_name: "開発", tax_rate_percent: rate, is_reduced_rate: true }],
+      };
+      expect(validateInvoiceIssue(marked, dummyProfile()).some((p) => p.includes("軽減"))).toBe(true);
+    }
+  });
+
+  test("税率は 10%・8%・対象外（0%）以外では発行できない", () => {
+    const odd = {
+      ...target,
+      lines: [{ item_name: "開発", tax_rate_percent: 5, is_reduced_rate: false }],
+    };
+    expect(validateInvoiceIssue(odd, dummyProfile()).some((p) => p.includes("税率"))).toBe(true);
+    const exempt = {
+      ...target,
+      lines: [{ item_name: "立替金", tax_rate_percent: 0, is_reduced_rate: false }],
+    };
+    expect(validateInvoiceIssue(exempt, dummyProfile())).toEqual([]);
+  });
+
   test("適格でない請求書は登録番号がなくても発行できる", () => {
     const problems = validateInvoiceIssue(
       { ...target, is_qualified: false },
