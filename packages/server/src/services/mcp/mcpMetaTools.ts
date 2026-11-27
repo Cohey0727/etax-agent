@@ -8,7 +8,6 @@
  * /api/agent/chat・/api/classify 系・/api/freee/trial-balance と同じ部品を使う。
  */
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { ACCOUNT_CRITERIA, aggregateIncome, buildTrialBalance, XtxBalanceSheetInput } from "@etax/shared";
 import { billingEnabled } from "../../gateways/stripeGateway";
 import {
@@ -16,12 +15,12 @@ import {
   loadAgentConfig,
   loadStorageConfig,
   loadSystemOneConfig,
-  serverDataDir,
 } from "../../lib/config";
 import { isDatabaseConfigured } from "../../lib/db";
-import { currentUserId } from "../../lib/tenantContext";
+import { ownerIdForWrite } from "../../lib/tenantContext";
 import { saveJevPromptOverride } from "../../repositories/jevPromptRepository";
 import { saveRegexRulesOverride } from "../../repositories/regexRulesRepository";
+import { settingsFilePath } from "../../repositories/settingsFiles";
 import { getSubscriptionRow } from "../../repositories/subscriptionRepository";
 import { listTransactionRows } from "../../repositories/transactionRepository";
 import { BalanceSheetInputSchema } from "../../schemas/etax";
@@ -318,14 +317,9 @@ export const mcpMetaTools: McpToolModule = {
       });
     },
     get_freee_trial_balance: async () => {
-      const owner = currentUserId();
-      const filename =
-        owner === undefined
-          ? "freee-trial-balance.json"
-          : `freee-trial-balance-${owner}.json`;
       let text: string;
       try {
-        text = await readFile(join(serverDataDir(), filename), "utf-8");
+        text = await readFile(settingsFilePath("freee-trial-balance.json", ownerIdForWrite()), "utf-8");
       } catch {
         throw new Error("freee試算表データがまだ取り込まれていません");
       }
