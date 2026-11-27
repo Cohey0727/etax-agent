@@ -61,7 +61,7 @@ const styles = {
     display: "flex",
     justifyContent: "flex-end",
   }),
-  // 所得サマリーのカードグリッド（IncomeSummary と同じ）。
+  // 所得サマリーのカードグリッド（DashboardIncomeSummary と同じ）。
   statGrid: style({
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",

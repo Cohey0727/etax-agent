@@ -1,9 +1,9 @@
 import { BlueDeduction, FilingType, IncomeBreakdown, blueDeductionCaps } from "@etax/shared";
 import { Card, Col, Text } from "@components/atoms";
 import { formatYen } from "@utils";
-import styles from "./IncomeSummary.css";
+import styles from "./DashboardIncomeSummary.css";
 
-export interface IncomeSummaryProps {
+export interface DashboardIncomeSummaryProps {
   breakdown: IncomeBreakdown;
   blue: BlueDeduction;
   /** 申告の種類（青色申告特別控除の区分）。変更は納税者情報画面で行う。 */
@@ -14,13 +14,13 @@ export interface IncomeSummaryProps {
   hasAgricultureIncome: boolean;
 }
 
-export const IncomeSummary = ({
+export const DashboardIncomeSummary = ({
   breakdown,
   blue,
   filingType,
   realEstateBusinessScale,
   hasAgricultureIncome,
-}: IncomeSummaryProps) => {
+}: DashboardIncomeSummaryProps) => {
   const caps = blueDeductionCaps({ filingType, realEstateBusinessScale });
   // 事業・不動産を合算して上限がかかる場合は、内訳ごとの上限は出さない。
   const pooled = filingType === "blue10" || realEstateBusinessScale || filingType === "white";

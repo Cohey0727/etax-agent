@@ -4,6 +4,6 @@ export * from "./DashboardSkeleton";
 export * from "./YearlyTrendPanel";
 export * from "./BreakdownPanel";
 export * from "./FilingStatusPanel";
-export * from "./IncomeSummary";
+export * from "./DashboardIncomeSummary";
 export * from "./ConsumptionTaxComparison";
 export * from "./FreeeTrialBalance";

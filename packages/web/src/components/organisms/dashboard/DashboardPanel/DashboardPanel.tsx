@@ -6,7 +6,7 @@ import {
   loadDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { ConsumptionTaxComparison } from "../ConsumptionTaxComparison";
-import { IncomeSummary } from "../IncomeSummary";
+import { DashboardIncomeSummary } from "../DashboardIncomeSummary";
 
 export interface DashboardPanelProps {
   transactions: Transaction[];
@@ -52,7 +52,7 @@ export const DashboardPanel = ({ transactions, year }: DashboardPanelProps) => {
       <Text variant="muted">
         {year}年の集計 ／ 取引 {tx.length} 件（全 {transactions.length} 件）／ 税込経理
       </Text>
-      <IncomeSummary
+      <DashboardIncomeSummary
         breakdown={figures.breakdown}
         blue={figures.blue}
         filingType={deductionState.filingType}
