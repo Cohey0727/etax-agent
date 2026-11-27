@@ -1,15 +1,15 @@
+import {
+  formatInvoiceQuantity,
+  INVOICE_PAYMENT_STATUS_LABELS,
+  INVOICE_STATUS_LABELS,
+  INVOICE_TAX_ROUNDING_LABELS,
+} from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { InvoiceRecord } from "@/api";
 import { AppButton, AppText, Chip, LabeledValue } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatDate, formatYen } from "@/utils";
-import {
-  PAYMENT_STATUS_LABELS,
-  PAYMENT_STATUS_TONES,
-  ROUNDING_LABELS,
-  STATUS_LABELS,
-  formatQuantity,
-} from "../invoiceOptions";
+import { PAYMENT_STATUS_TONES } from "../invoiceOptions";
 import { InvoiceReconciliation } from "../InvoiceReconciliation";
 
 export interface InvoiceDetailProps {
@@ -42,7 +42,7 @@ export function InvoiceDetail({
   return (
     <View style={styles.wrap}>
       <View style={styles.chips}>
-        <Chip label={STATUS_LABELS[invoice.status]} tone={isIssued ? "accent" : "muted"} />
+        <Chip label={INVOICE_STATUS_LABELS[invoice.status]} tone={isIssued ? "accent" : "muted"} />
         {invoice.document_number ? <Chip label={invoice.document_number} /> : null}
         {invoice.is_qualified ? <Chip label="適格請求書" /> : null}
         {invoice.corrects_document_number ? (
@@ -50,7 +50,7 @@ export function InvoiceDetail({
         ) : null}
         {invoice.payment_status ? (
           <Chip
-            label={PAYMENT_STATUS_LABELS[invoice.payment_status]}
+            label={INVOICE_PAYMENT_STATUS_LABELS[invoice.payment_status]}
             tone={PAYMENT_STATUS_TONES[invoice.payment_status]}
           />
         ) : null}
@@ -67,7 +67,7 @@ export function InvoiceDetail({
         {invoice.due_date ? (
           <LabeledValue label="支払期限" value={formatDate(invoice.due_date)} />
         ) : null}
-        <LabeledValue label="消費税額の端数処理" value={ROUNDING_LABELS[invoice.tax_rounding]} />
+        <LabeledValue label="消費税額の端数処理" value={INVOICE_TAX_ROUNDING_LABELS[invoice.tax_rounding]} />
         {invoice.issuer ? (
           <LabeledValue
             label="発行者"
@@ -84,7 +84,7 @@ export function InvoiceDetail({
               {line.is_reduced_rate ? " ※" : ""}
             </AppText>
             <LabeledValue
-              label={`数量 ${formatQuantity(line.quantity)}${line.unit} ・ 税率 ${line.tax_rate_percent}%`}
+              label={`数量 ${formatInvoiceQuantity(line.quantity)}${line.unit} ・ 税率 ${line.tax_rate_percent}%`}
               value={formatYen(line.amount)}
             />
             <AppText size="xs" tone="muted">

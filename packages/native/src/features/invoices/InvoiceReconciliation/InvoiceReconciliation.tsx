@@ -1,3 +1,8 @@
+import {
+  INVOICE_PAYMENT_KIND_LABELS,
+  INVOICE_PAYMENT_STATUS_LABELS,
+  RECONCILIATION_REASON_LABELS,
+} from "@etax/shared";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { InvoiceRecord } from "@/api";
@@ -14,12 +19,7 @@ import {
 } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatDate, formatYen, parseAmount } from "@/utils";
-import {
-  PAYMENT_KIND_LABELS,
-  PAYMENT_STATUS_LABELS,
-  PAYMENT_STATUS_TONES,
-  REASON_LABELS,
-} from "../invoiceOptions";
+import { PAYMENT_STATUS_TONES } from "../invoiceOptions";
 import { useReconciliationData } from "../useReconciliationData";
 
 export interface InvoiceReconciliationProps {
@@ -101,7 +101,7 @@ export function InvoiceReconciliation({ invoice, onChanged }: InvoiceReconciliat
           入金消込
         </AppText>
         <Chip
-          label={PAYMENT_STATUS_LABELS[settlement.status]}
+          label={INVOICE_PAYMENT_STATUS_LABELS[settlement.status]}
           tone={PAYMENT_STATUS_TONES[settlement.status]}
         />
       </View>
@@ -122,7 +122,7 @@ export function InvoiceReconciliation({ invoice, onChanged }: InvoiceReconciliat
             <View key={payment.id} style={styles.paymentRow}>
               <View style={styles.paymentTexts}>
                 <AppText size="sm" weight="semibold">
-                  {PAYMENT_KIND_LABELS[payment.kind]} {formatYen(payment.amount)}
+                  {INVOICE_PAYMENT_KIND_LABELS[payment.kind]} {formatYen(payment.amount)}
                 </AppText>
                 <AppText size="xs" tone="muted">
                   {payment.transaction
@@ -164,7 +164,7 @@ export function InvoiceReconciliation({ invoice, onChanged }: InvoiceReconciliat
               </AppText>
               <View style={styles.chips}>
                 {candidate.reasons.map((reason) => (
-                  <Chip key={reason} label={REASON_LABELS[reason]} tone="accent" />
+                  <Chip key={reason} label={RECONCILIATION_REASON_LABELS[reason]} tone="accent" />
                 ))}
               </View>
               <AppButton

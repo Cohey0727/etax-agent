@@ -1,14 +1,14 @@
+import {
+  emptyInvoiceLine,
+  INVOICE_TAX_RATE_OPTIONS,
+  INVOICE_TAX_ROUNDING_OPTIONS,
+  invoiceInputTotals,
+  invoiceLineAmount,
+} from "@etax/shared";
 import { Button, Col, Icon, Input, Row, Select, Text, Textarea } from "@components/atoms";
 import { InvoiceInput, InvoiceLineInput } from "@types";
 import { formatYen } from "@utils/format";
 import styles from "./InvoicePanel.css";
-import {
-  ROUNDING_OPTIONS,
-  TAX_RATE_OPTIONS,
-  emptyLine,
-  previewTotals,
-} from "./invoiceOptions";
-import { invoiceLineAmount } from "@etax/shared";
 
 export interface InvoiceFormProps {
   submitLabel: string;
@@ -43,7 +43,7 @@ export const InvoiceForm = ({
     });
     patch({ lines });
   };
-  const totals = previewTotals(value);
+  const totals = invoiceInputTotals(value);
 
   return (
     <Col gap="md">
@@ -93,7 +93,7 @@ export const InvoiceForm = ({
             value={value.tax_rounding}
             onChange={(e) => patch({ tax_rounding: e.target.value as InvoiceInput["tax_rounding"] })}
           >
-            {ROUNDING_OPTIONS.map((option) => (
+            {INVOICE_TAX_ROUNDING_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -172,7 +172,7 @@ export const InvoiceForm = ({
                 value={line.tax_rate_percent}
                 onChange={(e) => patchLine(index, { tax_rate_percent: Number(e.target.value) })}
               >
-                {TAX_RATE_OPTIONS.map((option) => (
+                {INVOICE_TAX_RATE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -217,7 +217,7 @@ export const InvoiceForm = ({
           <Button
             variant="tab"
             size="sm"
-            onClick={() => patch({ lines: [...value.lines, emptyLine()] })}
+            onClick={() => patch({ lines: [...value.lines, emptyInvoiceLine()] })}
             disabled={busy}
           >
             <Icon name="plus" size={14} /> 明細を追加

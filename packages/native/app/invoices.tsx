@@ -1,3 +1,4 @@
+import { emptyInvoiceInput, invoiceRecordToInput } from "@etax/shared";
 import { useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { InvoiceInput, InvoiceRecord, InvoiceSearchFilters } from "@/api";
@@ -15,7 +16,6 @@ import {
 import { InvoiceDetail } from "@/features/invoices/InvoiceDetail";
 import { InvoiceForm } from "@/features/invoices/InvoiceForm";
 import { InvoiceList } from "@/features/invoices/InvoiceList";
-import { emptyDraft, toInput } from "@/features/invoices/invoiceOptions";
 import { useInvoicesData } from "@/features/invoices/useInvoicesData";
 import { space } from "@/theme";
 
@@ -48,7 +48,7 @@ export default function InvoicesScreen() {
     handleSharePdf,
   } = useInvoicesData();
   const [formState, setFormState] = useState<FormState>(null);
-  const [draft, setDraft] = useState<InvoiceInput>(() => emptyDraft());
+  const [draft, setDraft] = useState<InvoiceInput>(() => emptyInvoiceInput());
   const [detailId, setDetailId] = useState<number | null>(null);
   // 検索条件の入力値（「検索」を押すまで一覧には反映しない）。
   const [searchText, setSearchText] = useState("");
@@ -84,13 +84,13 @@ export default function InvoicesScreen() {
       : null;
 
   const openCreate = () => {
-    setDraft(emptyDraft());
+    setDraft(emptyInvoiceInput());
     setFormState({ kind: "create" });
   };
 
   const openEdit = () => {
     if (!detailInvoice) return;
-    setDraft(toInput(detailInvoice));
+    setDraft(invoiceRecordToInput(detailInvoice));
     setFormState({ kind: "edit", id: detailInvoice.id });
   };
 
@@ -204,7 +204,7 @@ export default function InvoicesScreen() {
               void (async () => {
                 const correction = await handleCorrect(detailInvoice.id);
                 if (correction) {
-                  setDraft(toInput(correction));
+                  setDraft(invoiceRecordToInput(correction));
                   setFormState({ kind: "edit", id: correction.id });
                   setDetailId(null);
                 }

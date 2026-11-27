@@ -1,9 +1,13 @@
+import {
+  formatInvoiceQuantity,
+  INVOICE_STATUS_LABELS,
+  INVOICE_TAX_ROUNDING_LABELS,
+} from "@etax/shared";
 import { Badge, Button, Col, Row, Table, TableCell, TableHeaderCell, Text } from "@components/atoms";
 import { InvoiceRecord } from "@types";
 import { formatYen } from "@utils/format";
 import styles from "./InvoicePanel.css";
 import { InvoiceReconciliation } from "./InvoiceReconciliation";
-import { ROUNDING_LABELS, STATUS_LABELS, formatQuantity } from "./invoiceOptions";
 
 export interface InvoiceDetailProps {
   invoice: InvoiceRecord;
@@ -37,7 +41,7 @@ export const InvoiceDetail = ({
   return (
     <Col gap="md">
       <Row gap="sm" align="center" wrap>
-        <Badge>{STATUS_LABELS[invoice.status]}</Badge>
+        <Badge>{INVOICE_STATUS_LABELS[invoice.status]}</Badge>
         {invoice.document_number ? <Badge>{invoice.document_number}</Badge> : null}
         {invoice.is_qualified ? <Badge>適格請求書</Badge> : null}
         {invoice.corrects_document_number ? (
@@ -53,7 +57,7 @@ export const InvoiceDetail = ({
         <Text variant="caption">発行日: {invoice.issue_date}</Text>
         {invoice.due_date ? <Text variant="caption">支払期限: {invoice.due_date}</Text> : null}
         <Text variant="caption">
-          消費税額の端数処理: {ROUNDING_LABELS[invoice.tax_rounding]}
+          消費税額の端数処理: {INVOICE_TAX_ROUNDING_LABELS[invoice.tax_rounding]}
         </Text>
         {invoice.issuer ? (
           <Text variant="caption">
@@ -82,7 +86,7 @@ export const InvoiceDetail = ({
                   {line.is_reduced_rate ? " ※" : ""}
                 </TableCell>
                 <TableCell>
-                  {formatQuantity(line.quantity)}
+                  {formatInvoiceQuantity(line.quantity)}
                   {line.unit}
                 </TableCell>
                 <TableCell>{formatYen(line.unit_price)}</TableCell>

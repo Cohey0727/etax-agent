@@ -1,3 +1,4 @@
+import { validateInvoiceInput } from "@etax/shared";
 import { useCallback, useEffect, useState } from "react";
 import { InvoiceInput, InvoiceRecord, InvoiceSearchFilters } from "@types";
 import {
@@ -9,7 +10,6 @@ import {
   issueInvoice,
   updateInvoice,
 } from "@utils/api";
-import { validateInput } from "./invoiceOptions";
 
 export type LoadStatus = "loading" | "ready" | "unavailable";
 
@@ -68,7 +68,7 @@ export function useInvoicesData() {
   };
 
   const handleCreate = async (input: InvoiceInput): Promise<InvoiceRecord | null> => {
-    const problem = validateInput(input);
+    const problem = validateInvoiceInput(input);
     if (problem) {
       setError(problem);
       return null;
@@ -89,7 +89,7 @@ export function useInvoicesData() {
   };
 
   const handleUpdate = async (id: number, input: InvoiceInput): Promise<boolean> => {
-    const problem = validateInput(input);
+    const problem = validateInvoiceInput(input);
     if (problem) {
       setError(problem);
       return false;

@@ -1,3 +1,4 @@
+import { emptyInvoiceInput, invoiceRecordToInput } from "@etax/shared";
 import { useState } from "react";
 import { Button, Col, Icon, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox, Drawer } from "@components/molecules";
@@ -7,7 +8,6 @@ import { InvoiceForm } from "./InvoiceForm";
 import { InvoiceList } from "./InvoiceList";
 import { InvoiceSkeleton } from "./InvoiceSkeleton";
 import styles from "./InvoicePanel.css";
-import { emptyDraft, toInput } from "./invoiceOptions";
 import { useInvoicesData } from "./useInvoicesData";
 
 type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
@@ -41,7 +41,7 @@ export const InvoicePanel = () => {
     handleDownloadPdf,
   } = useInvoicesData();
   const [formState, setFormState] = useState<FormState>(null);
-  const [draft, setDraft] = useState<InvoiceInput>(() => emptyDraft());
+  const [draft, setDraft] = useState<InvoiceInput>(() => emptyInvoiceInput());
   const [detailId, setDetailId] = useState<number | null>(null);
   // 検索条件の入力値（「検索」を押すまで一覧には反映しない）。
   const [searchText, setSearchText] = useState("");
@@ -70,13 +70,13 @@ export const InvoicePanel = () => {
       : null;
 
   const openCreate = () => {
-    setDraft(emptyDraft());
+    setDraft(emptyInvoiceInput());
     setFormState({ kind: "create" });
   };
 
   const openEdit = () => {
     if (!detailInvoice) return;
-    setDraft(toInput(detailInvoice));
+    setDraft(invoiceRecordToInput(detailInvoice));
     setFormState({ kind: "edit", id: detailInvoice.id });
   };
 
@@ -219,7 +219,7 @@ export const InvoicePanel = () => {
               void (async () => {
                 const correction = await handleCorrect(detailInvoice.id);
                 if (correction) {
-                  setDraft(toInput(correction));
+                  setDraft(invoiceRecordToInput(correction));
                   setFormState({ kind: "edit", id: correction.id });
                   setDetailId(null);
                 }

@@ -1,11 +1,16 @@
-import { invoiceLineAmount } from "@etax/shared";
+import {
+  emptyInvoiceLine,
+  INVOICE_TAX_ROUNDING_OPTIONS,
+  invoiceInputTotals,
+  invoiceLineAmount,
+} from "@etax/shared";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { InvoiceInput, InvoiceLineInput } from "@/api";
 import { AppButton, AppText, DateField, Field, LabeledValue, MoneyField, SelectField, SwitchRow } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatYen, parseAmount } from "@/utils";
-import { ROUNDING_OPTIONS, TAX_RATE_OPTIONS, emptyLine, previewTotals } from "../invoiceOptions";
+import { TAX_RATE_OPTIONS } from "../invoiceOptions";
 
 export interface InvoiceFormProps {
   submitLabel: string;
@@ -41,7 +46,7 @@ export function InvoiceForm({ submitLabel, value, busy, onChange, onSubmit, onCa
     });
     patch({ lines });
   };
-  const totals = previewTotals(value);
+  const totals = invoiceInputTotals(value);
 
   return (
     <View style={styles.form}>
@@ -71,7 +76,7 @@ export function InvoiceForm({ submitLabel, value, busy, onChange, onSubmit, onCa
       <SelectField
         label="消費税額の端数処理"
         onChange={(next) => patch({ tax_rounding: next })}
-        options={ROUNDING_OPTIONS}
+        options={INVOICE_TAX_ROUNDING_OPTIONS}
         value={value.tax_rounding}
       />
       <SwitchRow
@@ -153,7 +158,7 @@ export function InvoiceForm({ submitLabel, value, busy, onChange, onSubmit, onCa
         variant="ghost"
         size="sm"
         disabled={busy}
-        onPress={() => patch({ lines: [...value.lines, emptyLine()] })}
+        onPress={() => patch({ lines: [...value.lines, emptyInvoiceLine()] })}
       />
 
       <Field

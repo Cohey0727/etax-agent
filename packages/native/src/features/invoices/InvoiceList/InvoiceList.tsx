@@ -1,9 +1,10 @@
+import { INVOICE_PAYMENT_STATUS_LABELS, INVOICE_STATUS_LABELS } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { InvoiceRecord } from "@/api";
 import { AppText, BouncePressable, Card, Chip, LabeledValue } from "@/components";
 import { space } from "@/theme";
 import { formatDate, formatYen } from "@/utils";
-import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES, STATUS_LABELS } from "../invoiceOptions";
+import { PAYMENT_STATUS_TONES } from "../invoiceOptions";
 
 export interface InvoiceListProps {
   invoices: InvoiceRecord[];
@@ -24,7 +25,7 @@ export function InvoiceList({ invoices, onSelect }: InvoiceListProps) {
           <Card index={index}>
             <View style={styles.chips}>
               <Chip
-                label={STATUS_LABELS[invoice.status]}
+                label={INVOICE_STATUS_LABELS[invoice.status]}
                 tone={invoice.status === "issued" ? "accent" : "muted"}
               />
               {invoice.document_number ? <Chip label={invoice.document_number} /> : null}
@@ -34,7 +35,7 @@ export function InvoiceList({ invoices, onSelect }: InvoiceListProps) {
               {invoice.is_qualified ? <Chip label="適格請求書" /> : null}
               {invoice.payment_status ? (
                 <Chip
-                  label={PAYMENT_STATUS_LABELS[invoice.payment_status]}
+                  label={INVOICE_PAYMENT_STATUS_LABELS[invoice.payment_status]}
                   tone={PAYMENT_STATUS_TONES[invoice.payment_status]}
                 />
               ) : null}

@@ -1,3 +1,8 @@
+import {
+  INVOICE_PAYMENT_KIND_LABELS,
+  INVOICE_PAYMENT_STATUS_LABELS,
+  RECONCILIATION_REASON_LABELS,
+} from "@etax/shared";
 import { useState } from "react";
 import {
   Badge,
@@ -15,11 +20,6 @@ import { AlertBox } from "@components/molecules";
 import { InvoiceRecord } from "@types";
 import { formatYen } from "@utils/format";
 import styles from "./InvoicePanel.css";
-import {
-  PAYMENT_KIND_LABELS,
-  PAYMENT_STATUS_LABELS,
-  REASON_LABELS,
-} from "./invoiceOptions";
 import { useReconciliationData } from "./useReconciliationData";
 
 export interface InvoiceReconciliationProps {
@@ -92,7 +92,7 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
     <Col gap="md">
       <Row gap="sm" align="center" wrap>
         <Text variant="sectionTitle">入金消込</Text>
-        <Badge>{PAYMENT_STATUS_LABELS[settlement.status]}</Badge>
+        <Badge>{INVOICE_PAYMENT_STATUS_LABELS[settlement.status]}</Badge>
       </Row>
       {error ? <AlertBox variant="error">{error}</AlertBox> : null}
 
@@ -136,7 +136,7 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
                   <TableCell>
                     {payment.transaction?.description ?? "（取引は削除済み）"}
                   </TableCell>
-                  <TableCell>{PAYMENT_KIND_LABELS[payment.kind]}</TableCell>
+                  <TableCell>{INVOICE_PAYMENT_KIND_LABELS[payment.kind]}</TableCell>
                   <TableCell>{formatYen(payment.amount)}</TableCell>
                   <TableCell>
                     {payment.kind === "payment" ? (
@@ -173,7 +173,7 @@ export const InvoiceReconciliation = ({ invoice, onChanged }: InvoiceReconciliat
               </Text>
               <Text variant="body">{formatYen(candidate.transaction.amount)}</Text>
               {candidate.reasons.map((reason) => (
-                <Badge key={reason}>{REASON_LABELS[reason]}</Badge>
+                <Badge key={reason}>{RECONCILIATION_REASON_LABELS[reason]}</Badge>
               ))}
               <Button
                 variant="tab"

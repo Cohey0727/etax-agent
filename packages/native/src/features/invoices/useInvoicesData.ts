@@ -2,6 +2,7 @@
  * useInvoicesData.ts — 請求書の読み込みと CRUD・発行・修正・PDF の管理。
  * 発行済みの帳票は不変で、画面側からも更新・削除の導線を出さない。
  */
+import { validateInvoiceInput } from "@etax/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   InvoiceInput,
@@ -18,7 +19,6 @@ import {
   shareFile,
   updateInvoice,
 } from "@/api";
-import { validateInput } from "./invoiceOptions";
 
 export type LoadStatus = "loading" | "ready" | "unavailable";
 
@@ -66,7 +66,7 @@ export function useInvoicesData() {
   };
 
   const handleCreate = async (input: InvoiceInput): Promise<InvoiceRecord | null> => {
-    const problem = validateInput(input);
+    const problem = validateInvoiceInput(input);
     if (problem) {
       setError(problem);
       return null;
@@ -87,7 +87,7 @@ export function useInvoicesData() {
   };
 
   const handleUpdate = async (id: number, input: InvoiceInput): Promise<boolean> => {
-    const problem = validateInput(input);
+    const problem = validateInvoiceInput(input);
     if (problem) {
       setError(problem);
       return false;
