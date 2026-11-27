@@ -1,7 +1,7 @@
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
-import { ChatAttachmentUpload, readLocalFileBytes } from "@/api";
+import { ChatAttachmentUpload, encodeBase64, readLocalFileBytes } from "@/api";
 
 /** 送信前に保持する添付（読み込み済みの実データつき）。 */
 export interface PendingAttachment extends ChatAttachmentUpload {
@@ -11,29 +11,6 @@ export interface PendingAttachment extends ChatAttachmentUpload {
 /** 添付の上限（Web・サーバーと揃える）。 */
 export const MAX_CHAT_ATTACHMENTS = 5;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
-
-const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-/** バイト列を Base64 へ（分割して変換する）。 */
-export function bytesToBase64(bytes: Uint8Array): string {
-  // バイト列をバイナリ文字列へ（分割して変換し、スタック溢れを避ける）
-  let binary = "";
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    for (const b of bytes.subarray(i, i + CHUNK)) binary += String.fromCharCode(b);
-  }
-  let result = "";
-  for (let i = 0; i < binary.length; i += 3) {
-    const a = binary.charCodeAt(i);
-    const b = i + 1 < binary.length ? binary.charCodeAt(i + 1) : 0;
-    const c = i + 2 < binary.length ? binary.charCodeAt(i + 2) : 0;
-    result += BASE64_CHARS[a >> 2];
-    result += BASE64_CHARS[((a & 3) << 4) | (b >> 4)];
-    result += i + 1 < binary.length ? BASE64_CHARS[((b & 15) << 2) | (c >> 6)] : "=";
-    result += i + 2 < binary.length ? BASE64_CHARS[c & 63] : "=";
-  }
-  return result;
-}
 
 let seq = 0;
 function nextId(): string {
@@ -66,7 +43,7 @@ export async function readAttachmentFile(
     id: nextId(),
     name,
     mimeType: mimeType ?? "application/octet-stream",
-    dataBase64: bytesToBase64(bytes),
+    dataBase64: encodeBase64(bytes),
   };
 }
 

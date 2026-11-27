@@ -19,8 +19,7 @@ import { SelectField } from "@/components/SelectField";
 import { Sheet } from "@/components/Sheet";
 import { SkeletonCard } from "@/components/Skeleton";
 import { space } from "@/theme";
-import { formatDate } from "@/utils";
-import { copyText } from "../copyText";
+import { copyText, formatDate } from "@/utils";
 
 const STATUS_LABELS: Record<ApiKeyItem["status"], { label: string; tone: ChipTone }> = {
   active: { label: "有効", tone: "positive" },

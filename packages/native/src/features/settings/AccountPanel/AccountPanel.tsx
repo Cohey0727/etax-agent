@@ -20,8 +20,7 @@ import { Field } from "@/components/Field";
 import { LabeledValue } from "@/components/LabeledValue";
 import { SkeletonCard } from "@/components/Skeleton";
 import { space } from "@/theme";
-import { formatDate } from "@/utils";
-import { copyText } from "../copyText";
+import { copyText, formatDate } from "@/utils";
 
 type BusyKind = "totpSetup" | "totpEnable" | "totpDisable" | "checkout" | "signOut" | null;
 

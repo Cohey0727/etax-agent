@@ -10,7 +10,7 @@ import { Chip } from "@/components/Chip";
 import { SkeletonCard } from "@/components/Skeleton";
 import { Tabs } from "@/components/Tabs";
 import { space } from "@/theme";
-import { copyText } from "../copyText";
+import { copyText } from "@/utils";
 
 type ClientId = "claudeCode" | "codex" | "muse";
 

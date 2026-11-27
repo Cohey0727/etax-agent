@@ -4,24 +4,8 @@
  * アップロードできない場合は画像を Base64 で直接渡す。
  */
 import { apiJson, apiJsonOrNull, ApiError, LONG_TIMEOUT_MS } from "./client";
-import { readLocalFileBytes, uploadViaPresignedUrl, UPLOADABLE_IMAGE_TYPES } from "./files";
+import { encodeBase64, readLocalFileBytes, uploadViaPresignedUrl, UPLOADABLE_IMAGE_TYPES } from "./files";
 import { AnalyzeReceiptResponse, ReceiptRecord } from "./types";
-
-/** Base64化（アップロード経路が使えない場合のフォールバック用）。 */
-function encodeBase64(bytes: Uint8Array): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i];
-    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
-    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
-    out += chars[a >> 2];
-    out += chars[((a & 3) << 4) | (b >> 4)];
-    out += i + 1 < bytes.length ? chars[((b & 15) << 2) | (c >> 6)] : "=";
-    out += i + 2 < bytes.length ? chars[c & 63] : "=";
-  }
-  return out;
-}
 
 /** 領収書の解析結果と、証憑台帳に記録されたファイルID（Base64 経路では記録されないので null）。 */
 export interface AnalyzedReceipt {

@@ -71,6 +71,21 @@ export function imageSource(url: string): { uri: string; headers?: Record<string
 
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+/** バイト列を Base64 文字列へ変換する（画像・添付を JSON で送る用）。 */
+export function encodeBase64(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i] ?? 0;
+    const b = bytes[i + 1] ?? 0;
+    const c = bytes[i + 2] ?? 0;
+    out += BASE64_CHARS[a >> 2];
+    out += BASE64_CHARS[((a & 3) << 4) | (b >> 4)];
+    out += i + 1 < bytes.length ? BASE64_CHARS[((b & 15) << 2) | (c >> 6)] : "=";
+    out += i + 2 < bytes.length ? BASE64_CHARS[c & 63] : "=";
+  }
+  return out;
+}
+
 /** Base64文字列をバイト列へ変換する（PDF等の生成物保存用）。 */
 export function decodeBase64(base64: string): Uint8Array {
   const clean = base64.replace(/[^A-Za-z0-9+/=]/g, "");
