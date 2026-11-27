@@ -6,7 +6,8 @@
  * 一本化する。入力は所有者スコープ付きのリポジトリ経由でのみ集める:
  * - 実績: 帳簿の取引（論理削除済みはリポジトリが除外）
  * - 入金予定: 発行済み請求書のうち未消込残額があるもの（消込サマリは
- *   消込リポジトリの集計を使い、残額の定義を請求書画面と揃える）
+ *   消込リポジトリの集計を使い、残額の定義を請求書画面と揃える）。
+ *   「修正した適格請求書」が発行済みの当初分は、修正分に置き換わるため除く
  * 基準日は Asia/Tokyo の今日（MCP の todayInTokyo と同じ決め方）。
  */
 import {
@@ -16,7 +17,7 @@ import {
   type CashFlowReport,
 } from "@etax/shared";
 import type { Db } from "../../lib/db";
-import { listInvoiceRows } from "../../repositories/invoiceRepository";
+import { listCorrectedInvoiceIds, listInvoiceRows } from "../../repositories/invoiceRepository";
 import { settlementSummaries } from "../../repositories/reconciliationRepository";
 import { listTransactionRows } from "../../repositories/transactionRepository";
 import type {
@@ -99,7 +100,9 @@ export async function fetchCashFlowReport(
   const transactionRows = await listTransactionRows(db);
   const transactions = transactionRows.map((row) => ({ date: row.date, amount: row.amount }));
 
-  const invoiceRows = await listInvoiceRows(db, { status: "issued" });
+  const issuedRows = await listInvoiceRows(db, { status: "issued" });
+  const corrected = await listCorrectedInvoiceIds(db, issuedRows.map((row) => row.id));
+  const invoiceRows = issuedRows.filter((row) => !corrected.has(row.id));
   const totals = new Map(invoiceRows.map((row) => [row.id, row.totalAmount]));
   const settlements = await settlementSummaries(db, totals);
   const receipts: CashFlowReceiptInput[] = [];

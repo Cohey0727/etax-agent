@@ -7,7 +7,7 @@
  * 発行済み帳票は不変: 更新・削除は下書きに限ることを呼び出し側（usecases）が
  * 担保し、リポジトリの発行処理は status = draft の行にだけ効く条件で守る。
  */
-import { and, asc, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import {
   computeInvoiceTotals,
   invoiceLineAmount,
@@ -170,6 +170,29 @@ export async function listInvoiceLines(db: Db, documentId: number): Promise<Docu
     .from(documentLinesTable)
     .where(eq(documentLinesTable.documentId, documentId))
     .orderBy(asc(documentLinesTable.lineOrder), asc(documentLinesTable.id));
+}
+
+/**
+ * 指定した帳票のうち、「修正した適格請求書」が発行済みのもの（当初分）の id。
+ * 修正分は当初分の全明細を写した置き換えの帳票なので、当初分の未消込額は
+ * 入金予定・消込候補に数えない。
+ */
+export async function listCorrectedInvoiceIds(
+  db: DbOrTx,
+  ids: readonly number[],
+): Promise<Set<number>> {
+  if (ids.length === 0) return new Set();
+  const owner = currentUserId();
+  const conditions = [
+    eq(documentsTable.status, "issued"),
+    inArray(documentsTable.correctsDocumentId, [...ids]),
+  ];
+  if (owner !== undefined) conditions.push(eq(documentsTable.ownerUserId, owner));
+  const rows = await db
+    .select({ correctsDocumentId: documentsTable.correctsDocumentId })
+    .from(documentsTable)
+    .where(and(...conditions));
+  return new Set(rows.flatMap((row) => (row.correctsDocumentId === null ? [] : [row.correctsDocumentId])));
 }
 
 /** 発行控えの検索条件（日付範囲・金額範囲・交付先/番号の部分一致・ステータス）。 */

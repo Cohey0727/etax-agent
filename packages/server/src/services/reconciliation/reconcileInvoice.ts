@@ -8,7 +8,11 @@
  */
 import { suggestReconciliations } from "@etax/shared";
 import { Db } from "../../lib/db";
-import { getInvoiceRow, lockInvoiceRow } from "../../repositories/invoiceRepository";
+import {
+  getInvoiceRow,
+  listCorrectedInvoiceIds,
+  lockInvoiceRow,
+} from "../../repositories/invoiceRepository";
 import {
   appliedAmountsByTransaction,
   deleteReconciliation,
@@ -112,6 +116,8 @@ export async function releaseInvoicePayment(
 /**
  * 消込候補を自動推測する。金額一致・取引先名の近似・期日の近接で採点した
  * 候補を返すだけで、消込は確定しない（確定は applyInvoicePayment のみ）。
+ * 「修正した適格請求書」が発行済みの当初分には候補を出さない（入金は
+ * 修正分に消し込む）。
  */
 export async function suggestInvoicePayments(
   db: Db,
@@ -120,6 +126,7 @@ export async function suggestInvoicePayments(
   const invoice = await getInvoiceRow(db, invoiceId);
   if (!invoice) throw new ReconciliationError(404, "請求書が見つかりません");
   if (invoice.status !== "issued") return [];
+  if ((await listCorrectedInvoiceIds(db, [invoice.id])).has(invoice.id)) return [];
   const summaries = await settlementSummaries(db, new Map([[invoice.id, invoice.totalAmount]]));
   const remaining = summaries.get(invoice.id)?.remainingAmount ?? invoice.totalAmount;
   const incomeRows = (await listTransactionRows(db)).filter((row) => row.amount > 0);

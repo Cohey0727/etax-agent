@@ -31,6 +31,12 @@ import {
   suggestInvoicePayments,
 } from "../src/services/reconciliation/reconcileInvoice";
 import { Db } from "../src/lib/db";
+import { fetchCashFlowReport } from "../src/services/cashFlow/getCashFlowReportData";
+import {
+  createInvoiceCorrectionDraft,
+  createInvoiceDocument,
+  issueInvoiceDocument,
+} from "../src/services/invoice/invoiceDocuments";
 
 async function makeInvoice(db: Db, totalAmount: number, issue = true): Promise<DocumentRow> {
   const header: InvoiceHeaderDraft = {
@@ -341,5 +347,33 @@ describe("消込の同時実行", () => {
     );
     const rows = await listTransactionRows(db);
     expect(rows.filter((row) => row.category === "支払手数料")).toHaveLength(1);
+  });
+});
+
+describe("修正した適格請求書の当初分", () => {
+  test("修正分を発行すると、当初分は入金予定と消込候補から外れる", async () => {
+    const db = await createTestDb();
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tokyo" });
+    const created = await createInvoiceDocument(db, {
+      issue_date: today,
+      due_date: today,
+      counterparty_name: "株式会社テスト商事",
+      is_qualified: false,
+      lines: [{ item_name: "開発", quantity: 1, unit_price: 100000, tax_rate_percent: 10 }],
+    });
+    const original = await issueInvoiceDocument(db, created!.id);
+    await makeTx(db, 110000, "振込 株式会社テスト商事");
+    expect(await suggestInvoicePayments(db, original.id)).toHaveLength(1);
+
+    // 修正用の下書きだけでは当初分はそのまま
+    const draft = await createInvoiceCorrectionDraft(db, original.id);
+    expect((await fetchCashFlowReport(db, {})).total_scheduled_inflow).toBe(110000);
+
+    const corrected = await issueInvoiceDocument(db, draft!.id);
+    const report = await fetchCashFlowReport(db, {});
+    expect(report.total_scheduled_inflow).toBe(110000);
+    expect(report.upcoming_receipts.map((r) => r.document_id)).toEqual([corrected.id]);
+    expect(await suggestInvoicePayments(db, original.id)).toEqual([]);
+    expect(await suggestInvoicePayments(db, corrected.id)).toHaveLength(1);
   });
 });
