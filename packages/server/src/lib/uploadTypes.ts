@@ -7,6 +7,16 @@
  * text/html で配信される Stored XSS になるため、受け入れ時と配信時の
  * 両方でこのリストに寄せる（Issue #7）。
  */
+/**
+ * 1ファイルのアップロードの上限（バイト）。API のリクエストボディの上限と
+ * 同じ値にする。署名付き URL でストレージへ直接上げたファイルはボディ上限を
+ * 通らないため、添付・解析の時点でストレージ上のサイズをこの上限で確かめる。
+ */
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+/** アップロードの上限を超えたときの文言。 */
+export const UPLOAD_TOO_LARGE_MESSAGE = "ファイルが大きすぎます（25MBまで）";
+
 export const ALLOWED_UPLOAD_CONTENT_TYPES = [
   "image/jpeg",
   "image/png",

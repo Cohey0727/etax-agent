@@ -11,6 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createTestDb } from "./testDb";
 import { createStorageClient, fixedAssetObjectKey } from "../src/gateways/storageGateway";
+import { loadStorageConfig } from "../src/lib/config";
+import { MAX_UPLOAD_BYTES } from "../src/lib/uploadTypes";
 import { insertFixedAssetRow } from "../src/repositories/fixedAssetRepository";
 import {
   deleteFixedAssetImageRow,
@@ -186,6 +188,26 @@ describe("HTTP: 固定資産画像の流れ", () => {
       json: { file_id: "00000000-0000-0000-0000-000000000000" },
     });
     expect(attached.status).toBe(400);
+  });
+
+  test("アップロードの上限を超えるファイルの添付は 400 で、実体も消す", async () => {
+    await createTestDb();
+    const created = await req("/api/fixed-assets", {
+      method: "POST",
+      json: { name: "棚", acquisition_date: "2026-02-01", cost: 120_000, useful_life_years: 8 },
+    });
+    const asset = created.body.asset as { id: number };
+    // 署名付き URL での直アップロードは API のボディ上限を通らないため、
+    // ストレージへ直接置いた状態を作る。
+    const fileId = crypto.randomUUID();
+    const storage = createStorageClient(loadStorageConfig());
+    await storage.save(fixedAssetObjectKey(fileId), new Uint8Array(MAX_UPLOAD_BYTES + 1), "image/png");
+    const attached = await req(`/api/fixed-assets/${asset.id}/images`, {
+      method: "POST",
+      json: { file_id: fileId },
+    });
+    expect(attached.status).toBe(400);
+    expect(await storage.head(fixedAssetObjectKey(fileId))).toBeNull();
   });
 
   test("存在しない資産への添付は 404", async () => {

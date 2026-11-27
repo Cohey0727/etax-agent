@@ -58,6 +58,7 @@ import {
 } from "./lib/errors";
 import { publicBaseUrl } from "./lib/publicUrl";
 import { defaultValidationHook } from "./lib/validationHook";
+import { MAX_UPLOAD_BYTES } from "./lib/uploadTypes";
 import { billingEnabled } from "./gateways/stripeGateway";
 import { StorageError, StorageObjectNotFoundError } from "./gateways/storageGateway";
 import { hasActivePlan } from "./repositories/subscriptionRepository";
@@ -164,7 +165,7 @@ app.use("/api/*", async (c, next) => {
 app.use(
   "/api/*",
   bodyLimit({
-    maxSize: 25 * 1024 * 1024,
+    maxSize: MAX_UPLOAD_BYTES,
     onError: (c) => c.json({ error: "リクエストが大きすぎます（上限 25MB）" }, 413),
   }),
 );

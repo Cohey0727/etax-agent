@@ -12,7 +12,12 @@ import { loadStorageConfig } from "../lib/config";
 import { requireDb } from "../lib/errors";
 import { fixedAssetImageDisplayUrl } from "../lib/fixedAssetImageUrl";
 import { readJsonBody } from "../lib/readJsonBody";
-import { isAllowedUploadContentType, normalizeContentType } from "../lib/uploadTypes";
+import {
+  isAllowedUploadContentType,
+  MAX_UPLOAD_BYTES,
+  normalizeContentType,
+  UPLOAD_TOO_LARGE_MESSAGE,
+} from "../lib/uploadTypes";
 import { getFixedAssetRow } from "../repositories/fixedAssetRepository";
 import {
   fixedAssetImageToApi,
@@ -83,6 +88,10 @@ export const attachFixedAssetImageHandler: RouteHandler<typeof attachFixedAssetI
   const head = await storage.head(fixedAssetObjectKey(fileId));
   if (!head) {
     throw new HTTPException(400, { message: "アップロードされた画像が確認できません" });
+  }
+  if (head.size > MAX_UPLOAD_BYTES) {
+    await storage.deleteObject(fixedAssetObjectKey(fileId)).catch(() => undefined);
+    throw new HTTPException(400, { message: UPLOAD_TOO_LARGE_MESSAGE });
   }
   const mimeType = normalizeContentType(head.contentType);
   if (!isAllowedUploadContentType(mimeType)) {

@@ -13,7 +13,12 @@ import { createStorageClient, filingReceiptObjectKey } from "../gateways/storage
 import { loadStorageConfig } from "../lib/config";
 import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
-import { isAllowedDocumentContentType, normalizeContentType } from "../lib/uploadTypes";
+import {
+  isAllowedDocumentContentType,
+  MAX_UPLOAD_BYTES,
+  normalizeContentType,
+  UPLOAD_TOO_LARGE_MESSAGE,
+} from "../lib/uploadTypes";
 import { getFilingSubmissionRowByFileId } from "../repositories/filingSubmissionRepository";
 import { ErrorSchema } from "../schemas/common";
 import {
@@ -74,6 +79,10 @@ export const attachFilingReceiptHandler: RouteHandler<typeof attachFilingReceipt
   const head = await storage.head(filingReceiptObjectKey(fileId));
   if (!head) {
     throw new HTTPException(400, { message: "アップロードされたファイルが確認できません" });
+  }
+  if (head.size > MAX_UPLOAD_BYTES) {
+    await storage.deleteObject(filingReceiptObjectKey(fileId)).catch(() => undefined);
+    throw new HTTPException(400, { message: UPLOAD_TOO_LARGE_MESSAGE });
   }
   const mimeType = normalizeContentType(head.contentType);
   if (!isAllowedDocumentContentType(mimeType)) {

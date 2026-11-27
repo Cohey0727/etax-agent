@@ -16,6 +16,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createTestDb } from "./testDb";
+import { createStorageClient, filingReceiptObjectKey } from "../src/gateways/storageGateway";
+import { loadStorageConfig } from "../src/lib/config";
+import { MAX_UPLOAD_BYTES } from "../src/lib/uploadTypes";
 import { filingSubmissionHistoryTable } from "../src/repositories/schema";
 
 process.env.DATABASE_URL =
@@ -259,6 +262,23 @@ describe("HTTP: 受信通知PDFの保管", () => {
       json: { file_id: "00000000-0000-0000-0000-000000000000" },
     });
     expect(missing.status).toBe(400);
+  });
+
+  test("アップロードの上限を超える受信通知の添付は 400 で、実体も消す", async () => {
+    await createTestDb();
+    const fileId = crypto.randomUUID();
+    const storage = createStorageClient(loadStorageConfig());
+    await storage.save(
+      filingReceiptObjectKey(fileId),
+      new Uint8Array(MAX_UPLOAD_BYTES + 1),
+      "application/pdf",
+    );
+    const attached = await req("/api/filing-submissions/2025/income/receipt", {
+      method: "POST",
+      json: { file_id: fileId },
+    });
+    expect(attached.status).toBe(400);
+    expect(await storage.head(filingReceiptObjectKey(fileId))).toBeNull();
   });
 
   test("presign の用途と形式の組み合わせを検証する", async () => {
