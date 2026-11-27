@@ -24,6 +24,15 @@ export function LedgerForm({ value, yearOptions, onChange, showClassify = true }
   const [classifying, setClassifying] = useState(false);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [classifyError, setClassifyError] = useState<string | null>(null);
+  // 入力中の金額の文字列。「-」だけのような途中の入力は数値にすると消えるので文字列でも持ち、
+  // その文字列が今の金額を表している間だけ表示に使う（金額が外から変わったら使わない）。
+  const [amountText, setAmountText] = useState<string | null>(null);
+  const shownAmount =
+    amountText !== null && parseAmount(amountText) === value.amount
+      ? amountText
+      : value.amount === 0
+        ? ""
+        : String(value.amount);
 
   const set = (patch: Partial<LedgerTransactionInput>) => onChange({ ...value, ...patch });
 
@@ -81,8 +90,11 @@ export function LedgerForm({ value, yearOptions, onChange, showClassify = true }
       ) : null}
       <Field
         label="金額（支出はマイナス）"
-        value={value.amount === 0 ? "" : String(value.amount)}
-        onChangeText={(t) => set({ amount: parseAmount(t) })}
+        value={shownAmount}
+        onChangeText={(t) => {
+          setAmountText(t);
+          set({ amount: parseAmount(t) });
+        }}
         keyboardType="numbers-and-punctuation"
         inputMode="decimal"
         placeholder="0"
