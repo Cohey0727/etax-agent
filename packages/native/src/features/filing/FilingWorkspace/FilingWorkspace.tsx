@@ -8,6 +8,7 @@ import {
   ExpandedIncomeInput,
   MiscIncomeInput,
   SalaryIncomeInput,
+  TAX_PARAMETERS,
   TaxCreditInputs,
   XtxBalanceSheetInput,
   applyBreakdownEntries,
@@ -66,6 +67,17 @@ const FILING_TABS: readonly { id: FilingTab; label: string }[] = [
 export function FilingWorkspace({ initialTab = "overview" }: { initialTab?: FilingTab }) {
   const { year } = useAppState();
   const { entry, update, reload } = useYearInput(filingInputsStore, year);
+  // 所得税の計算は年分ごとの税務パラメータが無いと行えない（無い年分で計算すると例外になる）
+  if (!(year in TAX_PARAMETERS)) {
+    return (
+      <Card>
+        <AppText size="sm" tone="muted">
+          {year}年分は所得税の計算に未対応です（対応: {Object.keys(TAX_PARAMETERS).join("・")}
+          年分）。年度を切り替えてください。
+        </AppText>
+      </Card>
+    );
+  }
   if (entry.status === "loading") {
     return (
       <View style={styles.wrap}>
