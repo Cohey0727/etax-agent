@@ -26,7 +26,7 @@ export interface LogoProps {
 // 4つの珠（菱形・上下円錐）を市松 2 トーンで並べ、点で接する構成。
 type ConeFill = "coneTop" | "coneBottom" | "lavender" | "accentToOnNavy";
 
-const CONES: readonly { d: string; fill: ConeFill }[] = [
+const cones: readonly { d: string; fill: ConeFill }[] = [
   { d: "M297 208 L512 360 L82 360 Z", fill: "coneTop" },
   { d: "M82 360 L512 360 L297 512 Z", fill: "coneBottom" },
   { d: "M727 208 L942 360 L512 360 Z", fill: "lavender" },
@@ -96,7 +96,7 @@ const coneProps = (
 
 const Beads = ({ tone, ids }: { tone: LogoTone; ids: GradientIds }) => (
   <>
-    {CONES.map((cone) => (
+    {cones.map((cone) => (
       <path key={cone.d} d={cone.d} {...coneProps(cone.fill, tone, ids)} />
     ))}
   </>
@@ -137,7 +137,7 @@ interface VariantSpec {
   render: (ids: GradientIds, tone: LogoTone) => ReactNode;
 }
 
-const VARIANTS: Record<LogoVariant, VariantSpec> = {
+const logoVariants: Record<LogoVariant, VariantSpec> = {
   mark: {
     viewBox: "0 0 1024 1024",
     widthRatio: 1,
@@ -162,7 +162,7 @@ const VARIANTS: Record<LogoVariant, VariantSpec> = {
   },
 };
 
-const DEFAULT_TONES: Record<LogoVariant, LogoTone> = {
+const defaultTones: Record<LogoVariant, LogoTone> = {
   mark: "auto",
   icon: "reversed",
   banner: "brand",
@@ -180,8 +180,8 @@ export const Logo = ({ variant = "mark", tone, size = 38, className }: LogoProps
     coneTop: `logo-cone-top-${uid}`,
     coneBottom: `logo-cone-bottom-${uid}`,
   };
-  const spec = VARIANTS[variant];
-  const resolvedTone = tone ?? DEFAULT_TONES[variant];
+  const spec = logoVariants[variant];
+  const resolvedTone = tone ?? defaultTones[variant];
   return (
     <svg
       role="img"

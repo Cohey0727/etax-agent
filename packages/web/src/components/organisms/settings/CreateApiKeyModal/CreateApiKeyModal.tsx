@@ -14,7 +14,7 @@ export interface CreateApiKeyModalProps {
   onSubmit: (name: string, expiresAt: string | null) => void;
 }
 
-const EXPIRY_OPTIONS = [
+const expiryOptions = [
   { value: "never", label: "無期限" },
   { value: "30", label: "30日" },
   { value: "90", label: "90日" },
@@ -22,7 +22,7 @@ const EXPIRY_OPTIONS = [
   { value: "custom", label: "日付を指定" },
 ] as const;
 
-type ExpiryChoice = (typeof EXPIRY_OPTIONS)[number]["value"];
+type ExpiryChoice = (typeof expiryOptions)[number]["value"];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -61,7 +61,7 @@ export const CreateApiKeyModal = ({ busy, onClose, onSubmit }: CreateApiKeyModal
             onChange={(e) => setExpiryChoice(e.target.value as ExpiryChoice)}
             aria-label="有効期限"
           >
-            {EXPIRY_OPTIONS.map((option) => (
+            {expiryOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

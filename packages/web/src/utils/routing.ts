@@ -21,7 +21,7 @@ import { AppView, FilingTab } from "@types";
  * 確定申告画面はさらにタブがぶら下がる（総合はスラッグなし）。
  * 例: 収支タブ = /accounts/2024/final-tax/balance。
  */
-const VIEW_SLUGS: Record<AppView, string> = {
+const viewSlugs: Record<AppView, string> = {
   [AppView.Dashboard]: "dashboard",
   [AppView.Ledger]: "ledger",
   [AppView.Reports]: "trial-balance",
@@ -37,7 +37,7 @@ const VIEW_SLUGS: Record<AppView, string> = {
 };
 
 /** 確定申告タブとURLスラッグの対応。総合（overview）は標準でスラッグなし。 */
-const FILING_TAB_SLUGS: Record<FilingTab, string | null> = {
+const filingTabSlugs: Record<FilingTab, string | null> = {
   overview: null,
   balance: "balance",
   deductions: "deductions",
@@ -45,14 +45,14 @@ const FILING_TAB_SLUGS: Record<FilingTab, string | null> = {
 };
 
 const viewForSlug = (slug: string): AppView | null => {
-  const entry = (Object.entries(VIEW_SLUGS) as [AppView, string][]).find(
+  const entry = (Object.entries(viewSlugs) as [AppView, string][]).find(
     ([, value]) => value === slug,
   );
   return entry ? entry[0] : null;
 };
 
 const filingTabForSlug = (slug: string): FilingTab | null => {
-  const entry = (Object.entries(FILING_TAB_SLUGS) as [FilingTab, string | null][]).find(
+  const entry = (Object.entries(filingTabSlugs) as [FilingTab, string | null][]).find(
     ([, value]) => value === slug,
   );
   return entry ? entry[0] : null;
@@ -72,9 +72,9 @@ export const pathForView = (view: AppView, year: number, filingTab?: FilingTab):
   if (view === AppView.FixedAssets) return "/fixed-assets";
   if (view === AppView.Invoices) return "/invoices";
   if (view === AppView.CashFlow) return "/cash-flow";
-  const base = `/accounts/${year}/${VIEW_SLUGS[view]}`;
+  const base = `/accounts/${year}/${viewSlugs[view]}`;
   if (view === AppView.Filing && filingTab) {
-    const slug = FILING_TAB_SLUGS[filingTab];
+    const slug = filingTabSlugs[filingTab];
     return slug ? `${base}/${slug}` : base;
   }
   return base;
@@ -117,28 +117,28 @@ export const parseAuthQuery = (search: string): AuthQuery => {
 export const parsePath = (pathname: string): ParsedRoute | null => {
   const parts = pathname.split("/").filter((part) => part.length > 0);
   if (parts.length === 0) return null;
-  if (parts[0] === VIEW_SLUGS[AppView.Settings]) {
+  if (parts[0] === viewSlugs[AppView.Settings]) {
     return { view: AppView.Settings, year: null, filingTab: null };
   }
-  if (parts[0] === VIEW_SLUGS[AppView.McpSettings] && parts.length === 1) {
+  if (parts[0] === viewSlugs[AppView.McpSettings] && parts.length === 1) {
     return { view: AppView.McpSettings, year: null, filingTab: null };
   }
-  if (parts[0] === VIEW_SLUGS[AppView.Ledger] && parts.length === 1) {
+  if (parts[0] === viewSlugs[AppView.Ledger] && parts.length === 1) {
     return { view: AppView.Ledger, year: null, filingTab: null };
   }
-  if (parts[0] === VIEW_SLUGS[AppView.Taxpayer] && parts.length === 1) {
+  if (parts[0] === viewSlugs[AppView.Taxpayer] && parts.length === 1) {
     return { view: AppView.Taxpayer, year: null, filingTab: null };
   }
-  if (parts[0] === VIEW_SLUGS[AppView.FixedAssets] && parts.length === 1) {
+  if (parts[0] === viewSlugs[AppView.FixedAssets] && parts.length === 1) {
     return { view: AppView.FixedAssets, year: null, filingTab: null };
   }
-  if (parts[0] === VIEW_SLUGS[AppView.Invoices] && parts.length === 1) {
+  if (parts[0] === viewSlugs[AppView.Invoices] && parts.length === 1) {
     return { view: AppView.Invoices, year: null, filingTab: null };
   }
-  if (parts[0] === VIEW_SLUGS[AppView.CashFlow] && parts.length === 1) {
+  if (parts[0] === viewSlugs[AppView.CashFlow] && parts.length === 1) {
     return { view: AppView.CashFlow, year: null, filingTab: null };
   }
-  if (parts[0] === VIEW_SLUGS[AppView.Receipt] && parts.length === 1) {
+  if (parts[0] === viewSlugs[AppView.Receipt] && parts.length === 1) {
     return { view: AppView.Receipt, year: null, filingTab: null };
   }
   if (parts[0] !== "accounts" || parts.length < 2) return null;

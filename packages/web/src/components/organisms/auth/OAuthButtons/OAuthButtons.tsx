@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ComponentType } from "react";
 import { Button, Col, Row, Text } from "@components/atoms";
 import styles from "./OAuthButtons.css";
 import { GitHubLogo, GoogleLogo } from "./oauthLogos";
@@ -16,10 +16,10 @@ export interface OAuthButtonsProps {
 }
 
 // プロバイダごとの公式ロゴ。列挙分岐はこのマッピング表に寄せる。
-const PROVIDER_LOGOS: Record<OAuthProviderKey, ReactNode> = {
-  google: <GoogleLogo />,
-  github: <GitHubLogo />,
-};
+const providerLogos = {
+  google: GoogleLogo,
+  github: GitHubLogo,
+} as const satisfies Record<OAuthProviderKey, ComponentType>;
 
 /**
  * OAuthButtons — 「または」の区切りと外部ログインのボタン群（organisms/auth）。
@@ -36,18 +36,21 @@ export const OAuthButtons = ({ providers, onSelect }: OAuthButtonsProps) => {
         </Text>
         <span className={styles.dividerLine} />
       </Row>
-      {providers.map((provider) => (
-        <Button
-          key={provider.key}
-          variant="ghost"
-          size="md"
-          className={styles.button}
-          onClick={() => onSelect(provider.key)}
-        >
-          {PROVIDER_LOGOS[provider.key]}
-          {provider.label}
-        </Button>
-      ))}
+      {providers.map((provider) => {
+        const ProviderLogo = providerLogos[provider.key];
+        return (
+          <Button
+            key={provider.key}
+            variant="ghost"
+            size="md"
+            className={styles.button}
+            onClick={() => onSelect(provider.key)}
+          >
+            <ProviderLogo />
+            {provider.label}
+          </Button>
+        );
+      })}
     </Col>
   );
 };

@@ -19,7 +19,7 @@ export const MAX_CHAT_ATTACHMENTS = 5;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 /** MIME タイプ → 添付の種別。ここに無い形式は受け付けない。 */
-const ATTACHMENT_KIND_BY_MIME: Record<string, AttachmentKind> = {
+const attachmentKindByMime: Record<string, AttachmentKind> = {
   "image/jpeg": "image",
   "image/png": "image",
   "image/webp": "image",
@@ -37,7 +37,7 @@ export const ATTACH_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,application/pdf,text/csv,.csv";
 
 const kindOfFile = (file: File): AttachmentKind | null => {
-  const byMime = ATTACHMENT_KIND_BY_MIME[file.type];
+  const byMime = attachmentKindByMime[file.type];
   if (byMime) return byMime;
   // CSV は MIME が空・汎用のことがあるため拡張子でも判定する。
   return file.name.toLowerCase().endsWith(".csv") ? "csv" : null;

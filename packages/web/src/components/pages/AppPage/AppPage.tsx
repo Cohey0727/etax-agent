@@ -36,7 +36,7 @@ import {
   SEND_KEY_STORAGE_KEY,
   THEME_STORAGE_KEY,
 } from "./appPageStorage";
-import { appViews, FILING_NAV_CHILDREN } from "./appViews";
+import { appViews, filingNavChildren } from "./appViews";
 import { useAuthGate } from "./useAuthGate";
 import { useLedgerSync } from "./useLedgerSync";
 import { useYearSelection } from "./useYearSelection";
@@ -270,7 +270,7 @@ export const AppPage = () => {
         )
       }
       onViewChange={setActiveView}
-      navChildren={FILING_NAV_CHILDREN}
+      navChildren={filingNavChildren}
       activeNavChildKey={filingTab}
       onNavChildSelect={handleNavChildSelect}
     >

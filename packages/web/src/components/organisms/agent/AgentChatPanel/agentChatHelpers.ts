@@ -129,7 +129,7 @@ export const deriveUiActions = (toolCalls: ToolCallRecord[]): AgentUiAction[] =>
 };
 
 /** ツール名の日本語ラベル（チャットのツールチップ表示用）。 */
-const TOOL_LABELS: Record<string, string> = {
+const toolLabels: Record<string, string> = {
   import_csv_info: "取込データの確認",
   search_transactions: "取引を検索",
   aggregate_year: "所得を集計",
@@ -155,7 +155,7 @@ const TOOL_LABELS: Record<string, string> = {
   set_theme: "テーマを変更",
 };
 
-export const toolLabel = (name: string): string => TOOL_LABELS[name] ?? name;
+export const toolLabel = (name: string): string => toolLabels[name] ?? name;
 
 /** チップに出す引数の要約（主要なものだけ短く）。 */
 export const summarizeToolArgs = (args: Record<string, unknown>): string => {

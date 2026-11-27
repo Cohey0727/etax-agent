@@ -1,7 +1,7 @@
 import { Card, Col, Row, SkeletonBar } from "@components/atoms";
 
 /** カード内の行バー（見出し＋本文の組）の並び。 */
-const CARD_ROWS: readonly { titleWidth: string; bodyWidths: readonly string[] }[] = [
+const cardRows: readonly { titleWidth: string; bodyWidths: readonly string[] }[] = [
   { titleWidth: "180px", bodyWidths: ["62%", "48%"] },
   { titleWidth: "140px", bodyWidths: ["80%", "70%"] },
 ];
@@ -13,7 +13,7 @@ const CARD_ROWS: readonly { titleWidth: string; bodyWidths: readonly string[] }[
 export const PageSkeleton = () => {
   return (
     <Col gap="md">
-      {CARD_ROWS.map((card) => (
+      {cardRows.map((card) => (
         <Card key={card.titleWidth}>
           <Col gap="sm">
             <SkeletonBar width={card.titleWidth} height={18} />

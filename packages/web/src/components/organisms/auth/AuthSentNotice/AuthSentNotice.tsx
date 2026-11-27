@@ -10,7 +10,7 @@ export interface AuthSentNoticeProps {
 }
 
 // 送信完了の文案。列挙分岐はこのマッピング表に寄せる。
-const NOTICE_COPY: Record<AuthSentVariant, { icon: IconName; message: string }> = {
+const noticeCopy: Record<AuthSentVariant, { icon: IconName; message: string }> = {
   magicSent: {
     icon: "mail",
     message: "ログインリンクをメールで送りました。メール内のリンクを開いてください（15分間有効）。",
@@ -26,7 +26,7 @@ const NOTICE_COPY: Record<AuthSentVariant, { icon: IconName; message: string }> 
  * 弾むアイコンと文案で「あとはメールを開くだけ」を伝える。
  */
 export const AuthSentNotice = ({ variant, onBack }: AuthSentNoticeProps) => {
-  const copy = NOTICE_COPY[variant];
+  const copy = noticeCopy[variant];
   return (
     <Col gap="md" align="center">
       <span className={styles.iconCircle}>

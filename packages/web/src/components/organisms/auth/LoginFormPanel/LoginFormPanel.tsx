@@ -11,7 +11,7 @@ export interface LoginFormPanelProps {
 }
 
 // モードごとの見出し。列挙分岐はこのマッピング表に寄せる。
-const MODE_HEADINGS: Record<LoginMode, { title: string; caption: string }> = {
+const modeHeadings: Record<LoginMode, { title: string; caption: string }> = {
   login: { title: "ログイン", caption: "おかえりなさい。続きは AI が進めます。" },
   register: { title: "アカウント作成", caption: "メールアドレスとパスワードで登録できます。" },
   totp: {
@@ -32,7 +32,7 @@ const MODE_HEADINGS: Record<LoginMode, { title: string; caption: string }> = {
  * 中身はモード切替のたびに弾んで入れ替わる。
  */
 export const LoginFormPanel = ({ mode, error, children }: LoginFormPanelProps) => {
-  const heading = MODE_HEADINGS[mode];
+  const heading = modeHeadings[mode];
   return (
     <section className={styles.root}>
       <div className={styles.card}>

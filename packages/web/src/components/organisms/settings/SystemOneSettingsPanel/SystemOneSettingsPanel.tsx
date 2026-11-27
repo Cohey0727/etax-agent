@@ -6,7 +6,7 @@ import { fetchSystemOneSettings, testSystemOneSettings, updateSystemOneSettings 
 type BusyKind = "save" | "test" | null;
 
 /** 読み込み中にフォームの代わりへ出すスケルトンの行数。 */
-const SKELETON_ROWS: readonly number[] = [1, 2, 3];
+const skeletonRows: readonly number[] = [1, 2, 3];
 
 /**
  * 科目判定（Jev / SystemOne互換）の接続設定カード。
@@ -99,7 +99,7 @@ export const SystemOneSettingsPanel = () => {
           {message ? (
             <Text variant="caption">{message.text}</Text>
           ) : (
-            SKELETON_ROWS.map((row) => (
+            skeletonRows.map((row) => (
               <Col key={row} gap="sm">
                 <SkeletonBar width="96px" height={12} />
                 <SkeletonBar height={36} />

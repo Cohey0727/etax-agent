@@ -39,7 +39,7 @@ const clientTabs = [
 type ClientId = (typeof clientTabs)[number]["id"];
 
 /** 読み込み中に代わりへ出すスケルトンの行数。 */
-const SKELETON_ROWS: readonly number[] = [1, 2, 3];
+const skeletonRows: readonly number[] = [1, 2, 3];
 
 export const McpConnectionPanel = () => {
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -86,7 +86,7 @@ export const McpConnectionPanel = () => {
         </Text>
         {loadState === "loading" ? (
           <Col gap="sm" aria-hidden="true">
-            {SKELETON_ROWS.map((row) => (
+            {skeletonRows.map((row) => (
               <SkeletonBar key={row} height={28} />
             ))}
           </Col>

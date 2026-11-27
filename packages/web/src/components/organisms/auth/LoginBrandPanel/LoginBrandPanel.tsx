@@ -3,13 +3,13 @@ import { WorkflowSteps } from "@components/organisms/auth/WorkflowSteps";
 import styles from "./LoginBrandPanel.css";
 
 // 価値訴求。実装済みの事実の範囲で書く（実績数値などの誇大表示はしない）。
-const VALUE_PROPS: readonly string[] = [
+const valueProps: readonly string[] = [
   "領収書の取り込みから申告書の作成まで、AI が自動で進めます",
   "MCP 連携で、Claude Code など外部の AI エージェントからそのまま操作できます",
   "計算は決定的エンジン。何度でも同じ結果を再現できます",
 ];
 
-const RISE_DELAYS = [
+const riseDelays = [
   styles.riseDelay0,
   styles.riseDelay1,
   styles.riseDelay2,
@@ -29,7 +29,7 @@ export const LoginBrandPanel = () => {
       <div className={styles.glowTop} aria-hidden="true" />
       <div className={styles.glowBottom} aria-hidden="true" />
       <Col gap="lg" justify="center" className={styles.content}>
-        <Row gap="sm" align="center" className={`${styles.rise} ${RISE_DELAYS[0]}`}>
+        <Row gap="sm" align="center" className={`${styles.rise} ${riseDelays[0]}`}>
           <div className={styles.brandMark}>
             <Logo variant="icon" size={40} />
           </div>
@@ -43,7 +43,7 @@ export const LoginBrandPanel = () => {
           </Col>
         </Row>
 
-        <Col gap="md" className={`${styles.rise} ${RISE_DELAYS[1]}`}>
+        <Col gap="md" className={`${styles.rise} ${riseDelays[1]}`}>
           <Text variant="hero" className={styles.headline}>
             AIが、<span className={styles.headlineAccent}>すべて</span>やります。
           </Text>
@@ -53,8 +53,8 @@ export const LoginBrandPanel = () => {
           </Text>
         </Col>
 
-        <Col gap="sm" className={`${styles.values} ${styles.rise} ${RISE_DELAYS[2]}`}>
-          {VALUE_PROPS.map((valueProp) => (
+        <Col gap="sm" className={`${styles.values} ${styles.rise} ${riseDelays[2]}`}>
+          {valueProps.map((valueProp) => (
             <Row key={valueProp} gap="sm" align="start">
               <span className={styles.valueIcon}>
                 <Icon name="check" size={13} />
@@ -64,11 +64,11 @@ export const LoginBrandPanel = () => {
           ))}
         </Col>
 
-        <div className={`${styles.workflow} ${styles.rise} ${RISE_DELAYS[3]}`}>
+        <div className={`${styles.workflow} ${styles.rise} ${riseDelays[3]}`}>
           <WorkflowSteps />
         </div>
 
-        <Text variant="caption" className={`${styles.note} ${styles.rise} ${RISE_DELAYS[4]}`}>
+        <Text variant="caption" className={`${styles.note} ${styles.rise} ${riseDelays[4]}`}>
           申告内容の最終確認と e-Tax への提出は、ご本人による操作です。
         </Text>
       </Col>

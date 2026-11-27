@@ -318,7 +318,7 @@ export async function testSystemOneSettings(input: {
   return requestJson<SystemOneTestResult>("/api/settings/systemone/test", jsonBody("POST", input));
 }
 
-const UPLOADABLE_IMAGE_TYPES: readonly string[] = [
+const uploadableImageTypes: readonly string[] = [
   "image/jpeg",
   "image/png",
   "image/webp",
@@ -339,7 +339,7 @@ export interface AnalyzedReceipt {
  * アップロードや解析の失敗では解析し直さない（同じ画像を AI に2回送らない）。
  */
 export async function analyzeReceiptImage(file: File): Promise<AnalyzedReceipt> {
-  if (UPLOADABLE_IMAGE_TYPES.includes(file.type)) {
+  if (uploadableImageTypes.includes(file.type)) {
     const presign = await requestPresignedUpload(file.type).catch(() => null);
     if (presign) {
       await putToPresignedUrl(file, presign.uploadUrl);
@@ -443,7 +443,7 @@ export async function uploadFixedAssetImage(
   assetId: number,
   file: File,
 ): Promise<FixedAssetImageRecord> {
-  if (!UPLOADABLE_IMAGE_TYPES.includes(file.type)) {
+  if (!uploadableImageTypes.includes(file.type)) {
     throw new Error("対応していないファイル形式です（JPEG / PNG / WebP / GIF のみ）");
   }
   const fileId = await uploadViaPresignedUrl(file, "fixed_asset");

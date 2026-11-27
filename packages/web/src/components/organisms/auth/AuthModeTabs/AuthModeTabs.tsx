@@ -7,7 +7,7 @@ export interface AuthModeTabsProps {
   onChange: (mode: PasswordAuthMode) => void;
 }
 
-const TABS: readonly { key: PasswordAuthMode; label: string }[] = [
+const authModeTabs: readonly { key: PasswordAuthMode; label: string }[] = [
   { key: "login", label: "ログイン" },
   { key: "register", label: "新規登録" },
 ];
@@ -19,7 +19,7 @@ const TABS: readonly { key: PasswordAuthMode; label: string }[] = [
 export const AuthModeTabs = ({ mode, onChange }: AuthModeTabsProps) => {
   return (
     <Row gap="none" className={styles.root}>
-      {TABS.map((tab) => (
+      {authModeTabs.map((tab) => (
         <Button
           key={tab.key}
           type="button"

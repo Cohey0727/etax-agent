@@ -8,7 +8,7 @@ interface WorkflowStep {
 }
 
 // AI が回す整備ワークフローの流れ（北極星）。実装済みの処理範囲だけを書く。
-const STEPS: readonly WorkflowStep[] = [
+const workflowSteps: readonly WorkflowStep[] = [
   { icon: "receipt", label: "取り込み", caption: "領収書・明細を読み取り" },
   { icon: "book", label: "帳簿", caption: "仕訳を自動で記録" },
   { icon: "check", label: "チェック", caption: "漏れや不整合を検出" },
@@ -17,9 +17,9 @@ const STEPS: readonly WorkflowStep[] = [
   { icon: "send", label: "提出記録", caption: "提出の控えを保管" },
 ];
 
-const DOT_DELAYS = [styles.dotDelay0, styles.dotDelay1, styles.dotDelay2] as const;
+const dotDelays = [styles.dotDelay0, styles.dotDelay1, styles.dotDelay2] as const;
 
-const STEP_DELAYS = [
+const stepDelays = [
   styles.stepDelay0,
   styles.stepDelay1,
   styles.stepDelay2,
@@ -44,19 +44,19 @@ export const WorkflowSteps = () => {
             AI ワークフロー
           </Text>
           <span className={styles.dots} aria-hidden="true">
-            {DOT_DELAYS.map((delayClass) => (
+            {dotDelays.map((delayClass) => (
               <span key={delayClass} className={`${styles.dot} ${delayClass}`} />
             ))}
           </span>
         </Row>
         <Col gap="sm" className={styles.steps}>
           <div className={styles.line} aria-hidden="true" />
-          {STEPS.map((step, index) => (
+          {workflowSteps.map((step, index) => (
             <Row
               key={step.label}
               gap="md"
               align="center"
-              className={`${styles.step} ${STEP_DELAYS[index]}`}
+              className={`${styles.step} ${stepDelays[index]}`}
             >
               <span className={styles.node}>
                 <Icon name={step.icon} size={15} />

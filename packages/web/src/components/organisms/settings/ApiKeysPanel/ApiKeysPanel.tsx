@@ -39,14 +39,14 @@ import styles from "./ApiKeysPanel.css";
 type LoadState = "loading" | "anonymous" | "failed" | "ready";
 
 /** ステータスの表示ラベル（列挙分岐はマッピング表で持つ）。 */
-const STATUS_LABELS: Record<ApiKeyStatus, string> = {
+const apiKeyStatusLabels: Record<ApiKeyStatus, string> = {
   active: "有効",
   revoked: "失効",
   expired: "期限切れ",
 };
 
 /** 読み込み中に表の代わりへ出すスケルトンの行数。 */
-const SKELETON_ROWS: readonly number[] = [1, 2, 3];
+const skeletonRows: readonly number[] = [1, 2, 3];
 
 export const ApiKeysPanel = () => {
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -131,7 +131,7 @@ export const ApiKeysPanel = () => {
         </Text>
         {loadState === "loading" ? (
           <Col gap="sm" aria-hidden="true">
-            {SKELETON_ROWS.map((row) => (
+            {skeletonRows.map((row) => (
               <SkeletonBar key={row} height={28} />
             ))}
           </Col>
@@ -191,7 +191,7 @@ export const ApiKeysPanel = () => {
                         {key.expires_at ? formatDateTime(key.expires_at) : "無期限"}
                       </TableCell>
                       <TableCell>
-                        <Badge>{STATUS_LABELS[key.status]}</Badge>
+                        <Badge>{apiKeyStatusLabels[key.status]}</Badge>
                       </TableCell>
                       <TableCell>
                         {key.status === "active" ? (

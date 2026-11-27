@@ -16,7 +16,7 @@ export interface SettingsPanelProps {
   onAgentConnectionChange: (config: AgentConnectionConfig) => void;
 }
 
-const THEME_OPTIONS: readonly {
+const themeOptions: readonly {
   mode: ThemeMode;
   label: string;
   icon: IconName;
@@ -32,7 +32,7 @@ const THEME_OPTIONS: readonly {
   { mode: "dark", label: "ダーク", icon: "moon", caption: "常に暗いテーマで表示します" },
 ];
 
-const SEND_KEY_OPTIONS: readonly { mode: SendKeyMode; label: string; caption: string }[] = [
+const sendKeyOptions: readonly { mode: SendKeyMode; label: string; caption: string }[] = [
   { mode: "enter", label: "Enter", caption: "Enterで送信します（Shift+Enterで改行）" },
   {
     mode: "modEnter",
@@ -41,7 +41,7 @@ const SEND_KEY_OPTIONS: readonly { mode: SendKeyMode; label: string; caption: st
   },
 ];
 
-const INFO_ROWS: readonly { label: string; value: string }[] = [
+const infoRows: readonly { label: string; value: string }[] = [
   { label: "アプリ", value: "eTaxAgent — 確定申告 準備ツール" },
   { label: "データの保存先", value: "このブラウザとサーバー（帳簿・学習履歴）" },
   { label: "申告の提出", value: "e-Tax での最終提出は納税者本人が行います" },
@@ -55,8 +55,8 @@ export const SettingsPanel = ({
   agentConnection,
   onAgentConnectionChange,
 }: SettingsPanelProps) => {
-  const activeOption = THEME_OPTIONS.find((option) => option.mode === themeMode);
-  const activeSendKeyOption = SEND_KEY_OPTIONS.find((option) => option.mode === sendKeyMode);
+  const activeOption = themeOptions.find((option) => option.mode === themeMode);
+  const activeSendKeyOption = sendKeyOptions.find((option) => option.mode === sendKeyMode);
   const [agentTestBusy, setAgentTestBusy] = useState(false);
   const [agentTestMessage, setAgentTestMessage] = useState<StatusMessage | null>(null);
 
@@ -92,7 +92,7 @@ export const SettingsPanel = ({
           <Col gap="sm">
             <Text variant="statLabel">テーマ</Text>
             <div className={styles.optionRow}>
-              {THEME_OPTIONS.map((option) => (
+              {themeOptions.map((option) => (
                 <Button
                   key={option.mode}
                   variant={option.mode === themeMode ? "primary" : "ghost"}
@@ -115,7 +115,7 @@ export const SettingsPanel = ({
           <Col gap="sm">
             <Text variant="statLabel">送信キー</Text>
             <div className={styles.optionRow}>
-              {SEND_KEY_OPTIONS.map((option) => (
+              {sendKeyOptions.map((option) => (
                 <Button
                   key={option.mode}
                   variant={option.mode === sendKeyMode ? "primary" : "ghost"}
@@ -201,7 +201,7 @@ export const SettingsPanel = ({
         <Col gap="md">
           <Text variant="sectionTitle">アプリについて</Text>
           <div>
-            {INFO_ROWS.map((row) => (
+            {infoRows.map((row) => (
               <div key={row.label} className={styles.infoRow}>
                 <Text variant="statLabel">{row.label}</Text>
                 <Text variant="body">{row.value}</Text>

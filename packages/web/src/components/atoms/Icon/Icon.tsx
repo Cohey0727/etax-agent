@@ -38,7 +38,7 @@ export type IconName =
   | "send";
 
 // 線画アイコンのパス集。色は currentColor で呼び出し側に委ねる。
-const ICON_PATHS: Record<IconName, ReactNode> = {
+const iconPaths: Record<IconName, ReactNode> = {
   grid: (
     <>
       <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -282,7 +282,7 @@ export const Icon = ({ name, size = 18 }: IconProps) => {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {ICON_PATHS[name]}
+      {iconPaths[name]}
     </svg>
   );
 };

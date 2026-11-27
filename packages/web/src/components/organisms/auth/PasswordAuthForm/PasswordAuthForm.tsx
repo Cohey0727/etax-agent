@@ -17,7 +17,7 @@ export interface PasswordAuthFormProps {
 }
 
 // モードごとの文案。列挙分岐はこのマッピング表に寄せる。
-const FORM_COPY: Record<
+const formCopy: Record<
   PasswordAuthMode,
   {
     passwordPlaceholder: string;
@@ -53,7 +53,7 @@ export const PasswordAuthForm = ({
   onSecretChange,
   onSubmit,
 }: PasswordAuthFormProps) => {
-  const copy = FORM_COPY[mode];
+  const copy = formCopy[mode];
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     onSubmit();
