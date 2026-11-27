@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AgentConnectionConfig, testAgentSettings, testSystemOneSettings } from "@/api";
+import { AgentConnectionConfig, testAgentSettings } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 import { AlertBox } from "@/components/AlertBox";
 import { AppButton } from "@/components/AppButton";
@@ -8,15 +8,13 @@ import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { EMPTY_AGENT_CONNECTION, loadAgentConnection, saveAgentConnection } from "../agentConnectionStorage";
 
-type TestKind = "agent" | "systemone" | null;
-
 /** 外部接続（AI）の上書き設定と接続テスト。値は端末に保存し、エージェント送信時に使う。 */
 export function AgentConnectionPanel() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [config, setConfig] = useState<AgentConnectionConfig>(EMPTY_AGENT_CONNECTION);
   const [loaded, setLoaded] = useState(false);
-  const [testing, setTesting] = useState<TestKind>(null);
+  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -30,17 +28,15 @@ export function AgentConnectionPanel() {
     void saveAgentConnection(userId, next);
   };
 
-  const testInput = {
-    baseUrl: config.baseUrl.trim() || undefined,
-    model: config.model.trim() || undefined,
-    apiKey: config.apiKey.trim() || undefined,
-  };
-
   const handleAgentTest = async () => {
-    setTesting("agent");
+    setTesting(true);
     setMessage(null);
     try {
-      const result = await testAgentSettings(testInput);
+      const result = await testAgentSettings({
+        baseUrl: config.baseUrl.trim() || undefined,
+        model: config.model.trim() || undefined,
+        apiKey: config.apiKey.trim() || undefined,
+      });
       setMessage(
         result.ok
           ? { ok: true, text: `接続できました（モデル: ${result.model ?? "—"}、応答: ${result.reply ?? "—"}）` }
@@ -49,24 +45,7 @@ export function AgentConnectionPanel() {
     } catch {
       setMessage({ ok: false, text: "接続テストに失敗しました" });
     } finally {
-      setTesting(null);
-    }
-  };
-
-  const handleSystemOneTest = async () => {
-    setTesting("systemone");
-    setMessage(null);
-    try {
-      const result = await testSystemOneSettings(testInput);
-      setMessage(
-        result.ok
-          ? { ok: true, text: `科目判定AIへ接続できました（候補: ${result.top ?? "—"}）` }
-          : { ok: false, text: `接続できませんでした: ${result.error ?? "不明なエラー"}` },
-      );
-    } catch {
-      setMessage({ ok: false, text: "接続テストに失敗しました" });
-    } finally {
-      setTesting(null);
+      setTesting(false);
     }
   };
 
@@ -102,15 +81,8 @@ export function AgentConnectionPanel() {
         label="接続テスト（AIエージェント）"
         variant="ghost"
         size="sm"
-        loading={testing === "agent"}
+        loading={testing}
         onPress={() => void handleAgentTest()}
-      />
-      <AppButton
-        label="接続テスト（科目判定AI）"
-        variant="ghost"
-        size="sm"
-        loading={testing === "systemone"}
-        onPress={() => void handleSystemOneTest()}
       />
       {message ? <AlertBox tone={message.ok ? "success" : "error"} message={message.text} /> : null}
     </Card>
