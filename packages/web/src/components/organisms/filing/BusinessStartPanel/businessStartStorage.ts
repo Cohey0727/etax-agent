@@ -6,11 +6,7 @@
  * 保存は入力一式の置き換えなので、読み込みに失敗したときは編集させない。
  */
 import { BusinessStartInputs, SalarySituationRow } from "@types";
-import {
-  SavedInputResult,
-  fetchBusinessStartInputs,
-  saveBusinessStartInputsToServer,
-} from "@utils/api";
+import { SavedInputResult, fetchBusinessStartInputs } from "@utils/api";
 
 function emptySalaryRow(): SalarySituationRow {
   return { count: null, terms: "", has_tax: null };
@@ -60,11 +56,4 @@ export async function loadBusinessStartInputs(): Promise<SavedInputResult<Busine
   const result = await fetchBusinessStartInputs();
   if (result.status !== "loaded") return result;
   return { status: "loaded", value: { ...emptyBusinessStartInputs(), ...result.value } };
-}
-
-/** 専用入力をDBへ保存する。失敗した場合は false。 */
-export async function saveBusinessStartInputs(
-  state: BusinessStartInputs,
-): Promise<boolean> {
-  return saveBusinessStartInputsToServer(state);
 }

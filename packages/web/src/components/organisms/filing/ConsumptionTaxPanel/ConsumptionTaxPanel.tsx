@@ -1,7 +1,5 @@
 import {
   ConsumptionFilingInputs,
-  ConsumptionReturn,
-  ConsumptionTaxSummary,
   Transaction,
   computeConsumptionReturn,
   deriveBasePeriodSalesThousands,

@@ -144,8 +144,3 @@ export async function loadTaxpayer(year: number): Promise<LoadedTaxpayer | null>
   if (await saveTaxpayerProfile(year, local)) markSent(year);
   return { taxpayer: local, carriedFrom: null };
 }
-
-/** 対象年のプロフィールとしてDBへ保存する。 */
-export async function saveTaxpayer(year: number, taxpayer: XtxTaxpayerInput): Promise<void> {
-  await saveTaxpayerProfile(year, taxpayer);
-}

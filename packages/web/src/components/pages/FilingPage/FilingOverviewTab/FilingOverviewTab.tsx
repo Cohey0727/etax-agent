@@ -39,7 +39,6 @@ export const FilingOverviewTab = ({
         filingType={state.filingType}
         realEstateBusinessScale={state.realEstateBusinessScale}
         balanceSheet={state.balanceSheet}
-        originalIncomeTax={null}
         incomeTaxPayments={state.incomeTaxPayments}
         onIncomeTaxPaymentsChange={(next) => deduction.update({ incomeTaxPayments: next })}
         onOpenSection={onOpenSection}

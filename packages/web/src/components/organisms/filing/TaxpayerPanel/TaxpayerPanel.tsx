@@ -53,11 +53,6 @@ export interface TaxpayerPanelProps {
   realEstateBusinessScale?: boolean;
   /** 貸借対照表の入力（申告入力に保存されたもの）。XTXの決算書4面に反映する。 */
   balanceSheet?: XtxBalanceSheetInput | null;
-  /**
-   * 申告済みの所得税額（過去に確定した分）。入っていれば、その確定分と
-   * 比較する修正申告として出力する。null なら確定申告として出力する。
-   */
-  originalIncomeTax: number | null;
   /** 源泉徴収税額・予定納税額（申告入力に保存されたもの）。 */
   incomeTaxPayments: IncomeTaxPaymentInputs;
   onIncomeTaxPaymentsChange: (next: IncomeTaxPaymentInputs) => void;
@@ -82,7 +77,6 @@ export const TaxpayerPanel = ({
   filingType,
   realEstateBusinessScale,
   balanceSheet,
-  originalIncomeTax,
   incomeTaxPayments,
   onIncomeTaxPaymentsChange,
   onOpenSection,
@@ -113,13 +107,9 @@ export const TaxpayerPanel = ({
     };
   }, [year]);
 
-  // 申告の種類はモードとして選ぶものではなく、入力内容から決まる。
-  // 申告済みの所得税額が入っていれば過去の確定分と比較する修正申告になる。
-  const amendment = originalIncomeTax !== null;
-
   const buildRequest = (): ExportXtxRequest => ({
     year,
-    amendment,
+    amendment: false,
     submission_date: submissionDate,
     taxpayer,
     transactions,
@@ -139,7 +129,7 @@ export const TaxpayerPanel = ({
     real_estate_business_scale: realEstateBusinessScale,
     withholding_tax: withholdingTax,
     prepaid_tax: prepaidTax,
-    original_third_period_tax: amendment ? originalIncomeTax : null,
+    original_third_period_tax: null,
     balance_sheet:
       balanceSheet && !isBalanceSheetEmpty(balanceSheet)
         ? balanceSheetToWire(balanceSheet)
@@ -283,7 +273,7 @@ export const TaxpayerPanel = ({
           <div className={styles.fieldLabel}>
             <Text variant="muted">申告の種類</Text>
           </div>
-          <Text>{amendment ? "修正申告" : "確定申告"}</Text>
+          <Text>確定申告</Text>
         </Row>
         <Row gap="sm">
           <div className={styles.fieldLabel}>
@@ -333,12 +323,6 @@ export const TaxpayerPanel = ({
             aria-label="予定納税額"
           />
         </Row>
-
-        <Text variant="muted">
-          申告の種類は入力内容から決まります。申告済みの所得税額が入っている場合は
-          その確定分と比較する修正申告として、入っていない場合は確定申告として
-          出力します。
-        </Text>
 
         {balanceSheetCheck ? (
           <AlertBox variant="notice">

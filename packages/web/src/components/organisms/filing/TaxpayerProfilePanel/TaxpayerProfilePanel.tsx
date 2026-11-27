@@ -2,12 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Card, Col, Input, Row, SkeletonBar, Text } from "@components/atoms";
 import { RetryNotice } from "@components/molecules/RetryNotice";
 import { XtxTaxpayerInput } from "@types";
-import {
-  LoadedTaxpayer,
-  emptyTaxpayer,
-  loadTaxpayer,
-  saveTaxpayer,
-} from "./taxpayerStorage";
+import { saveTaxpayerProfile } from "@utils/api";
+import { LoadedTaxpayer, emptyTaxpayer, loadTaxpayer } from "./taxpayerStorage";
 import styles from "./TaxpayerProfilePanel.css";
 
 /** テキスト入力の項目定義（ラベル列つきで並べる）。 */
@@ -90,7 +86,7 @@ export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       const pending = pendingRef.current;
       pendingRef.current = null;
-      if (pending) void saveTaxpayer(pending.year, pending.taxpayer);
+      if (pending) void saveTaxpayerProfile(pending.year, pending.taxpayer);
     };
   }, []);
 
@@ -103,7 +99,7 @@ export const TaxpayerProfilePanel = ({ year }: TaxpayerProfilePanelProps) => {
       timerRef.current = null;
       const pending = pendingRef.current;
       pendingRef.current = null;
-      if (pending) void saveTaxpayer(pending.year, pending.taxpayer);
+      if (pending) void saveTaxpayerProfile(pending.year, pending.taxpayer);
     }, SAVE_DELAY_MS);
   };
 

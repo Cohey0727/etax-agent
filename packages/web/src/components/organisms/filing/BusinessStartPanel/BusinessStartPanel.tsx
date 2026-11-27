@@ -20,6 +20,7 @@ import {
 import {
   exportBlueReturnPdfFile,
   exportOpeningNoticePdfFile,
+  saveBusinessStartInputsToServer,
 } from "@utils/api";
 import { downloadPdfFile } from "@utils/fileDownload";
 import { todayIso } from "@utils/localDate";
@@ -27,7 +28,6 @@ import { loadTaxpayer } from "@components/organisms/filing/TaxpayerProfilePanel/
 import {
   emptyBusinessStartInputs,
   loadBusinessStartInputs,
-  saveBusinessStartInputs,
 } from "./businessStartStorage";
 import styles from "./BusinessStartPanel.css";
 
@@ -110,7 +110,7 @@ export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       const pending = pendingRef.current;
       pendingRef.current = null;
-      if (pending) void saveBusinessStartInputs(pending);
+      if (pending) void saveBusinessStartInputsToServer(pending);
     };
   }, []);
 
@@ -124,7 +124,7 @@ export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
       timerRef.current = null;
       const pending = pendingRef.current;
       pendingRef.current = null;
-      if (pending) void saveBusinessStartInputs(pending);
+      if (pending) void saveBusinessStartInputsToServer(pending);
     }, SAVE_DELAY_MS);
   };
 

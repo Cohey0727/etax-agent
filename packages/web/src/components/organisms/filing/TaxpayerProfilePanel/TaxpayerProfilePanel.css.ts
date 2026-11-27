@@ -1,5 +1,4 @@
 import { style } from "@vanilla-extract/css";
-import { theme } from "@configs";
 
 const styles = {
   // 入力欄のラベル列。幅を固定して入力欄の左端を揃える。
