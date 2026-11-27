@@ -116,10 +116,20 @@ export async function getTransactionRow(db: DbOrTx, id: number): Promise<Transac
 }
 
 /**
+ * 割り当て年度が year の取引の条件。未設定（0）の行は日付の年で判定する
+ * （effectiveFiscalYear と同じ意味論を SQL で表す）。一覧と年度の置き換えで
+ * 同じ条件を使い、一覧に出る行と置き換えで消える行を揃える。
+ */
+function fiscalYearCondition(year: number) {
+  return or(
+    eq(transactionsTable.fiscalYear, year),
+    and(eq(transactionsTable.fiscalYear, 0), like(transactionsTable.date, `${year}-%`)),
+  )!;
+}
+
+/**
  * 取引を日付・id 順に取得する（削除済みは含まない）。incomeType / year が
- * あれば SQL で絞り込む。year は割り当て年度で判定し、未設定（0）の行は
- * 日付の年で判定する（effectiveFiscalYear と同じ意味論を SQL で表す）。
- * 全件ロードして JS で絞る従来方式は、件数が増えると無駄が大きい（Issue #11）。
+ * あれば SQL で絞り込む（year は fiscalYearCondition）。
  */
 export async function listTransactionRows(
   db: Db,
@@ -129,14 +139,7 @@ export async function listTransactionRows(
   const owner = currentUserId();
   const conditions = [isNull(transactionsTable.deletedAt)];
   if (incomeType) conditions.push(eq(transactionsTable.incomeType, incomeType));
-  if (year !== undefined) {
-    conditions.push(
-      or(
-        eq(transactionsTable.fiscalYear, year),
-        and(eq(transactionsTable.fiscalYear, 0), like(transactionsTable.date, `${year}-%`)),
-      )!,
-    );
-  }
+  if (year !== undefined) conditions.push(fiscalYearCondition(year));
   if (owner !== undefined) conditions.push(eq(transactionsTable.ownerUserId, owner));
   return db
     .select()
@@ -342,7 +345,8 @@ export async function listTransactionFingerprintRows(db: Db): Promise<
 
 /**
  * 指定した割り当て年度の取引を丸ごと置き換える（画面側の確定状態を帳簿の正とする）。
- * 削除対象は日付ではなく割り当て年度で決める（日付が他年の取引も含む）。
+ * 削除対象は日付ではなく割り当て年度で決める（日付が他年の取引も含む。
+ * 割り当て年度が未設定の行は日付の年で判定する）。
  * 置き換えで消える取引は論理削除にし、変更履歴（削除・登録）を残す。
  * 取込リンク（import_id）は外れる。削除と挿入は1トランザクションで行う。
  */
@@ -367,10 +371,7 @@ export async function replaceYearTransactionRows(
   return db.transaction(async (tx) => {
     const now = new Date();
     const owner = currentUserId();
-    const yearConditions = [
-      eq(transactionsTable.fiscalYear, year),
-      isNull(transactionsTable.deletedAt),
-    ];
+    const yearConditions = [fiscalYearCondition(year), isNull(transactionsTable.deletedAt)];
     if (owner !== undefined) yearConditions.push(eq(transactionsTable.ownerUserId, owner));
     const beforeRows = await tx
       .select()

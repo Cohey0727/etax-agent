@@ -92,4 +92,18 @@ describe("取引の変更履歴と論理削除", () => {
     const newHistory = await listTransactionHistoryRows(db, inserted[0].id);
     expect(newHistory.map((h) => h.action)).toEqual(["created"]);
   });
+
+  test("割り当て年度が未設定（0）の取引も、日付の年の置き換えで消える", async () => {
+    const db = await createTestDb();
+    const unassigned = { ...values, fiscalYear: 0 };
+    await replaceYearTransactionRows(db, 2026, [unassigned]);
+    expect((await listTransactionRows(db, undefined, 2026)).length).toBe(1);
+    await replaceYearTransactionRows(db, 2026, [unassigned]);
+    expect((await listTransactionRows(db, undefined, 2026)).length).toBe(1);
+    // 日付が別の年の未設定行は対象外
+    await insertTransactionRow(db, { ...unassigned, date: "2025-12-31" });
+    await replaceYearTransactionRows(db, 2026, []);
+    expect((await listTransactionRows(db, undefined, 2026)).length).toBe(0);
+    expect((await listTransactionRows(db, undefined, 2025)).length).toBe(1);
+  });
 });
