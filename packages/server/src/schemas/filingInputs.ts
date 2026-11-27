@@ -20,6 +20,6 @@ export const FilingInputsYearParamSchema = z
 
 export const SaveFilingInputsRequestSchema = z
   .object({
-    state: z.unknown().openapi({ description: "申告入力（DeductionState）" }),
+    state: z.record(z.string(), z.unknown()).openapi({ description: "申告入力（DeductionState）" }),
   })
   .openapi("SaveFilingInputsRequest");

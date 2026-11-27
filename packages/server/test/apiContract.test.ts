@@ -432,3 +432,22 @@ describe("freee 試算表の所有者別ファイル", () => {
     expect(asSecond.body["source"]).toBe("second");
   });
 });
+
+describe("入力系の保存の文言", () => {
+  test("開業入力の形が不正なら固有の文言", async () => {
+    const r = await req("/api/business-start-inputs", { method: "PUT", json: { state: { start_date: 1 } } });
+    expect(r.body["error"]).toBe("専用入力の形が不正です");
+  });
+
+  test("申告入力の state がオブジェクトでなければ固有の文言", async () => {
+    const r = await req("/api/filing-inputs/2025", { method: "PUT", json: { state: [1] } });
+    expect(r.status).toBe(400);
+    expect(r.body["error"]).toBe("state はオブジェクトで指定してください");
+  });
+
+  test("試算表の year が無ければ固有の文言", async () => {
+    const r = await req("/api/calc/trial-balance", { method: "POST", json: { transactions: [] } });
+    expect(r.status).toBe(400);
+    expect(r.body["error"]).toBe("year が必要です");
+  });
+});

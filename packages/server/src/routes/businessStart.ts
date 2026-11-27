@@ -2,6 +2,7 @@
  * businessStart.ts — 開業届・青色申告承認申請書の専用入力のルート登録（routes）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { validationHook } from "../lib/validationHook";
 import {
   getBusinessStartInputsHandler,
   getBusinessStartInputsRoute,
@@ -13,6 +14,10 @@ import {
 
 const app = new OpenAPIHono();
 app.openapi(getBusinessStartInputsRoute, getBusinessStartInputsHandler);
-app.openapi(saveBusinessStartInputsRoute, saveBusinessStartInputsHandler);
+app.openapi(
+  saveBusinessStartInputsRoute,
+  saveBusinessStartInputsHandler,
+  validationHook(() => "専用入力の形が不正です"),
+);
 
 export default app;
