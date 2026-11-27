@@ -55,3 +55,48 @@ describe("起動設定", () => {
     expect(serverOptions.idleTimeout ?? 10).toBeGreaterThan(10);
   });
 });
+
+describe("入力検証の失敗は { error: string } の 400 で返す", () => {
+  const cases: { name: string; path: string; init?: RequestInit }[] = [
+    { name: "減価償却: year の欠落", path: "/api/fixed-assets/depreciation" },
+    {
+      name: "提出の記録: 税目が不正",
+      path: "/api/filing-submissions/2025/corporate",
+      init: { method: "PUT", json: { acceptance_number: "1", submitted_date: null } },
+    },
+    {
+      name: "確定スナップショット: figures の欠落",
+      path: "/api/filing-snapshots/2025",
+      init: { method: "POST", json: { figures: { business_income: 1 } } },
+    },
+    { name: "資金繰り: from の書式", path: "/api/cash-flow?from=2025-13" },
+    { name: "請求書一覧: status が不正", path: "/api/invoices?status=void" },
+    {
+      name: "開業入力: state の形",
+      path: "/api/business-start-inputs",
+      init: { method: "PUT", json: { state: { start_date: 1 } } },
+    },
+    {
+      name: "申告入力: ボディがオブジェクトでない",
+      path: "/api/filing-inputs/2025",
+      init: { method: "PUT", json: [1, 2] },
+    },
+  ];
+  for (const c of cases) {
+    test(c.name, async () => {
+      const r = await req(c.path, c.init);
+      expect(r.status).toBe(400);
+      expect(typeof r.body["error"]).toBe("string");
+      expect(r.body["error"]).not.toBe("");
+      expect(r.body["success"]).toBeUndefined();
+    });
+  }
+
+  test("失敗した項目名を文言に含める", async () => {
+    const r = await req("/api/filing-submissions/2025/corporate", {
+      method: "PUT",
+      json: { acceptance_number: "1", submitted_date: null },
+    });
+    expect(r.body["error"]).toBe("kind が不正です");
+  });
+});

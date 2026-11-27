@@ -52,6 +52,7 @@ import { ACCOUNT_CRITERIA } from "@etax/shared";
 import { ensureTables, getDb, isDatabaseConfigured, tablesReady } from "./lib/db";
 import { encryptionEnabled } from "./lib/encryption";
 import { publicBaseUrl } from "./lib/publicUrl";
+import { defaultValidationHook } from "./lib/validationHook";
 import { billingEnabled } from "./gateways/stripeGateway";
 import { hasActivePlan } from "./repositories/subscriptionRepository";
 import { authRequired, runWithTenant } from "./lib/tenantContext";
@@ -91,7 +92,9 @@ import settingsRoutes from "./routes/settings";
 import taxpayerRoutes from "./routes/taxpayer";
 import transactionsRoutes from "./routes/transactions";
 
-const app = new OpenAPIHono();
+// 子ルートのバリデーション失敗も、個別のフックが無ければこの defaultHook で
+// { error } 形式の 400 にする（子アプリは親の defaultHook を辿る）。
+const app = new OpenAPIHono({ defaultHook: defaultValidationHook });
 
 /**
  * CORS はワイルドカードにせず、許可オリジンを設定ベースにする（Issue #7）。

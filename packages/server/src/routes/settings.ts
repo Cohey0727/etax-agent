@@ -2,7 +2,7 @@
  * settings.ts — 設定系ルートの登録（routes: 登録のみ）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { legacyValidationHook } from "../lib/validationHook";
+import { validationHook } from "../lib/validationHook";
 import {
   getSystemOneSettingsHandler,
   getSystemOneSettingsRoute,
@@ -25,17 +25,17 @@ app.openapi(getSystemOneSettingsRoute, getSystemOneSettingsHandler);
 app.openapi(
   updateSystemOneSettingsRoute,
   updateSystemOneSettingsHandler,
-  legacyValidationHook(() => "JSONボディが必要です"),
+  validationHook(() => "JSONボディが必要です"),
 );
 app.openapi(
   testSystemOneSettingsRoute,
   testSystemOneSettingsHandler,
-  legacyValidationHook(() => "JSONボディが必要です"),
+  validationHook(() => "JSONボディが必要です"),
 );
 app.openapi(
   testAgentSettingsRoute,
   testAgentSettingsHandler,
-  legacyValidationHook(() => "JSONボディが必要です"),
+  validationHook(() => "JSONボディが必要です"),
 );
 
 export default app;

@@ -2,7 +2,7 @@
  * receipts.ts — 領収書・証憑系ルートの登録（routes: 登録のみ）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { legacyValidationHook } from "../lib/validationHook";
+import { validationHook } from "../lib/validationHook";
 import { analyzeReceiptHandler, analyzeReceiptRoute } from "../usecases/analyzeReceipt";
 import { getReceiptContentHandler, getReceiptContentRoute } from "../usecases/getReceiptContent";
 import { linkReceiptHandler, linkReceiptRoute } from "../usecases/linkReceipt";
@@ -17,7 +17,7 @@ const app = new OpenAPIHono();
 app.openapi(
   analyzeReceiptRoute,
   analyzeReceiptHandler,
-  legacyValidationHook(() => "JSONボディが必要です"),
+  validationHook(() => "JSONボディが必要です"),
 );
 app.openapi(listReceiptsRoute, listReceiptsHandler);
 app.openapi(getReceiptContentRoute, getReceiptContentHandler);

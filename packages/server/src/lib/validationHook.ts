@@ -1,10 +1,11 @@
 /**
- * validationHook.ts — zod-openapi のバリデーション失敗を、従来の
- * `{ error: string }` 形式・従来文言の 400 レスポンスへ変換するフック（lib）。
+ * validationHook.ts — zod-openapi のバリデーション失敗を `{ error: string }`
+ * 形式の 400 レスポンスへ変換するフック（lib）。
  *
- * フレームワーク既定の zod エラー JSON は返さず、エンドポイントごとに
- * 従来どおりの日本語文言を返すため、メッセージ決定は呼び出し側の
- * 関数（issue のパス一覧 → 文言）に委ねる。
+ * フレームワーク既定の応答は error が zod エラーのオブジェクトで、画面は
+ * 文言として表示できない。ルートアプリの defaultHook に defaultValidationHook
+ * を置いて全ルートに効かせ、エンドポイント固有の文言が要るルートだけ
+ * validationHook(messageFor) を個別に渡す。
  */
 import { Hook } from "@hono/zod-openapi";
 
@@ -16,7 +17,7 @@ import { Hook } from "@hono/zod-openapi";
  * 共有するこのファクトリでは具体型を名指しできない（unknown 等に寄せると
  * 応答型の位置で代入互換が崩れる）。any はこの1箇所に限定する。
  */
-export function legacyValidationHook(
+export function validationHook(
   messageFor: (issuePaths: string[]) => string,
 ): Hook<any, any, any, any> {
   return (result, c) => {
@@ -27,3 +28,12 @@ export function legacyValidationHook(
     return c.json({ error: messageFor(issuePaths) }, 400);
   };
 }
+
+/** 失敗した項目名を並べた文言。項目を指さない失敗はボディ全体の不備とみなす。 */
+export function defaultValidationMessage(issuePaths: string[]): string {
+  const named = [...new Set(issuePaths.filter((path) => path !== ""))];
+  return named.length > 0 ? `${named.join("・")} が不正です` : "JSONボディが必要です";
+}
+
+/** 個別の文言を持たないルートに使う defaultHook。 */
+export const defaultValidationHook = validationHook(defaultValidationMessage);
