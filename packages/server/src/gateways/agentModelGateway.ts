@@ -7,9 +7,8 @@
  *   含む会話制御は Vercel AI SDK に任せ（公式SDKに相当する第1選択肢）、
  *   ここでは設定 → LanguageModel の生成だけを担う。
  *
- * 送信ヘッダーの注意（手書きゲートウェイ時代に実地で判明した互換性要件）:
- *   - User-Agent は既定のランタイム値だと Cloudflare に弾かれることがある
- *     ため 'etax-agent/0.1' を明示する。
+ * 送信ヘッダーの注意（互換性要件）:
+ *   - User-Agent は USER_AGENT を明示する（userAgent.ts）。
  *   - OpenCode Go は x-opencode-session ヘッダーが無いリクエストを拒否する
  *     （MissingSessionID）ため、OpenAI互換では常に送る。他のエンドポイント
  *     では無視される。セッションIDはモデル生成ごとに新規発行する
@@ -19,8 +18,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { LanguageModel } from "ai";
 import { AgentConfig } from "../lib/config";
-
-const USER_AGENT = "etax-agent/0.1";
+import { USER_AGENT } from "./userAgent";
 
 /**
  * リダイレクトを追わない fetch。接続先は利用者が指定できるため、検証済みの

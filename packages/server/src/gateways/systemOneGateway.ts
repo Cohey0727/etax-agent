@@ -13,6 +13,7 @@
 import { z } from "@hono/zod-openapi";
 import { AccountCriterion } from "@etax/shared";
 import { SystemOneConfig } from "../lib/config";
+import { USER_AGENT } from "./userAgent";
 
 /** SystemOne 呼び出しの失敗を表す例外。 */
 export class SystemOneError extends Error {}
@@ -37,8 +38,6 @@ export interface SystemOneClient {
     learnedPrompt?: string,
   ): Promise<AccountJudgement>;
 }
-
-const USER_AGENT = "etax-agent/0.1";
 
 /**
  * 判定時の固定の注意書き（プロンプトの指示文に常時含める）。

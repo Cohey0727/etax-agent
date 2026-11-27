@@ -21,13 +21,13 @@
  *                      tool_use / tool_result 形式へ相互変換する。
  *
  * 送信ヘッダーの注意（互換性要件）:
- *   - User-Agent はランタイム既定値だと Cloudflare に弾かれる
- *     （error 1010）ため 'etax-agent/0.1' を明示する。
+ *   - User-Agent は USER_AGENT を明示する（userAgent.ts）。
  *   - OpenCode Go は x-opencode-session ヘッダーが無いリクエストを拒否する
  *     （MissingSessionID）ため、OpenAI互換では常に送る。他のエンドポイントでは無視される。
  */
 import { z } from "@hono/zod-openapi";
 import { AgentConfig } from "../lib/config";
+import { USER_AGENT } from "./userAgent";
 
 /** LLM 呼び出しの失敗を表す例外。instanceof 判定のための慣用としてクラスで定義する。 */
 export class LLMError extends Error {}
@@ -71,8 +71,6 @@ export interface ChatResult {
 export interface LLMClient {
   chat(messages: ChatMessage[], tools?: ToolDef[]): Promise<ChatResult>;
 }
-
-const USER_AGENT = "etax-agent/0.1";
 
 /** OpenAI互換 Chat Completions 応答のエンベロープ（使う部分だけを検証する）。 */
 const openAiChatCompletionSchema = z.looseObject({
