@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createTestDb } from "./testDb";
 import { Db } from "../src/lib/db";
-import { LEGACY_OWNER_ID, runWithTenant } from "../src/lib/tenantContext";
+import { DEFAULT_OWNER_ID, runWithTenant } from "../src/lib/tenantContext";
 import { createUser } from "../src/repositories/userRepository";
 import { listTransactionRows } from "../src/repositories/transactionRepository";
 import { McpToolResult } from "../src/services/mcp/mcpToolKit";
@@ -239,7 +239,7 @@ describe("REST と同じ入力上限", () => {
 describe("get_freee_trial_balance の所有者別ファイル", () => {
   test("既定ユーザーは無印、他の所有者は -<ID> のファイルを読む", async () => {
     const other = (await createUser(db, "mcp-tools-other@example.com", "password-123")).id;
-    expect(userId).toBe(LEGACY_OWNER_ID);
+    expect(userId).toBe(DEFAULT_OWNER_ID);
     const dataDir = process.env.ETAX_DATA_DIR!;
     await writeFile(join(dataDir, "freee-trial-balance.json"), JSON.stringify({ owner: "legacy" }));
     await writeFile(join(dataDir, `freee-trial-balance-${other}.json`), JSON.stringify({ owner: "other" }));
