@@ -1,12 +1,12 @@
 import { StyleSheet, View } from "react-native";
-import { AppText, Field, SelectField, SwitchRow } from "@/components";
+import { AppText, Field, SelectField } from "@/components";
 import { SalarySituationRow } from "@/api";
 import { space } from "@/theme";
 import { parseOptionalNumber } from "@/utils";
 
 /**
  * businessStartFields.tsx — 開業届・青色申告承認申請書パネルの入力部品。
- * ラベル付きの選択・チェック欄と、期限表示の行、提出のしかたの案内。
+ * ラベル付きの有無の選択欄と、期限表示の行、提出のしかたの案内。
  */
 
 /** YYYY-MM-DD を「YYYY年M月D日」へ整形する。 */
@@ -56,17 +56,6 @@ export function NullableBoolField({ label, value, onChange }: NullableBoolFieldP
       onChange={(v) => onChange(v === "" ? null : v === "yes")}
     />
   );
-}
-
-export interface CheckRowProps {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}
-
-/** チェック欄（ラベル＋スイッチ）。 */
-export function CheckRow({ label, checked, onChange }: CheckRowProps) {
-  return <SwitchRow label={label} value={checked} onChange={onChange} />;
 }
 
 export interface SalaryRowFieldsProps {

@@ -13,10 +13,11 @@ export interface BreakdownEntriesFieldsProps {
   /** 内訳（名称・金額） */
   entries: BreakdownEntry[];
   /**
-   * 内訳が未入力のときに残っている合計（手入力時代の保存値）。
+   * 保存済みの合計。内訳が無く合計だけが保存されているとき（エージェントや
+   * MCP が合計だけを入れた場合など）は、これを1件の内訳として見せる。
    * 内訳を編集し始めたら、合計は内訳の合計に置き換わる。
    */
-  legacyTotal: number;
+  savedTotal: number;
   onChange: (entries: BreakdownEntry[]) => void;
   /** 名称欄のプレースホルダ（例: 寄附先（自治体名など）） */
   namePlaceholder: string;
@@ -38,21 +39,21 @@ export interface BreakdownEntriesFieldsProps {
 export function BreakdownEntriesFields({
   title,
   entries,
-  legacyTotal,
+  savedTotal,
   onChange,
   namePlaceholder,
   nameLabel,
   addLabel,
   note,
 }: BreakdownEntriesFieldsProps) {
-  const [open, setOpen] = useState(() => entries.length > 0 || legacyTotal > 0);
+  const [open, setOpen] = useState(() => entries.length > 0 || savedTotal > 0);
   // 内訳がまだ無い場合は、保存済みの合計を1件として見せる（消えないように）。
   // 何も無ければ空の1行から始められるようにする。
   const rows: BreakdownEntry[] =
     entries.length > 0
       ? entries
-      : legacyTotal > 0
-        ? [{ id: "breakdown-legacy", recipient: "", amount: legacyTotal }]
+      : savedTotal > 0
+        ? [{ id: "breakdown-saved-total", recipient: "", amount: savedTotal }]
         : [{ id: "breakdown-initial", recipient: "", amount: 0 }];
   const total = rows.reduce((sum, e) => sum + (e.amount || 0), 0);
 

@@ -1,9 +1,9 @@
 import { BLUE_BOOK_OPTIONS } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
-import { AppText, DateField, Field, SelectField } from "@/components";
+import { AppText, DateField, Field, SelectField, SwitchRow } from "@/components";
 import { BusinessStartInputs } from "@/api";
 import { space } from "@/theme";
-import { CheckRow, NullableBoolField, SalaryRowFields } from "./businessStartFields";
+import { NullableBoolField, SalaryRowFields } from "./businessStartFields";
 
 /**
  * BusinessStartSections.tsx — 開業届の項目と青色申告承認申請書の項目の
@@ -38,14 +38,14 @@ export function OpeningNoticeFields({ inputs, update }: BusinessStartSectionsPro
       <AppText size="lg" weight="bold">
         開業届の項目
       </AppText>
-      <CheckRow
+      <SwitchRow
         label="「青色申告承認申請書」をあわせて提出する"
-        checked={inputs.submits_blue_application}
+        value={inputs.submits_blue_application}
         onChange={(checked) => update({ submits_blue_application: checked })}
       />
-      <CheckRow
+      <SwitchRow
         label="消費税の「課税事業者選択届出書」をあわせて提出する"
-        checked={inputs.submits_consumption_election}
+        value={inputs.submits_consumption_election}
         onChange={(checked) => update({ submits_consumption_election: checked })}
       />
       <Field
@@ -192,10 +192,10 @@ export function BlueReturnFields({ inputs, update }: BusinessStartSectionsProps)
         備付帳簿名
       </AppText>
       {BLUE_BOOK_OPTIONS.map((option) => (
-        <CheckRow
+        <SwitchRow
           key={option.key}
           label={option.label}
-          checked={inputs.books.includes(option.key)}
+          value={inputs.books.includes(option.key)}
           onChange={(checked) => toggleBook(option.key, checked)}
         />
       ))}

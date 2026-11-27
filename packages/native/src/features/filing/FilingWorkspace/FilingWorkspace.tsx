@@ -250,7 +250,6 @@ function FilingWorkspaceContent({ initialTab, deductionState, update }: FilingWo
           incomeTaxPayments={deductionState.incomeTaxPayments}
           onIncomeTaxPaymentsChange={(next) => update((s) => ({ ...s, incomeTaxPayments: next }))}
           expandedWithholding={expandedWithholdingTotal(expandedBreakdown)}
-          originalIncomeTax={null}
           onOpenSection={openSection}
         />
         <SubmissionRecordPanel year={year} kind="income" />

@@ -9,6 +9,7 @@ import {
   DateField,
   Field,
   SkeletonBar,
+  SwitchRow,
 } from "@/components";
 import {
   BusinessStartIncomeType,
@@ -25,7 +26,6 @@ import { LoadFailedNotice } from "../fields";
 import { taxpayerProfileStore, todayIso } from "../taxpayerData";
 import { useYearInput } from "../useYearInput";
 import {
-  CheckRow,
   DeadlineRow,
   SubmissionGuide,
   formatJapaneseDate,
@@ -204,10 +204,10 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
           所得の種類
         </AppText>
         {INCOME_TYPE_OPTIONS.map((option) => (
-          <CheckRow
+          <SwitchRow
             key={option.key}
             label={option.label}
-            checked={inputs.income_types.includes(option.key)}
+            value={inputs.income_types.includes(option.key)}
             onChange={(checked) => toggleIncomeType(option.key, checked)}
           />
         ))}
@@ -260,6 +260,5 @@ const styles = StyleSheet.create({
   wrap: { gap: space.sm },
   skeletonRow: { gap: 6 },
   deadlines: { gap: space.sm },
-  office: { gap: space.sm },
   actions: { gap: space.sm },
 });

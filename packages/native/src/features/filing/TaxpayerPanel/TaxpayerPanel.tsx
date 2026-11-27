@@ -80,11 +80,6 @@ export interface TaxpayerPanelProps {
   onIncomeTaxPaymentsChange: (next: IncomeTaxPaymentInputs) => void;
   /** 配当・株式等譲渡の入力に含まれる源泉徴収税額（XTX でも源泉徴収税額へ加算される） */
   expandedWithholding: number;
-  /**
-   * 申告済みの所得税額（過去に確定した分）。入っていれば、その確定分と
-   * 比較する修正申告として出力する。null なら確定申告として出力する。
-   */
-  originalIncomeTax: number | null;
   /** 納税者情報画面への遷移（確定申告画面の総合でのみ渡される）。 */
   onOpenSection?: (section: FilingSection) => void;
 }
@@ -111,7 +106,6 @@ export function TaxpayerPanel({
   incomeTaxPayments,
   onIncomeTaxPaymentsChange,
   expandedWithholding,
-  originalIncomeTax,
   onOpenSection,
 }: TaxpayerPanelProps) {
   const { entry: profileEntry, reload: reloadProfile } = useYearInput(taxpayerProfileStore, year);
@@ -130,13 +124,9 @@ export function TaxpayerPanel({
 
   const supported = xtxSupportedYears().includes(year);
 
-  // 申告の種類はモードとして選ぶものではなく、入力内容から決まる。
-  // 申告済みの所得税額が入っていれば過去の確定分と比較する修正申告になる。
-  const amendment = originalIncomeTax !== null;
-
   const buildRequest = (taxpayer: XtxTaxpayerInput): ExportXtxRequest => ({
     year,
-    amendment,
+    amendment: false,
     submission_date: submissionDate,
     taxpayer,
     transactions,
@@ -156,7 +146,7 @@ export function TaxpayerPanel({
     real_estate_business_scale: realEstateBusinessScale,
     withholding_tax: withholdingTax,
     prepaid_tax: prepaidTax,
-    original_third_period_tax: amendment ? originalIncomeTax : null,
+    original_third_period_tax: null,
     balance_sheet:
       balanceSheet && !isBalanceSheetEmpty(balanceSheet)
         ? balanceSheetToWire(balanceSheet)
@@ -284,7 +274,7 @@ export function TaxpayerPanel({
         <AppText size="md" weight="bold">
           出力の条件
         </AppText>
-        <LabeledValue label="申告の種類" value={amendment ? "修正申告" : "確定申告"} />
+        <LabeledValue label="申告の種類" value="確定申告" />
         <DateField label="提出日" value={submissionDate} onChange={setSubmissionDate} />
         <AmountField
           label="源泉徴収税額"
@@ -313,12 +303,6 @@ export function TaxpayerPanel({
             strong
           />
         </View>
-
-        <AppText size="sm" tone="muted">
-          申告の種類は入力内容から決まります。申告済みの所得税額が入っている場合は
-          その確定分と比較する修正申告として、入っていない場合は確定申告として
-          出力します。
-        </AppText>
 
         {balanceSheetCheck ? (
           <AlertBox
