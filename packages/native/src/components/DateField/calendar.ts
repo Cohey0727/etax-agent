@@ -7,6 +7,10 @@ export interface DateParts {
 }
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+/** 年チップの最初の年。生年月日や古い固定資産の取得日も選べるようにする。 */
+const EARLIEST_YEAR = 1900;
+/** 年チップを今年から何年先まで並べるか。 */
+const YEARS_AHEAD = 15;
 
 /** "YYYY-MM-DD" を分解する。不正な値・存在しない日は null。 */
 export function parseDateValue(value: string): DateParts | null {
@@ -46,4 +50,13 @@ export function dateDisplayLabel(parts: DateParts): string {
 export function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
   const index = year * 12 + (month - 1) + delta;
   return { year: Math.floor(index / 12), month: (index % 12) + 1 };
+}
+
+/** 年チップに並べる年（昇順）。範囲外の値が入っていても、その年は必ず含める。 */
+export function selectableYears(todayYear: number, valueYear: number | null): number[] {
+  const first = Math.min(EARLIEST_YEAR, valueYear ?? EARLIEST_YEAR);
+  const last = Math.max(todayYear + YEARS_AHEAD, valueYear ?? todayYear);
+  const years: number[] = [];
+  for (let year = first; year <= last; year += 1) years.push(year);
+  return years;
 }

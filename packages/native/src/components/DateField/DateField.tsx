@@ -6,7 +6,7 @@ import { AppText } from "../AppText";
 import { Sheet } from "../Sheet";
 import {
   dateDisplayLabel, daysInMonth, firstWeekday, formatDateValue,
-  parseDateValue, shiftMonth, todayParts,
+  parseDateValue, selectableYears, shiftMonth, todayParts,
 } from "./calendar";
 
 export interface DateFieldProps {
@@ -20,7 +20,6 @@ export interface DateFieldProps {
 }
 
 const WEEKDAY_LABELS: readonly string[] = ["日", "月", "火", "水", "木", "金", "土"];
-const YEAR_RANGE = 15;
 
 /**
  * 日付入力。タップでカレンダーのボトムシートを開く。
@@ -46,8 +45,7 @@ export function DateField({ label, value, onChange, hint, clearable }: DateField
   };
 
   const today = todayParts();
-  const years: number[] = [];
-  for (let y = today.year - YEAR_RANGE; y <= today.year + YEAR_RANGE; y += 1) years.push(y);
+  const years = selectableYears(today.year, view.year);
   const dayCount = daysInMonth(view.year, view.month);
   const offset = firstWeekday(view.year, view.month);
   const cells: (number | null)[] = [
