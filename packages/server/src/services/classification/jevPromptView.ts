@@ -2,7 +2,7 @@
  * jevPromptView.ts — jev 用プロンプトの組み立て（services/classification）。
  *
  * カスタム（手編集）・自動生成・実効プロンプトをまとめた表示用データを返す。
- * MCP とエージェントの設定ツールで共有する。
+ * 設定画面（REST）・MCP・エージェントの設定ツールで共有する。
  */
 import { getJevPromptOverride } from "../../lib/config";
 import { loadClassificationHistory } from "../../repositories/classificationHistoryRepository";

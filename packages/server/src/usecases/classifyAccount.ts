@@ -3,15 +3,13 @@
  * 自動生成ルール → SystemOne（プロンプト）→ キーワードルールの順で判定する。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { createSystemOneClient } from "../gateways/systemOneGateway";
-import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../lib/config";
-import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import {
   AccountClassificationSchema,
   ClassifyAccountRequestSchema,
 } from "../schemas/classify";
 import { ErrorSchema } from "../schemas/common";
 import { classifyAccount } from "../services/classification/classifyAccount";
+import { loadClassifyDeps } from "../services/classification/loadClassifyDeps";
 
 export const classifyAccountRoute = createRoute({
   method: "post",
@@ -39,8 +37,5 @@ export const classifyAccountRoute = createRoute({
 
 export const classifyAccountHandler: RouteHandler<typeof classifyAccountRoute> = async (c) => {
   const body = c.req.valid("json");
-  const history = await loadClassificationHistory();
-  const systemOne = createSystemOneClient(loadSystemOneConfig());
-  const result = await classifyAccount(body.description, { history, systemOne, jevPromptOverride: getJevPromptOverride(), regexRulesOverride: getRegexRulesOverride() });
-  return c.json(result, 200);
+  return c.json(await classifyAccount(body.description, await loadClassifyDeps()), 200);
 };

@@ -5,11 +5,9 @@
  * 設定画面の「AIのメモリー」のプロンプト編集欄が使う。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { getJevPromptOverride } from "../lib/config";
-import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import { JevPromptResponseSchema } from "../schemas/classify";
 import { ErrorSchema } from "../schemas/common";
-import { generateRules } from "../services/classification/generateRules";
+import { buildJevPromptView } from "../services/classification/jevPromptView";
 
 export const getJevPromptRoute = createRoute({
   method: "get",
@@ -30,15 +28,5 @@ export const getJevPromptRoute = createRoute({
 });
 
 export const getJevPromptHandler: RouteHandler<typeof getJevPromptRoute> = async (c) => {
-  const history = await loadClassificationHistory();
-  const customPrompt = getJevPromptOverride();
-  const generatedPrompt = generateRules(history).jevPrompt;
-  return c.json(
-    {
-      customPrompt,
-      generatedPrompt,
-      effectivePrompt: customPrompt || generatedPrompt,
-    },
-    200,
-  );
+  return c.json(await buildJevPromptView(), 200);
 };

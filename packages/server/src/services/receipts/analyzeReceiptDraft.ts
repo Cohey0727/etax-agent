@@ -19,22 +19,15 @@ import {
   StorageError,
   StorageObjectNotFoundError,
 } from "../../gateways/storageGateway";
-import { createSystemOneClient } from "../../gateways/systemOneGateway";
-import {
-  getJevPromptOverride,
-  getRegexRulesOverride,
-  loadAgentConfig,
-  loadStorageConfig,
-  loadSystemOneConfig,
-} from "../../lib/config";
+import { loadAgentConfig, loadStorageConfig } from "../../lib/config";
 import { Db } from "../../lib/db";
+import { BusinessError } from "../../lib/errors";
 import { ALLOWED_UPLOAD_CONTENT_TYPES } from "../../lib/uploadTypes";
-import { loadClassificationHistory } from "../../repositories/classificationHistoryRepository";
 import { upsertReceiptExtraction } from "../../repositories/receiptRepository";
 import { AnalyzeReceiptResponse } from "../../schemas/receipt";
 import { classifyAccount } from "../classification/classifyAccount";
+import { loadClassifyDeps } from "../classification/loadClassifyDeps";
 import { extractReceipt, ReceiptImage } from "./extractReceipt";
-import { BusinessError } from "../../lib/errors";
 
 /** 領収書解析まわりの業務エラー。status は REST 側の HTTP ステータスに対応する。 */
 export class ReceiptAnalysisError extends BusinessError {}
@@ -103,14 +96,10 @@ export async function analyzeReceiptDraft(
     throw new ReceiptAnalysisError(503, e instanceof Error ? e.message : String(e));
   }
   const state = [extracted.payee, extracted.description].filter(Boolean).join(" ");
-  const history = await loadClassificationHistory();
-  const systemOne = createSystemOneClient(loadSystemOneConfig());
-  const classification = await classifyAccount(state || extracted.description, {
-    history,
-    systemOne,
-    jevPromptOverride: getJevPromptOverride(),
-    regexRulesOverride: getRegexRulesOverride(),
-  });
+  const classification = await classifyAccount(
+    state || extracted.description,
+    await loadClassifyDeps(),
+  );
   const result = { ...extracted, classification };
   // 証憑と取引の紐付けの土台として、fileId 経路の解析結果を証憑台帳へ
   // 記録する（DB未設定・記録失敗でも解析自体は成功として返す）。

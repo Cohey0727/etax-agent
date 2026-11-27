@@ -6,11 +6,10 @@
  * 結果としてプロンプト一式（カスタム／自動生成／実効）を返す。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import { saveJevPromptOverride } from "../repositories/jevPromptRepository";
 import { JevPromptResponseSchema, UpdateJevPromptRequestSchema } from "../schemas/classify";
 import { ErrorSchema } from "../schemas/common";
-import { generateRules } from "../services/classification/generateRules";
+import { buildJevPromptView } from "../services/classification/jevPromptView";
 
 export const updateJevPromptRoute = createRoute({
   method: "put",
@@ -38,15 +37,6 @@ export const updateJevPromptRoute = createRoute({
 
 export const updateJevPromptHandler: RouteHandler<typeof updateJevPromptRoute> = async (c) => {
   const body = c.req.valid("json");
-  const customPrompt = await saveJevPromptOverride(body.prompt);
-  const history = await loadClassificationHistory();
-  const generatedPrompt = generateRules(history).jevPrompt;
-  return c.json(
-    {
-      customPrompt,
-      generatedPrompt,
-      effectivePrompt: customPrompt || generatedPrompt,
-    },
-    200,
-  );
+  await saveJevPromptOverride(body.prompt);
+  return c.json(await buildJevPromptView(), 200);
 };

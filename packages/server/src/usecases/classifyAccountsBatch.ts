@@ -5,15 +5,13 @@
  * 先に確定し、残りだけを逐次 SystemOne に投げる。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { createSystemOneClient } from "../gateways/systemOneGateway";
-import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../lib/config";
-import { loadClassificationHistory } from "../repositories/classificationHistoryRepository";
 import {
   ClassifyAccountsBatchRequestSchema,
   ClassifyAccountsBatchResponseSchema,
 } from "../schemas/classify";
 import { ErrorSchema } from "../schemas/common";
 import { classifyAccount } from "../services/classification/classifyAccount";
+import { loadClassifyDeps } from "../services/classification/loadClassifyDeps";
 
 export const classifyAccountsBatchRoute = createRoute({
   method: "post",
@@ -43,11 +41,10 @@ export const classifyAccountsBatchHandler: RouteHandler<
   typeof classifyAccountsBatchRoute
 > = async (c) => {
   const body = c.req.valid("json");
-  const history = await loadClassificationHistory();
-  const systemOne = createSystemOneClient(loadSystemOneConfig());
+  const deps = await loadClassifyDeps();
   const results = [];
   for (const item of body.items) {
-    results.push(await classifyAccount(item.description, { history, systemOne, jevPromptOverride: getJevPromptOverride(), regexRulesOverride: getRegexRulesOverride() }));
+    results.push(await classifyAccount(item.description, deps));
   }
   return c.json({ results }, 200);
 };
