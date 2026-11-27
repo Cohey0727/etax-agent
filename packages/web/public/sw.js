@@ -4,7 +4,7 @@
  * 静的アセットはキャッシュ優先＋裏で更新する。/api/ は一切キャッシュしない
  * （帳簿や判定などの業務データは常にサーバーの最新を正とする）。
  */
-const CACHE_NAME = "etaxagent-v3";
+const CACHE_NAME = "etaxagent-v4";
 const CORE_ASSETS = [
   "/",
   "/manifest.json",
@@ -43,11 +43,15 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     // 画面はネットワーク優先。オフライン時のみキャッシュしたトップを返す。
+    // トップとして控えるのはアプリの画面の正常な応答だけ（エラー応答や LP などの
+    // 静的な HTML を控えると、オフラインで起動したときにアプリが出なくなる）。
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/", copy));
+          if (response.ok && !url.pathname.endsWith(".html")) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put("/", copy));
+          }
           return response;
         })
         .catch(() => caches.match("/")),
