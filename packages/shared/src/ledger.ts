@@ -17,7 +17,7 @@
  */
 
 import { normalizeSearchText } from "./text";
-import { normalizeBusinessRatio, transactionBusinessAmount } from "./taxcalc";
+import { categoryIncomeLines, normalizeBusinessRatio, transactionBusinessAmount } from "./taxcalc";
 import { VALID_INCOME_TYPES, type IncomeType, type Transaction } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -358,30 +358,20 @@ export function categoryTotals(transactions: Transaction[]): Record<string, numb
 
 /**
  * 決算書の経費欄に渡す科目別合計を作る。支出は正の金額（絶対値）に揃え、
- * 不動産の家賃収入だけは収入として正のまま残す。XTX生成（exportXtx）と
- * 試算表（trialBalance）が同じ振り分けを使うための単一実装。
+ * 不動産の家賃収入だけは収入として正のまま残す。科目ごとの純額で振り分ける
+ * のは aggregateIncome と同じ（categoryIncomeLines）で、経費行の合計は経費計と
+ * 一致する。XTX生成（exportXtx）と試算表（trialBalance）が同じ振り分けを使う
+ * ための単一実装。
  */
 export function statementCategoryTotals(
   transactions: Transaction[],
   incomeType: IncomeType,
 ): Record<string, number> {
-  const totals = categoryTotals(transactions.filter((t) => t.income_type === incomeType));
-  const result: Record<string, number> = {};
-  for (const [category, value] of Object.entries(totals)) {
-    if (category === "家賃収入") {
-      if (value > 0) result[category] = value;
-    } else if (value < 0) {
-      result[category] = -value;
-    }
-  }
+  const lines = categoryIncomeLines(transactions, incomeType);
+  const result: Record<string, number> = { ...lines.expenses };
+  const rent = lines.revenue["家賃収入"] ?? 0;
+  if (rent > 0) result["家賃収入"] = rent;
   return result;
-}
-
-/** 住宅家賃（消費税非課税）の収入合計。category=家賃収入 のものを事業分で拾う。 */
-export function residentialRentTotal(transactions: Transaction[]): number {
-  return transactions
-    .filter((t) => t.income_type === "real_estate" && t.category === "家賃収入" && t.amount > 0)
-    .reduce((sum, t) => sum + transactionBusinessAmount(t), 0);
 }
 
 // ---------------------------------------------------------------------------

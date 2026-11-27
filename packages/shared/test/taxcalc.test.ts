@@ -229,6 +229,32 @@ describe("サンプルCSV（2024年分）", () => {
     expect(estimateInputTax(txs)).toBe(10_000);
   });
 
+  test("経費の返金は課税売上ではなく仕入の減額として扱う", () => {
+    const figures = computeCorrectedFigures(
+      normalizeTransactions([
+        { date: "2025-03-01", year: 2025, description: "売上", amount: 1_100_000, category: "売上高", income_type: "business" },
+        { date: "2025-03-05", year: 2025, description: "回線", amount: -110_000, category: "通信費", income_type: "business" },
+        { date: "2025-03-20", year: 2025, description: "回線 返金", amount: 55_000, category: "通信費", income_type: "business" },
+      ]),
+      2025,
+    );
+    expect(figures.business_revenue).toBe(1_100_000);
+    expect(figures.business_expenses).toBe(55_000);
+    expect(figures.taxable_sales).toBe(1_100_000);
+    expect(figures.input_tax_estimate).toBe(5_000);
+  });
+
+  test("家賃収入の返金は住宅家賃（非課税売上）を減らし、課税売上を負にしない", () => {
+    const txs = normalizeTransactions([
+      { date: "2025-03-01", year: 2025, description: "家賃", amount: 100_000, category: "家賃収入", income_type: "real_estate" },
+      { date: "2025-03-02", year: 2025, description: "家賃 日割り返金", amount: -10_000, category: "家賃収入", income_type: "real_estate" },
+    ]);
+    expect(residentialRentTotal(txs)).toBe(90_000);
+    const figures = computeCorrectedFigures(txs, 2025);
+    expect(figures.taxable_sales).toBe(0);
+    expect(figures.nontaxable_sales).toBe(90_000);
+  });
+
   test("本則: 課税売上割合が95%未満なら仕入税額を一括比例配分で按分する", () => {
     // 課税売上 11,000,000（税抜 10,000,000）・非課税売上 1,000,000 → 割合 90.90%
     const r = consumptionTax({

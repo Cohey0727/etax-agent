@@ -24,7 +24,7 @@
 * （控除によってその区分が赤字になることはない）。
 */
 
-import type { Transaction} from "./types";
+import type { IncomeType, Transaction } from "./types";
 import {
   agricultureIncomeBeforeBlueDeduction,
   computeAgricultureStatement,
@@ -177,35 +177,72 @@ businessIncome: number;
 realEstateIncome: number;
 }
 
-/** 取引リストを income_type ごとに収入/経費へ振り分ける。 */
+/** 符号によらず収入側で集計する勘定科目（返品・返金は収入の減額になる）。 */
+export const REVENUE_CATEGORIES: ReadonlySet<string> = new Set(["売上高", "家賃収入"]);
+
+/** 収入区分ごとの勘定科目別の収入・経費（事業分の金額。経費は正の金額）。 */
+export interface CategoryIncomeLines {
+  revenue: Record<string, number>;
+  expenses: Record<string, number>;
+}
+
+/**
+ * 収入区分の取引を勘定科目ごとに事業分の純額で集計し、収入と経費に分ける。
+ * 収入科目（REVENUE_CATEGORIES）は純額を収入に、それ以外の科目は純額が負なら
+ * 経費、正なら収入にする。経費の返金・売上の返品は同じ科目の中で相殺される。
+ */
+export function categoryIncomeLines(
+  transactions: Transaction[],
+  incomeType: IncomeType,
+): CategoryIncomeLines {
+  const net = new Map<string, number>();
+  for (const t of transactions) {
+    if ((t.income_type || "other") !== incomeType) continue;
+    net.set(t.category, (net.get(t.category) ?? 0) + transactionBusinessAmount(t));
+  }
+  const lines: CategoryIncomeLines = { revenue: {}, expenses: {} };
+  for (const [category, amount] of net) {
+    if (REVENUE_CATEGORIES.has(category) || amount > 0) lines.revenue[category] = amount;
+    else if (amount < 0) lines.expenses[category] = -amount;
+  }
+  return lines;
+}
+
+function sumValues(record: Record<string, number>): number {
+  return Object.values(record).reduce((sum, value) => sum + value, 0);
+}
+
+/**
+ * 取引リストを income_type ごとに収入/経費へ振り分ける。事業・不動産は勘定科目
+ * ごとの純額で振り分け（categoryIncomeLines）、決算書の科目別の行と合計を一致
+ * させる。その他区分（資金移動など）は取引の符号で振り分ける。
+ */
 export function aggregateIncome(transactions: Transaction[]): IncomeBreakdown {
-const b = {
-businessRevenue: 0,
-businessExpenses: 0,
-realEstateRevenue: 0,
-realEstateExpenses: 0,
-otherRevenue: 0,
-otherExpenses: 0,
-};
-for (const t of transactions) {
-const amount = transactionBusinessAmount(t);
-const itype = t.income_type || "other";
-if (itype === "business") {
-if (amount >= 0) b.businessRevenue += amount;
-else b.businessExpenses += -amount;
-} else if (itype === "real_estate") {
-if (amount >= 0) b.realEstateRevenue += amount;
-else b.realEstateExpenses += -amount;
-} else {
-if (amount >= 0) b.otherRevenue += amount;
-else b.otherExpenses += -amount;
-}
-}
-return {
-...b,
-businessIncome: b.businessRevenue - b.businessExpenses,
-realEstateIncome: b.realEstateRevenue - b.realEstateExpenses,
-};
+  const business = categoryIncomeLines(transactions, "business");
+  const realEstate = categoryIncomeLines(transactions, "real_estate");
+  let otherRevenue = 0;
+  let otherExpenses = 0;
+  for (const t of transactions) {
+    const itype = t.income_type || "other";
+    if (itype === "business" || itype === "real_estate") continue;
+    const amount = transactionBusinessAmount(t);
+    if (amount >= 0) otherRevenue += amount;
+    else otherExpenses += -amount;
+  }
+  const businessRevenue = sumValues(business.revenue);
+  const businessExpenses = sumValues(business.expenses);
+  const realEstateRevenue = sumValues(realEstate.revenue);
+  const realEstateExpenses = sumValues(realEstate.expenses);
+  return {
+    businessRevenue,
+    businessExpenses,
+    realEstateRevenue,
+    realEstateExpenses,
+    otherRevenue,
+    otherExpenses,
+    businessIncome: businessRevenue - businessExpenses,
+    realEstateIncome: realEstateRevenue - realEstateExpenses,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +401,19 @@ detail,
 export const RESIDENTIAL_RENT_CATEGORIES: ReadonlySet<string> = new Set(["家賃収入"]);
 
 /**
+ * 住宅家賃（消費税非課税）の収入合計。不動産所得の住宅家賃の科目を、事業分の
+ * 純額（返金は差し引く）で数える。純額が負の科目は 0 とする。
+ */
+export function residentialRentTotal(transactions: Transaction[]): number {
+  const revenue = categoryIncomeLines(transactions, "real_estate").revenue;
+  let rent = 0;
+  for (const category of RESIDENTIAL_RENT_CATEGORIES) {
+    rent += Math.max(revenue[category] ?? 0, 0);
+  }
+  return rent;
+}
+
+/**
 * (課税売上(税込), 非課税売上(税込)) を所得内訳から求める。
 *
 * IncomeBreakdown 単体では家賃額が分からないため、家賃収入額が
@@ -401,19 +451,19 @@ export const NON_TAXABLE_EXPENSE_CATEGORIES: ReadonlySet<string> = new Set([
 
 /**
 * 経費取引から仕入税額を概算する（税込経費 × 10/110、課税仕入のみ）。
-* 対象は事業・不動産の取引だけで、資金移動・私用（収入区分 other）は数えない。
+* 対象は事業・不動産の経費科目だけで、資金移動・私用（収入区分 other）は数えない。
 * 課税売上割合による按分前の額。
 * あくまで概算。本則課税の正式な仕入税額は請求書等で確定させること。
 */
 export function estimateInputTax(transactions: Transaction[]): number {
+// 課税仕入れの母数は事業分のみ（家事按分後の金額。消基通11-1-5）で、
+// 経費の返金は同じ科目の中で差し引く。
 let total = 0;
-for (const t of transactions) {
-if (t.income_type !== "business" && t.income_type !== "real_estate") continue;
-// 課税仕入れの母数は事業分のみ（家事按分後の金額。消基通11-1-5）。
-const amount = transactionBusinessAmount(t);
-if (amount >= 0) continue;
-if (NON_TAXABLE_EXPENSE_CATEGORIES.has(t.category || "")) continue;
-total += -amount;
+for (const incomeType of ["business", "real_estate"] as const) {
+for (const [category, amount] of Object.entries(categoryIncomeLines(transactions, incomeType).expenses)) {
+if (NON_TAXABLE_EXPENSE_CATEGORIES.has(category)) continue;
+total += amount;
+}
 }
 return outputTaxFromTaxInclusive(total);
 }
@@ -520,20 +570,7 @@ export function computeCorrectedFigures(
     agricultureBeforeDeduction,
   );
 
-  // 住宅家賃（非課税）の合計。ledger.residentialRentTotal と同条件だが、
-  // taxcalc の独立性（ledger に依存しない）を保つためここで数える。
-  let rent = 0;
-  for (const t of transactions) {
-    const amount = transactionBusinessAmount(t);
-    if (
-      (t.income_type || "") === "real_estate" &&
-      RESIDENTIAL_RENT_CATEGORIES.has(t.category || "") &&
-      amount > 0
-    ) {
-      rent += amount;
-    }
-  }
-  const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
+  const [taxable, nontaxable] = taxableSalesFromBreakdown(b, residentialRentTotal(transactions));
   const inputTax = estimateInputTax(transactions);
   const methods = ["standard", "simplified", "special20"] as const;
   const payables = methods.map(

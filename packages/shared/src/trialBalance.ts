@@ -16,6 +16,7 @@
 import { filterYear, statementCategoryTotals } from "./ledger";
 import {
   aggregateIncome,
+  categoryIncomeLines,
   computeCorrectedFigures,
   transactionBusinessAmount,
   type CorrectedFigures,
@@ -123,35 +124,28 @@ export interface TrialBalanceOptions {
 // 損益計算書の行の組み立て（決算書と同じ規則）
 // ---------------------------------------------------------------------------
 
-/** 収入の内訳（事業分の科目別合計、金額の大きい順）。合計は区分の収入と一致する。 */
-function revenueLines(transactions: Transaction[], incomeType: IncomeType): TrialBalanceLine[] {
-  const totals = new Map<string, number>();
-  for (const t of transactions) {
-    if (t.income_type !== incomeType) continue;
-    const amount = transactionBusinessAmount(t);
-    if (amount <= 0) continue;
-    totals.set(t.category, (totals.get(t.category) ?? 0) + amount);
-  }
-  return [...totals.entries()]
+/** 科目別合計を金額の大きい順の行にする。 */
+function linesByAmount(totals: Record<string, number>): TrialBalanceLine[] {
+  return Object.entries(totals)
     .map(([category, amount]) => ({ category, categories: [category], amount }))
     .sort((a, b) => b.amount - a.amount);
 }
 
-/** 支出の内訳（事業分の絶対値の科目別合計、金額の大きい順）。 */
-function expenseLinesBySign(
-  transactions: Transaction[],
-  incomeType: IncomeType,
-): TrialBalanceLine[] {
-  const totals = new Map<string, number>();
+/** 収入の内訳（事業分の科目別純額、金額の大きい順）。合計は区分の収入と一致する。 */
+function revenueLines(transactions: Transaction[], incomeType: IncomeType): TrialBalanceLine[] {
+  return linesByAmount(categoryIncomeLines(transactions, incomeType).revenue);
+}
+
+/** その他区分の内訳（取引の符号で収入・支出に分けた科目別合計、金額の大きい順）。 */
+function otherLinesBySign(transactions: Transaction[], sign: 1 | -1): TrialBalanceLine[] {
+  const totals: Record<string, number> = {};
   for (const t of transactions) {
-    if (t.income_type !== incomeType) continue;
+    if ((t.income_type || "other") !== "other") continue;
     const amount = transactionBusinessAmount(t);
-    if (amount >= 0) continue;
-    totals.set(t.category, (totals.get(t.category) ?? 0) + -amount);
+    if (sign > 0 ? amount <= 0 : amount >= 0) continue;
+    totals[t.category] = (totals[t.category] ?? 0) + Math.abs(amount);
   }
-  return [...totals.entries()]
-    .map(([category, amount]) => ({ category, categories: [category], amount }))
-    .sort((a, b) => b.amount - a.amount);
+  return linesByAmount(totals);
 }
 
 /**
@@ -413,9 +407,9 @@ export function buildTrialBalance(
     business: businessPl(yearTx, figures),
     real_estate: realEstatePl(yearTx, figures),
     other: {
-      revenue_lines: revenueLines(yearTx, "other"),
+      revenue_lines: otherLinesBySign(yearTx, 1),
       revenue: breakdown.otherRevenue,
-      expense_lines: expenseLinesBySign(yearTx, "other"),
+      expense_lines: otherLinesBySign(yearTx, -1),
       expenses: breakdown.otherExpenses,
     },
     monthly: monthlyRows(yearTx),

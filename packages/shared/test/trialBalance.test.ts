@@ -170,6 +170,28 @@ describe("buildTrialBalance の損益計算書（XTX決算書との一致）", (
   });
 });
 
+describe("buildTrialBalance: 経費の返金・売上の返品", () => {
+  const withRefunds: Transaction[] = [
+    tx({ description: "売上", amount: 1_100_000, category: "売上高" }),
+    tx({ description: "売上の返品", amount: -110_000, category: "売上高" }),
+    tx({ description: "回線", amount: -110_000, category: "通信費" }),
+    tx({ description: "回線 返金", amount: 55_000, category: "通信費" }),
+  ];
+  const tb = buildTrialBalance(withRefunds, 2023);
+  const sum = (lines: { amount: number }[]) => lines.reduce((a, l) => a + l.amount, 0);
+
+  test("経費の返金は経費の減額、売上の返品は売上の減額として集計する", () => {
+    expect(tb.business.revenue).toBe(990_000);
+    expect(tb.business.expenses).toBe(55_000);
+    expect(tb.business.revenue_lines.map((l) => l.category)).toEqual(["売上高"]);
+  });
+
+  test("経費行の合計は経費計と一致する", () => {
+    expect(sum(tb.business.expense_lines)).toBe(tb.business.expenses);
+    expect(sum(tb.business.revenue_lines)).toBe(tb.business.revenue);
+  });
+});
+
 describe("buildTrialBalance の月次推移", () => {
   const tb = buildTrialBalance(TRANSACTIONS, 2023);
 
