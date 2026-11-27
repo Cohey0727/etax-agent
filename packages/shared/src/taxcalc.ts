@@ -63,32 +63,6 @@ const BLUE_MAIN_CAPS: Record<FilingType, number> = {
   white: 0,
 };
 
-export interface BlueDeductionCaps {
-  /** 事業所得からの控除上限 */
-  business: number;
-  /** 不動産所得からの控除上限 */
-  realEstate: number;
-  /** 合計の上限 */
-  total: number;
-}
-
-/**
- * 申告の種類と不動産の規模から、青色申告特別控除の上限を求める。
- * - 青色65万円・55万円控除は、不動産所得と事業所得の合計額が限度
- *   （国税庁タックスアンサー No.2072）。不動産が事業的規模かどうかで
- *   合算限度は変わらない。
- * - 青色10万円控除も合算した所得に対して 10万円が限度。
- * - 白色申告は控除なし。
- * 返り値の business / realEstate はいずれも合算限度（プール上限）と同額で、
- * 区分ごとの別枠上限ではない。
- */
-export function blueDeductionCaps(options: BlueDeductionOptions = {}): BlueDeductionCaps {
-  const filingType = options.filingType ?? "blue65";
-  const main = BLUE_MAIN_CAPS[filingType];
-  if (filingType === "white") return { business: 0, realEstate: 0, total: 0 };
-  return { business: main, realEstate: main, total: main };
-}
-
 /** 簡易課税のみなし仕入率（事業区分ごと） */
 export const SIMPLIFIED_RATES = {
 wholesale: 0.9, // 第1種 卸売業
@@ -275,7 +249,7 @@ total: number;
 * - 不動産所得のみで事業的規模でない場合は 10万円が限度。
 * - 10万円控除も合算した所得に対して 10万円が限度。
 * 申告の種類（青色55万円・10万円・白色）や不動産の事業的規模は
-* BlueDeductionOptions で切り替える（上限の組み立ては blueDeductionCaps）。
+* BlueDeductionOptions で切り替える（上限は BLUE_MAIN_CAPS）。
 * 所得がマイナスの区分からは控除しない（控除で赤字は作らない）。
 */
 export function blueDeduction(
@@ -291,14 +265,14 @@ const agrPos = Math.max(agricultureIncome, 0);
 if (filingType === "white") {
 return { realEstate: 0, business: 0, agriculture: 0, total: 0 };
 }
-const caps = blueDeductionCaps(options);
+const mainCap = BLUE_MAIN_CAPS[filingType];
 // 事業を営んでおらず、不動産貸付けが事業的規模でない場合は 10万円が限度。
 // 農業所得は事業所得の一部なので、農業を営んでいれば事業を営んでいる側。
 const operatesBusiness = options.operatesBusiness ?? bizPos + agrPos > 0;
 const cap =
 !operatesBusiness && !options.realEstateBusinessScale
-? Math.min(caps.total, BLUE_MAX_REAL_ESTATE)
-: caps.total;
+? Math.min(mainCap, BLUE_MAX_REAL_ESTATE)
+: mainCap;
 const pool = Math.min(cap, rePos + bizPos + agrPos);
 const realEstate = Math.min(rePos, pool);
 const business = Math.min(bizPos, pool - realEstate);
