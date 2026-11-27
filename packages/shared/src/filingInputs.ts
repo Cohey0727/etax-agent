@@ -36,7 +36,6 @@ import {
 } from "./expandedIncome";
 import { filterYear } from "./ledger";
 import {
-  type ComputeCorrectedFiguresOptions,
   computeCorrectedFigures,
   type CorrectedFigures,
   type FilingType,
@@ -571,30 +570,6 @@ export function declaredIncomeTaxOf(
 /** 確定スナップショットの数値（computeFilingFigures の結果から作る）。 */
 export function snapshotFiguresOf(figures: FilingFigures): FilingSnapshotFigures {
   return toSnapshotFigures(figures.corrected, figures.manual, figures.taxResult);
-}
-
-/**
- * 確定スナップショット用の計算結果を組み立てる。
- * 所得の内訳は帳簿から、税額は計算結果から取る。計算結果が無い場合は null
- * （スナップショットを作らない）。帳簿に取引が無い年（給与・雑所得だけの年）も作る。
- */
-export function buildSnapshotFigures(
-  transactions: Transaction[],
-  year: number,
-  filingOptions: ComputeCorrectedFiguresOptions | undefined,
-  miscIncome: MiscIncomeInput | undefined,
-  taxResult: IncomeTaxResult | undefined,
-  salaryIncome?: SalaryIncomeInput,
-): FilingSnapshotFigures | null {
-  if (!taxResult) return null;
-  const corrected = computeCorrectedFigures(filterYear(transactions, year), year, filingOptions);
-  const manual = computeManualIncomes(
-    year,
-    salaryIncome ?? EMPTY_SALARY_INCOME,
-    miscIncome ?? EMPTY_MISC_INCOME,
-    ledgerIncomeOf(corrected),
-  );
-  return toSnapshotFigures(corrected, manual, taxResult);
 }
 
 /** 帳簿から求める所得（事業・不動産・農業の青色申告特別控除後）の合計。 */

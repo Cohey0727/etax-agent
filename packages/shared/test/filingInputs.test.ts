@@ -6,7 +6,6 @@ import { describe, expect, test } from "bun:test";
 import {
   applyBreakdownEntries,
   applyDeductionPatch,
-  buildSnapshotFigures,
   computeFilingFigures,
   deriveBasePeriodSalesThousands,
   freshDeductionState,
@@ -17,7 +16,7 @@ import {
   specialRelativeInputApplies,
   youngDependentInputApplies,
 } from "../src/filingInputs";
-import { computeIncomeTax, EMPTY_DEDUCTION_INPUTS, EMPTY_TAX_CREDIT_INPUTS } from "../src/deductions";
+import { EMPTY_DEDUCTION_INPUTS, EMPTY_TAX_CREDIT_INPUTS } from "../src/deductions";
 import type { Transaction } from "../src/types";
 
 const tx = (date: string, amount: number, category: string, extra: Partial<Transaction> = {}): Transaction => ({
@@ -146,46 +145,6 @@ describe("applyBreakdownEntries / applyDeductionPatch", () => {
   });
 });
 
-describe("buildSnapshotFigures", () => {
-  const transactions = [tx("2025-02-01", 5_000_000, "売上高"), tx("2025-02-10", -1_000_000, "外注費")];
-  const taxResult = computeIncomeTax({
-    year: 2025,
-    totalIncome: 3_350_000,
-    deductions: EMPTY_DEDUCTION_INPUTS,
-    taxCredits: EMPTY_TAX_CREDIT_INPUTS,
-  });
-
-  test("所得の内訳は帳簿から、税額は計算結果から取る", () => {
-    const figures = buildSnapshotFigures(transactions, 2025, { filingType: "blue65" }, undefined, taxResult);
-    expect(figures).toEqual({
-      business_income: 3_350_000,
-      real_estate_income: 0,
-      misc_income: 0,
-      total_income: taxResult.totalIncome,
-      total_deductions: taxResult.deductionsTotal,
-      taxable_income: taxResult.taxableIncome,
-      final_tax: taxResult.finalTax,
-    });
-  });
-
-  test("計算結果が無い場合は null", () => {
-    expect(buildSnapshotFigures(transactions, 2025, undefined, undefined, undefined)).toBeNull();
-  });
-
-  test("対象年の取引が無くても（給与・雑所得だけの年）計算結果から控えを作る", () => {
-    const salaryOnly = computeIncomeTax({
-      year: 2024,
-      totalIncome: 4_000_000,
-      deductions: EMPTY_DEDUCTION_INPUTS,
-      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
-    });
-    const figures = buildSnapshotFigures(transactions, 2024, undefined, undefined, salaryOnly);
-    expect(figures?.business_income).toBe(0);
-    expect(figures?.total_income).toBe(salaryOnly.totalIncome);
-    expect(figures?.final_tax).toBe(salaryOnly.finalTax);
-  });
-});
-
 describe("computeFilingFigures / snapshotFiguresOf", () => {
   // 不動産（事業的規模でない）だけを帳簿に持ち、農業所得と一時所得を申告入力で持つ。
   const transactions = [
@@ -214,6 +173,17 @@ describe("computeFilingFigures / snapshotFiguresOf", () => {
     expect(f.expanded.comprehensiveAddition).toBe(500_000);
     expect(f.totalIncome).toBe(3_350_000);
     expect(f.taxResult.totalIncome).toBe(3_350_000);
+  });
+
+  test("帳簿に取引が無い年（給与だけ）も確定スナップショットを作る", () => {
+    const f = computeFilingFigures([], 2025, {
+      ...freshDeductionState(),
+      salaryIncome: { revenue: 5_000_000, adjustmentEligible: false },
+    });
+    const snapshot = snapshotFiguresOf(f);
+    expect(snapshot.business_income).toBe(0);
+    expect(snapshot.total_income).toBe(f.taxResult.totalIncome);
+    expect(snapshot.final_tax).toBe(f.taxResult.finalTax);
   });
 
   test("確定スナップショットの所得内訳も同じ計算から作る", () => {
