@@ -55,12 +55,10 @@ function amount(x: number): number {
 
 /**
  * 基礎控除。合計所得金額と年分で決まる。年度ごとの段階表は
- * taxParameters（TAX_PARAMETERS）が持ち、ここでは引いて適用するだけ。
+ * taxParameters（TAX_PARAMETERS）が持ち、ここでは引いて適用するだけ（No.1199）。
  * - 令和5・6年分: 48万円（2,400万円超で逓減、2,500万円超は0）
- * - 令和7年分: 本則58万円への改正＋令和7・8年分限りの上乗せ特例で、
- *   132万円以下は95万円になる（措法41条の16の2）
- * - 令和8年分: 上乗せ特例が縮小（132万円以下は78万円）
- * - 令和9年分以降: 上乗せなし（本則のみ。655万円超も58万円）
+ * - 令和7年分: 本則58万円＋上乗せ特例（132万円以下は95万円）
+ * - 令和8・9年分: 本則62万円＋上乗せ特例（489万円以下は104万円）
  */
 export function basicDeduction(year: number, totalIncome: number): number {
   return lookupTier(taxParametersFor(year).basicDeductionTiers, amount(totalIncome));
@@ -108,7 +106,7 @@ const SPOUSE_SPECIAL_TIERS: { upTo: number; amounts: [number, number, number] }[
 
 /**
  * 配偶者特別控除。配偶者の合計所得金額が、配偶者控除の要件
- * （令和7年分: 58万円、令和6年分以前: 48万円）を超え133万円以下のときに
+ * （年度パラメータの spouseIncomeLimit）を超え133万円以下のときに
  * 段階的に適用される。本人の合計所得が1,000万円を超えると適用なし。
  * spouseTotalIncome が null（配偶者なし等）なら 0。
  */
