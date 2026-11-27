@@ -12,7 +12,7 @@ import {
   yearSelectOptions,
 } from "./appTemplateUtils";
 
-export interface AppTemplateProps {
+export interface AppTemplateProps<NavChildKey extends string> {
   /** 全画面の登録。nav が false の画面はサイドバーに出さず、他画面からの遷移専用。 */
   views: readonly { id: AppView; label: string; icon: IconName; nav: boolean }[];
   activeView: AppView;
@@ -28,14 +28,14 @@ export interface AppTemplateProps {
   agentHeaderExtra?: ReactNode;
   onViewChange: (view: AppView) => void;
   /** 画面にぶら下がる子項目（サイドバーのネスト表示。確定申告のタブなど）。 */
-  navChildren?: readonly { view: AppView; key: string; label: string }[];
+  navChildren?: readonly { view: AppView; key: NavChildKey; label: string }[];
   /** 選択中の子項目の key。親画面がアクティブなときだけハイライトする。 */
-  activeNavChildKey?: string | null;
-  onNavChildSelect?: (view: AppView, key: string) => void;
+  activeNavChildKey?: NavChildKey | null;
+  onNavChildSelect?: (view: AppView, key: NavChildKey) => void;
   children?: ReactNode;
 }
 
-export const AppTemplate = ({
+export const AppTemplate = <NavChildKey extends string>({
   views,
   activeView,
   years,
@@ -51,7 +51,7 @@ export const AppTemplate = ({
   activeNavChildKey,
   onNavChildSelect,
   children,
-}: AppTemplateProps) => {
+}: AppTemplateProps<NavChildKey>) => {
   // 年度の追加はセレクタの中の選択肢で行う（最大年度+1 / 最小年度-1）。
   const yearOptions = yearSelectOptions(years, selectedYear);
   const handleYearSelect = (raw: string) => {
@@ -93,7 +93,7 @@ export const AppTemplate = ({
     onViewChange(view);
     if (isNarrow) setSidebarOpen(false);
   };
-  const handleNavChildSelect = (view: AppView, key: string) => {
+  const handleNavChildSelect = (view: AppView, key: NavChildKey) => {
     onNavChildSelect?.(view, key);
     if (isNarrow) setSidebarOpen(false);
   };

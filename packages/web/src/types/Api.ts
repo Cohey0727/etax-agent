@@ -789,12 +789,14 @@ export interface LedgerTransactionSnapshot extends LedgerTransaction {
   deleted_at: string | null;
 }
 
+/** 変更履歴の操作（登録・訂正・削除）。 */
+export type HistoryAction = "created" | "updated" | "deleted";
+
 /** 取引の変更履歴1件（登録・訂正・削除の記録、電帳法の訂正・削除履歴）。 */
 export interface TransactionHistoryEntry {
   id: number;
   transaction_id: number;
-  /** created / updated / deleted */
-  action: string;
+  action: HistoryAction;
   before: LedgerTransactionSnapshot | null;
   after: LedgerTransactionSnapshot | null;
   created_at: string;
@@ -805,8 +807,7 @@ export interface FilingSubmissionHistoryEntry {
   id: number;
   year: number;
   kind: FilingSubmissionKind;
-  /** created / updated / deleted */
-  action: string;
+  action: HistoryAction;
   before: FilingSubmission | null;
   after: FilingSubmission | null;
   created_at: string;

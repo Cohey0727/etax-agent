@@ -5,6 +5,7 @@
  * スナップショットは「項目ラベル＋表示用文字列」の並びに変換済みの形で
  * 受け取る（ドメイン知識は呼び出し側の organism が持つ）。
  */
+import { HistoryAction } from "@types";
 
 /** スナップショットの1項目（表示用に整形済みの値）。 */
 export interface HistoryFieldValue {
@@ -75,19 +76,14 @@ export const buildHistoryChanges = (
   return changes;
 };
 
-/** 操作種別（created / updated / deleted）の表示名。 */
-export const historyActionLabel = (action: string): string => {
-  switch (action) {
-    case "created":
-      return "登録";
-    case "updated":
-      return "訂正";
-    case "deleted":
-      return "削除";
-    default:
-      return action;
-  }
-};
+const historyActionLabels = {
+  created: "登録",
+  updated: "訂正",
+  deleted: "削除",
+} as const satisfies Record<HistoryAction, string>;
+
+/** 操作種別の表示名。 */
+export const historyActionLabel = (action: HistoryAction): string => historyActionLabels[action];
 
 /** ISO日時文字列を表示用（日本時間）に整形する。解釈できなければそのまま返す。 */
 export const formatHistoryDateTime = (iso: string): string => {

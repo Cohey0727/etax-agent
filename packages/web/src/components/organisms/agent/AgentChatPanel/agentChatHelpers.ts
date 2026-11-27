@@ -10,7 +10,7 @@ import { ChatSession } from "@utils";
 /**
  * エージェントが代行する画面操作。ツール実行結果から導き、AppPage が実際の状態変更を行う。
  * - setYear: 年度切替（集計・消費税計算が対象年を引いたとき）
- * - navigate: 画面遷移（集計系はダッシュボード、修正申告の差分は修正申告画面）
+ * - navigate: 画面遷移（集計系はダッシュボード、修正申告の差分は確定申告画面）
  */
 export type AgentUiAction =
   | { type: "setYear"; year: number }
@@ -22,80 +22,107 @@ export type AgentUiAction =
   /** 変更の影響を受ける画面を、表示中なら読み直す（他の画面の未保存の入力は残す）。 */
   | { type: "reloadView"; view: AppView };
 
-/** 帳簿DBへの書き込み系ツール（成功したら画面の取引と、帳簿を自前で読む画面を読み直す）。 */
-const WRITE_TOOL_NAMES = new Set(["update_transactions", "add_transaction", "delete_transaction"]);
+/** サーバーから届くツール実行の記録。 */
+interface ToolCallRecord {
+  name: string;
+  arguments: Record<string, unknown>;
+  result?: unknown;
+}
 
-/** 設定系の書き込みツール（成功したら表示中の画面を読み直す）。 */
-const SETTINGS_WRITE_TOOL_NAMES = new Set([
-  "set_classification_rules",
-  "set_jev_prompt",
-  "update_systemone_settings",
-]);
+const succeeded = (tc: ToolCallRecord): boolean =>
+  (tc.result as { ok?: unknown } | undefined)?.ok === true;
 
-// ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。
-export const deriveUiActions = (
-  toolCalls: { name: string; arguments: Record<string, unknown>; result?: unknown }[],
-) => {
-  const actions: AgentUiAction[] = [];
-  const seen = new Set<string>();
-  const push = (action: AgentUiAction) => {
-    const key = JSON.stringify(action);
-    if (!seen.has(key)) {
-      seen.add(key);
-      actions.push(action);
-    }
-  };
-  for (const tc of toolCalls) {
-    if (tc.name === "aggregate_year" || tc.name === "consumption_tax") {
-      if (typeof tc.arguments.year === "number") {
-        push({ type: "setYear", year: tc.arguments.year });
-      }
-      push({ type: "navigate", view: AppView.Dashboard });
-    } else if (tc.name === "amendment_delta") {
-      // 修正の比較は確定申告画面（前回確定との差分）に出す。
-      push({ type: "navigate", view: AppView.Filing });
-    } else if (tc.name === "set_theme") {
+/** 集計・消費税計算は、対象年へ切り替えてダッシュボードで見せる。 */
+const showYearOnDashboard = (tc: ToolCallRecord): AgentUiAction[] => [
+  ...(typeof tc.arguments.year === "number"
+    ? [{ type: "setYear", year: tc.arguments.year } as const]
+    : []),
+  { type: "navigate", view: AppView.Dashboard },
+];
+
+/** 帳簿の書き込みが成功したら、画面の取引と、帳簿を自前で読む画面（帳簿・領収書）を読み直す。 */
+const reloadLedger = (tc: ToolCallRecord): AgentUiAction[] =>
+  succeeded(tc)
+    ? [
+        { type: "reloadTransactions" },
+        { type: "reloadView", view: AppView.Ledger },
+        { type: "reloadView", view: AppView.Receipt },
+      ]
+    : [];
+
+/** 設定の変更は、設定画面を開いていればその表示に効く。 */
+const reloadSettings = (tc: ToolCallRecord): AgentUiAction[] =>
+  succeeded(tc) ? [{ type: "reloadView", view: AppView.Settings }] : [];
+
+/** ツール名 → 画面操作。ここに無いツール（参照系）は画面を変えない。 */
+const toolUiActions = new Map<string, (tc: ToolCallRecord) => AgentUiAction[]>([
+  ["aggregate_year", showYearOnDashboard],
+  ["consumption_tax", showYearOnDashboard],
+  // 修正の比較は確定申告画面（前回確定との差分）に出す。
+  ["amendment_delta", () => [{ type: "navigate", view: AppView.Filing }]],
+  [
+    "set_theme",
+    (tc) => {
       const mode = tc.arguments.mode;
-      if (mode === "light" || mode === "dark" || mode === "system") {
-        push({ type: "setTheme", mode });
-      }
-    } else if (WRITE_TOOL_NAMES.has(tc.name)) {
-      // 書き込みが成功していたら、帳簿の最新状態を画面へ反映する。
-      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
-        push({ type: "reloadTransactions" });
-        push({ type: "reloadView", view: AppView.Ledger });
-        push({ type: "reloadView", view: AppView.Receipt });
-      }
-    } else if (tc.name === "set_deductions") {
+      return mode === "light" || mode === "dark" || mode === "system"
+        ? [{ type: "setTheme", mode }]
+        : [];
+    },
+  ],
+  ["update_transactions", reloadLedger],
+  ["add_transaction", reloadLedger],
+  ["delete_transaction", reloadLedger],
+  [
+    "set_deductions",
+    (tc) => {
       // 控除入力の変更は画面側の保存値へ適用し、確定申告画面で見せる。
       const result = tc.result as
         | { ok?: unknown; applied?: unknown; year?: unknown; patch?: unknown }
         | undefined;
-      if (result?.ok === true && result.applied === "deductions" && typeof result.year === "number") {
-        push({
-          type: "applyDeductions",
-          year: result.year,
-          patch: (result.patch ?? {}) as DeductionPatch,
-        });
-        push({ type: "navigate", view: AppView.Filing });
+      if (result?.ok !== true || result.applied !== "deductions" || typeof result.year !== "number") {
+        return [];
       }
-    } else if (tc.name === "set_filing_status") {
-      // 申告ステータスは確定申告画面の表示に効く。
-      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
-        push({ type: "navigate", view: AppView.Filing });
-        push({ type: "reloadView", view: AppView.Filing });
-      }
-    } else if (tc.name === "update_taxpayer_profile") {
-      // 納税者情報は独立画面で見せる。
-      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
-        push({ type: "navigate", view: AppView.Taxpayer });
-        push({ type: "reloadView", view: AppView.Taxpayer });
-      }
-    } else if (SETTINGS_WRITE_TOOL_NAMES.has(tc.name)) {
-      // 設定の変更は、設定画面を開いていればその表示に効く。
-      if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
-        push({ type: "reloadView", view: AppView.Settings });
-      }
+      return [
+        { type: "applyDeductions", year: result.year, patch: (result.patch ?? {}) as DeductionPatch },
+        { type: "navigate", view: AppView.Filing },
+      ];
+    },
+  ],
+  [
+    "set_filing_status",
+    (tc) =>
+      succeeded(tc)
+        ? [
+            { type: "navigate", view: AppView.Filing },
+            { type: "reloadView", view: AppView.Filing },
+          ]
+        : [],
+  ],
+  [
+    "update_taxpayer_profile",
+    (tc) =>
+      succeeded(tc)
+        ? [
+            { type: "navigate", view: AppView.Taxpayer },
+            { type: "reloadView", view: AppView.Taxpayer },
+          ]
+        : [],
+  ],
+  ["set_classification_rules", reloadSettings],
+  ["set_jev_prompt", reloadSettings],
+  ["update_systemone_settings", reloadSettings],
+]);
+
+/** ツール実行結果 → 画面操作。同じ操作は1ターンに1回だけ。 */
+export const deriveUiActions = (toolCalls: ToolCallRecord[]): AgentUiAction[] => {
+  const actions: AgentUiAction[] = [];
+  const seen = new Set<string>();
+  for (const tc of toolCalls) {
+    for (const action of toolUiActions.get(tc.name)?.(tc) ?? []) {
+      const key = JSON.stringify(action);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      actions.push(action);
     }
   }
   return actions;

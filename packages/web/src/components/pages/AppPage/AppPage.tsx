@@ -160,8 +160,8 @@ export const AppPage = () => {
   }, [handleYearChange]);
 
   // サイドバーのネスト項目（確定申告のタブ）から直接そのタブへ遷移する。
-  const handleNavChildSelect = (view: AppView, key: string) => {
-    if (view === AppView.Filing) setFilingTab(key as FilingTab);
+  const handleNavChildSelect = (view: AppView, key: FilingTab) => {
+    if (view === AppView.Filing) setFilingTab(key);
     setActiveView(view);
   };
   const handleAgentConnectionChange = (config: AgentConnectionConfig) => {

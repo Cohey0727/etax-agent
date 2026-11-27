@@ -24,15 +24,18 @@ import {
 
 type LoadState = "loading" | "anonymous" | "ready";
 
-const BILLING_STATUS_LABELS: Record<string, string> = {
-  none: "未契約",
-  active: "契約中",
-  trialing: "トライアル中",
-  past_due: "支払い確認中",
-  canceled: "解約済み",
-  incomplete: "手続き未完了",
-  unpaid: "未払い",
-};
+/** 課金の状態ごとの表示名と、契約中（申し込みのボタンを出さない）として扱うか。 */
+const billingStatuses = {
+  none: { label: "未契約", subscribed: false },
+  active: { label: "契約中", subscribed: true },
+  trialing: { label: "トライアル中", subscribed: true },
+  past_due: { label: "支払い確認中", subscribed: false },
+  canceled: { label: "解約済み", subscribed: false },
+  incomplete: { label: "手続き未完了", subscribed: false },
+  unpaid: { label: "未払い", subscribed: false },
+} as const satisfies Record<string, { label: string; subscribed: boolean }>;
+
+type BillingStatus = keyof typeof billingStatuses;
 
 export const AccountPanel = () => {
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -150,10 +153,10 @@ export const AccountPanel = () => {
     );
   }
 
-  const billingLabel = billing
-    ? (BILLING_STATUS_LABELS[billing.status] ?? billing.status)
-    : "取得できませんでした";
-  const subscribed = billing?.status === "active" || billing?.status === "trialing";
+  // 課金の状態はサーバーが決済サービスの値をそのまま返すので、知っている値だけを状態として扱う。
+  const status = billing && isBillingStatus(billing.status) ? billingStatuses[billing.status] : null;
+  const billingLabel = billing ? (status?.label ?? billing.status) : "取得できませんでした";
+  const subscribed = status?.subscribed ?? false;
 
   return (
     <Col gap="lg">
@@ -262,3 +265,7 @@ export const AccountPanel = () => {
     </Col>
   );
 };
+
+function isBillingStatus(value: string): value is BillingStatus {
+  return Object.hasOwn(billingStatuses, value);
+}
