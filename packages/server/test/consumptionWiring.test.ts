@@ -46,6 +46,7 @@ function sales(year: number): Transaction {
     account: "普通預金",
     category: "売上高",
     income_type: "business",
+    tax_category: "",
   };
 }
 
