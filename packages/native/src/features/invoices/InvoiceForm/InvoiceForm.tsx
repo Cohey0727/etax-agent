@@ -1,4 +1,5 @@
 import { invoiceLineAmount } from "@etax/shared";
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { InvoiceInput, InvoiceLineInput } from "@/api";
 import { AppButton, AppText, DateField, Field, LabeledValue, MoneyField, SelectField, SwitchRow } from "@/components";
@@ -21,6 +22,14 @@ export interface InvoiceFormProps {
  * サーバーと同じ共有計算で出す）。
  */
 export function InvoiceForm({ submitLabel, value, busy, onChange, onSubmit, onCancel }: InvoiceFormProps) {
+  // 明細ごとの入力中の数量の文字列。「1.」のような途中の入力は数値にすると小数点が
+  // 消えるので文字列でも持ち、その文字列が今の数量を表している間だけ表示に使う。
+  const [quantityTexts, setQuantityTexts] = useState<Record<number, string>>({});
+  const shownQuantity = (index: number, quantity: number): string => {
+    const text = quantityTexts[index];
+    if (text !== undefined && parseQuantity(text) === quantity) return text;
+    return quantity === 0 ? "" : String(quantity);
+  };
   const patch = (next: Partial<InvoiceInput>) => onChange({ ...value, ...next });
   const patchLine = (index: number, next: Partial<InvoiceLineInput>) => {
     const lines = value.lines.map((line, i) => {
@@ -88,10 +97,10 @@ export function InvoiceForm({ submitLabel, value, busy, onChange, onSubmit, onCa
             inputMode="decimal"
             keyboardType="decimal-pad"
             onChangeText={(text) => {
-              const parsed = Number(text);
-              patchLine(index, { quantity: text === "" || Number.isNaN(parsed) ? 0 : parsed });
+              setQuantityTexts((prev) => ({ ...prev, [index]: text }));
+              patchLine(index, { quantity: parseQuantity(text) });
             }}
-            value={line.quantity === 0 ? "" : String(line.quantity)}
+            value={shownQuantity(index, line.quantity)}
           />
           <Field
             label="単位"
@@ -171,6 +180,12 @@ export function InvoiceForm({ submitLabel, value, busy, onChange, onSubmit, onCa
       </View>
     </View>
   );
+}
+
+/** 数量の入力を数値にする。空欄・数として読めない入力は 0。 */
+function parseQuantity(text: string): number {
+  const parsed = Number(text);
+  return text === "" || Number.isNaN(parsed) ? 0 : parsed;
 }
 
 const styles = StyleSheet.create({
