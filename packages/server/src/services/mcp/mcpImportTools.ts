@@ -1,23 +1,13 @@
 /**
  * mcpImportTools.ts — MCP の CSV 取込系ツール（services/mcp）。
  *
- * REST の /api/import/csv・/api/imports と同じ取込パイプライン
- * （services/csvImport）とリポジトリを使う。CSV は文字列または
- * Base64（Shift_JIS 等のバイト列はこちら）で受け、列マッピングは
- * REST と同じ自動判定、重複は指紋で除外してから保存する。
+ * REST の /api/import/csv・/api/imports と同じ取込の本体（services/csvImport/
+ * importCsvText）とリポジトリを使う。CSV は文字列または Base64（Shift_JIS 等の
+ * バイト列はこちら）で受ける。
  */
-import { parseCsv } from "@etax/shared";
-import { errorMessage } from "../../lib/errors";
-import {
-  createImportWithTransactions,
-  importToApi,
-  listImportRows,
-} from "../../repositories/importRepository";
-import { listTransactionFingerprintRows } from "../../repositories/transactionRepository";
-import { decodeCsvBytes } from "../csvImport/csvDecoding";
-import { excludeImportedTransactions } from "../csvImport/importDedupe";
-import { resolveMapping } from "../csvImport/csvMapping";
-import { parseWithMapping } from "../csvImport/csvParsing";
+import { importToApi, listImportRows } from "../../repositories/importRepository";
+import { decodeCsvBase64 } from "../csvImport/csvDecoding";
+import { CsvMappingParseError, importCsvText } from "../csvImport/importCsvText";
 import { McpToolModule, requireDb, textResult } from "./mcpToolKit";
 
 export const mcpImportTools: McpToolModule = {
@@ -51,71 +41,27 @@ export const mcpImportTools: McpToolModule = {
   handlers: {
     import_csv: async (args) => {
       const db = requireDb();
-      let filename = "upload.csv";
-      if (typeof args["filename"] === "string" && args["filename"] !== "") {
-        filename = args["filename"];
-      }
-      let sourceName = "";
-      if (typeof args["source_name"] === "string") sourceName = args["source_name"];
-
-      let text: string;
-      let encoding = "utf-8";
+      const filename =
+        typeof args["filename"] === "string" && args["filename"] !== "" ? args["filename"] : "upload.csv";
+      const sourceName = typeof args["source_name"] === "string" ? args["source_name"] : "";
+      let decoded: { text: string; encoding: string };
       if (typeof args["content_base64"] === "string") {
-        const bin = atob(args["content_base64"]);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const decoded = decodeCsvBytes(bytes);
-        text = decoded.text;
-        encoding = decoded.encoding;
+        decoded = decodeCsvBase64(args["content_base64"]);
       } else if (typeof args["content"] === "string") {
-        text = args["content"];
+        decoded = { text: args["content"], encoding: "utf-8" };
       } else {
         throw new Error("content（CSV文字列）または content_base64 が必要です");
       }
-      if (!sourceName) sourceName = filename.replace(/\.[^.]+$/, "") || "CSV取込";
-
-      let rows: string[][];
       try {
-        rows = parseCsv(text);
+        return textResult(await importCsvText(db, { ...decoded, filename, sourceName }));
       } catch (e) {
-        throw new Error(`CSVのパースに失敗しました: ${errorMessage(e)}`);
+        if (e instanceof CsvMappingParseError) {
+          throw new Error(
+            `マッピングは決まりましたがパースに失敗しました: ${e.message}（mapping=${JSON.stringify(e.mapping)}, mappingSource=${e.mappingSource}）`,
+          );
+        }
+        throw e;
       }
-      if (rows.length === 0) throw new Error("CSVが空です");
-      const headers = (rows[0] as string[]).map((h) => h.trim());
-      const dataRows = rows.slice(1);
-
-      const { mapping, source } = await resolveMapping(headers, dataRows);
-      let parsed;
-      try {
-        parsed = parseWithMapping(rows, mapping, sourceName);
-      } catch (e) {
-        throw new Error(
-          `マッピングは決まりましたがパースに失敗しました: ${errorMessage(e)}（mapping=${JSON.stringify(mapping)}, mappingSource=${source}）`,
-        );
-      }
-
-      const existing = await listTransactionFingerprintRows(db);
-      const deduped = excludeImportedTransactions(parsed.transactions, existing, mapping);
-      const importId = await createImportWithTransactions(db, {
-        filename,
-        sourceName,
-        mapping,
-        transactions: deduped.fresh,
-      });
-
-      return textResult({
-        mapping,
-        mappingSource: source,
-        encoding,
-        filename,
-        count: deduped.fresh.length,
-        totalRows: parsed.totalRows,
-        skippedRows: parsed.skippedRows,
-        duplicatesSkipped: deduped.duplicates,
-        persisted: true,
-        importId,
-        transactions: deduped.fresh.slice(0, 500),
-      });
     },
     list_imports: async () => {
       const db = requireDb();

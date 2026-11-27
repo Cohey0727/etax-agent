@@ -6,7 +6,6 @@
  * /api/transactions/*、/api/classify/*、/api/receipts/* と同じリポジトリ/
  * サービスを使う。
  */
-import { normalizeBusinessRatio } from "@etax/shared";
 import { createStorageClient, receiptObjectKey } from "../../gateways/storageGateway";
 import { loadStorageConfig } from "../../lib/config";
 import { getDb } from "../../lib/db";
@@ -27,7 +26,6 @@ import {
   listRecentTransactionHistoryRows,
   listTransactionHistoryRows,
   listTransactionRows,
-  replaceYearTransactionRows,
   transactionHistoryToApi,
   transactionToApi,
 } from "../../repositories/transactionRepository";
@@ -37,6 +35,7 @@ import { loadClassifyDeps } from "../classification/loadClassifyDeps";
 import { buildLedgerPdf } from "../pdf/buildLedgerPdf";
 import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import { analyzeReceiptDraft } from "../receipts/analyzeReceiptDraft";
+import { replaceYearTransactions } from "../transactions/replaceYearTransactions";
 import {
   TransactionInput,
   TransactionWriteResult,
@@ -439,35 +438,8 @@ export const mcpLedgerTools: McpToolModule = {
       if (!parsed.success) {
         throw new Error("year と transactions が必要です");
       }
-      const { year, transactions } = parsed.data;
-      if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-        throw new Error("year が不正です");
-      }
-      const values = transactions.map((body) => {
-        const date = body.date ?? "";
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-          throw new Error("date は YYYY-MM-DD 形式で指定してください");
-        }
-        if (typeof body.amount !== "number" || !Number.isFinite(body.amount)) {
-          throw new Error("amount は数値で指定してください");
-        }
-        return {
-          date,
-          fiscalYear:
-            typeof body.fiscal_year === "number" && Number.isInteger(body.fiscal_year)
-              ? body.fiscal_year
-              : year,
-          description: body.description ?? "",
-          amount: Math.trunc(body.amount),
-          account: body.account ?? "",
-          category: body.category ? body.category : "未分類",
-          incomeType: body.income_type ?? "other",
-          taxCategory: body.tax_category ?? "",
-          businessRatioPercent: normalizeBusinessRatio(body.business_ratio_percent),
-          businessRatioBasis: body.business_ratio_basis ?? "",
-        };
-      });
-      const rows = await replaceYearTransactionRows(db, year, values);
+      const rows = await replaceYearTransactions(db, parsed.data);
+      const year = parsed.data.year;
       return textResult({
         year,
         count: rows.length,
