@@ -45,7 +45,6 @@ import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import { loadReturnFormTemplate } from "../pdf/loadReturnFormTemplate";
 import { buildReturnFormValues } from "../pdf/returnFormValues";
 import { toTaxpayer } from "../../usecases/exportXtx";
-import { ExportXtxRequest } from "../../schemas/etax";
 import { savedTaxpayerProfile } from "./mcpBusinessStartTools";
 import {
   McpToolModule,
@@ -60,6 +59,7 @@ import {
   realEstateScaleProperty,
   requireDb,
   salaryIncomeArg,
+  taxpayerArg,
   textResult,
   todayInTokyo,
   yearArg,
@@ -272,12 +272,9 @@ export const mcpSubmissionTools: McpToolModule = {
     export_return_pdf: async (args) => {
       const db = requireDb();
       const year = yearArg(args);
-      const taxpayerArg = args["taxpayer"];
-      const taxpayer =
-        taxpayerArg !== undefined ? taxpayerArg : await savedTaxpayerProfile(db, year);
-      if (typeof taxpayer !== "object" || taxpayer === null) {
-        throw new Error("taxpayer（納税者情報）が必要です");
-      }
+      const taxpayer = taxpayerArg(
+        args["taxpayer"] !== undefined ? args["taxpayer"] : await savedTaxpayerProfile(db, year),
+      );
       // 計算は income_tax / export_xtx と同じ部品・同じ順序で行う。
       const tx = await ledgerTransactions(db, year);
       const agricultureInput = agricultureArg(args);
@@ -336,7 +333,7 @@ export const mcpSubmissionTools: McpToolModule = {
         amendment,
         submissionDate:
           typeof args["submission_date"] === "string" ? args["submission_date"] : todayInTokyo(),
-        taxpayer: toTaxpayer(taxpayer as ExportXtxRequest["taxpayer"]),
+        taxpayer: toTaxpayer(taxpayer),
         figures,
         tax,
         miscIncome,

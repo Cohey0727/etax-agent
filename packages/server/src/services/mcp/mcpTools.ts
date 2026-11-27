@@ -86,7 +86,6 @@ import { mcpMetaTools } from "./mcpMetaTools";
 import { mcpProfileTools } from "./mcpProfileTools";
 import { mcpSubmissionTools } from "./mcpSubmissionTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
-import { ExportXtxRequest } from "../../schemas/etax";
 import { CreateFixedAssetRequestSchema } from "../../schemas/fixedAsset";
 
 export type { McpToolDef, McpToolResult } from "./mcpToolKit";
@@ -106,6 +105,7 @@ import {
   realEstateScaleProperty,
   requireDb,
   salaryIncomeArg,
+  taxpayerArg,
   textResult,
   todayInTokyo,
   yearProperty,
@@ -776,8 +776,7 @@ export async function dispatchMcpTool(
       case "export_xtx": {
         const db = requireDb();
         const year = Number(args["year"]);
-        const taxpayerArg = args["taxpayer"];
-        if (typeof taxpayerArg !== "object" || taxpayerArg === null) {
+        if (typeof args["taxpayer"] !== "object" || args["taxpayer"] === null) {
           throw new Error("taxpayer（納税者情報）が必要です");
         }
         const tx = await ledgerTransactions(db, year);
@@ -827,7 +826,7 @@ export async function dispatchMcpTool(
           submissionDate: typeof args["submission_date"] === "string"
             ? args["submission_date"]
             : todayInTokyo(),
-          taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
+          taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
           figures,
           filingType: filingOptionsArg(args).filingType,
           depreciation:
@@ -865,8 +864,7 @@ export async function dispatchMcpTool(
         });
       }
       case "export_consumption_xtx": {
-        const taxpayerArg = args["taxpayer"];
-        if (typeof taxpayerArg !== "object" || taxpayerArg === null) {
+        if (typeof args["taxpayer"] !== "object" || args["taxpayer"] === null) {
           throw new Error("taxpayer（納税者情報）が必要です");
         }
         const periodFrom = String(args["period_from"] ?? "");
@@ -904,7 +902,7 @@ export async function dispatchMcpTool(
           };
           const simplifiedResult = computeSimplifiedConsumptionReturn(simplifiedInput);
           const xtx = buildSimplifiedConsumptionXtx({
-            taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
+            taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
             periodFrom,
             periodTo,
             submissionDate,
@@ -941,7 +939,7 @@ export async function dispatchMcpTool(
           };
           const specialResult = computeSpecial20ConsumptionReturn(specialInput);
           const xtx = buildSpecial20ConsumptionXtx({
-            taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
+            taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
             periodFrom,
             periodTo,
             submissionDate,
@@ -972,7 +970,7 @@ export async function dispatchMcpTool(
         };
         const result = computeConsumptionReturn(input);
         const xtx = buildConsumptionXtx({
-          taxpayer: toTaxpayer(taxpayerArg as ExportXtxRequest["taxpayer"]),
+          taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
           periodFrom,
           periodTo,
           submissionDate: typeof args["submission_date"] === "string"

@@ -97,3 +97,47 @@ describe("register_fixed_asset の入力検証", () => {
     expect(depreciation.isError).toBeUndefined();
   });
 });
+
+describe("XTX・PDF 出力の taxpayer", () => {
+  const taxpayer = {
+    name: "テスト太郎",
+    name_kana: "テストタロウ",
+    zip_code: "1000001",
+    address: "東京都千代田区霞が関一丁目1番1号",
+    birth_date: "1980-04-01",
+    phone: "09000000000",
+    tax_office_name: "麹町",
+    tax_office_code: "01101",
+    user_id: "1234567890123456",
+  };
+
+  test("任意の項目を省いても出力できる", async () => {
+    const income = await call("export_xtx", { year: 2025, taxpayer });
+    expect(income.isError).toBeUndefined();
+    const consumption = await call("export_consumption_xtx", {
+      taxpayer,
+      period_from: "2025-01-01",
+      period_to: "2025-12-31",
+      base_period_sales_thousands: 5000,
+      sales_incl_10: 1_100_000,
+      purchases_incl_10: 550_000,
+    });
+    expect(consumption.isError).toBeUndefined();
+  });
+
+  test("必須の項目が欠けていれば、不足している項目を案内する", async () => {
+    const result = await call("export_xtx", {
+      year: 2025,
+      taxpayer: { name: "テスト太郎", name_kana: "テストタロウ" },
+    });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("納税者情報に不足");
+    expect(text(result)).not.toContain("TypeError");
+  });
+
+  test("文字列でない項目はエラーにする", async () => {
+    const result = await call("export_xtx", { year: 2025, taxpayer: { ...taxpayer, name: 123 } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("taxpayer");
+  });
+});

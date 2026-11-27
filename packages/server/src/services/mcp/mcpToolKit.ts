@@ -28,6 +28,8 @@ import {
 import { Db, getDb } from "../../lib/db";
 import { databaseUnavailableMessage } from "../../lib/errors";
 import { TransactionRow } from "../../repositories/schema";
+import { emptyTaxpayerProfile } from "../../repositories/taxpayerRepository";
+import { XtxTaxpayerRequest, XtxTaxpayerSchema } from "../../schemas/etax";
 import {
   effectiveFiscalYear,
   listTransactionRows,
@@ -294,6 +296,19 @@ export function agricultureArg(args: Record<string, unknown>): AgricultureInput 
     cultivationCostDeduction: num(rec["cultivationCostDeduction"]),
     beefCattleExemptionAmount: num(rec["beefCattleExemptionAmount"]),
   });
+}
+
+/**
+ * 納税者情報の引数を XTX・様式 PDF の入力形式にする。ツールの説明では主な項目
+ * 以外を任意としているため、欠けた項目は空文字で補う（空の必須項目は XTX の
+ * 生成側が不足項目として案内する）。文字列でない値はエラーにする。
+ */
+export function taxpayerArg(value: unknown): XtxTaxpayerRequest {
+  const parsed = XtxTaxpayerSchema.partial().safeParse(value);
+  if (!parsed.success) {
+    throw new Error("taxpayer（納税者情報）は各項目を文字列にしたオブジェクトで渡してください");
+  }
+  return { ...emptyTaxpayerProfile(), ...parsed.data };
 }
 
 /** 今日の日付（日本時間、YYYY-MM-DD）。 */
