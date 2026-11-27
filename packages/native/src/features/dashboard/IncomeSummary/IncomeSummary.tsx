@@ -9,6 +9,8 @@ export interface IncomeSummaryProps {
   blue: BlueDeduction;
   filingType: FilingType;
   realEstateBusinessScale: boolean;
+  /** 申告入力に農業所得があるか（青色申告特別控除の農業分を出す） */
+  hasAgricultureIncome: boolean;
 }
 
 /** 事業所得・不動産所得と青色申告特別控除のサマリー。 */
@@ -17,6 +19,7 @@ export function IncomeSummary({
   blue,
   filingType,
   realEstateBusinessScale,
+  hasAgricultureIncome,
 }: IncomeSummaryProps) {
   const caps = blueDeductionCaps({ filingType, realEstateBusinessScale });
   const pooled = filingType === "blue10" || realEstateBusinessScale || filingType === "white";
@@ -45,6 +48,9 @@ export function IncomeSummary({
         </AppText>
         <LabeledValue label={realEstateLabel} value={formatYen(blue.realEstate)} />
         <LabeledValue label={businessLabel} value={formatYen(blue.business)} />
+        {hasAgricultureIncome ? (
+          <LabeledValue label="農業分" value={formatYen(blue.agriculture)} />
+        ) : null}
         <LabeledValue label={totalLabel} value={formatYen(blue.total)} strong />
       </Card>
     </View>

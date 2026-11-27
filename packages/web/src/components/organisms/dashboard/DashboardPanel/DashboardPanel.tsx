@@ -1,4 +1,4 @@
-import { dashboardFigures, DeductionState, filterYear, Transaction } from "@etax/shared";
+import { dashboardFigures, DeductionState, filterYear, isAgricultureEmpty, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Col, Text } from "@components/atoms";
 import { loadDeductionState } from "@components/organisms/filing/DeductionPanel/deductionStorage";
@@ -25,8 +25,14 @@ export const DashboardPanel = ({ transactions, year }: DashboardPanelProps) => {
       dashboardFigures(tx, {
         filingType: deductionState.filingType,
         realEstateBusinessScale: deductionState.realEstateBusinessScale,
+        agriculture: deductionState.agriculture,
       }),
-    [tx, deductionState.filingType, deductionState.realEstateBusinessScale],
+    [
+      tx,
+      deductionState.filingType,
+      deductionState.realEstateBusinessScale,
+      deductionState.agriculture,
+    ],
   );
 
   return (
@@ -39,6 +45,7 @@ export const DashboardPanel = ({ transactions, year }: DashboardPanelProps) => {
         blue={figures.blue}
         filingType={deductionState.filingType}
         realEstateBusinessScale={deductionState.realEstateBusinessScale}
+        hasAgricultureIncome={!isAgricultureEmpty(deductionState.agriculture)}
       />
       <ConsumptionTaxComparison
         year={year}

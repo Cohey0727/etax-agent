@@ -10,6 +10,8 @@ export interface IncomeSummaryProps {
   filingType: FilingType;
   /** 不動産貸付けが事業的規模か */
   realEstateBusinessScale: boolean;
+  /** 申告入力に農業所得があるか（青色申告特別控除の農業分を出す） */
+  hasAgricultureIncome: boolean;
 }
 
 export const IncomeSummary = ({
@@ -17,6 +19,7 @@ export const IncomeSummary = ({
   blue,
   filingType,
   realEstateBusinessScale,
+  hasAgricultureIncome,
 }: IncomeSummaryProps) => {
   const caps = blueDeductionCaps({ filingType, realEstateBusinessScale });
   // 事業・不動産を合算して上限がかかる場合は、内訳ごとの上限は出さない。
@@ -51,6 +54,12 @@ export const IncomeSummary = ({
             <Text variant="statLabel">{businessLabel}</Text>
             <Text>{formatYen(blue.business)}</Text>
           </Col>
+          {hasAgricultureIncome ? (
+            <Col gap="none">
+              <Text variant="statLabel">農業分</Text>
+              <Text>{formatYen(blue.agriculture)}</Text>
+            </Col>
+          ) : null}
           <Col gap="none">
             <Text variant="statLabel">{totalLabel}</Text>
             <Text variant="statValue">{formatYen(blue.total)}</Text>

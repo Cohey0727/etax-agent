@@ -3,6 +3,7 @@
  * 消費税3方式の比較・勘定科目ごとの内訳・年ごとの推移）の検証。
  */
 import { describe, expect, test } from "bun:test";
+import { EMPTY_AGRICULTURE_INPUT } from "../src/agriculture";
 import { categoryBreakdown, dashboardFigures, yearlyIncomeTotals } from "../src/dashboard";
 import { filterYear, importCsvText } from "../src/ledger";
 import { computeCorrectedFigures } from "../src/taxcalc";
@@ -25,6 +26,22 @@ describe("dashboardFigures", () => {
     expect(figures.nontaxableSalesIncl).toBe(corrected.nontaxable_sales);
     expect(figures.inputTaxEstimate).toBe(corrected.input_tax_estimate);
     expect(figures.blue.total).toBe(corrected.blue_deduction);
+  });
+
+  test("申告入力の農業所得を青色申告特別控除の配分に入れ、確定申告の計算と一致させる", () => {
+    const tx = csv(["2025-04-01,家賃,1200000,口座,家賃収入,real_estate"]);
+    const agriculture = { ...EMPTY_AGRICULTURE_INPUT, salesAmount: 800_000 };
+    const options = { filingType: "blue65" as const, agriculture };
+    const figures = dashboardFigures(tx, options);
+    const corrected = computeCorrectedFigures(tx, 2025, options);
+    // 事業的規模でない不動産所得だけなら上限は10万円だが、農業所得があるので65万円まで。
+    expect(figures.blue).toEqual({
+      realEstate: corrected._detail.blue_deduction_real_estate,
+      business: corrected._detail.blue_deduction_business,
+      agriculture: corrected._detail.blue_deduction_agriculture,
+      total: corrected.blue_deduction,
+    });
+    expect(figures.blue.realEstate).toBe(650_000);
   });
 });
 

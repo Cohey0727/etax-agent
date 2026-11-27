@@ -10,14 +10,11 @@ import { filterYear } from "./ledger";
 import {
   aggregateIncome,
   BlueDeduction,
-  BlueDeductionOptions,
-  blueDeduction,
+  ComputeCorrectedFiguresOptions,
+  computeCorrectedFigures,
   ConsumptionMethod,
   consumptionTax,
-  estimateInputTax,
   IncomeBreakdown,
-  residentialRentTotal,
-  taxableSalesFromBreakdown,
   transactionBusinessAmount,
 } from "./taxcalc";
 import { Transaction } from "./types";
@@ -45,16 +42,26 @@ export interface DashboardFigures {
 
 const CONSUMPTION_METHOD_ORDER: readonly ConsumptionMethod[] = ["standard", "simplified", "special20"];
 
-/** 対象年の取引（割り当て年度で絞ったもの）から、ダッシュボードの数値一式を求める。 */
+/**
+ * 対象年の取引（割り当て年度で絞ったもの）から、ダッシュボードの数値一式を求める。
+ * 青色申告特別控除と消費税の入力は確定申告画面と同じ computeCorrectedFigures から取る
+ * （申告入力の農業所得も控除の配分に入る）。
+ */
 export function dashboardFigures(
   yearTransactions: Transaction[],
-  options: BlueDeductionOptions,
+  options: ComputeCorrectedFiguresOptions,
 ): DashboardFigures {
   const breakdown = aggregateIncome(yearTransactions);
-  const blue = blueDeduction(breakdown.realEstateIncome, breakdown.businessIncome, options);
-  const rent = residentialRentTotal(yearTransactions);
-  const [taxableSalesIncl, nontaxableSalesIncl] = taxableSalesFromBreakdown(breakdown, rent);
-  const inputTaxEstimate = estimateInputTax(yearTransactions);
+  const corrected = computeCorrectedFigures(yearTransactions, 0, options);
+  const blue: BlueDeduction = {
+    realEstate: corrected._detail.blue_deduction_real_estate,
+    business: corrected._detail.blue_deduction_business,
+    agriculture: corrected._detail.blue_deduction_agriculture,
+    total: corrected.blue_deduction,
+  };
+  const taxableSalesIncl = corrected.taxable_sales;
+  const nontaxableSalesIncl = corrected.nontaxable_sales;
+  const inputTaxEstimate = corrected.input_tax_estimate;
   const consumption = CONSUMPTION_METHOD_ORDER.map((method) => {
     const result = consumptionTax({
       taxableSalesIncl,

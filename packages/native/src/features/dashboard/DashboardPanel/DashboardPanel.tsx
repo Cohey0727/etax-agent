@@ -4,6 +4,7 @@ import {
   dashboardFigures,
   filterYear,
   freshDeductionState,
+  isAgricultureEmpty,
 } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -43,8 +44,14 @@ export function DashboardPanel({ transactions, year }: DashboardPanelProps) {
       dashboardFigures(tx, {
         filingType: deductionState.filingType,
         realEstateBusinessScale: deductionState.realEstateBusinessScale,
+        agriculture: deductionState.agriculture,
       }),
-    [tx, deductionState.filingType, deductionState.realEstateBusinessScale],
+    [
+      tx,
+      deductionState.filingType,
+      deductionState.realEstateBusinessScale,
+      deductionState.agriculture,
+    ],
   );
 
   return (
@@ -57,6 +64,7 @@ export function DashboardPanel({ transactions, year }: DashboardPanelProps) {
         blue={figures.blue}
         filingType={deductionState.filingType}
         realEstateBusinessScale={deductionState.realEstateBusinessScale}
+        hasAgricultureIncome={!isAgricultureEmpty(deductionState.agriculture)}
       />
       <ConsumptionTaxComparison
         year={year}
