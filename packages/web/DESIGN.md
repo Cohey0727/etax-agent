@@ -79,7 +79,7 @@
 ## Atomic Design の置き場所
 
 - atoms: `Button` `Card` `Text` `Badge` `Input` `Select` `Textarea` `Table` 系 `Row` `Col` `Icon` `LoadingCircle`。ドメインを持たない。
-- molecules: `Tabs`（向きで横タブ／サイドバーナビに切替）、`AlertBox`。
+- molecules: `Tabs`（横並びのタブ）、`AlertBox`、`Modal`、`Drawer`、`FormField`、`PasswordField`、`MultiSelectFilter`、`HistoryTimeline`、`PageSkeleton`、`TableSkeleton`。
 - organisms: 画面領域ごとの機能部品（dashboard / ledger / import / receipt / filing / settings / agent 配下）。
 - templates: `AppTemplate`（サイドバー＋ヘッダの骨格）。pages: 画面ごとの配線。
 - スタイルの例外は2つだけ: データ由来の値（バーの幅 % など）のインライン指定と、

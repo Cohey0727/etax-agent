@@ -221,11 +221,6 @@ export async function agentChat(
   });
 }
 
-/** 勘定科目を1件判定する（履歴→SystemOne→ルール）。 */
-export async function classifyAccount(description: string): Promise<AccountClassification> {
-  return requestJson<AccountClassification>("/api/classify/account", jsonBody("POST", { description }));
-}
-
 /** 勘定科目をまとめて判定する（カード明細の行など）。 */
 export async function classifyAccountsBatch(
   descriptions: string[],

@@ -15,9 +15,6 @@ export const setStorageUserId = (userId: number | null): void => {
   currentUserId = userId;
 };
 
-/** 現在のストレージ用ユーザーID。 */
-export const storageUserId = (): number | null => currentUserId;
-
 /** ベースキーを現在のユーザーの名前空間へ寄せる。 */
 export const userScopedKey = (baseKey: string): string =>
   currentUserId === null ? baseKey : `${baseKey}:u${currentUserId}`;

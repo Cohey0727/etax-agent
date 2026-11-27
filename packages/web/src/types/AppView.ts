@@ -11,7 +11,6 @@ export const AppView = {
   Taxpayer: "taxpayer",
   Settings: "settings",
   McpSettings: "mcpSettings",
-  Agent: "agent",
 } as const;
 
 export type AppView = (typeof AppView)[keyof typeof AppView];

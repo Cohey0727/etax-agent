@@ -1,4 +1,4 @@
-import { style, styleVariants } from "@vanilla-extract/css";
+import { style } from "@vanilla-extract/css";
 import { theme } from "@configs";
 
 const styles = {
@@ -22,15 +22,6 @@ const styles = {
         borderColor: theme.color.accent,
         boxShadow: `0 0 0 3px ${theme.color.focusRing}`,
       },
-    },
-  }),
-  variant: styleVariants({
-    default: {},
-    code: {
-      width: "100%",
-      minHeight: "220px",
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-      fontSize: theme.fontSizes.xs,
     },
   }),
 };

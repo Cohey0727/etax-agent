@@ -34,7 +34,6 @@ const VIEW_SLUGS: Record<AppView, string> = {
   [AppView.Invoices]: "invoices",
   [AppView.Settings]: "settings",
   [AppView.McpSettings]: "mcp-settings",
-  [AppView.Agent]: "agent",
 };
 
 /** 確定申告タブとURLスラッグの対応。総合（overview）は標準でスラッグなし。 */
