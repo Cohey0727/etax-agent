@@ -25,18 +25,10 @@
  *   DATABASE_URL  : PostgreSQL の接続文字列（DB機能に必須）。
  */
 import { join } from "node:path";
-import { currentUserId, LEGACY_OWNER_ID } from "./tenantContext";
+import { ownerIdForWrite } from "./tenantContext";
 
 /** 設定不備を表す例外。instanceof 判定のための慣用としてクラスで定義する。 */
 export class ConfigError extends Error {}
-
-/**
- * 設定の上書きを所有者（テナント）ごとに引くためのキー。
- * テナント文脈が無い場合（起動時・認証オフ運用）は既定ユーザーを指す。
- */
-function settingsOwnerId(): number {
-  return currentUserId() ?? LEGACY_OWNER_ID;
-}
 
 export type AgentSchema = "openai" | "claude";
 
@@ -108,7 +100,7 @@ const systemOneOverridesByOwner = new Map<number, SystemOneOverrides>();
 
 /** 保存済み設定の上書きを差し替える（現在のテナントの所有者として保持する）。 */
 export function setSystemOneOverrides(overrides: SystemOneOverrides): void {
-  setSystemOneOverridesForOwner(settingsOwnerId(), overrides);
+  setSystemOneOverridesForOwner(ownerIdForWrite(), overrides);
 }
 
 /** 所有者を指定して上書きを差し替える（起動時の全所有者読み込み用）。 */
@@ -121,7 +113,7 @@ export function setSystemOneOverridesForOwner(
 
 /** 現在のテナントの上書き（保存済み設定）を読む。 */
 export function getSystemOneOverrides(): SystemOneOverrides {
-  return systemOneOverridesByOwner.get(settingsOwnerId()) ?? {};
+  return systemOneOverridesByOwner.get(ownerIdForWrite()) ?? {};
 }
 
 /**
@@ -133,7 +125,7 @@ const jevPromptOverrideByOwner = new Map<number, string>();
 
 /** 保存済みの jev 用プロンプト上書きを差し替える（jevPromptRepository が使う）。 */
 export function setJevPromptOverride(prompt: string): void {
-  setJevPromptOverrideForOwner(settingsOwnerId(), prompt);
+  setJevPromptOverrideForOwner(ownerIdForWrite(), prompt);
 }
 
 /** 所有者を指定して jev 用プロンプト上書きを差し替える（起動時の全所有者読み込み用）。 */
@@ -143,7 +135,7 @@ export function setJevPromptOverrideForOwner(ownerId: number, prompt: string): v
 
 /** 現在のテナントの jev 用プロンプト上書きを読む（未設定なら空文字）。 */
 export function getJevPromptOverride(): string {
-  return jevPromptOverrideByOwner.get(settingsOwnerId()) ?? "";
+  return jevPromptOverrideByOwner.get(ownerIdForWrite()) ?? "";
 }
 
 /**
@@ -160,7 +152,7 @@ const regexRulesOverrideByOwner = new Map<
 export function setRegexRulesOverride(
   rules: { pattern: string; category: string }[] | null,
 ): void {
-  setRegexRulesOverrideForOwner(settingsOwnerId(), rules);
+  setRegexRulesOverrideForOwner(ownerIdForWrite(), rules);
 }
 
 /** 所有者を指定して正規表現ルール上書きを差し替える（起動時の全所有者読み込み用）。 */
@@ -173,7 +165,7 @@ export function setRegexRulesOverrideForOwner(
 
 /** 現在のテナントの正規表現ルール上書きを読む（未設定なら null）。 */
 export function getRegexRulesOverride(): { pattern: string; category: string }[] | null {
-  return regexRulesOverrideByOwner.get(settingsOwnerId()) ?? null;
+  return regexRulesOverrideByOwner.get(ownerIdForWrite()) ?? null;
 }
 
 /**
