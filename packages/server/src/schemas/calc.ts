@@ -7,6 +7,7 @@
  * 検証で弾くのは「JSONオブジェクトでないボディ」だけに留める。
  */
 import { z } from "@hono/zod-openapi";
+import { TaxYearSchema } from "./common";
 
 // ---------------------------------------------------------------------------
 // 集計（aggregate）
@@ -281,7 +282,7 @@ export const AgricultureInputSchema = z
 
 export const CalculateIncomeTaxRequestSchema = z
   .object({
-    year: z.number(),
+    year: TaxYearSchema,
     totalIncome: z.number(),
     deductions: DeductionInputsSchema,
     taxCredits: TaxCreditInputsSchema,

@@ -8,6 +8,7 @@
  */
 import { z } from "@hono/zod-openapi";
 import { DeductionInputsSchema, TaxCreditInputsSchema } from "./calc";
+import { TaxYearSchema } from "./common";
 import { TaxpayerProfileSchema } from "./taxpayer";
 
 export const XtxTaxpayerSchema = z
@@ -193,7 +194,7 @@ export type BalanceSheetInputRequest = z.infer<typeof BalanceSheetInputSchema>;
 
 export const ExportXtxRequestSchema = z
   .object({
-    year: z.number(),
+    year: TaxYearSchema,
     amendment: z.boolean(),
     submission_date: z.string(),
     taxpayer: XtxTaxpayerSchema,

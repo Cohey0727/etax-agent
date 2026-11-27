@@ -7,6 +7,7 @@
  * を置いて全ルートに効かせ、エンドポイント固有の文言が要るルートだけ
  * validationHook(messageFor) を個別に渡す。
  */
+import { TAX_PARAMETERS } from "@etax/shared";
 import { Hook } from "@hono/zod-openapi";
 
 /**
@@ -33,6 +34,14 @@ export function validationHook(
 export function defaultValidationMessage(issuePaths: string[]): string {
   const named = [...new Set(issuePaths.filter((path) => path !== ""))];
   return named.length > 0 ? `${named.join("・")} が不正です` : "JSONボディが必要です";
+}
+
+/** 年分（TaxYearSchema）を受けるルートの文言。年分以外の不備はボディ全体の不備とみなす。 */
+export function taxYearValidationMessage(issuePaths: string[]): string {
+  if (issuePaths.includes("year")) {
+    return `year は対応年分（${Object.keys(TAX_PARAMETERS).join(", ")}）で指定してください`;
+  }
+  return "JSONボディが必要です";
 }
 
 /** 個別の文言を持たないルートに使う defaultHook。 */

@@ -1,10 +1,10 @@
 /**
  * common.ts — 共通スキーマ（schemas）。
  *
- * ErrorSchema: 本プロジェクトのエラーレスポンスは従来どおり `{ error }` 形式。
- * CODING_CONVENTIONS_BACKEND の例は `message` フィールドだが、既存クライアント
- * （web / 外部利用者）との互換を優先し `error` を正とする。
+ * ErrorSchema: エラーレスポンスは `{ error }` 形式（web / native / 外部利用者が
+ * error を文言として読む）。
  */
+import { TAX_PARAMETERS } from "@etax/shared";
 import { z } from "@hono/zod-openapi";
 
 export const ErrorSchema = z
@@ -14,3 +14,9 @@ export const ErrorSchema = z
   .openapi("Error");
 
 export type ErrorResponse = z.infer<typeof ErrorSchema>;
+
+/** 税務パラメータを定義している年分。所得税額の計算と申告データの出力はこの年分だけを受ける。 */
+export const TaxYearSchema = z
+  .number()
+  .int()
+  .refine((year) => Object.hasOwn(TAX_PARAMETERS, year));

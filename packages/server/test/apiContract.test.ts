@@ -100,3 +100,73 @@ describe("入力検証の失敗は { error: string } の 400 で返す", () => {
     expect(r.body["error"]).toBe("kind が不正です");
   });
 });
+
+describe("税務パラメータの無い年分は 400", () => {
+  const deductions = {
+    socialInsurancePaid: 0,
+    smallBusinessMutualAidPaid: 0,
+    lifeInsurance: { newGeneral: 0, newCareMedical: 0, newPension: 0, oldGeneral: 0, oldPension: 0 },
+    earthquakeInsurance: { earthquake: 0, oldLongTerm: 0 },
+    medicalExpensesPaid: 0,
+    medicalReimbursement: 0,
+    donationsTotal: 0,
+    casualtyLoss: null,
+    spouseCategory: "none",
+    spouseTotalIncome: null,
+    dependents: { general: 0, specific: 0, elderly: 0, elderlyCohabiting: 0 },
+    disability: { general: 0, special: 0, specialCohabiting: 0 },
+    isWidow: false,
+    isSingleParent: false,
+    isWorkingStudent: false,
+    specialRelativeTotalIncome: null,
+  };
+  const taxCredits = {
+    housingLoanBalance: 0,
+    housingLoanLimit: 0,
+    housingLoanRate: 0,
+    dividendCorporate: 0,
+    dividendTrust: 0,
+    politicalDonations: 0,
+    certifiedNpoDonations: 0,
+    seismicRetrofitStandardCost: 0,
+    seismicRetrofitOtherCost: 0,
+    foreignTaxPaid: 0,
+    foreignIncome: 0,
+    flatReduction: 0,
+  };
+  const taxpayer = {
+    name: "", name_kana: "", zip_code: "", address: "", address_line2: "", birth_date: "",
+    phone: "", tax_office_name: "", tax_office_code: "", my_number: "", user_id: "",
+    occupation: "", shop_name: "", jan1_address: "",
+  };
+
+  test("所得税額の計算", async () => {
+    const r = await req("/api/calc/income-tax", {
+      method: "POST",
+      json: { year: 2022, totalIncome: 5_000_000, deductions, taxCredits },
+    });
+    expect(r.status).toBe(400);
+    expect(String(r.body["error"])).toContain("対応年分");
+  });
+
+  test("所得税額の計算: 年に小数は受けない", async () => {
+    const r = await req("/api/calc/income-tax", {
+      method: "POST",
+      json: { year: 2025.5, totalIncome: 5_000_000, deductions, taxCredits },
+    });
+    expect(r.status).toBe(400);
+  });
+
+  test("XTX 出力", async () => {
+    const r = await req("/api/etax/export-xtx", {
+      method: "POST",
+      json: {
+        year: 2022, amendment: false, submission_date: "2023-03-01", taxpayer,
+        transactions: [], deductions, tax_credits: taxCredits,
+        withholding_tax: 0, prepaid_tax: 0, original_third_period_tax: null,
+      },
+    });
+    expect(r.status).toBe(400);
+    expect(String(r.body["error"])).toContain("対応年分");
+  });
+});

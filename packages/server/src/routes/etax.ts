@@ -2,7 +2,7 @@
  * etax.ts — e-Tax 連携ルートの登録（routes: 登録のみ、ロジックは持たない）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { validationHook } from "../lib/validationHook";
+import { taxYearValidationMessage, validationHook } from "../lib/validationHook";
 import {
   exportConsumptionXtxHandler,
   exportConsumptionXtxRoute,
@@ -29,12 +29,12 @@ const app = new OpenAPIHono();
 app.openapi(
   exportXtxRoute,
   exportXtxHandler,
-  validationHook(() => "JSONボディが必要です"),
+  validationHook(taxYearValidationMessage),
 );
 app.openapi(
   exportReturnPdfRoute,
   exportReturnPdfHandler,
-  validationHook(() => "JSONボディが必要です"),
+  validationHook(taxYearValidationMessage),
 );
 app.openapi(
   exportConsumptionXtxRoute,

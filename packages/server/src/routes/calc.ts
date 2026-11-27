@@ -2,7 +2,7 @@
  * calc.ts — 計算系ルートの登録（routes: 登録のみ、ロジックは持たない）。
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { validationHook } from "../lib/validationHook";
+import { taxYearValidationMessage, validationHook } from "../lib/validationHook";
 import {
   calculateAggregateHandler,
   calculateAggregateRoute,
@@ -49,7 +49,7 @@ app.openapi(
 app.openapi(
   calculateIncomeTaxRoute,
   calculateIncomeTaxHandler,
-  validationHook(() => "JSONボディが必要です"),
+  validationHook(taxYearValidationMessage),
 );
 
 export default app;
