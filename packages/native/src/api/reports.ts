@@ -1,18 +1,14 @@
 /**
  * reports.ts — 試算表・資金繰り・freee試算表（実績）のAPI。
  */
-import { AgricultureWire, BalanceSheetWireInput, FilingType, Transaction } from "@etax/shared";
 import { apiJson, apiJsonOrNull } from "./client";
-import { CashFlowReport, FreeeTrialBalance, TrialBalanceResponse } from "./types";
-
-export interface FetchTrialBalanceRequest {
-  transactions: Transaction[];
-  year: number;
-  filing_type?: FilingType;
-  real_estate_business_scale?: boolean;
-  balance_sheet?: BalanceSheetWireInput;
-  agriculture?: AgricultureWire;
-}
+import {
+  CashFlowReport,
+  FetchCashFlowRequest,
+  FetchTrialBalanceRequest,
+  FreeeTrialBalance,
+  TrialBalanceResponse,
+} from "./types";
 
 /** 試算表レポート（当年＋前年）を計算系APIから取得する。 */
 export async function fetchTrialBalance(
@@ -22,12 +18,6 @@ export async function fetchTrialBalance(
     method: "POST",
     body: request,
   });
-}
-
-export interface FetchCashFlowRequest {
-  from?: string;
-  months?: number;
-  opening_balance?: number;
 }
 
 /** 資金繰りレポート（実績＋未消込請求書の入金予定）を取得する。 */

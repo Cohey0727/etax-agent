@@ -1,12 +1,12 @@
-import { applyCsvClassificationEdits, Transaction } from "@etax/shared";
+import {
+  applyCsvClassificationEdits,
+  ledgerRowToTransaction,
+  Transaction,
+  transactionToLedgerInput,
+} from "@etax/shared";
 import { useEffect, useState } from "react";
 import { AppView } from "@types";
-import {
-  fetchLedgerTransactions,
-  ledgerRowToTransaction,
-  transactionToLedgerInput,
-  updateLedgerTransaction,
-} from "@utils/api";
+import { fetchLedgerTransactions, updateLedgerTransaction } from "@utils/api";
 
 /**
  * useLedgerSync.ts — 帳簿（DB）と画面の取引状態の同期（AppPage 用フック）。

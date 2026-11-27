@@ -1,10 +1,10 @@
-import { ACCOUNT_NAMES, guessIncomeType } from "@etax/shared";
+import { ACCOUNT_NAMES, guessIncomeType, transactionToLedgerInput } from "@etax/shared";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useState } from "react";
 import { Image, View } from "react-native";
 import {
   AnalyzeReceiptResponse, analyzeReceiptImage, createLedgerTransaction, fetchReceipts,
-  linkReceipt, ReceiptRecord, recordClassificationFeedback, transactionToLedgerInput, unlinkReceipt,
+  linkReceipt, ReceiptRecord, recordClassificationFeedback, unlinkReceipt,
 } from "@/api";
 import { AlertBox, AppButton, AppText, Card, DateField, Field, ScreenContainer, SelectField, SkeletonCard } from "@/components";
 import { useAppState } from "@/state/AppContext";

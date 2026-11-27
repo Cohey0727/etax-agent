@@ -2,7 +2,7 @@
  * AppContext.tsx — 全画面共通の状態（選択中の年度・帳簿の取引）。
  * 年度の単一の出所はここ。画面は props ではなくこのコンテキストから引く。
  */
-import { Transaction } from "@etax/shared";
+import { ledgerRowToTransaction, Transaction } from "@etax/shared";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ReactNode,
@@ -13,7 +13,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { LedgerTransaction, fetchLedgerTransactions, ledgerRowToTransaction } from "@/api";
+import { LedgerTransaction, fetchLedgerTransactions } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 
 const YEAR_STORAGE_KEY = "etax.selected-year";

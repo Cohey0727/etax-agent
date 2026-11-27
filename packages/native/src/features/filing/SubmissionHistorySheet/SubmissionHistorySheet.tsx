@@ -6,6 +6,7 @@ import {
   FilingSubmissionHistoryEntry,
   FilingSubmissionKind,
   fetchFilingSubmissionHistory,
+  HistoryAction,
 } from "@/api";
 import { space } from "@/theme";
 import { formatDate } from "@/utils";
@@ -29,7 +30,7 @@ const kindLabels: Record<FilingSubmissionKind, string> = {
   consumption: "消費税",
 };
 
-const actionLabels: Record<string, string> = {
+const actionLabels: Record<HistoryAction, string> = {
   created: "登録",
   updated: "訂正",
   deleted: "削除",
@@ -101,7 +102,7 @@ function HistoryEntry({ entry }: { entry: FilingSubmissionHistoryEntry }) {
     <View style={styles.entry}>
       <View style={styles.entryHead}>
         <AppText size="md" weight="semibold">
-          {actionLabels[entry.action] ?? entry.action}
+          {actionLabels[entry.action]}
         </AppText>
         <AppText size="sm" tone="muted">
           {formatDate(entry.created_at)}

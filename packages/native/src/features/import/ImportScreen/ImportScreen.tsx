@@ -1,13 +1,14 @@
 import {
-  ACCOUNT_NAMES, applyCsvClassificationEdits, guessIncomeType, IncomeType, sampleTransactions, Transaction,
+  ACCOUNT_NAMES, applyCsvClassificationEdits, guessIncomeType, IncomeType, ledgerRowToTransaction,
+  sampleTransactions, Transaction, transactionToLedgerInput,
 } from "@etax/shared";
 import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
 import { View } from "react-native";
 import {
   ClassificationSource, classifyAccountsBatch, createLedgerTransaction, fetchLedgerTransactions, ImportCsvResponse,
-  importCsvBytes, ledgerRowToTransaction, readLocalFileBytes, recordClassificationFeedback,
-  transactionToLedgerInput, updateLedgerTransaction,
+  importCsvBytes, readLocalFileBytes, recordClassificationFeedback,
+  updateLedgerTransaction,
 } from "@/api";
 import { AlertBox, AppButton, AppText, Card, ScreenContainer, SelectField } from "@/components";
 import { useAppState } from "@/state/AppContext";
@@ -46,7 +47,6 @@ export function ImportScreen() {
     try {
       const bytes = await readLocalFileBytes(asset.uri);
       const res = await importCsvBytes(bytes, asset.name);
-      if (res.error) throw new Error(res.error);
       setResult(res);
       setTxs(res.transactions);
     } catch (e) {

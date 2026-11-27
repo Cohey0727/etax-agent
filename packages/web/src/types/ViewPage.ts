@@ -1,5 +1,5 @@
 import { Transaction } from "@etax/shared";
-import { AgentConnectionConfig } from "./AgentConnection";
+import { AgentConnectionConfig } from "./Api";
 import { AppView } from "./AppView";
 import { SendKeyMode } from "./Chat";
 import { ThemeMode } from "./Theme";

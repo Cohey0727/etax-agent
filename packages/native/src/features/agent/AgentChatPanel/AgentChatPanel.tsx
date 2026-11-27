@@ -109,7 +109,6 @@ export function AgentChatPanel({
         snapshot ?? undefined,
         sent.map(toChatAttachmentUpload),
       );
-      if (res.error) setError(res.error);
       const answered: ChatMessage[] = [
         ...next,
         {

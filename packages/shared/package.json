@@ -1,1 +1,1 @@
-{"exports":{".":"./src/index.ts"},"main":"src/index.ts","name":"@etax/shared","private":true,"scripts":{"test":"bun test"},"type":"module","types":"src/index.ts","version":"0.1.0"}
+{"exports":{".":"./src/index.ts","./apiWire":"./src/apiWire.ts"},"main":"src/index.ts","name":"@etax/shared","private":true,"scripts":{"test":"bun test"},"type":"module","types":"src/index.ts","version":"0.1.0"}

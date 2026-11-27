@@ -1,4 +1,4 @@
-import { TAX_CATEGORIES } from "@etax/shared";
+import { isIncomeType, TAX_CATEGORIES } from "@etax/shared";
 import { Badge, Button, Col, Icon, Input, Row, Select, TableCell, Text } from "@components/atoms";
 import { LedgerTransaction } from "@types";
 import {
@@ -110,7 +110,10 @@ export const LedgerTableRow = ({
       <Select
         className={styles.cellSelect}
         value={edit.income_type}
-        onChange={(e) => onEdit(row, { income_type: e.target.value })}
+        onChange={(e) => {
+          const incomeType = e.target.value;
+          if (isIncomeType(incomeType)) onEdit(row, { income_type: incomeType });
+        }}
         aria-label="区分"
       >
         {INCOME_TYPE_OPTIONS.map((option) => (

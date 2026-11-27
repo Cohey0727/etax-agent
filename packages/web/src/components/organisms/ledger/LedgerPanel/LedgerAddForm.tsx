@@ -1,3 +1,4 @@
+import { isIncomeType } from "@etax/shared";
 import { RefObject } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import {
@@ -106,7 +107,10 @@ export const LedgerAddForm = ({
               <Text variant="statLabel">区分</Text>
               <Select
                 value={draft.income_type}
-                onChange={(e) => onDraftChange({ ...draft, income_type: e.target.value })}
+                onChange={(e) => {
+                  const incomeType = e.target.value;
+                  if (isIncomeType(incomeType)) onDraftChange({ ...draft, income_type: incomeType });
+                }}
               >
                 {INCOME_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>

@@ -1,4 +1,4 @@
-import { USEFUL_LIFE_PRESETS } from "@etax/shared";
+import { isFixedAssetIncomeType, USEFUL_LIFE_PRESETS } from "@etax/shared";
 import { useState } from "react";
 import { Button, Col, Input, Row, Select } from "@components/atoms";
 import { FixedAssetInput } from "@types";
@@ -69,7 +69,10 @@ export const FixedAssetForm = ({
           <Select
             id="fa-income-type"
             value={value.income_type}
-            onChange={(e) => patch({ income_type: e.target.value })}
+            onChange={(e) => {
+              const incomeType = e.target.value;
+              if (isFixedAssetIncomeType(incomeType)) patch({ income_type: incomeType });
+            }}
           >
             {INCOME_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>

@@ -1,11 +1,5 @@
-import { Transaction } from "@etax/shared";
-import {
-  ApiError,
-  createLedgerTransaction,
-  ledgerRowToTransaction,
-  linkReceipt,
-  transactionToLedgerInput,
-} from "@utils/api";
+import { ledgerRowToTransaction, Transaction, transactionToLedgerInput } from "@etax/shared";
+import { ApiError, createLedgerTransaction, linkReceipt } from "@utils/api";
 
 /** 領収書から登録した結果。persisted は帳簿DBに保存できたか、linked は証憑を紐付けたか。 */
 export interface ReceiptRegistration {

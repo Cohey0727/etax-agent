@@ -108,7 +108,7 @@ export function LedgerForm({ value, yearOptions, onChange, showClassify = true }
       <SelectField
         label="区分"
         value={value.income_type}
-        options={INCOME_TYPE_OPTIONS.map((o) => ({ value: o.value as string, label: o.label }))}
+        options={INCOME_TYPE_OPTIONS}
         onChange={(income_type) => set({ income_type })}
       />
       <SelectField

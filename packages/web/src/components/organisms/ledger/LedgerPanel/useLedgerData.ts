@@ -1,11 +1,10 @@
-import { Transaction } from "@etax/shared";
+import { ledgerRowToTransaction, Transaction } from "@etax/shared";
 import { useEffect, useRef, useState } from "react";
 import { LedgerTransaction } from "@types";
 import {
   createLedgerTransaction,
   deleteLedgerTransaction,
   fetchLedgerTransactions,
-  ledgerRowToTransaction,
   recordClassificationFeedback,
   updateLedgerTransaction,
 } from "@utils/api";

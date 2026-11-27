@@ -13,7 +13,7 @@ export const METHOD_OPTIONS: readonly { value: DepreciationMethod; label: string
   Object.keys(DEPRECIATION_METHOD_LABELS) as DepreciationMethod[]
 ).map((value) => ({ value, label: DEPRECIATION_METHOD_LABELS[value].option }));
 
-export const INCOME_TYPE_OPTIONS: readonly { value: string; label: string }[] = (
+export const INCOME_TYPE_OPTIONS: readonly { value: FixedAssetIncomeType; label: string }[] = (
   Object.keys(FIXED_ASSET_INCOME_TYPE_LABELS) as FixedAssetIncomeType[]
 ).map((value) => ({ value, label: FIXED_ASSET_INCOME_TYPE_LABELS[value] }));
 

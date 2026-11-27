@@ -1,4 +1,4 @@
-import { IncomeType, Transaction } from "@etax/shared";
+import { Transaction } from "@etax/shared";
 import {
   AccountClassification,
   AgentChatResponse,
@@ -758,45 +758,6 @@ export async function exportConsumptionXtxFile(
 // ---------------------------------------------------------------------------
 // 帳簿（DB保存の取引）
 // ---------------------------------------------------------------------------
-
-/** 帳簿の行を画面共通の Transaction へ変換する。 */
-export function ledgerRowToTransaction(row: LedgerTransaction): Transaction {
-  const incomeType: IncomeType =
-    row.income_type === "business" || row.income_type === "real_estate"
-      ? row.income_type
-      : "other";
-  return {
-    date: row.date,
-    // 割り当て年度を正とする（旧サーバーの応答など fiscal_year が無い場合は日付の年）
-    year: row.fiscal_year || Number(row.date.slice(0, 4)),
-    description: row.description,
-    amount: row.amount,
-    account: row.account,
-    category: row.category,
-    income_type: incomeType,
-    tax_category: row.tax_category ?? "",
-    // 旧サーバーの応答など割合が無い場合は未指定（100）として扱う
-    business_ratio_percent:
-      typeof row.business_ratio_percent === "number" ? row.business_ratio_percent : undefined,
-    business_ratio_basis: row.business_ratio_basis ?? undefined,
-  };
-}
-
-/** 画面共通の Transaction を帳簿保存用の入力へ変換する。 */
-export function transactionToLedgerInput(tx: Transaction): LedgerTransactionInput {
-  return {
-    date: tx.date,
-    fiscal_year: tx.year,
-    description: tx.description,
-    amount: tx.amount,
-    account: tx.account,
-    category: tx.category,
-    income_type: tx.income_type,
-    tax_category: tx.tax_category,
-    business_ratio_percent: tx.business_ratio_percent ?? 100,
-    business_ratio_basis: tx.business_ratio_basis ?? "",
-  };
-}
 
 /**
  * 帳簿の取引を取得する。year 省略時は全件。

@@ -4,15 +4,16 @@ import { View } from "react-native";
 import {
   fetchRecentTransactionHistory,
   fetchTransactionHistory,
+  HistoryAction,
   TransactionHistoryEntry,
 } from "@/api";
 import { AppText, Chip } from "@/components";
 import { formatDate, formatYen } from "@/utils";
 
-const ACTION_LABELS: Record<string, string> = {
-  create: "登録",
-  update: "訂正",
-  delete: "削除",
+const actionLabels: Record<HistoryAction, string> = {
+  created: "登録",
+  updated: "訂正",
+  deleted: "削除",
 };
 
 /**
@@ -48,7 +49,7 @@ export function TransactionHistory({ transactionId }: { transactionId?: number }
         return (
           <View key={entry.id} style={{ gap: 2 }}>
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-              <Chip label={ACTION_LABELS[entry.action] ?? entry.action} tone="accent" />
+              <Chip label={actionLabels[entry.action]} tone="accent" />
               <AppText size="xs" tone="muted">{formatDate(entry.created_at)}</AppText>
             </View>
             {snap ? (
