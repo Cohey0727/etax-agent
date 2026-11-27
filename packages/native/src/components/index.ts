@@ -6,6 +6,7 @@ export * from "./AppSidebar";
 export * from "./AppText";
 export * from "./BouncePressable";
 export * from "./Card";
+export * from "./ChatSheet";
 export * from "./Chip";
 export * from "./DateField";
 export * from "./Field";
