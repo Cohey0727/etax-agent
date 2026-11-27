@@ -68,7 +68,13 @@ export function parseWithMapping(
         skippedRows++;
         continue;
       }
-      amount = (c ?? 0) - (d ?? 0); // 入金 − 出金
+      // 入金 − 出金。出金列と入金列が両方ある形式では各列が金額の大きさを
+      // 表す（出金を負数で印字する銀行もある）ため絶対値で合成する。出金列
+      // だけの形式（カードの利用金額など）では負数が返品・返金を表すので
+      // 符号をそのまま使う。
+      amount = iDebit >= 0 && iCredit >= 0
+        ? Math.abs(c ?? 0) - Math.abs(d ?? 0)
+        : (c ?? 0) - (d ?? 0);
     } else {
       const n = parseAmountCell(cell(row, iAmount));
       if (n === null) {

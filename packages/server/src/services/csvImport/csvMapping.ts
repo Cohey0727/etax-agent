@@ -19,15 +19,25 @@ import { detectDateFormat, parseDateCell } from "./csvCellParsing";
 const normalizeHeader = (h: string) => h.replace(/[\s　]+/g, "").toLowerCase();
 
 const dateKeywords = ["お取引日", "取引日", "ご利用日", "利用日", "日付", "年月日", "お支払日", "支払日", "明細日", "date"];
-const creditKeywords = ["お預かり金額", "お預り金額", "お預入金額", "預入金額", "入金金額", "お預かり", "お預り", "入金", "credit", "貸方"];
+const creditKeywords = ["お預かり金額", "お預り金額", "お預入金額", "預かり金額", "預り金額", "預入金額", "入金金額", "お預かり", "お預り", "入金", "credit", "貸方"];
 const debitKeywords = ["お支払い金額", "お支払金額", "支払金額", "出金金額", "引落金額", "ご利用金額", "利用金額", "出金", "お支払い", "支払い", "debit", "借方"];
 const balanceKeywords = ["差引残高", "お預り金残高", "残高", "balance"];
 const accountKeywords = ["口座名", "口座番号", "口座", "カード名", "account"];
 const descriptionKeywords = ["ご利用内容", "お取引内容", "取引内容", "ご利用先", "摘要欄", "摘要", "内容", "加盟店", "店舗名", "項目", "description"];
-const amountKeywords = ["金額", "ご利用代金", "amount"];
+const amountKeywords = ["金額", "入出金", "ご利用代金", "amount"];
 const categoryKeywords = ["勘定科目", "科目", "費目", "category"];
 const incomeTypeKeywords = ["収入区分", "所得区分", "income_type", "incometype"];
 const taxCategoryKeywords = ["税区分", "消費税区分", "tax_category", "taxcategory"];
+
+/**
+ * 入金と出金の両方を表す見出し（入出金・入払区分など）か。符号付きの金額1列
+ * または区分の列であり、出金列・入金列のどちらでもない（「入出金」は
+ * 「出金」を部分文字列に含むため、除かないと出金列と誤判定する）。
+ */
+function isCombinedInOutHeader(h: string): boolean {
+  const nh = normalizeHeader(h);
+  return nh.includes("入") && (nh.includes("出") || nh.includes("払"));
+}
 
 /**
  * キーワード一致で最適な列を選ぶ。キーワードが長い（具体的）ほど高スコア。
@@ -59,8 +69,8 @@ function pickColumn(
 /** キーワード・ヒューリスティクスによる自動マッピング。 */
 export function heuristicMapping(headers: string[], dataRows: string[][]): CsvMapping {
   const used = new Set<string>();
-  const take = (kws: string[]) => {
-    const col = pickColumn(headers, kws, used);
+  const take = (kws: string[], candidates: string[] = headers) => {
+    const col = pickColumn(candidates, kws, used);
     if (col) used.add(col);
     return col;
   };
@@ -80,8 +90,9 @@ export function heuristicMapping(headers: string[], dataRows: string[][]): CsvMa
     }
   }
 
-  const creditColumn = take(creditKeywords);
-  const debitColumn = take(debitKeywords);
+  const splitCandidates = headers.filter((h) => !isCombinedInOutHeader(h));
+  const creditColumn = take(creditKeywords, splitCandidates);
+  const debitColumn = take(debitKeywords, splitCandidates);
   const balanceColumn = take(balanceKeywords);
   const accountColumn = take(accountKeywords);
   const descriptionColumn = take(descriptionKeywords);
