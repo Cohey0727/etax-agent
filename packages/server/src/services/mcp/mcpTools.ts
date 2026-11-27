@@ -10,14 +10,10 @@
  *   - e-Tax への最終提出は本ツール群でも行わない（納税者本人の操作）。
  */
 import {
-  aggregateIncome,
-  amendmentDelta,
-  blueDeduction,
   buildConsumptionXtx,
   buildSimplifiedConsumptionXtx,
   buildSpecial20ConsumptionXtx,
   buildXtxFiling,
-  categoryTotals,
   computeAgricultureStatement,
   computeConsumptionReturn,
   computeSimplifiedConsumptionReturn,
@@ -25,17 +21,10 @@ import {
   computeCorrectedFigures,
   computeExpandedIncomes,
   computeIncomeTax,
-  consumptionTax,
-  depreciationForYear,
-  estimateInputTax,
   expandedWithholdingTotal,
   isAgricultureEmpty,
-  normalizeBusinessRatio,
-  residentialRentTotal,
   resolveTaxCreditInputs,
   computeManualIncomes,
-  smallSpecialUsage,
-  taxableSalesFromBreakdown,
   xtxSupportedYears,
 } from "@etax/shared";
 import { DrizzleQueryError } from "drizzle-orm/errors";
@@ -43,38 +32,13 @@ import { billingEnabled } from "../../gateways/stripeGateway";
 import { errorMessage } from "../../lib/errors";
 import { authRequired } from "../../lib/tenantContext";
 import { hasActivePlan } from "../../repositories/subscriptionRepository";
-import { recordClassification } from "../../repositories/classificationHistoryRepository";
-import {
-  filingStatusToApi,
-  listFilingStatusRows,
-  upsertFilingStatusRow,
-} from "../../repositories/filingStatusRepository";
-import { TransactionRow } from "../../repositories/schema";
-import {
-  deleteTransactionRow,
-  insertTransactionRow,
-  listTransactionRows,
-  transactionToApi,
-  updateTransactionRow,
-} from "../../repositories/transactionRepository";
 import {
   depreciationDetailRowsForYear,
-  fixedAssetToApi,
-  fixedAssetToInput,
-  insertFixedAssetRow,
-  isActiveInYear,
   listFixedAssetRows,
 } from "../../repositories/fixedAssetRepository";
-import {
-  linkReceiptRow,
-  listReceiptRows,
-  receiptToApi,
-} from "../../repositories/receiptRepository";
-import { classifyAccount } from "../classification/classifyAccount";
-import { loadClassifyDeps } from "../classification/loadClassifyDeps";
-import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { mcpAssetTools } from "./mcpAssetTools";
 import { mcpBusinessStartTools } from "./mcpBusinessStartTools";
+import { mcpCalcTools } from "./mcpCalcTools";
 import { mcpCashFlowTools } from "./mcpCashFlowTools";
 import { mcpImportTools } from "./mcpImportTools";
 import { mcpInvoiceTools } from "./mcpInvoiceTools";
@@ -83,8 +47,6 @@ import { mcpMetaTools } from "./mcpMetaTools";
 import { mcpProfileTools } from "./mcpProfileTools";
 import { mcpSubmissionTools } from "./mcpSubmissionTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
-import { CreateFixedAssetRequestSchema } from "../../schemas/fixedAsset";
-
 import {
   McpToolDef,
   McpToolHandler,
@@ -94,14 +56,12 @@ import {
   expandedIncomeArg,
   filingOptionsArg,
   filingTypeProperty,
-  idArg,
   ledgerTransactions,
   mergeDeductionInputs,
   mergeTaxCreditInputs,
   miscIncomeArg,
   numArg,
   nullableNumArg,
-  parseIncomeType,
   realEstateScaleProperty,
   requireDb,
   salaryIncomeArg,
@@ -112,189 +72,8 @@ import {
   yearProperty,
 } from "./mcpToolKit";
 
+/** XTX（申告等データ）を出力するツール。他のツールはドメイン別モジュールが持つ。 */
 const CORE_MCP_TOOLS: McpToolDef[] = [
-  {
-    name: "aggregate_year",
-    description:
-      "帳簿DBの指定年の取引を集計し、事業所得・不動産所得と青色申告特別控除を返す。控除は申告の種類（filing_type、既定は青色65万円）と不動産の規模で変わる。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        year: yearProperty,
-        filing_type: filingTypeProperty,
-        real_estate_business_scale: realEstateScaleProperty,
-      },
-      required: ["year"],
-    },
-  },
-  {
-    name: "consumption_tax",
-    description:
-      "帳簿DBの指定年の消費税を、本則（standard）・簡易課税（simplified）・2割特例（special20）の3方式すべて計算して返す。家賃収入は非課税として扱う。",
-    inputSchema: { type: "object", properties: { year: yearProperty }, required: ["year"] },
-  },
-  {
-    name: "search_tax_knowledge",
-    description:
-      "税務知識ベース（国税庁タックスアンサーの本文を収録）を検索し、関連する制度・手続きの抜粋と出典（No.とURL）を返す。税率・控除の要件や上限、簡易課税のみなし仕入率、申告・納付の手続きや期限など、税制のルールで不確かな点の確認に使う。金額の計算は他の計算ツールで行うこと。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "検索キーワード（空白区切りで複数可。例: 簡易課税 みなし仕入率 第5種）",
-        },
-        limit: { type: "integer", description: "返す件数（任意、既定5、最大10）" },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "income_tax",
-    description:
-      "帳簿DBの指定年の集計をもとに、所得控除・税額控除を入れて所得税額（復興特別所得税込み・確定税額）を計算する。deductions / tax_credits は未指定の項目はゼロとして扱う。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        year: yearProperty,
-        deductions: { type: "object", description: "所得控除の入力（DeductionInputs、camelCase）" },
-        tax_credits: { type: "object", description: "税額控除の入力（TaxCreditInputs、camelCase）" },
-        expanded_income: {
-          type: "object",
-          description:
-            "配当・一時・株式等譲渡の入力（任意、camelCase）: temp{revenue,expenses}、dividend{listedRevenue,listedTrustRevenue,listedWithholding,listedMode(comprehensive/separate/none),generalRevenue,generalTrustRevenue,generalWithholding,interestExpense}、stocks{general/listed{revenue,otherRevenue,acquisitionCost,transferFees,otherExpenses},listedWithholding,specialAccounts[{brokerName,branchName,withholdingAccount,revenue,cost,withholding}]}。配当控除の対象額は配当の内訳から自動で決まる",
-        },
-        agriculture: {
-          type: "object",
-          description:
-            "農業所得の入力（任意、camelCase）: farmName、salesAmount（販売金額）、householdConsumption（家事消費・事業消費金額）、miscRevenue（雑収入）、produceOpeningInventory/produceClosingInventory（農産物の棚卸高）、otherOpeningInventory/otherClosingInventory（農産物以外の棚卸高）、expenseTotals（科目名→金額の合計。支出は正の金額）、familyWorkerSalary（専従者給与・青色）、familyWorkerDeduction（専従者控除・白色）、badDebtProvisionIn/badDebtProvisionBack（貸倒引当金）、cultivationCostDeduction（育成費用）、beefCattleExemptionAmount（肉用牛特例金額・表示のみ）。農業所得は帳簿の取引とは混ぜず、決算書（農業所得用）の計算と青色申告特別控除の配分まで行う",
-        },
-        filing_type: filingTypeProperty,
-        real_estate_business_scale: realEstateScaleProperty,
-      },
-      required: ["year"],
-    },
-  },
-  {
-    name: "amendment_delta",
-    description:
-      "申告済み（original）と修正後（corrected）のフラットなJSONを比較し、項目ごとの差分と税額の増減を返す。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        original: { type: "object", description: "申告済み内容のフラットなJSON" },
-        corrected: { type: "object", description: "修正後内容のフラットなJSON" },
-      },
-      required: ["original", "corrected"],
-    },
-  },
-  {
-    name: "list_transactions",
-    description: "帳簿DBの取引を返す。year を指定するとその年だけに絞る。",
-    inputSchema: {
-      type: "object",
-      properties: { year: { type: "integer", description: "対象年（西暦、任意）" } },
-    },
-  },
-  {
-    name: "add_transaction",
-    description:
-      "帳簿DBに取引を1件追加する。amount は符号つき税込金額（収入は正、支出は負）。category に未分類以外を指定すると分類の学習履歴にも記録される。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        date: { type: "string", description: "日付（YYYY-MM-DD）" },
-        description: { type: "string", description: "摘要" },
-        amount: { type: "number", description: "符号つき税込金額" },
-        account: { type: "string", description: "口座・支払手段など（任意）" },
-        category: { type: "string", description: "勘定科目（任意、既定は未分類）" },
-        income_type: {
-          type: "string",
-          enum: ["business", "real_estate", "other"],
-          description: "所得区分（任意、既定は business）",
-        },
-        tax_category: {
-          type: "string",
-          description: "消費税の税区分（任意。課税売上10% / 課対仕入10% / 非課売上 / 対象外 など）",
-        },
-        fiscal_year: {
-          type: "integer",
-          description: "割り当て年度（任意。既定は日付の年。日付と違う年へ計上する場合に指定）",
-        },
-        business_ratio_percent: {
-          type: "integer",
-          minimum: 0,
-          maximum: 100,
-          description: "事業専用割合（家事按分、0〜100の整数。任意、既定は100＝全額事業分）",
-        },
-        business_ratio_basis: {
-          type: "string",
-          description: "按分根拠のメモ（任意。例: 面積割合 20㎡/60㎡）",
-        },
-      },
-      required: ["date", "description", "amount"],
-    },
-  },
-  {
-    name: "update_transaction",
-    description: "帳簿DBの取引を部分更新する。id 以外は変更したい項目だけ渡す。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "integer", description: "取引ID" },
-        date: { type: "string" },
-        fiscal_year: { type: "integer", description: "割り当て年度" },
-        description: { type: "string" },
-        amount: { type: "number" },
-        account: { type: "string" },
-        category: { type: "string" },
-        income_type: { type: "string", enum: ["business", "real_estate", "other"] },
-        tax_category: { type: "string" },
-        business_ratio_percent: {
-          type: "integer",
-          minimum: 0,
-          maximum: 100,
-          description: "事業専用割合（家事按分、0〜100の整数）",
-        },
-        business_ratio_basis: { type: "string", description: "按分根拠のメモ" },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "delete_transaction",
-    description: "帳簿DBの取引を1件削除する。",
-    inputSchema: {
-      type: "object",
-      properties: { id: { type: "integer", description: "取引ID" } },
-      required: ["id"],
-    },
-  },
-  {
-    name: "classify_account",
-    description:
-      "摘要から勘定科目を判定する（過去の学習履歴 → SystemOne → キーワードルールの順）。候補と確信度も返す。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        description: { type: "string", description: "摘要" },
-        amount: { type: "number", description: "金額（任意、判定の参考）" },
-      },
-      required: ["description"],
-    },
-  },
-  {
-    name: "classify_feedback",
-    description: "確定した勘定科目を学習履歴に記録する。次回以降の classify_account で優先される。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        description: { type: "string", description: "摘要" },
-        account: { type: "string", description: "確定した勘定科目" },
-      },
-      required: ["description", "account"],
-    },
-  },
   {
     name: "export_xtx",
     description:
@@ -395,90 +174,11 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
       ],
     },
   },
-  {
-    name: "register_fixed_asset",
-    description:
-      "固定資産台帳に資産を登録する。method は straight_line（定額法）/ declining_balance（定率法200%）/ lump_sum（一括償却資産）/ small_special（少額減価償却資産の特例）から選ぶ。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "資産の名称等" },
-        quantity: { type: "string", description: "面積又は数量（任意）" },
-        income_type: { type: "string", enum: ["business", "real_estate", "agriculture"], description: "所得区分（既定 business）" },
-        acquisition_date: { type: "string", description: "取得年月日（YYYY-MM-DD）" },
-        service_start_date: { type: "string", description: "事業供用年月日（任意、省略時は取得日）" },
-        cost: { type: "integer", description: "取得価額（円、正の整数）" },
-        useful_life_years: { type: "integer", description: "耐用年数（年、1以上の整数）" },
-        method: {
-          type: "string",
-          enum: ["straight_line", "declining_balance", "lump_sum", "small_special"],
-          description: "償却方法（既定 straight_line）",
-        },
-        business_ratio_percent: {
-          type: "integer",
-          minimum: 0,
-          maximum: 100,
-          description: "事業専用割合 0〜100の整数（既定100）",
-        },
-      },
-      required: ["name", "acquisition_date", "cost", "useful_life_years"],
-    },
-  },
-  {
-    name: "list_fixed_assets",
-    description: "固定資産台帳の一覧を返す。",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "get_depreciation",
-    description:
-      "指定年の減価償却を台帳から計算する（資産ごとの普通償却費・必要経費算入額・未償却残高と、所得区分ごとの合計、少額特例の年間300万円上限の使用状況）。",
-    inputSchema: {
-      type: "object",
-      properties: { year: yearProperty },
-      required: ["year"],
-    },
-  },
-  {
-    name: "list_receipts",
-    description: "証憑（領収書画像）の一覧を返す。各証憑の解析結果と、紐付いている取引IDを含む。",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "link_receipt",
-    description: "証憑（file_id）を取引（transaction_id）へ紐付ける。帳簿から証憑を辿れるようにするための操作。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        file_id: { type: "string", description: "証憑のファイルID" },
-        transaction_id: { type: "number", description: "紐付け先の取引ID" },
-      },
-      required: ["file_id", "transaction_id"],
-    },
-  },
-  {
-    name: "get_filing_status",
-    description: "申告ステータス（確認・控除計算・提出の済み状態）を全年度分返す。",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "set_filing_status",
-    description: "指定年の申告ステータスを更新する。渡した項目だけが書き換わる（true で済み、false で未了）。",
-    inputSchema: {
-      type: "object",
-      properties: {
-        year: yearProperty,
-        confirmed: { type: "boolean" },
-        calculated: { type: "boolean" },
-        submitted: { type: "boolean" },
-      },
-      required: ["year"],
-    },
-  },
 ];
 
 /** ドメイン別ツールモジュール（定義と実行関数は各モジュールが持つ）。 */
 const DOMAIN_TOOL_MODULES: McpToolModule[] = [
+  mcpCalcTools,
   mcpProfileTools,
   mcpImportTools,
   mcpLedgerTools,
@@ -525,23 +225,6 @@ async function assertPlanForGatedTool(name: string): Promise<void> {
   throw new Error("この機能は有料プラン（月額490円）への加入が必要です");
 }
 
-/**
- * 保存済みの取引の科目を学習履歴に記録する。取引はすでに確定しているため、
- * 記録の失敗でツール全体を失敗にすると、クライアントの再実行で取引が
- * 二重に登録される。失敗は警告文として返す（成功なら null）。
- */
-async function recordClassificationAfterSave(
-  description: string,
-  category: string,
-): Promise<string | null> {
-  try {
-    await recordClassification(description, category);
-    return null;
-  } catch (e) {
-    console.warn(`[mcp] 分類の学習履歴に記録できませんでした: ${errorMessage(e)}`);
-    return `取引は保存しましたが、分類の学習履歴には記録できませんでした: ${errorMessage(e)}`;
-  }
-}
 
 /** MCP ツールの実行。例外は isError の結果として返す（呼び出し側で判断できるように）。 */
 export async function dispatchMcpTool(
@@ -551,229 +234,6 @@ export async function dispatchMcpTool(
   try {
     await assertPlanForGatedTool(name);
     switch (name) {
-      case "aggregate_year": {
-        const db = requireDb();
-        const year = yearArg(args);
-        const tx = await ledgerTransactions(db, year);
-        const b = aggregateIncome(tx);
-        const blue = blueDeduction(b.realEstateIncome, b.businessIncome, filingOptionsArg(args));
-        return textResult({
-          year,
-          count: tx.length,
-          business_revenue: b.businessRevenue,
-          business_expenses: b.businessExpenses,
-          business_income: b.businessIncome,
-          real_estate_revenue: b.realEstateRevenue,
-          real_estate_expenses: b.realEstateExpenses,
-          real_estate_income: b.realEstateIncome,
-          blue_deduction_real_estate: blue.realEstate,
-          blue_deduction_business: blue.business,
-          blue_deduction_total: blue.total,
-          business_income_after_blue: b.businessIncome - blue.business,
-          real_estate_income_after_blue: b.realEstateIncome - blue.realEstate,
-          category_totals: categoryTotals(tx),
-        });
-      }
-      case "consumption_tax": {
-        const db = requireDb();
-        const year = yearArg(args);
-        const tx = await ledgerTransactions(db, year);
-        const b = aggregateIncome(tx);
-        const rent = residentialRentTotal(tx);
-        const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
-        const methods = (["standard", "simplified", "special20"] as const).map((method) => {
-          const r = consumptionTax({
-            taxableSalesIncl: taxable,
-            nontaxableSalesIncl: nontaxable,
-            inputTax: method === "standard" ? estimateInputTax(tx) : 0,
-            method,
-          });
-          return {
-            method: r.method,
-            output_tax: r.outputTax,
-            input_tax: r.inputTax,
-            payable: r.payable,
-            detail: r.detail,
-          };
-        });
-        return textResult({
-          year,
-          taxable_sales_incl_tax: taxable,
-          nontaxable_sales_incl_tax: nontaxable,
-          methods,
-          note: "本則の仕入税額は経費からの概算です。正式には請求書等で確定してください。",
-        });
-      }
-      case "income_tax": {
-        const db = requireDb();
-        const year = yearArg(args);
-        const tx = await ledgerTransactions(db, year);
-        const agricultureInput = agricultureArg(args);
-        const agriculture =
-          agricultureInput && !isAgricultureEmpty(agricultureInput)
-            ? computeAgricultureStatement(agricultureInput)
-            : undefined;
-        const figures = computeCorrectedFigures(tx, year, {
-          ...filingOptionsArg(args),
-          agriculture: agricultureInput,
-        });
-        const manual = computeManualIncomes(
-          year,
-          salaryIncomeArg(args),
-          miscIncomeArg(args),
-          figures._detail.business_income +
-            figures._detail.real_estate_income +
-            figures._detail.agriculture_income,
-        );
-        const expandedInput = expandedIncomeArg(args);
-        const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
-        const baseTaxCredits = mergeTaxCreditInputs(args["tax_credits"]);
-        const result = computeIncomeTax({
-          year,
-          totalIncome:
-            figures._detail.business_income +
-            figures._detail.real_estate_income +
-            figures._detail.agriculture_income +
-            manual.total +
-            (expanded?.comprehensiveAddition ?? 0),
-          deductions: mergeDeductionInputs(args["deductions"]),
-          taxCredits: expanded ? resolveTaxCreditInputs(baseTaxCredits, expanded) : baseTaxCredits,
-          separateTaxation: expanded
-            ? { stockIncome: expanded.separateStockIncome, dividendIncome: expanded.separateDividendIncome }
-            : undefined,
-        });
-        return textResult({
-          ...result,
-          ...(expanded ? { expanded_income: expanded } : {}),
-          ...(agriculture ? { agriculture } : {}),
-        });
-      }
-      case "amendment_delta": {
-        const original = args["original"];
-        const corrected = args["corrected"];
-        if (
-          typeof original !== "object" || original === null ||
-          typeof corrected !== "object" || corrected === null
-        ) {
-          throw new Error("original と corrected の両方（JSONオブジェクト）が必要です");
-        }
-        const d = amendmentDelta(
-          original as Record<string, unknown>,
-          corrected as Record<string, unknown>,
-        );
-        return textResult({ year: d.year, field_diffs: d.fieldDiffs, tax_delta: d.taxDelta });
-      }
-      case "list_transactions": {
-        const db = requireDb();
-        const year = args["year"] === undefined ? undefined : yearArg(args);
-        const rows = await listTransactionRows(db, undefined, year);
-        return textResult({
-          count: rows.length,
-          transactions: rows.map(transactionToApi),
-        });
-      }
-      case "add_transaction": {
-        const db = requireDb();
-        const category = typeof args["category"] === "string" && args["category"] !== ""
-          ? args["category"]
-          : "未分類";
-        // String()/Number() で変換すると "undefined" や NaN がそのまま保存されるため、型を確かめてから使う。
-        const date = args["date"];
-        if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-          throw new Error("date は YYYY-MM-DD 形式で渡してください");
-        }
-        if (typeof args["description"] !== "string") {
-          throw new Error("description（摘要）は文字列で渡してください");
-        }
-        if (args["amount"] === undefined || args["amount"] === null) {
-          throw new Error("amount（符号つき税込金額）が必要です");
-        }
-        const fiscalYearArg = args["fiscal_year"];
-        const row = await insertTransactionRow(db, {
-          date,
-          fiscalYear:
-            typeof fiscalYearArg === "number" &&
-            Number.isInteger(fiscalYearArg) &&
-            fiscalYearArg >= 1900 &&
-            fiscalYearArg <= 2100
-              ? fiscalYearArg
-              : Number(date.slice(0, 4)),
-          description: args["description"],
-          amount: numArg(args, "amount"),
-          account: typeof args["account"] === "string" ? args["account"] : "",
-          category,
-          incomeType: parseIncomeType(args["income_type"]),
-          taxCategory: typeof args["tax_category"] === "string" ? args["tax_category"] : "",
-          businessRatioPercent: normalizeBusinessRatio(args["business_ratio_percent"]),
-          businessRatioBasis:
-            typeof args["business_ratio_basis"] === "string" ? args["business_ratio_basis"] : "",
-        });
-        if (!row) throw new Error("取引の登録に失敗しました");
-        const warning =
-          category !== "未分類" ? await recordClassificationAfterSave(row.description, category) : null;
-        return textResult({ transaction: transactionToApi(row), ...(warning ? { warning } : {}) });
-      }
-      case "update_transaction": {
-        const db = requireDb();
-        const id = idArg(args, "id");
-        const patch: Partial<TransactionRow> = {};
-        if (typeof args["date"] === "string") {
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(args["date"])) {
-            throw new Error("date は YYYY-MM-DD 形式で渡してください");
-          }
-          patch.date = args["date"];
-        }
-        if (
-          typeof args["fiscal_year"] === "number" &&
-          Number.isInteger(args["fiscal_year"]) &&
-          args["fiscal_year"] >= 1900 &&
-          args["fiscal_year"] <= 2100
-        ) {
-          patch.fiscalYear = args["fiscal_year"];
-        }
-        if (typeof args["description"] === "string") patch.description = args["description"];
-        if (args["amount"] !== undefined) patch.amount = numArg(args, "amount");
-        if (typeof args["account"] === "string") patch.account = args["account"];
-        if (typeof args["category"] === "string") patch.category = args["category"];
-        if (args["income_type"] !== undefined) patch.incomeType = parseIncomeType(args["income_type"]);
-        if (typeof args["tax_category"] === "string") patch.taxCategory = args["tax_category"];
-        if (typeof args["business_ratio_percent"] === "number") {
-          patch.businessRatioPercent = normalizeBusinessRatio(args["business_ratio_percent"]);
-        }
-        if (typeof args["business_ratio_basis"] === "string") {
-          patch.businessRatioBasis = args["business_ratio_basis"];
-        }
-        const row = await updateTransactionRow(db, id, patch);
-        if (!row) throw new Error(`取引が見つかりません: id=${id}`);
-        const warning =
-          patch.category !== undefined && patch.category !== "未分類"
-            ? await recordClassificationAfterSave(row.description, patch.category)
-            : null;
-        return textResult({ transaction: transactionToApi(row), ...(warning ? { warning } : {}) });
-      }
-      case "delete_transaction": {
-        const db = requireDb();
-        const id = idArg(args, "id");
-        const row = await deleteTransactionRow(db, id);
-        if (!row) throw new Error(`取引が見つかりません: id=${id}`);
-        return textResult({ deleted: transactionToApi(row) });
-      }
-      case "classify_account": {
-        const description = args["description"];
-        if (typeof description !== "string" || description === "") {
-          throw new Error("description（摘要）が必要です");
-        }
-        return textResult(await classifyAccount(description, await loadClassifyDeps()));
-      }
-      case "classify_feedback": {
-        const description = args["description"];
-        const account = args["account"];
-        if (typeof description !== "string" || description === "" || typeof account !== "string" || account === "") {
-          throw new Error("description（摘要）と account（勘定科目）が必要です");
-        }
-        await recordClassification(description, account);
-        return textResult({ ok: true });
-      }
       case "export_xtx": {
         const db = requireDb();
         const year = yearArg(args);
@@ -991,103 +451,6 @@ export async function dispatchMcpTool(
           full_deduction: result.fullDeduction,
           xtx,
         });
-      }
-      case "search_tax_knowledge": {
-        requireDb();
-        const query = typeof args["query"] === "string" ? args["query"] : "";
-        if (!query.trim()) throw new Error("query（検索キーワード）が必要です");
-        const limit =
-          typeof args["limit"] === "number" ? Math.min(10, Math.max(1, Math.trunc(args["limit"]))) : 5;
-        return textResult(await searchTaxKnowledge(query, limit));
-      }
-      case "register_fixed_asset": {
-        const db = requireDb();
-        const parsed = CreateFixedAssetRequestSchema.safeParse(args);
-        if (!parsed.success) {
-          throw new Error(
-            "固定資産の入力が不正です（取得価額・耐用年数は正の整数、事業専用割合は0〜100の整数、日付は YYYY-MM-DD）",
-          );
-        }
-        const body = parsed.data;
-        const row = await insertFixedAssetRow(db, {
-          name: body.name,
-          quantity: body.quantity ?? "",
-          incomeType: body.income_type ?? "business",
-          acquisitionDate: body.acquisition_date,
-          serviceStartDate: body.service_start_date ?? null,
-          cost: body.cost,
-          usefulLifeYears: body.useful_life_years,
-          method: body.method ?? "straight_line",
-          businessRatioPercent: body.business_ratio_percent ?? 100,
-          disposedDate: body.disposed_date ?? null,
-        });
-        return textResult({ asset: row ? fixedAssetToApi(row) : null });
-      }
-      case "list_fixed_assets": {
-        const db = requireDb();
-        const rows = await listFixedAssetRows(db);
-        return textResult({ assets: rows.map(fixedAssetToApi) });
-      }
-      case "get_depreciation": {
-        const db = requireDb();
-        const year = yearArg(args);
-        const rows = (await listFixedAssetRows(db)).filter((row) => isActiveInYear(row, year));
-        const detail = [];
-        const totals = { business: 0, real_estate: 0, agriculture: 0 };
-        for (const row of rows) {
-          const dep = depreciationForYear(fixedAssetToInput(row), year);
-          if (!dep) continue;
-          detail.push({
-            asset_id: row.id,
-            name: row.name,
-            income_type: row.incomeType,
-            months: dep.months,
-            opening_book_value: dep.openingBookValue,
-            basis_amount: dep.basisAmount,
-            rate: dep.rate,
-            guarantee_amount: dep.guaranteeAmount,
-            ordinary: dep.ordinary,
-            deductible: dep.deductible,
-            closing_book_value: dep.closingBookValue,
-          });
-          if (row.incomeType === "business") totals.business += dep.deductible;
-          if (row.incomeType === "real_estate") totals.real_estate += dep.deductible;
-          if (row.incomeType === "agriculture") totals.agriculture += dep.deductible;
-        }
-        return textResult({
-          year,
-          rows: detail,
-          deductible_totals: totals,
-          small_special: smallSpecialUsage(rows.map(fixedAssetToInput), year),
-        });
-      }
-      case "list_receipts": {
-        const db = requireDb();
-        const rows = await listReceiptRows(db);
-        return textResult({ receipts: rows.map(receiptToApi) });
-      }
-      case "link_receipt": {
-        const db = requireDb();
-        const fileId = args["file_id"];
-        if (typeof fileId !== "string" || !fileId) throw new Error("file_id が必要です");
-        const row = await linkReceiptRow(db, fileId, idArg(args, "transaction_id"));
-        return textResult({ receipt: row ? receiptToApi(row) : null });
-      }
-      case "get_filing_status": {
-        const db = requireDb();
-        const rows = await listFilingStatusRows(db);
-        return textResult({ statuses: rows.map(filingStatusToApi) });
-      }
-      case "set_filing_status": {
-        const db = requireDb();
-        const year = yearArg(args);
-        const row = await upsertFilingStatusRow(db, year, {
-          confirmed: typeof args["confirmed"] === "boolean" ? args["confirmed"] : undefined,
-          calculated: typeof args["calculated"] === "boolean" ? args["calculated"] : undefined,
-          submitted: typeof args["submitted"] === "boolean" ? args["submitted"] : undefined,
-        });
-        if (!row) throw new Error("申告ステータスの更新に失敗しました");
-        return textResult({ status: filingStatusToApi(row) });
       }
       default: {
         const domainHandler = DOMAIN_HANDLERS[name];

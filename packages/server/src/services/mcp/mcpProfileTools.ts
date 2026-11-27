@@ -1,15 +1,20 @@
 /**
- * mcpProfileTools.ts — MCP の申告プロフィール/申告入力/確定スナップショット
- * 系ツール（services/mcp）。
+ * mcpProfileTools.ts — MCP の申告プロフィール/申告入力/確定スナップショット/
+ * 申告ステータス系ツール（services/mcp）。
  *
  * REST の /api/taxpayer/{year}・/api/filing-inputs/{year}・
- * /api/filing-snapshots/{year} と同じリポジトリ・検証を使う。
+ * /api/filing-snapshots/{year}・/api/filing-status と同じリポジトリ・検証を使う。
  * プロフィールの保存は対象年への全体書き換え（REST と同じ意味論）。
  */
 import {
   getFilingInputRow,
   upsertFilingInputRow,
 } from "../../repositories/filingInputRepository";
+import {
+  filingStatusToApi,
+  listFilingStatusRows,
+  upsertFilingStatusRow,
+} from "../../repositories/filingStatusRepository";
 import {
   filingSnapshotToApi,
   insertFilingSnapshotRow,
@@ -105,6 +110,25 @@ export const mcpProfileTools: McpToolModule = {
         required: ["year"],
       },
     },
+    {
+      name: "get_filing_status",
+      description: "申告ステータス（確認・控除計算・提出の済み状態）を全年度分返す。",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "set_filing_status",
+      description: "指定年の申告ステータスを更新する。渡した項目だけが書き換わる（true で済み、false で未了）。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          year: yearProperty,
+          confirmed: { type: "boolean" },
+          calculated: { type: "boolean" },
+          submitted: { type: "boolean" },
+        },
+        required: ["year"],
+      },
+    },
   ],
   handlers: {
     get_taxpayer_profile: async (args) => {
@@ -194,6 +218,22 @@ export const mcpProfileTools: McpToolModule = {
       const year = yearArg(args);
       const rows = await listFilingSnapshotRows(db, year);
       return textResult({ snapshots: rows.map(filingSnapshotToApi) });
+    },
+    get_filing_status: async () => {
+      const db = requireDb();
+      const rows = await listFilingStatusRows(db);
+      return textResult({ statuses: rows.map(filingStatusToApi) });
+    },
+    set_filing_status: async (args) => {
+      const db = requireDb();
+      const year = yearArg(args);
+      const row = await upsertFilingStatusRow(db, year, {
+        confirmed: typeof args["confirmed"] === "boolean" ? args["confirmed"] : undefined,
+        calculated: typeof args["calculated"] === "boolean" ? args["calculated"] : undefined,
+        submitted: typeof args["submitted"] === "boolean" ? args["submitted"] : undefined,
+      });
+      if (!row) throw new Error("申告ステータスの更新に失敗しました");
+      return textResult({ status: filingStatusToApi(row) });
     },
   },
 };

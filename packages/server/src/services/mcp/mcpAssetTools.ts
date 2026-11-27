@@ -1,11 +1,12 @@
 /**
- * mcpAssetTools.ts — MCP の固定資産まわりの追加ツール（services/mcp）。
+ * mcpAssetTools.ts — MCP の固定資産まわりのツール（services/mcp）。
  *
- * 資産の更新・削除と、画像の添付/一覧/取り外し。REST の
+ * 資産の登録・一覧・更新・削除、減価償却の計算と、画像の添付/一覧/取り外し。REST の
  * /api/fixed-assets/{id} 系と同じリポジトリ/検証を使う。画像の添付は
  * REST の署名付きURLフローと違い、実体を Base64 で受けてサーバー側の
  * ストレージへ直接保存する（形式が画像でない場合は弾く）。
  */
+import { depreciationForYear, smallSpecialUsage } from "@etax/shared";
 import {
   createStorageClient,
   fixedAssetObjectKey,
@@ -16,7 +17,11 @@ import { isAllowedUploadContentType, normalizeContentType } from "../../lib/uplo
 import {
   deleteFixedAssetRow,
   fixedAssetToApi,
+  fixedAssetToInput,
   getFixedAssetRow,
+  insertFixedAssetRow,
+  isActiveInYear,
+  listFixedAssetRows,
   updateFixedAssetRow,
 } from "../../repositories/fixedAssetRepository";
 import {
@@ -26,8 +31,18 @@ import {
   insertFixedAssetImageRow,
   listFixedAssetImageRows,
 } from "../../repositories/fixedAssetImageRepository";
-import { UpdateFixedAssetRequestSchema } from "../../schemas/fixedAsset";
-import { McpToolModule, idArg, requireDb, textResult } from "./mcpToolKit";
+import {
+  CreateFixedAssetRequestSchema,
+  UpdateFixedAssetRequestSchema,
+} from "../../schemas/fixedAsset";
+import {
+  McpToolModule,
+  idArg,
+  requireDb,
+  textResult,
+  yearArg,
+  yearProperty,
+} from "./mcpToolKit";
 
 const assetPatchProperties = {
   name: { type: "string", description: "資産の名称等" },
@@ -116,6 +131,50 @@ export const mcpAssetTools: McpToolModule = {
         type: "object",
         properties: { file_id: { type: "string", description: "画像のファイルID" } },
         required: ["file_id"],
+      },
+    },
+    {
+      name: "register_fixed_asset",
+      description:
+        "固定資産台帳に資産を登録する。method は straight_line（定額法）/ declining_balance（定率法200%）/ lump_sum（一括償却資産）/ small_special（少額減価償却資産の特例）から選ぶ。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "資産の名称等" },
+          quantity: { type: "string", description: "面積又は数量（任意）" },
+          income_type: { type: "string", enum: ["business", "real_estate", "agriculture"], description: "所得区分（既定 business）" },
+          acquisition_date: { type: "string", description: "取得年月日（YYYY-MM-DD）" },
+          service_start_date: { type: "string", description: "事業供用年月日（任意、省略時は取得日）" },
+          cost: { type: "integer", description: "取得価額（円、正の整数）" },
+          useful_life_years: { type: "integer", description: "耐用年数（年、1以上の整数）" },
+          method: {
+            type: "string",
+            enum: ["straight_line", "declining_balance", "lump_sum", "small_special"],
+            description: "償却方法（既定 straight_line）",
+          },
+          business_ratio_percent: {
+            type: "integer",
+            minimum: 0,
+            maximum: 100,
+            description: "事業専用割合 0〜100の整数（既定100）",
+          },
+        },
+        required: ["name", "acquisition_date", "cost", "useful_life_years"],
+      },
+    },
+    {
+      name: "list_fixed_assets",
+      description: "固定資産台帳の一覧を返す。",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "get_depreciation",
+      description:
+        "指定年の減価償却を台帳から計算する（資産ごとの普通償却費・必要経費算入額・未償却残高と、所得区分ごとの合計、少額特例の年間300万円上限の使用状況）。",
+      inputSchema: {
+        type: "object",
+        properties: { year: yearProperty },
+        required: ["year"],
       },
     },
   ],
@@ -225,6 +284,67 @@ export const mcpAssetTools: McpToolModule = {
         file_id: fileId,
         mime_type: downloaded.mimeType,
         content_base64: downloaded.dataBase64,
+      });
+    },
+    register_fixed_asset: async (args) => {
+      const db = requireDb();
+      const parsed = CreateFixedAssetRequestSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new Error(
+          "固定資産の入力が不正です（取得価額・耐用年数は正の整数、事業専用割合は0〜100の整数、日付は YYYY-MM-DD）",
+        );
+      }
+      const body = parsed.data;
+      const row = await insertFixedAssetRow(db, {
+        name: body.name,
+        quantity: body.quantity ?? "",
+        incomeType: body.income_type ?? "business",
+        acquisitionDate: body.acquisition_date,
+        serviceStartDate: body.service_start_date ?? null,
+        cost: body.cost,
+        usefulLifeYears: body.useful_life_years,
+        method: body.method ?? "straight_line",
+        businessRatioPercent: body.business_ratio_percent ?? 100,
+        disposedDate: body.disposed_date ?? null,
+      });
+      return textResult({ asset: row ? fixedAssetToApi(row) : null });
+    },
+    list_fixed_assets: async () => {
+      const db = requireDb();
+      const rows = await listFixedAssetRows(db);
+      return textResult({ assets: rows.map(fixedAssetToApi) });
+    },
+    get_depreciation: async (args) => {
+      const db = requireDb();
+      const year = yearArg(args);
+      const rows = (await listFixedAssetRows(db)).filter((row) => isActiveInYear(row, year));
+      const detail = [];
+      const totals = { business: 0, real_estate: 0, agriculture: 0 };
+      for (const row of rows) {
+        const dep = depreciationForYear(fixedAssetToInput(row), year);
+        if (!dep) continue;
+        detail.push({
+          asset_id: row.id,
+          name: row.name,
+          income_type: row.incomeType,
+          months: dep.months,
+          opening_book_value: dep.openingBookValue,
+          basis_amount: dep.basisAmount,
+          rate: dep.rate,
+          guarantee_amount: dep.guaranteeAmount,
+          ordinary: dep.ordinary,
+          deductible: dep.deductible,
+          closing_book_value: dep.closingBookValue,
+        });
+        if (row.incomeType === "business") totals.business += dep.deductible;
+        if (row.incomeType === "real_estate") totals.real_estate += dep.deductible;
+        if (row.incomeType === "agriculture") totals.agriculture += dep.deductible;
+      }
+      return textResult({
+        year,
+        rows: detail,
+        deductible_totals: totals,
+        small_special: smallSpecialUsage(rows.map(fixedAssetToInput), year),
       });
     },
   },
