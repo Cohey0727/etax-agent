@@ -12,15 +12,15 @@
  */
 import {
   buildCashFlowReport,
+  CashFlowReceiptInput,
+  CashFlowReport,
   defaultCashFlowOptions,
-  type CashFlowReceiptInput,
-  type CashFlowReport,
 } from "@etax/shared";
-import type { Db } from "../../lib/db";
+import { Db } from "../../lib/db";
 import { listCorrectedInvoiceIds, listInvoiceRows } from "../../repositories/invoiceRepository";
 import { settlementSummaries } from "../../repositories/reconciliationRepository";
 import { listTransactionRows } from "../../repositories/transactionRepository";
-import type {
+import {
   CashFlowReceiptResponse,
   CashFlowReportResponse,
   CashFlowScheduledReceiptResponse,

@@ -19,8 +19,8 @@ import {
   getBusinessStartInputRow,
   upsertBusinessStartInputRow,
 } from "../src/repositories/businessStartRepository";
-import type { BusinessStartInputs } from "../src/schemas/businessStart";
-import type { TaxpayerProfile } from "../src/schemas/taxpayer";
+import { BusinessStartInputs } from "../src/schemas/businessStart";
+import { TaxpayerProfile } from "../src/schemas/taxpayer";
 import {
   buildBlueReturnFormValues,
   buildOpeningNoticeFormValues,

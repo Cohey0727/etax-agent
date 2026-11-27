@@ -21,7 +21,7 @@ import {
   insertTransactionRow,
 } from "../src/repositories/transactionRepository";
 import { createApiKey, createUser } from "../src/repositories/userRepository";
-import type { Db } from "../src/lib/db";
+import { Db } from "../src/lib/db";
 
 const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ?? "postgres://etax:etax@127.0.0.1:5432/etaxagent_test";
