@@ -152,7 +152,7 @@ export const importCsvHandler: RouteHandler<typeof importCsvRoute> = async (c) =
     count: effectiveTransactions.length,
     totalRows: parsed.totalRows,
     skippedRows: parsed.skippedRows,
-    duplicatesSkipped: parsed.duplicatesSkipped + alreadyImported,
+    duplicatesSkipped: alreadyImported,
     persisted,
     importId: importId ?? null,
     persistWarning: persistWarning ?? null,

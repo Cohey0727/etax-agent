@@ -111,7 +111,7 @@ export const mcpImportTools: McpToolModule = {
         count: deduped.fresh.length,
         totalRows: parsed.totalRows,
         skippedRows: parsed.skippedRows,
-        duplicatesSkipped: parsed.duplicatesSkipped + deduped.duplicates,
+        duplicatesSkipped: deduped.duplicates,
         persisted: true,
         importId,
         transactions: deduped.fresh.slice(0, 500),

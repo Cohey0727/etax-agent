@@ -163,7 +163,7 @@ const MAPPING_SYSTEM_PROMPT = `あなたは銀行・カード明細CSVの「列�
 {"dateColumn":null,"descriptionColumn":null,"amountColumn":null,"debitColumn":null,"creditColumn":null,"balanceColumn":null,"accountColumn":null,"categoryColumn":null,"incomeTypeColumn":null,"taxCategoryColumn":null,"dateFormat":"YYYY/MM/DD","amountSign":"as-is"}`;
 
 /** LLMの応答JSONを検証して CsvMapping にする。不正なら null（呼び出し側がヒューリスティクスへ落とす）。 */
-export function validateAiMapping(raw: unknown, headers: string[]): CsvMapping | null {
+function validateAiMapping(raw: unknown, headers: string[]): CsvMapping | null {
   if (typeof raw !== "object" || raw === null) return null;
   const o = raw as Record<string, unknown>;
   const headerSet = new Set(headers);

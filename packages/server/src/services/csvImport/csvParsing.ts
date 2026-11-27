@@ -6,7 +6,7 @@
  * ファイル内の同一行はここでは落とさない（同日・同額の正当な別取引が
  * あり得るため）。重複の除外は DB との多重集合突合（importDedupe）が担う。
  */
-import { classifyTransactionRow, parseCsv, Transaction } from "@etax/shared";
+import { classifyTransactionRow, Transaction } from "@etax/shared";
 import { CsvMapping } from "../../schemas/importCsv";
 import { parseAmountCell, parseDateCell } from "./csvCellParsing";
 
@@ -14,9 +14,6 @@ export interface ParseResult {
   transactions: Transaction[];
   /** 日付や金額が読めず読み飛ばした行数 */
   skippedRows: number;
-  /** 重複として除外した行数（パース段階では落とさないため常に0。
-   * 呼び出し側が DB 突合で除外した件数を加算して報告する） */
-  duplicatesSkipped: number;
   /** データ行の総数（ヘッダー除く） */
   totalRows: number;
 }
@@ -49,7 +46,6 @@ export function parseWithMapping(
   const cell = (row: string[], i: number): string => (i >= 0 ? (row[i] ?? "") : "");
   const transactions: Transaction[] = [];
   let skippedRows = 0;
-  const duplicatesSkipped = 0;
 
   for (const row of dataRows) {
     if (row.every((c) => c.trim() === "")) continue; // 完全な空行は数えない
@@ -107,13 +103,5 @@ export function parseWithMapping(
     transactions.push(tx);
   }
   transactions.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  return { transactions, skippedRows, duplicatesSkipped, totalRows: dataRows.length };
-}
-
-/** デコード済みテキストから (ヘッダー, データ行) を取り出す。 */
-export function splitHeader(text: string): { headers: string[]; dataRows: string[][] } {
-  const rows = parseCsv(text);
-  if (rows.length === 0) throw new Error("CSVが空です");
-  const headers = (rows[0] as string[]).map((h) => h.trim());
-  return { headers, dataRows: rows.slice(1) };
+  return { transactions, skippedRows, totalRows: dataRows.length };
 }

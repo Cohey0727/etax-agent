@@ -85,6 +85,5 @@ describe("parseWithMapping", () => {
     ];
     const result = parseWithMapping(rows, mapping, "テスト銀行");
     expect(result.transactions).toHaveLength(2);
-    expect(result.duplicatesSkipped).toBe(0);
   });
 });

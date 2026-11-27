@@ -135,7 +135,7 @@ export function drawMultilineText(
 }
 
 /** 枠幅に合わせて文字単位で折り返す簡易ラッパー（日本語は禁則処理なし）。 */
-export function wrapText(
+function wrapText(
   ctx: DrawContext,
   text: string,
   size: number,
@@ -179,34 +179,5 @@ export function drawCircle(
     yScale: ryRatio * ctx.height,
     borderColor: FORM_INK,
     borderWidth: 1.1 * ctx.scale,
-  });
-}
-
-/**
- * 「□」の選択欄へチェック（レ点）を描く。中心と一辺はページ寸法に
- * 対する比率。フォントに依存しないよう線分で描く。
- */
-export function drawCheck(
-  ctx: DrawContext,
-  cxRatio: number,
-  cyTopRatio: number,
-  sizeRatio: number,
-): void {
-  const cx = cxRatio * ctx.width;
-  const cy = ctx.height * (1 - cyTopRatio);
-  const w = sizeRatio * ctx.width;
-  const h = sizeRatio * ctx.height;
-  const width = 1.4 * ctx.scale;
-  ctx.page.drawLine({
-    start: { x: cx - w * 0.42, y: cy + h * 0.02 },
-    end: { x: cx - w * 0.1, y: cy - h * 0.34 },
-    thickness: width,
-    color: FORM_INK,
-  });
-  ctx.page.drawLine({
-    start: { x: cx - w * 0.1, y: cy - h * 0.34 },
-    end: { x: cx + w * 0.46, y: cy + h * 0.38 },
-    thickness: width,
-    color: FORM_INK,
   });
 }

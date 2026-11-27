@@ -54,7 +54,7 @@ function receiptToApi(receipt: CashFlowReceiptInput): CashFlowReceiptResponse {
 }
 
 /** shared の計算結果を API 形式（snake_case）へ変換する。 */
-export function cashFlowReportToApi(report: CashFlowReport): CashFlowReportResponse {
+function cashFlowReportToApi(report: CashFlowReport): CashFlowReportResponse {
   return {
     from_month: report.fromMonth,
     to_month: report.toMonth,

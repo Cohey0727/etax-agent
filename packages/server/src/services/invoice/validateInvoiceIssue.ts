@@ -10,7 +10,7 @@ import { InvoiceIssuer } from "../../schemas/invoice";
 import { TaxpayerProfile } from "../../schemas/taxpayer";
 
 /** 適格請求書発行事業者の登録番号の形式（T＋数字13桁）。 */
-export const INVOICE_NUMBER_PATTERN = /^T\d{13}$/;
+const INVOICE_NUMBER_PATTERN = /^T\d{13}$/;
 
 /** 適格請求書に記載できる税率（標準10%・軽減8%・対象外0%）。 */
 const QUALIFIED_TAX_RATES: readonly number[] = [10, 8, 0];
