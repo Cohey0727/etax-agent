@@ -15,9 +15,8 @@ import {
   insertInvoice,
   InvoiceHeaderDraft,
   InvoiceLineDraft,
+  issueInvoiceRow,
   listInvoiceLines,
-  markInvoiceIssued,
-  nextDocumentNumber,
   updateInvoice,
 } from "../../repositories/invoiceRepository";
 import {
@@ -138,9 +137,8 @@ export async function issueInvoiceDocument(db: Db, id: number): Promise<InvoiceR
   if (problems.length > 0) {
     throw new InvoiceDocumentError(400, problems.join("／"));
   }
-  const documentNumber = await nextDocumentNumber(db, row.issueDate);
   const issuer = buildIssuerSnapshot(profile, row.isQualified);
-  const issued = await markInvoiceIssued(db, id, documentNumber, issuer);
+  const issued = await issueInvoiceRow(db, id, row.issueDate, issuer);
   if (!issued) throw new InvoiceDocumentError(400, "すでに発行済みです");
   return fetchInvoiceResponse(db, issued);
 }

@@ -7,7 +7,7 @@
  * 発行済み帳票は不変: 更新・削除は下書きに限ることを呼び出し側（usecases）が
  * 担保し、リポジトリの発行処理は status = draft の行にだけ効く条件で守る。
  */
-import { and, asc, desc, eq, gte, ilike, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import {
   computeInvoiceTotals,
   invoiceLineAmount,
@@ -294,7 +294,7 @@ export async function deleteInvoice(db: Db, id: number): Promise<boolean> {
  * 発行時の採番を決める。所有者のその暦年に発行済みの件数＋1 を
  * 「YYYY-0001」形式にする。
  */
-export async function nextDocumentNumber(db: Db, issueDate: string): Promise<string> {
+export async function nextDocumentNumber(db: DbOrTx, issueDate: string): Promise<string> {
   const year = issueDate.slice(0, 4);
   const owner = currentUserId();
   const conditions = [eq(documentsTable.status, "issued"), gte(documentsTable.issueDate, `${year}-01-01`), lte(documentsTable.issueDate, `${year}-12-31`)];
@@ -321,7 +321,7 @@ export async function fetchInvoiceResponse(db: Db, row: DocumentRow): Promise<In
 
 /** 下書きを発行済みにする（採番と発行者スナップショットを凍結する）。 */
 export async function markInvoiceIssued(
-  db: Db,
+  db: DbOrTx,
   id: number,
   documentNumber: string,
   issuer: InvoiceIssuer,
@@ -337,4 +337,24 @@ export async function markInvoiceIssued(
     .where(and(invoiceIdCondition(id), eq(documentsTable.status, "draft")))
     .returning();
   return updated[0] ?? null;
+}
+
+/**
+ * 下書きを採番して発行済みにする。採番（発行済みの件数＋1）は件数を数えて
+ * 決めるため、採番から発行までを1トランザクションにし、所有者×年の
+ * アドバイザリロックで同時の発行を直列にする（番号の重複を防ぐ）。
+ * 下書きでなければ（同時の発行で先に発行済みになった場合も）null。
+ */
+export async function issueInvoiceRow(
+  db: Db,
+  id: number,
+  issueDate: string,
+  issuer: InvoiceIssuer,
+): Promise<DocumentRow | null> {
+  const lockKey = `invoice-document-number:${currentUserId() ?? "all"}:${issueDate.slice(0, 4)}`;
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+    const documentNumber = await nextDocumentNumber(tx, issueDate);
+    return markInvoiceIssued(tx, id, documentNumber, issuer);
+  });
 }

@@ -21,6 +21,10 @@ import { upsertTaxpayerProfileRow } from "../src/repositories/taxpayerRepository
 import { emptyTaxpayerProfile } from "../src/repositories/taxpayerRepository";
 import { buildInvoicePdf } from "../src/services/pdf/buildInvoicePdf";
 import {
+  InvoiceDocumentError,
+  issueInvoiceDocument,
+} from "../src/services/invoice/invoiceDocuments";
+import {
   buildIssuerSnapshot,
   validateInvoiceIssue,
 } from "../src/services/invoice/validateInvoiceIssue";
@@ -107,6 +111,34 @@ describe("請求書リポジトリ", () => {
     expect(invoice.corrects_document_id).toBe(source!.id);
     expect(invoice.corrects_document_number).toBe("2026-0001");
     expect(invoice.status).toBe("draft");
+  });
+});
+
+describe("請求書の発行（採番）", () => {
+  test("下書きを同時に発行しても帳票番号は重複せず、連番になる", async () => {
+    const db = await createTestDb();
+    const drafts = await Promise.all(
+      Array.from({ length: 10 }, () => insertInvoice(db, header({ is_qualified: false }), lines, null)),
+    );
+    const issued = await Promise.all(drafts.map((draft) => issueInvoiceDocument(db, draft!.id)));
+    const numbers = issued.map((invoice) => invoice.document_number ?? "").sort();
+    expect(numbers).toEqual(
+      Array.from({ length: 10 }, (_, i) => `2026-${String(i + 1).padStart(4, "0")}`),
+    );
+  });
+
+  test("同じ下書きを同時に発行しても1回だけ発行され、番号を消費しない", async () => {
+    const db = await createTestDb();
+    const draft = await insertInvoice(db, header({ is_qualified: false }), lines, null);
+    const results = await Promise.allSettled([
+      issueInvoiceDocument(db, draft!.id),
+      issueInvoiceDocument(db, draft!.id),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((r) => r.status === "rejected");
+    expect(rejected?.status === "rejected" && rejected.reason).toBeInstanceOf(InvoiceDocumentError);
+    const next = await insertInvoice(db, header({ is_qualified: false }), lines, null);
+    expect((await issueInvoiceDocument(db, next!.id)).document_number).toBe("2026-0002");
   });
 });
 
