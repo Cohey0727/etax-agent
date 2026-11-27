@@ -10,6 +10,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { sql } from "drizzle-orm";
 import { serverDataDir } from "../src/lib/config";
+import { createSession, createUser } from "../src/repositories/userRepository";
 import { createTestDb } from "./testDb";
 
 const testDatabaseUrl =
@@ -404,5 +405,30 @@ describe("ボディの上限", () => {
     });
     expect(r.status).toBe(413);
     expect(String(r.body["error"])).not.toBe("");
+  });
+});
+
+describe("freee 試算表の所有者別ファイル", () => {
+  test("既定ユーザーと文脈なしは無印、他の所有者は -<ID> のファイルを読む", async () => {
+    const db = await createTestDb();
+    const first = await createUser(db, "freee-1@example.com", "password-123");
+    const second = await createUser(db, "freee-2@example.com", "password-123");
+    expect(first.id).toBe(1);
+    const dir = serverDataDir();
+    await writeFile(join(dir, "freee-trial-balance.json"), JSON.stringify({ source: "shared", years: [] }));
+    await writeFile(
+      join(dir, `freee-trial-balance-${second.id}.json`),
+      JSON.stringify({ source: "second", years: [] }),
+    );
+    const anonymous = await req("/api/freee/trial-balance");
+    expect(anonymous.body["source"]).toBe("shared");
+    const asFirst = await req("/api/freee/trial-balance", {
+      headers: { Cookie: `etax_session=${await createSession(db, first.id)}` },
+    });
+    expect(asFirst.body["source"]).toBe("shared");
+    const asSecond = await req("/api/freee/trial-balance", {
+      headers: { Cookie: `etax_session=${await createSession(db, second.id)}` },
+    });
+    expect(asSecond.body["source"]).toBe("second");
   });
 });
