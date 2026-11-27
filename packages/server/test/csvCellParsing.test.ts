@@ -28,6 +28,20 @@ describe("parseDateCell", () => {
   test("実在しない日付は null", () => {
     expect(parseDateCell("2024-02-30")).toBeNull();
   });
+
+  test("和暦の略記（R・H と区切り記号）を西暦に直す", () => {
+    expect(parseDateCell("R06.01.05")).toBe("2024-01-05");
+    expect(parseDateCell("R6.1.5")).toBe("2024-01-05");
+    expect(parseDateCell("r6/1/5")).toBe("2024-01-05");
+    expect(parseDateCell("H31.4.30")).toBe("2019-04-30");
+    expect(parseDateCell("R元.5.1")).toBe("2019-05-01");
+    expect(parseDateCell("令和6/1/5")).toBe("2024-01-05");
+  });
+
+  test("2桁年の表記は先頭から読み、文字の後ろの数字を年とみなさない", () => {
+    expect(parseDateCell("24/1/5")).toBe("2024-01-05");
+    expect(parseDateCell("X31.4.30")).toBeNull();
+  });
 });
 
 describe("parseAmountCell", () => {
