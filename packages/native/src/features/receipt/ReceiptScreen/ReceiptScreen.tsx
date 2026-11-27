@@ -21,6 +21,8 @@ interface ReceiptDraft {
   description: string;
   account: string;
   classification: AnalyzeReceiptResponse["classification"];
+  /** 解析時に証憑台帳へ記録されたファイル。記録されていなければ null。 */
+  fileId: string | null;
 }
 
 /** 領収書画面。撮影/選択→解析→確認・修正→帳簿登録＋証憑紐付けと、証憑ライブラリ。 */
@@ -50,7 +52,7 @@ export function ReceiptScreen() {
     setLoading(true); setError(null); setAdded(false); setLinkNote(null); setDraft(null);
     setPreviewUri(asset.uri);
     try {
-      const res = await analyzeReceiptImage(asset.uri, asset.mimeType ?? "image/jpeg");
+      const { result: res, fileId } = await analyzeReceiptImage(asset.uri, asset.mimeType ?? "image/jpeg");
       const description = [res.payee, res.description].filter(Boolean).join(" ");
       setDraft({
         date: res.date ?? "",
@@ -58,6 +60,7 @@ export function ReceiptScreen() {
         description,
         account: res.classification.account,
         classification: res.classification,
+        fileId,
       });
       await reloadLibrary();
     } catch (e) {
@@ -100,21 +103,18 @@ export function ReceiptScreen() {
         business_ratio_percent: 100,
       }));
       void recordClassificationFeedback(draft.description, draft.account);
-      // 解析時に証憑台帳へ記録された未紐付けの最新証憑を、この取引へ紐付ける
-      const list = await fetchReceipts().catch(() => null);
-      const candidate = (list ?? [])
-        .filter((r) => r.transaction_id === null)
-        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-      if (candidate) {
+      if (draft.fileId) {
         try {
-          await linkReceipt(candidate.file_id, created.id);
+          await linkReceipt(draft.fileId, created.id);
           setLinkNote("証憑を取引に紐付けました。");
         } catch {
           setLinkNote("証憑の紐付けに失敗しました。下の一覧から手動で紐付けてください。");
         }
       } else {
-        setLinkNote("紐付け対象の証憑が見つかりませんでした（Base64経路では証憑台帳に残らない場合があります）。");
+        setLinkNote("この画像は証憑の一覧に残っていないため、取引に紐付けていません。");
       }
+      // 同じ下書きで二重に登録しないよう、登録したら下書きを閉じる
+      setDraft(null);
       await reloadLedger();
       await reloadLibrary();
       setAdded(true);

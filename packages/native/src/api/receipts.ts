@@ -1,7 +1,7 @@
 /**
  * receipts.ts — 領収書（証憑）の解析・一覧・紐付けのAPI。
  * 解析は署名付きURLでアップロードしてファイルIDで依頼し、
- * 使えない場合は画像を Base64 で直接渡す経路にフォールバックする。
+ * アップロードできない場合は画像を Base64 で直接渡す。
  */
 import { apiJson, apiJsonOrNull, ApiError } from "./client";
 import { readLocalFileBytes, uploadViaPresignedUrl, UPLOADABLE_IMAGE_TYPES } from "./files";
@@ -23,29 +23,37 @@ function encodeBase64(bytes: Uint8Array): string {
   return out;
 }
 
+/** 領収書の解析結果と、証憑台帳に記録されたファイルID（Base64 経路では記録されないので null）。 */
+export interface AnalyzedReceipt {
+  result: AnalyzeReceiptResponse;
+  fileId: string | null;
+}
+
 /**
  * 領収書画像（端末上のURI）を読み取り、科目判定まで済んだ下書きを返す。
+ * Base64 の直接渡しへ落とすのは、ファイルをアップロードできなかったときだけ。
+ * 解析そのものの失敗はやり直さずに返す（同じ画像で解析を2回走らせない）。
  */
 export async function analyzeReceiptImage(
   uri: string,
   mimeType: string,
-): Promise<AnalyzeReceiptResponse> {
+): Promise<AnalyzedReceipt> {
   const bytes = await readLocalFileBytes(uri);
   if (UPLOADABLE_IMAGE_TYPES.includes(mimeType)) {
-    try {
-      const fileId = await uploadViaPresignedUrl(bytes, mimeType);
-      return await apiJson<AnalyzeReceiptResponse>("/api/receipts/analyze", {
+    const fileId = await uploadViaPresignedUrl(bytes, mimeType).catch(() => null);
+    if (fileId) {
+      const result = await apiJson<AnalyzeReceiptResponse>("/api/receipts/analyze", {
         method: "POST",
         body: { fileId },
       });
-    } catch {
-      // アップロード経路が使えない場合は Base64 の直接渡しに落とす
+      return { result, fileId };
     }
   }
-  return apiJson<AnalyzeReceiptResponse>("/api/receipts/analyze", {
+  const result = await apiJson<AnalyzeReceiptResponse>("/api/receipts/analyze", {
     method: "POST",
     body: { imageBase64: encodeBase64(bytes), mimeType },
   });
+  return { result, fileId: null };
 }
 
 /** 証憑の一覧を取得する。DB未接続の場合は null。 */
