@@ -66,10 +66,27 @@ function matchRows(rows: TransactionRow[], args: UpdateTransactionsArgs): Transa
 }
 
 /**
+ * 文字列の引数を、前後の空白を除いて空なら未指定として扱う。
+ * LLM は任意の文字列引数を空文字で埋めることがあり、空文字を「指定あり」と
+ * 読むと、絞り込みなしの全件変更や科目の空文字上書きになるため。
+ */
+function presentText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/**
  * 条件に合う取引へ科目・区分・税区分を一括で付け替える。
  * 条件不足・対象なし・上限超過は Error を投げる（呼び出し側で LLM へ返す）。
  */
-export async function updateTransactionsBulk(args: UpdateTransactionsArgs) {
+export async function updateTransactionsBulk(rawArgs: UpdateTransactionsArgs) {
+  const args: UpdateTransactionsArgs = {
+    ...rawArgs,
+    keyword: presentText(rawArgs.keyword),
+    category: presentText(rawArgs.category),
+    setCategory: presentText(rawArgs.setCategory),
+    setTaxCategory: presentText(rawArgs.setTaxCategory),
+  };
   const db = getDb();
   if (!db) throw new Error("帳簿DBが利用できないため、取引を変更できませんでした");
   const hasCriterion =
