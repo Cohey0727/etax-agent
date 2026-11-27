@@ -220,13 +220,13 @@ const BalanceSheetEditor = ({
             {sheet.opening_balanced ? null : (
               <Text>
                 期首の貸借が一致していません（差額{" "}
-                {formatYen(sheet.opening_assets - sheet.opening_liabilities_capital)}円）。
+                {formatYen(sheet.opening_assets - sheet.opening_liabilities_capital)}）。
               </Text>
             )}
             {sheet.closing_balanced ? null : (
               <Text>
                 期末の貸借が一致していません（差額{" "}
-                {formatYen(sheet.closing_assets - sheet.closing_liabilities_capital)}円）。
+                {formatYen(sheet.closing_assets - sheet.closing_liabilities_capital)}）。
               </Text>
             )}
             <Text>このまま保存はできますが、XTX出力ではエラーになります。</Text>
