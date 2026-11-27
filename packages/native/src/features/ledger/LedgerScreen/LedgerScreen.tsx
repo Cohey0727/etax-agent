@@ -53,13 +53,16 @@ export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScr
     () => (ledgerRows ?? []).filter((r) => r.fiscal_year === year).sort((a, b) => a.date.localeCompare(b.date)),
     [ledgerRows, year],
   );
+  // 絞り込みの候補はこの年度の取引にある値。選択中でこの年度に無い値も候補に残し、
+  // 年度を切り替えた後も何で絞っているかが見えて外せるようにする。
   const categories = useMemo(
-    () => [...new Set(yearRows.map((r) => r.category))].sort(),
-    [yearRows],
+    () => [...new Set([...yearRows.map((r) => r.category), ...filters.categories])].sort(),
+    [yearRows, filters.categories],
   );
   const taxCategories = useMemo(
-    () => [...new Set(yearRows.map((r) => r.tax_category))].sort(),
-    [yearRows],
+    () =>
+      [...new Set([...yearRows.map((r) => r.tax_category), ...filters.taxCategories])].sort(),
+    [yearRows, filters.taxCategories],
   );
   const visible = useMemo(
     () => applyLedgerFilters(yearRows, filters),
