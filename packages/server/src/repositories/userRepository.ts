@@ -33,7 +33,7 @@ export async function getUserByEmail(db: Db, email: string): Promise<UserRow | u
  * ユーザーを作る。パスワードは Bun.password（argon2id）でハッシュ化する。
  * emailVerified は呼び出し側が決める: パスワード登録はメール所有を
  * 証明していないため、SaaS 運用では確認メールを経るまで false を渡す。
- * それ以外の経路（ローカル運用など）は従来どおり true。
+ * それ以外の経路（ローカル運用など）は true。
  */
 export async function createUser(
   db: Db,
@@ -368,7 +368,7 @@ export async function revokeApiKeyRow(
 }
 
 /**
- * 期限切れのセッションと各種トークンを削除する（Issue #11: 定期掃除）。
+ * 期限切れのセッションと各種トークンを削除する（定期掃除）。
  * 放置するとテーブルが単調に増え続けるため、起動時と定期実行で呼ぶ。
  * 削除した件数を返す。
  */

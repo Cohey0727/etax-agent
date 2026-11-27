@@ -1,11 +1,10 @@
 /**
  * agentModelGateway.ts — 対話エージェント用 LLM への接続点（gateways）。
  *
- * 外部APIの呼び方（CODING_CONVENTIONS_BACKEND「Gateways」）の選択理由:
- *   接続先は AGENT_BASE_URL で差し替え可能な OpenAI互換エンドポイント
- *   （OpenCode Go 等）と Anthropic Messages API の2系統。ツール呼び出しを
- *   含む会話制御は Vercel AI SDK に任せ（公式SDKに相当する第1選択肢）、
- *   ここでは設定 → LanguageModel の生成だけを担う。
+ * 接続先は AGENT_BASE_URL で差し替え可能な OpenAI互換エンドポイント
+ * （OpenCode Go 等）と Anthropic Messages API の2系統。ツール呼び出しを
+ * 含む会話制御は Vercel AI SDK に任せ、ここでは設定 → LanguageModel の
+ * 生成だけを担う。
  *
  * 送信ヘッダーの注意（互換性要件）:
  *   - User-Agent は USER_AGENT を明示する（userAgent.ts）。

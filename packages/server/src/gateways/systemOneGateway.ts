@@ -6,8 +6,8 @@
  *   POST {baseUrl}/v1/systemone
  *   { state, questions: { <名前>: { type: "choice", instructions, criteria } }, model? }
  * 接続先は差し替え可能（TypeSafe Jev / Liquid d1 / Ollama の判定モデル /
- * sokudan の互換サーバー等）。公式SDKは接続先ごとに存在しないため、
- * llmGateway と同じく規約の第3選択肢「fetch＋zod検証」を採用する。
+ * sokudan の互換サーバー等）。接続先ごとの公式SDKも OpenAPI スキーマも
+ * 無いため、fetch で呼び、応答は zod で検証する。
  * 応答形式は実装ごとに揺れがあるため、確率分布の在り処をゆるく検証して吸収する。
  */
 import { z } from "@hono/zod-openapi";

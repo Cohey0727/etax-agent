@@ -13,7 +13,7 @@ import { Db, DbOrTx } from "../lib/db";
 
 /**
  * バルク INSERT のチャンク幅。PostgreSQL のパラメータ上限（65,535）に
- * 達しないよう、1回の INSERT はこの件数までに区切る（Issue #11）。
+ * 達しないよう、1回の INSERT はこの件数までに区切る。
  */
 export const BULK_INSERT_CHUNK_SIZE = 1000;
 
@@ -38,7 +38,7 @@ import {
 
 /**
  * 取引の割り当て年度。fiscal_year が未設定（0）の行は日付の年として扱う
- * （移行直後・直接投入された行への保険。ensureTables が起動時に埋める）。
+ * （年度を指定せずに入った行への保険。ensureTables が起動時に埋める）。
  */
 export function effectiveFiscalYear(row: { fiscalYear: number; date: string }): number {
   return row.fiscalYear || Number(row.date.slice(0, 4)) || 0;

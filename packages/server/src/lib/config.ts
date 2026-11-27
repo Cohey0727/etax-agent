@@ -169,7 +169,7 @@ export function getRegexRulesOverride(): { pattern: string; category: string }[]
 }
 
 /**
- * 接続先（baseUrl）と API キーの出所を揃える（Issue #5 のキー漏洩対策）。
+ * 接続先（baseUrl）と API キーの出所を揃える（サーバーのキーの漏洩対策）。
  *
  * ユーザーが指定した baseUrl へは、サーバー環境変数のキーを決して
  * 送らない。カスタム baseUrl には、ユーザー自身が設定したキーだけを

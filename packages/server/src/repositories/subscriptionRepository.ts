@@ -86,7 +86,7 @@ export async function upsertSubscriptionRow(
 
 /**
  * Webhook イベントを処理済みとして記録する。新規なら true、
- * 記録済み（再送）なら false を返す（冪等性、Issue #8）。
+ * 記録済み（再送）なら false を返す（冪等性）。
  * 記録は処理の成功後に行う: 先に記録すると、処理が失敗したイベントが
  * Stripe の再送でも二度と適用されなくなってしまうため。
  */

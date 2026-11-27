@@ -40,7 +40,7 @@ export async function listImportRows(db: Db): Promise<ImportRow[]> {
  * 作成された取込の id を返す（取得できなければ undefined）。
  * 取込記録・取引・変更履歴は1トランザクションで書き、途中で失敗しても
  * 半端な取込が残らないようにする。大量行はパラメータ上限対策で
- * チャンクに分けて INSERT する（Issue #11）。
+ * チャンクに分けて INSERT する。
  */
 export async function createImportWithTransactions(
   db: Db,

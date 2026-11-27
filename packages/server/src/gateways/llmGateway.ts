@@ -1,13 +1,11 @@
 /**
  * llmGateway.ts — LLM API（外部サービス）への唯一の接続点（gateways）。
  *
- * 外部APIの呼び方（CODING_CONVENTIONS_BACKEND「Gateways」）の選択理由:
- *   本ゲートウェイの接続先は AGENT_BASE_URL で差し替え可能な任意の
- *   OpenAI互換エンドポイント（OpenRouter / OpenCode Zen 等）と
- *   Anthropic Messages API の2系統であり、差し替え先ごとに公式SDKは
- *   存在しない（特に OpenCode Zen に公式SDK・OpenAPIスキーマはない）。
- *   よって規約の第3選択肢「fetch で呼び、応答は zod で検証する」を採用し、
- *   応答エンベロープは本ファイル内の zod スキーマで検証してから使う。
+ * 接続先は AGENT_BASE_URL で差し替え可能な任意の OpenAI互換エンドポイント
+ * （OpenRouter / OpenCode Zen 等）と Anthropic Messages API の2系統。
+ * 差し替え先ごとの公式SDKは無い（OpenCode Zen には公式SDKも OpenAPI
+ * スキーマも無い）ため fetch で呼び、応答エンベロープは本ファイル内の
+ * zod スキーマで検証してから使う。
  *
  * 内部の会話形式は OpenAI スタイルに統一する:
  *   messages: [{role, content, tool_calls?, tool_call_id?, name?}, ...]

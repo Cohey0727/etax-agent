@@ -6,7 +6,7 @@
  * 上書きとして保持され、科目判定では学習履歴から自動生成されるプロンプトより
  * 優先される。空文字で保存すると上書きが消え、自動生成に戻る。
  * マルチテナント分離のため、ファイルと上書きは所有者ごとに分ける
- * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
+ * （settingsFiles 参照）。
  */
 import { mkdir, readFile } from "node:fs/promises";
 import { serializeFileUpdate, writeFileAtomic } from "../lib/atomicFile";

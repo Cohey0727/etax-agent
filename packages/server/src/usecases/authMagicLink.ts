@@ -4,7 +4,7 @@
  * 15分・1回限り。未登録のメールアドレスなら、消費時にパスワードなしの
  * ユーザーを作る（パスワードレス登録）。送信は Resend（services/email）。
  * リンクの宛先は設定済みの公開オリジン（ETAX_PUBLIC_URL）だけで組み立てる。
- * Host / Origin ヘッダは汚染され得るため使わない（Issue #6）。未設定なら
+ * Host / Origin ヘッダは汚染され得るため使わない。未設定なら
  * 安全なリンクを作れないので送信自体をしない。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
@@ -111,7 +111,7 @@ export const magicLinkConsumeHandler: RouteHandler<typeof magicLinkConsumeRoute>
   }
   const user = existing ?? (await createPasswordlessUser(db, email));
   // TOTP 有効なユーザーはパスワード経路と同じく2段階目を必須にする
-  // （マジックリンクだけで 2FA を迂回させない、Issue #6）。
+  // （マジックリンクだけで 2FA を迂回させない）。
   if (user.totpEnabled) {
     return c.json({
       totp_required: true as const,

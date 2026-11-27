@@ -51,7 +51,7 @@ export const transactionsTable = pgTable("transactions", {
   /**
    * 割り当て年度（この取引を計上する年）。既定は日付の年だが、年末の
    * カード利用など日付と違う年へ割り当てることがある。0 は未設定
-   * （日付の年として扱う。移行直後の行への保険で、起動時に日付の年で埋める）。
+   * （日付の年として扱う。年度を指定せずに入った行は、起動時に日付の年で埋める）。
    */
   fiscalYear: integer("fiscal_year").notNull().default(0),
   description: text("description").notNull().default(""),
@@ -321,7 +321,7 @@ export const usersTable = pgTable("users", {
    * メールアドレスの所有確認が済んでいるか。パスワード登録だけでは
    * 他人のメールでも登録できてしまう（Pre-Account Takeover）ため、
    * SaaS 運用では確認が済むまでパスワードログインを許可しない。
-   * 既存行は DDL の DEFAULT true で確認済みとして移行する。
+   * 列の無い行は DDL の DEFAULT true で確認済みとして扱う。
    */
   emailVerified: boolean("email_verified").notNull().default(true),
   createdAt: timestampColumn("created_at")
@@ -416,7 +416,6 @@ export type ApiKeyRow = typeof apiKeysTable.$inferSelect;
 /**
  * 申告入力（控除・税額控除・雑所得・申告種別）の年度別保存。
  * 形は画面側の DeductionState（JSON）で、サーバーは検証せずそのまま持つ。
- * 以前はブラウザの localStorage に保存していたものをサーバーDBへ移行した。
  */
 export const filingInputsTable = pgTable(
   "filing_inputs",
@@ -435,7 +434,7 @@ export const filingInputsTable = pgTable(
 export type FilingInputRow = typeof filingInputsTable.$inferSelect;
 
 /**
- * 開業届・青色申告承認申請書の専用入力（Issue #22）。
+ * 開業届・青色申告承認申請書の専用入力。
  * 開業は一度きりの手続きで年度に属さないため、年度別の filing_inputs とは
  * 別に、所有者ごとに1件だけ持つ。形は schemas/businessStart で検証済みの
  * BusinessStartInputs の JSON。
@@ -453,7 +452,7 @@ export type BusinessStartInputRow = typeof businessStartInputsTable.$inferSelect
 
 /**
  * 提出の記録（年度×税目ごと）。e-Tax で提出した後に受信通知の受付番号を
- * 手入力で残し、受信通知 PDF を紐づけて保管する（Issue #28 Phase 1）。
+ * 手入力で残し、受信通知 PDF を紐づけて保管する。
  * 受付番号が入ると申告ステータス（filing_status.submitted）と連動する。
  * 受信通知 PDF の実体はストレージ（filing-receipts/<fileId>）にあり、
  * 本テーブルはファイルIDだけを持つ。
@@ -512,7 +511,7 @@ export const filingSubmissionHistoryTable = pgTable("filing_submission_history",
 export type FilingSubmissionHistoryRow = typeof filingSubmissionHistoryTable.$inferSelect;
 
 /**
- * 帳票（請求書）の本体（Issue #25 Phase 1）。
+ * 帳票（請求書）の本体。
  * 発行（status = issued）した帳票は不変とする：内容の誤りは、元の帳票を
  * 書き換えず「修正した適格請求書」を新規発行して correctsDocumentId で
  * 紐付ける（消費税法57条の4第4項。受領側は修正できないため）。
@@ -591,7 +590,7 @@ export type DocumentLineRow = typeof documentLinesTable.$inferSelect;
 export type NewDocumentLineRow = typeof documentLinesTable.$inferInsert;
 
 /**
- * 入金消込の記録（Issue #17 Phase 1-2）。発行済み請求書と入金取引の
+ * 入金消込の記録。発行済み請求書と入金取引の
  * 紐付けで、1件の入金を複数請求書へ分けたり（1対多）、複数回の入金で
  * 1件の請求書を消し込んだり（多対1）できるよう、充当額をレコードごとに持つ。
  * kind:

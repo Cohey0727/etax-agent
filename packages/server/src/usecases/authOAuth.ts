@@ -71,7 +71,7 @@ function providerFromParam(c: Context): OAuthProvider {
 
 /**
  * redirect_uri の組み立てには設定済みの公開オリジンだけを使う。
- * Host / Origin ヘッダは汚染され得るため使わない（Issue #6）。
+ * Host / Origin ヘッダは汚染され得るため使わない。
  * 未設定なら安全な redirect_uri を作れないので null を返す。
  */
 function redirectUri(provider: OAuthProvider): string | null {

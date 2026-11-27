@@ -62,7 +62,7 @@ export async function listFixedAssetRows(db: Db): Promise<FixedAssetRow[]> {
 /**
  * id 指定の所有者条件。テナント文脈がある場合は自テナントの行だけに絞る
  * （他テナントの資産は「存在しない」として扱い、IDOR を塞ぐ）。
- * 文脈が無い（認証オフ）場合は id のみで従来どおり。
+ * 文脈が無い（認証オフ）場合は id のみで引く。
  */
 function fixedAssetIdCondition(id: number) {
   const owner = currentUserId();

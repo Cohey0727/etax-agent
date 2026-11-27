@@ -1,6 +1,6 @@
 /**
  * filingSubmissionRepository.ts — 提出の記録（受付番号・受信通知PDF）への
- * データアクセス（repositories）。Issue #28 Phase 1。
+ * データアクセス（repositories）。
  *
  * 変更はすべて filing_submission_history へ変更前後のスナップショットと
  * ともに記録する（電子帳簿保存法の訂正・削除履歴に相当する仕組みで、

@@ -64,7 +64,7 @@ export const registerHandler: RouteHandler<typeof registerRoute> = async (c) => 
   if (authRequired()) {
     // SaaS 運用: パスワード登録だけではメール所有を証明できないため、
     // 確認メールのリンクを経るまで未確認として作り、セッションは発行しない
-    // （Pre-Account Takeover 対策、Issue #6）。確認は authVerifyEmail が担う。
+    // （Pre-Account Takeover 対策）。確認は authVerifyEmail が担う。
     const base = publicBaseUrl();
     if (!base) {
       throw new HTTPException(503, {

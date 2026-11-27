@@ -2,7 +2,7 @@
  * publicUrl.ts — 公開オリジン（ETAX_PUBLIC_URL）の解決（lib）。
  * メール内リンクや OAuth の redirect_uri は、Host / Origin ヘッダで
  * 組み立てるとヘッダ汚染で攻撃者のドメインへ誘導できてしまうため、
- * 設定済みの公開オリジンだけを使う（Issue #6 Origin 汚染対策）。
+ * 設定済みの公開オリジンだけを使う。
  */
 import { Context } from "hono";
 

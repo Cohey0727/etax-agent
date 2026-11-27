@@ -6,7 +6,7 @@
  * 上書きとして保持され、loadSystemOneConfig() が環境変数より優先して使う。
  * APIキーを含むため、このファイルは Git 管理外（データディレクトリ配下）。
  * マルチテナント分離のため、ファイルと上書きは所有者ごとに分ける
- * （settingsFiles 参照。既定ユーザーは従来のファイル名をそのまま使う）。
+ * （settingsFiles 参照）。
  */
 import { mkdir, readFile } from "node:fs/promises";
 import { serializeFileUpdate, writeFileAtomic } from "../lib/atomicFile";
