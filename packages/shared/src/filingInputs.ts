@@ -10,6 +10,7 @@
  */
 import { type AgricultureInput, EMPTY_AGRICULTURE_INPUT, normalizeAgricultureInput } from "./agriculture";
 import { normalizeBalanceSheetInput } from "./balanceSheet";
+import { smallBusinessSpecialLabel } from "./dashboard";
 import {
   computeIncomeTax,
   computeManualIncomes,
@@ -626,7 +627,7 @@ export function flatReductionInputApplies(year: number): boolean {
  */
 export function smallBusinessSpecialName(year: number): string | null {
   const rate = TAX_PARAMETERS[year]?.smallBusinessSpecialRate ?? null;
-  return rate === null ? null : `${Math.round(rate * 10)}割特例`;
+  return rate === null ? null : smallBusinessSpecialLabel(rate);
 }
 
 /**
