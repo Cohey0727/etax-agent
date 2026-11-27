@@ -49,6 +49,12 @@ export interface BlueDeductionOptions {
   filingType?: FilingType;
   /** 不動産貸付けが事業的規模か（既定: false＝事業的規模でない） */
   realEstateBusinessScale?: boolean;
+  /**
+   * 事業（農業を含む）を営んでいるか。55万・65万円控除の要件は事業を営んで
+   * いることで、事業所得が赤字でも満たす（No.2072）。未指定なら事業所得・
+   * 農業所得が黒字かどうかで判定する。
+   */
+  operatesBusiness?: boolean;
 }
 
 /** 申告の種類ごとの控除上限（本体分）。 */
@@ -241,10 +247,11 @@ if (filingType === "white") {
 return { realEstate: 0, business: 0, agriculture: 0, total: 0 };
 }
 const caps = blueDeductionCaps(options);
-// 不動産所得のみ（事業所得なし）で事業的規模でない場合は 10万円が限度。
-// 農業所得は事業所得の一部なので、農業所得があれば「事業所得なし」にはならない。
+// 事業を営んでおらず、不動産貸付けが事業的規模でない場合は 10万円が限度。
+// 農業所得は事業所得の一部なので、農業を営んでいれば事業を営んでいる側。
+const operatesBusiness = options.operatesBusiness ?? bizPos + agrPos > 0;
 const cap =
-bizPos + agrPos <= 0 && !options.realEstateBusinessScale
+!operatesBusiness && !options.realEstateBusinessScale
 ? Math.min(caps.total, BLUE_MAX_REAL_ESTATE)
 : caps.total;
 const pool = Math.min(cap, rePos + bizPos + agrPos);
@@ -504,7 +511,12 @@ export function computeCorrectedFigures(
   const blue = blueDeduction(
     b.realEstateIncome,
     b.businessIncome,
-    options,
+    {
+      ...options,
+      operatesBusiness:
+        options.operatesBusiness ??
+        (agricultureStatement !== undefined || transactions.some((t) => t.income_type === "business")),
+    },
     agricultureBeforeDeduction,
   );
 

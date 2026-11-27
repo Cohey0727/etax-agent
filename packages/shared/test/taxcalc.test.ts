@@ -98,6 +98,30 @@ describe("青色申告特別控除の振り分け", () => {
     expect(blue.total).toBe(100_000);
   });
 
+  test("事業を営んでいれば、事業所得が赤字でも不動産から65万円まで控除する（No.2072）", () => {
+    const blue = blueDeduction(1_000_000, -200_000, { filingType: "blue65", operatesBusiness: true });
+    expect(blue.realEstate).toBe(650_000);
+    expect(blue.business).toBe(0);
+    expect(blue.total).toBe(650_000);
+  });
+
+  test("事業を営んでいなければ、不動産のみ（事業的規模でない）は10万円が限度", () => {
+    const blue = blueDeduction(1_000_000, 0, { filingType: "blue65", operatesBusiness: false });
+    expect(blue.total).toBe(100_000);
+  });
+
+  test("修正後の数値: 事業の取引があれば事業所得が赤字でも65万円の限度", () => {
+    const figures = computeCorrectedFigures(
+      normalizeTransactions([
+        { date: "2025-03-01", year: 2025, description: "家賃", amount: 1_000_000, category: "家賃収入", income_type: "real_estate" },
+        { date: "2025-03-05", year: 2025, description: "回線", amount: -200_000, category: "通信費", income_type: "business" },
+      ]),
+      2025,
+    );
+    expect(figures._detail.blue_deduction_real_estate).toBe(650_000);
+    expect(figures.blue_deduction).toBe(650_000);
+  });
+
   test("順序(iv) 赤字の区分は控除ゼロ（不動産赤字・事業黒字）", () => {
     const blue = blueDeduction(-100_000, 800_000);
     expect(blue.realEstate).toBe(0);
