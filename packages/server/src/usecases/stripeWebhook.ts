@@ -33,12 +33,23 @@ interface StripeObject {
   status?: string;
   payment_status?: string;
   current_period_end?: number;
+  items?: { data?: { current_period_end?: number }[] };
   client_reference_id?: string;
   metadata?: Record<string, string>;
 }
 
-function periodEnd(sec: number | undefined): Date | null {
-  return typeof sec === "number" ? new Date(sec * 1000) : null;
+/**
+ * サブスクリプションの期間終了。現行の API では期間はサブスクリプション項目
+ * （items.data）ごとに持つため、その最も早い終了を使う。項目に無ければ
+ * サブスクリプション直下の値（項目へ移る前の API バージョン）を使う。
+ * どちらも無ければ undefined（保存済みの期間終了を消さない）。
+ */
+function periodEnd(obj: StripeObject): Date | undefined {
+  const itemEnds = (obj.items?.data ?? [])
+    .map((item) => item.current_period_end)
+    .filter((sec): sec is number => typeof sec === "number" && Number.isFinite(sec));
+  const sec = itemEnds.length > 0 ? Math.min(...itemEnds) : obj.current_period_end;
+  return typeof sec === "number" && Number.isFinite(sec) ? new Date(sec * 1000) : undefined;
 }
 
 /** イベントの作成時刻（順序逆転の判定用）。数値でなければ null。 */
@@ -65,7 +76,7 @@ export const stripeWebhookHandler: RouteHandler<typeof stripeWebhookRoute> = asy
   const customerId = typeof obj.customer === "string" ? obj.customer : "";
   const eventCreated = eventCreatedDate(event.created);
 
-  // 冪等性: 処理済みのイベントの再送は何もしない（Issue #8）。
+  // 冪等性: 処理済みのイベントの再送は何もしない。
   // 記録は処理の成功後に行う（失敗したイベントは再送で回復できるように）。
   const eventId = typeof event.id === "string" && event.id !== "" ? event.id : null;
   if (eventId && (await isStripeEventRecorded(db, eventId))) {
@@ -107,15 +118,25 @@ export const stripeWebhookHandler: RouteHandler<typeof stripeWebhookRoute> = asy
   ) {
     const existing = customerId ? await getSubscriptionByCustomerId(db, customerId) : undefined;
     const userId = existing?.ownerUserId ?? Number(obj.metadata?.user_id);
-    if (Number.isInteger(userId) && userId > 0 && !isStale(existing?.lastEventCreatedAt)) {
+    const subscriptionId = typeof obj.id === "string" ? obj.id : undefined;
+    // 同じ顧客に別のサブスクリプション（解約前の古い契約など）があっても、
+    // 記録中の契約以外のイベントで状態を上書きしない。
+    const isTrackedSubscription =
+      !existing?.stripeSubscriptionId || existing.stripeSubscriptionId === subscriptionId;
+    if (
+      Number.isInteger(userId) &&
+      userId > 0 &&
+      isTrackedSubscription &&
+      !isStale(existing?.lastEventCreatedAt)
+    ) {
       await upsertSubscriptionRow(db, userId, {
         stripeCustomerId: customerId || undefined,
-        stripeSubscriptionId: typeof obj.id === "string" ? obj.id : undefined,
+        stripeSubscriptionId: subscriptionId,
         status:
           event.type === "customer.subscription.deleted"
             ? "canceled"
             : (obj.status ?? "active"),
-        currentPeriodEnd: periodEnd(obj.current_period_end),
+        currentPeriodEnd: periodEnd(obj),
         ...(eventCreated ? { lastEventCreatedAt: eventCreated } : {}),
       });
     }
