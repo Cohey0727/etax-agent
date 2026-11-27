@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText, Card, DateField, Field, SkeletonBar } from "@/components";
 import { XtxTaxpayerInput } from "@/api";
 import { space } from "@/theme";
-import { LoadedTaxpayer, emptyTaxpayer, loadTaxpayer, saveTaxpayer } from "../taxpayerData";
+import { LoadFailedNotice } from "../fields";
+import { taxpayerProfileStore } from "../taxpayerData";
+import { useYearInput } from "../useYearInput";
 
 /** テキスト入力の項目定義。 */
 const TEXT_FIELDS: readonly {
@@ -37,9 +38,6 @@ const PREVIOUS_FIELDS: readonly {
   { key: "previous_address", label: "異動前の住所", placeholder: "東京都千代田区千代田1-1" },
 ];
 
-/** 入力が止まってからDBへ保存するまでの待ち時間（ミリ秒）。 */
-const SAVE_DELAY_MS = 600;
-
 /** 読み込み中にフォームの代わりへ出すスケルトンの行数。 */
 const SKELETON_ROWS: readonly number[] = [1, 2, 3, 4, 5, 6];
 
@@ -54,67 +52,35 @@ export interface TaxpayerProfilePanelProps {
  * 消費税タブが同じ保存値を読み直して出力に使う。
  */
 export function TaxpayerProfilePanel({ year }: TaxpayerProfilePanelProps) {
-  const [loaded, setLoaded] = useState<LoadedTaxpayer | null>(null);
-  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
-  const pendingRef = useRef<{ year: number; taxpayer: XtxTaxpayerInput } | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { entry, update: updateProfile, reload } = useYearInput(taxpayerProfileStore, year);
 
-  // 年度が切り替わったら、その年度のプロフィール（無ければ引き継ぎ）を読み直す。
-  useEffect(() => {
-    let cancelled = false;
-    setLoaded(null);
-    void loadTaxpayer(year).then((next) => {
-      if (cancelled) return;
-      setLoaded(next);
-      setTaxpayer(next.taxpayer);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [year]);
-
-  // 画面を離れるとき、保存待ちの入力があれば即座に保存する。
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-      if (pending) void saveTaxpayer(pending.year, pending.taxpayer);
-    };
-  }, []);
-
-  const update = (key: keyof XtxTaxpayerInput, value: string) => {
-    const next = { ...taxpayer, [key]: value };
-    setTaxpayer(next);
-    pendingRef.current = { year, taxpayer: next };
-    if (timerRef.current !== null) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-      if (pending) void saveTaxpayer(pending.year, pending.taxpayer);
-    }, SAVE_DELAY_MS);
-  };
+  const update = (key: keyof XtxTaxpayerInput, value: string) =>
+    updateProfile((current) => ({ ...current, taxpayer: { ...current.taxpayer, [key]: value } }));
 
   // 保存済みプロフィールの読み込みが終わるまでは、空のフォームではなくスケルトンを出す
   // （空欄を「未保存」と見せないため。読み込み前に入力すると上書きされる事故も防ぐ）。
-  if (!loaded) {
+  if (entry.status !== "ready") {
     return (
       <Card>
         <View style={styles.wrap}>
           <AppText size="lg" weight="bold">
             納税者情報
           </AppText>
-          {SKELETON_ROWS.map((row) => (
-            <View key={row} style={styles.skeletonRow}>
-              <SkeletonBar width="30%" height={14} />
-              <SkeletonBar height={36} />
-            </View>
-          ))}
+          {entry.status === "failed" ? (
+            <LoadFailedNotice message="納税者情報を取得できませんでした。" onRetry={reload} />
+          ) : (
+            SKELETON_ROWS.map((row) => (
+              <View key={row} style={styles.skeletonRow}>
+                <SkeletonBar width="30%" height={14} />
+                <SkeletonBar height={36} />
+              </View>
+            ))
+          )}
         </View>
       </Card>
     );
   }
+  const { taxpayer, carriedFrom } = entry.value;
 
   return (
     <Card>
@@ -126,9 +92,9 @@ export function TaxpayerProfilePanel({ year }: TaxpayerProfilePanelProps) {
           申告書の見出しに入る情報です。プロフィールは年度別にサーバー（この
           アプリのDB）へ保存されます。
         </AppText>
-        {loaded.carriedFrom != null ? (
+        {carriedFrom != null ? (
           <AppText size="sm" tone="muted">
-            {loaded.carriedFrom}年分のプロフィールを引き継いでいます。変更すると
+            {carriedFrom}年分のプロフィールを引き継いでいます。変更すると
             {year}年分として保存されます。
           </AppText>
         ) : null}

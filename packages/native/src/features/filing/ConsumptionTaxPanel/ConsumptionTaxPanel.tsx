@@ -6,21 +6,21 @@ import {
   filterYear,
   summarizeConsumptionTax,
 } from "@etax/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { AlertBox, AppButton, AppText, Card, DateField, LabeledValue, SelectField } from "@/components";
 import {
   ExportConsumptionXtxRequest,
-  XtxTaxpayerInput,
   exportConsumptionXtxFile,
   saveTextToCacheFile,
   shareFile,
 } from "@/api";
 import { space } from "@/theme";
 import { formatNumber, formatYen } from "@/utils";
-import { AmountField, ResultRow, SectionHead } from "../fields";
+import { AmountField, LoadFailedNotice, ResultRow, SectionHead } from "../fields";
 import { EtaxImportGuide } from "../EtaxImportGuide";
-import { emptyTaxpayer, loadTaxpayer, todayIso } from "../taxpayerData";
+import { taxpayerProfileStore, todayIso } from "../taxpayerData";
+import { useYearInput } from "../useYearInput";
 import {
   AMENDMENT_FIELDS,
   EDITABLE_FIELDS,
@@ -49,18 +49,9 @@ const FILING_KIND_OPTIONS: readonly { value: string; label: string }[] = [
  * あわせて、帳簿ベースの3方式（本則・簡易・2割特例）の税額比較も出す。
  */
 export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelProps) {
-  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
-
-  // 納税者プロフィール（DB保存）を読み込む。出力するXTXの見出しに使う。
-  useEffect(() => {
-    let cancelled = false;
-    void loadTaxpayer(year).then((loadedProfile) => {
-      if (!cancelled) setTaxpayer(loadedProfile.taxpayer);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [year]);
+  // 納税者プロフィール（DB保存）。出力するXTXの見出しに使う。
+  const { entry: profileEntry, reload: reloadProfile } = useYearInput(taxpayerProfileStore, year);
+  const taxpayer = profileEntry.status === "ready" ? profileEntry.value.taxpayer : null;
 
   const summary = useMemo(() => summarizeConsumptionTax(transactions, year), [transactions, year]);
   const [form, setForm] = useState<EditableForm>(() => ({
@@ -112,6 +103,7 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
   };
 
   const handleExport = async () => {
+    if (!taxpayer) return;
     setExporting(true);
     setMessage(null);
     setError(null);
@@ -158,7 +150,10 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
           title="消費税申告書（本則）の作成"
           description="消費税及び地方消費税の確定申告書（一般用）と付表1・2を作成します。売上・仕入の金額は帳簿の税区分集計から自動で決まります（帳簿と食い違う入力はできません）。税区分の付け直しは帳簿で行ってください。納税者情報は納税者情報画面で入力したものを使います。期限後申告も申告の種類は「確定」です。"
         />
-        {taxpayer.name === "" ? (
+        {profileEntry.status === "failed" ? (
+          <LoadFailedNotice message="納税者情報を取得できませんでした。" onRetry={reloadProfile} />
+        ) : null}
+        {taxpayer && taxpayer.name === "" ? (
           <AppText size="sm" tone="muted">
             納税者情報が未入力です。先に納税者情報画面で氏名・住所・税務署名を入力してください。
           </AppText>
@@ -242,7 +237,7 @@ export function ConsumptionTaxPanel({ transactions, year }: ConsumptionTaxPanelP
 
         <AppButton
           label={exporting ? "出力中…" : "消費税のe-Tax用データを出力（XTX）"}
-          disabled={exporting}
+          disabled={exporting || !taxpayer}
           loading={exporting}
           onPress={() => void handleExport()}
         />

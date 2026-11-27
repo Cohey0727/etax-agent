@@ -13,7 +13,6 @@ import {
 import {
   BusinessStartIncomeType,
   BusinessStartInputs,
-  XtxTaxpayerInput,
   exportBlueReturnPdfFile,
   exportOpeningNoticePdfFile,
   saveBase64ToCacheFile,
@@ -23,7 +22,8 @@ import {
 import { space } from "@/theme";
 import { emptyBusinessStartInputs, loadBusinessStartInputs } from "../businessStartData";
 import { LoadFailedNotice } from "../fields";
-import { loadTaxpayer, todayIso } from "../taxpayerData";
+import { taxpayerProfileStore, todayIso } from "../taxpayerData";
+import { useYearInput } from "../useYearInput";
 import {
   CheckRow,
   DeadlineRow,
@@ -60,7 +60,8 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
   const [inputs, setInputs] = useState<BusinessStartInputs>(() => emptyBusinessStartInputs());
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput | null>(null);
+  // 同じ画面の納税者情報の編集欄と同じ値を読む（編集した直後の出力にもそのまま使われる）
+  const { entry: profileEntry } = useYearInput(taxpayerProfileStore, year);
   const [exporting, setExporting] = useState<"opening" | "blue" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,16 +84,6 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
     setLoadStatus("loading");
     setLoadAttempt((n) => n + 1);
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadTaxpayer(year).then((next) => {
-      if (!cancelled) setTaxpayer(next.taxpayer);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [year]);
 
   // 画面を離れるとき、保存待ちの入力があれば即座に保存する。
   useEffect(() => {
@@ -126,10 +117,11 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
   };
 
   const handleExport = async (kind: "opening" | "blue") => {
-    if (!taxpayer) {
+    if (profileEntry.status !== "ready") {
       setError("納税者プロフィールを読み込めていないため、出力できません。");
       return;
     }
+    const { taxpayer } = profileEntry.value;
     setExporting(kind);
     setMessage(null);
     setError(null);

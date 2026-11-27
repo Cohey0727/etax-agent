@@ -19,9 +19,17 @@ import {
   xtxSupportedYears,
 } from "@etax/shared";
 import * as Linking from "expo-linking";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { AlertBox, AppButton, AppText, Card, DateField, LabeledValue } from "@/components";
+import {
+  AlertBox,
+  AppButton,
+  AppText,
+  Card,
+  DateField,
+  LabeledValue,
+  SkeletonBar,
+} from "@/components";
 import {
   ExportXtxRequest,
   XtxTaxpayerInput,
@@ -33,10 +41,11 @@ import {
   shareFile,
 } from "@/api";
 import { space } from "@/theme";
-import { AmountField, SectionHead } from "../fields";
+import { AmountField, LoadFailedNotice, SectionHead } from "../fields";
 import { EtaxImportGuide } from "../EtaxImportGuide";
 import { FilingSection } from "../FilingPanel";
-import { emptyTaxpayer, loadTaxpayer, todayIso } from "../taxpayerData";
+import { taxpayerProfileStore, todayIso } from "../taxpayerData";
+import { useYearInput } from "../useYearInput";
 
 /** 提出先の e-Tax トップページ。 */
 const ETAX_URL = "https://www.e-tax.nta.go.jp";
@@ -91,7 +100,8 @@ export function TaxpayerPanel({
   originalIncomeTax,
   onOpenSection,
 }: TaxpayerPanelProps) {
-  const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
+  const { entry: profileEntry, reload: reloadProfile } = useYearInput(taxpayerProfileStore, year);
+  const taxpayer = profileEntry.status === "ready" ? profileEntry.value.taxpayer : null;
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
   const [withholdingTax, setWithholdingTax] = useState(0);
   const [prepaidTax, setPrepaidTax] = useState(0);
@@ -106,22 +116,11 @@ export function TaxpayerPanel({
 
   const supported = xtxSupportedYears().includes(year);
 
-  // 年度が切り替わったら、その年度のプロフィールを読み直す。
-  useEffect(() => {
-    let cancelled = false;
-    void loadTaxpayer(year).then((loadedProfile) => {
-      if (!cancelled) setTaxpayer(loadedProfile.taxpayer);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [year]);
-
   // 申告の種類はモードとして選ぶものではなく、入力内容から決まる。
   // 申告済みの所得税額が入っていれば過去の確定分と比較する修正申告になる。
   const amendment = originalIncomeTax !== null;
 
-  const buildRequest = (): ExportXtxRequest => ({
+  const buildRequest = (taxpayer: XtxTaxpayerInput): ExportXtxRequest => ({
     year,
     amendment,
     submission_date: submissionDate,
@@ -169,13 +168,14 @@ export function TaxpayerPanel({
   }, [balanceSheet, transactions, year, filingType, realEstateBusinessScale]);
 
   const handleExport = async () => {
+    if (!taxpayer) return;
     setExporting(true);
     setMessage(null);
     setError(null);
     setExportedFilename(null);
     setXsdWarning(null);
     try {
-      const result = await exportXtxFile(buildRequest());
+      const result = await exportXtxFile(buildRequest(taxpayer));
       const file = saveTextToCacheFile(result.filename, result.xtx);
       await shareFile(file, "application/xml");
       setExportedFilename(result.filename);
@@ -191,11 +191,12 @@ export function TaxpayerPanel({
   };
 
   const handleExportPdf = async () => {
+    if (!taxpayer) return;
     setExportingPdf(true);
     setMessage(null);
     setError(null);
     try {
-      const result = await exportReturnPdfFile(buildRequest());
+      const result = await exportReturnPdfFile(buildRequest(taxpayer));
       const file = saveBase64ToCacheFile(result.filename, result.pdf_base64);
       await shareFile(file, "application/pdf");
       setMessage(
@@ -209,6 +210,7 @@ export function TaxpayerPanel({
   };
 
   const handleExportDomicilePdf = async () => {
+    if (!taxpayer) return;
     setExportingDomicile(true);
     setMessage(null);
     setError(null);
@@ -230,33 +232,6 @@ export function TaxpayerPanel({
     }
   };
 
-  const summaryRows: readonly { label: string; value: string }[] = [
-    {
-      label: "氏名",
-      value: taxpayer.name
-        ? taxpayer.name_kana
-          ? `${taxpayer.name}（${taxpayer.name_kana}）`
-          : taxpayer.name
-        : "",
-    },
-    {
-      label: "住所",
-      value: [
-        taxpayer.zip_code ? `〒${taxpayer.zip_code}` : "",
-        taxpayer.address,
-        taxpayer.address_line2,
-      ]
-        .filter((part) => part.length > 0)
-        .join(" "),
-    },
-    { label: "電話番号", value: taxpayer.phone },
-    {
-      label: "提出先の税務署",
-      value: taxpayer.tax_office_name ? `${taxpayer.tax_office_name}税務署` : "",
-    },
-    { label: "インボイス登録番号", value: taxpayer.invoice_number },
-  ];
-
   return (
     <Card>
       <View style={styles.wrap}>
@@ -268,15 +243,21 @@ export function TaxpayerPanel({
         <AppText size="md" weight="bold">
           納税者情報
         </AppText>
-        <View>
-          {summaryRows.map((row) => (
-            <LabeledValue
-              key={row.label}
-              label={row.label}
-              value={row.value === "" ? "未入力" : row.value}
-            />
-          ))}
-        </View>
+        {taxpayer ? (
+          <View>
+            {taxpayerSummaryRows(taxpayer).map((row) => (
+              <LabeledValue
+                key={row.label}
+                label={row.label}
+                value={row.value === "" ? "未入力" : row.value}
+              />
+            ))}
+          </View>
+        ) : profileEntry.status === "failed" ? (
+          <LoadFailedNotice message="納税者情報を取得できませんでした。" onRetry={reloadProfile} />
+        ) : (
+          <SkeletonBar height={96} />
+        )}
         {onOpenSection ? (
           <AppButton
             label="納税者情報を開く"
@@ -324,21 +305,21 @@ export function TaxpayerPanel({
         <View style={styles.actions}>
           <AppButton
             label={exporting ? "出力中…" : "e-Tax用データを出力（XTX）"}
-            disabled={!supported || exporting}
+            disabled={!supported || exporting || !taxpayer}
             loading={exporting}
             onPress={() => void handleExport()}
           />
           <AppButton
             label={exportingPdf ? "出力中…" : "申告書の紙イメージ（PDF）"}
             variant="ghost"
-            disabled={exportingPdf}
+            disabled={exportingPdf || !taxpayer}
             loading={exportingPdf}
             onPress={() => void handleExportPdf()}
           />
           <AppButton
             label={exportingDomicile ? "出力中…" : "納税地の異動申出書（PDF）"}
             variant="ghost"
-            disabled={exportingDomicile}
+            disabled={exportingDomicile || !taxpayer}
             loading={exportingDomicile}
             onPress={() => void handleExportDomicilePdf()}
           />
@@ -364,6 +345,36 @@ export function TaxpayerPanel({
       </View>
     </Card>
   );
+}
+
+/** 提出パネルに出す納税者情報の要約（未入力の項目は空文字）。 */
+function taxpayerSummaryRows(taxpayer: XtxTaxpayerInput): readonly { label: string; value: string }[] {
+  return [
+    {
+      label: "氏名",
+      value: taxpayer.name
+        ? taxpayer.name_kana
+          ? `${taxpayer.name}（${taxpayer.name_kana}）`
+          : taxpayer.name
+        : "",
+    },
+    {
+      label: "住所",
+      value: [
+        taxpayer.zip_code ? `〒${taxpayer.zip_code}` : "",
+        taxpayer.address,
+        taxpayer.address_line2,
+      ]
+        .filter((part) => part.length > 0)
+        .join(" "),
+    },
+    { label: "電話番号", value: taxpayer.phone },
+    {
+      label: "提出先の税務署",
+      value: taxpayer.tax_office_name ? `${taxpayer.tax_office_name}税務署` : "",
+    },
+    { label: "インボイス登録番号", value: taxpayer.invoice_number },
+  ];
 }
 
 const styles = StyleSheet.create({
