@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { ACCOUNT_NAMES } from "@etax/shared";
 import { Button, Card, Col, Input, Row, Select, Text, Textarea } from "@components/atoms";
 import { JevPromptInfo, RegexRuleItem, RegexRulesInfo } from "@types";
-import { fetchJevPrompt, fetchRegexRules, updateJevPrompt, updateRegexRules } from "@utils";
+import {
+  fetchJevPrompt,
+  fetchRegexRules,
+  updateJevPrompt,
+  updateRegexRules,
+  withCurrentOption,
+} from "@utils";
 import styles from "./AiMemoryPanel.css";
 
 interface AiMemoryData {
@@ -141,7 +147,7 @@ export const AiMemoryPanel = () => {
                       onChange={(e) => editRule(index, { category: e.target.value })}
                       aria-label={`科目 ${index + 1}`}
                     >
-                      {ACCOUNT_NAMES.map((name) => (
+                      {withCurrentOption(ACCOUNT_NAMES, rule.category).map((name) => (
                         <option key={name} value={name}>
                           {name}
                         </option>

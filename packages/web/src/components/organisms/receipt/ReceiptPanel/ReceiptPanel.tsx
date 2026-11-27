@@ -3,7 +3,7 @@ import { ChangeEvent, useRef, useState } from "react";
 import { Button, Card, Col, Icon, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { AccountClassification, ClassificationSource } from "@types";
-import { analyzeReceiptImage, recordClassificationFeedback } from "@utils";
+import { analyzeReceiptImage, recordClassificationFeedback, withCurrentOption } from "@utils";
 import styles from "./ReceiptPanel.css";
 import { registerReceiptTransaction } from "./ReceiptPanel.utils";
 
@@ -209,7 +209,7 @@ export const ReceiptPanel = ({ onAnalyzed, onRegistered }: ReceiptPanelProps) =>
                 onChange={(e) => setDraft({ ...draft, account: e.target.value })}
                 aria-label="勘定科目"
               >
-                {[...ACCOUNT_NAMES, "未分類"].map((name) => (
+                {withCurrentOption([...ACCOUNT_NAMES, "未分類"], draft.account).map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>

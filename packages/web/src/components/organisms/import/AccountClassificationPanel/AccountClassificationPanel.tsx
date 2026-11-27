@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button, Card, Col, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { AccountClassification, ClassificationSource } from "@types";
-import { classifyAccountsBatch, recordClassificationFeedback } from "@utils";
+import { classifyAccountsBatch, recordClassificationFeedback, withCurrentOption } from "@utils";
 import styles from "./AccountClassificationPanel.css";
 
 export interface AccountClassificationPanelProps {
@@ -131,7 +131,7 @@ export const AccountClassificationPanel = ({
                     )
                   }
                 >
-                  {[...ACCOUNT_NAMES, "未分類"].map((name) => (
+                  {withCurrentOption([...ACCOUNT_NAMES, "未分類"], s.account).map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
