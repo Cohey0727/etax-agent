@@ -40,15 +40,10 @@ import {
 } from "@etax/shared";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { billingEnabled } from "../../gateways/stripeGateway";
-import { createSystemOneClient } from "../../gateways/systemOneGateway";
-import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
 import { errorMessage } from "../../lib/errors";
 import { authRequired } from "../../lib/tenantContext";
 import { hasActivePlan } from "../../repositories/subscriptionRepository";
-import {
-  loadClassificationHistory,
-  recordClassification,
-} from "../../repositories/classificationHistoryRepository";
+import { recordClassification } from "../../repositories/classificationHistoryRepository";
 import {
   filingStatusToApi,
   listFilingStatusRows,
@@ -76,6 +71,7 @@ import {
   receiptToApi,
 } from "../../repositories/receiptRepository";
 import { classifyAccount } from "../classification/classifyAccount";
+import { loadClassifyDeps } from "../classification/loadClassifyDeps";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import { mcpAssetTools } from "./mcpAssetTools";
 import { mcpBusinessStartTools } from "./mcpBusinessStartTools";
@@ -762,14 +758,11 @@ export async function dispatchMcpTool(
         return textResult({ deleted: transactionToApi(row) });
       }
       case "classify_account": {
-        const history = await loadClassificationHistory();
-        const systemOne = createSystemOneClient(loadSystemOneConfig());
         const description = args["description"];
         if (typeof description !== "string" || description === "") {
           throw new Error("description（摘要）が必要です");
         }
-        const result = await classifyAccount(description, { history, systemOne, jevPromptOverride: getJevPromptOverride(), regexRulesOverride: getRegexRulesOverride() });
-        return textResult(result);
+        return textResult(await classifyAccount(description, await loadClassifyDeps()));
       }
       case "classify_feedback": {
         const description = args["description"];

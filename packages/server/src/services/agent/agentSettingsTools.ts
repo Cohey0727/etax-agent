@@ -7,15 +7,7 @@
  * 失敗は例外として投げ、呼び出し側（agentAiTools）が { ok: false, error } に
  * 変えて LLM へ返す。
  */
-import {
-  getJevPromptOverride,
-  getRegexRulesOverride,
-  loadSystemOneConfig,
-} from "../../lib/config";
-import { getDb } from "../../lib/db";
-import { databaseUnavailableMessage } from "../../lib/errors";
-import { createSystemOneClient } from "../../gateways/systemOneGateway";
-import { loadClassificationHistory } from "../../repositories/classificationHistoryRepository";
+import { loadSystemOneConfig } from "../../lib/config";
 import {
   filingStatusToApi,
   listFilingStatusRows,
@@ -32,20 +24,14 @@ import {
   upsertTaxpayerProfileRow,
 } from "../../repositories/taxpayerRepository";
 import { TaxpayerProfile } from "../../schemas/taxpayer";
-import { classifyAccount } from "../classification/classifyAccount";
+import { buildJevPromptView } from "../classification/jevPromptView";
 import { buildRegexRulesView } from "../classification/regexRulesView";
-import { RegexRule, generateRules } from "../classification/generateRules";
+import { RegexRule } from "../classification/generateRules";
 import { updateSystemOneSettings } from "../classification/updateSystemOneSettings";
 import { validateJevPrompt } from "../classification/validateJevPrompt";
 import { validateRegexRules } from "../classification/validateRegexRules";
 import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsView";
-
-/** DBが必須のツールで、DB未設定なら例外を投げる。 */
-function requireDb() {
-  const db = getDb();
-  if (!db) throw new Error(databaseUnavailableMessage);
-  return db;
-}
+import { requireDb } from "../mcp/mcpToolKit";
 
 /** 正規表現ルール一式（カスタム／自動生成／実効）を返す。 */
 export async function getClassificationRulesForAgent() {
@@ -62,20 +48,20 @@ export async function setClassificationRulesForAgent(rules: RegexRule[]) {
 
 /** jev 用プロンプト（カスタム／自動生成／実効）を返す。 */
 export async function getJevPromptForAgent() {
-  const history = await loadClassificationHistory();
-  const customPrompt = getJevPromptOverride();
-  const generatedPrompt = generateRules(history).jevPrompt;
-  return { custom_prompt: customPrompt, generated_prompt: generatedPrompt, effective_prompt: customPrompt || generatedPrompt };
+  const view = await buildJevPromptView();
+  return {
+    custom_prompt: view.customPrompt,
+    generated_prompt: view.generatedPrompt,
+    effective_prompt: view.effectivePrompt,
+  };
 }
 
 /** jev 用プロンプトを保存する。空文字で自動生成に戻る。 */
 export async function setJevPromptForAgent(prompt: string) {
   const validated = validateJevPrompt(prompt);
   if (!validated.ok) throw new Error(validated.message);
-  const customPrompt = await saveJevPromptOverride(prompt);
-  const history = await loadClassificationHistory();
-  const generatedPrompt = generateRules(history).jevPrompt;
-  return { custom_prompt: customPrompt, generated_prompt: generatedPrompt, effective_prompt: customPrompt || generatedPrompt };
+  await saveJevPromptOverride(prompt);
+  return getJevPromptForAgent();
 }
 
 /** SystemOne の接続設定（保存値と実効値。APIキーは有無だけ）を返す。 */
@@ -182,17 +168,4 @@ export async function updateTaxpayerProfileForAgent(year: number, patch: Partial
   return row
     ? taxpayerProfileForAgent(taxpayerProfileToApi(row))
     : { ok: false, error: "納税者プロフィールを更新できませんでした" };
-}
-
-/** 摘要1件の勘定科目を、現在の判定パイプライン（正規表現→jev→キーワード）で判定する。 */
-export async function classifyAccountForAgent(description: string) {
-  const history = await loadClassificationHistory();
-  const systemOne = createSystemOneClient(loadSystemOneConfig());
-  const result = await classifyAccount(description, {
-    history,
-    systemOne,
-    jevPromptOverride: getJevPromptOverride(),
-    regexRulesOverride: getRegexRulesOverride(),
-  });
-  return result;
 }

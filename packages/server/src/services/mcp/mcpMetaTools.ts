@@ -12,7 +12,6 @@ import { join } from "node:path";
 import { ACCOUNT_CRITERIA, aggregateIncome, buildTrialBalance, XtxBalanceSheetInput } from "@etax/shared";
 import { billingEnabled } from "../../gateways/stripeGateway";
 import {
-  getJevPromptOverride,
   getSystemOneOverrides,
   loadAgentConfig,
   loadStorageConfig,
@@ -21,7 +20,6 @@ import {
 } from "../../lib/config";
 import { isDatabaseConfigured } from "../../lib/db";
 import { currentUserId } from "../../lib/tenantContext";
-import { loadClassificationHistory } from "../../repositories/classificationHistoryRepository";
 import { saveJevPromptOverride } from "../../repositories/jevPromptRepository";
 import { saveRegexRulesOverride } from "../../repositories/regexRulesRepository";
 import { getSubscriptionRow } from "../../repositories/subscriptionRepository";
@@ -33,7 +31,8 @@ import { AgentChatError, executeAgentChat } from "../agent/executeAgentChat";
 import { testAgentConnection } from "../agent/testAgentConnection";
 import { testSystemOneConnection } from "../classification/testSystemOneConnection";
 import { updateSystemOneSettings } from "../classification/updateSystemOneSettings";
-import { generateRules, RegexRule } from "../classification/generateRules";
+import { RegexRule } from "../classification/generateRules";
+import { buildJevPromptView } from "../classification/jevPromptView";
 import { buildRegexRulesView } from "../classification/regexRulesView";
 import { validateJevPrompt } from "../classification/validateJevPrompt";
 import { validateRegexRules } from "../classification/validateRegexRules";
@@ -290,15 +289,8 @@ export const mcpMetaTools: McpToolModule = {
       );
     },
     get_classify_settings: async () => {
-      const history = await loadClassificationHistory();
-      const customPrompt = getJevPromptOverride();
-      const generatedPrompt = generateRules(history).jevPrompt;
       return textResult({
-        jev_prompt: {
-          customPrompt,
-          generatedPrompt,
-          effectivePrompt: customPrompt || generatedPrompt,
-        },
+        jev_prompt: await buildJevPromptView(),
         regex_rules: await buildRegexRulesView(),
       });
     },
@@ -320,15 +312,8 @@ export const mcpMetaTools: McpToolModule = {
       }
       if (prompt !== undefined) await saveJevPromptOverride(prompt);
       if (rules !== undefined) await saveRegexRulesOverride(rules);
-      const history = await loadClassificationHistory();
-      const customPrompt = getJevPromptOverride();
-      const generatedPrompt = generateRules(history).jevPrompt;
       return textResult({
-        jev_prompt: {
-          customPrompt,
-          generatedPrompt,
-          effectivePrompt: customPrompt || generatedPrompt,
-        },
+        jev_prompt: await buildJevPromptView(),
         regex_rules: await buildRegexRulesView(),
       });
     },

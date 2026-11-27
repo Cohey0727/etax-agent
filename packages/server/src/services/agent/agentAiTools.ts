@@ -8,6 +8,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { TaxpayerProfile } from "../../schemas/taxpayer";
+import { classifyAccount } from "../classification/classifyAccount";
+import { loadClassifyDeps } from "../classification/loadClassifyDeps";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
 import {
   addTransactionForAgent,
@@ -16,7 +18,6 @@ import {
   updateTransactionsBulk,
 } from "./agentDbWrites";
 import {
-  classifyAccountForAgent,
   getClassificationRulesForAgent,
   getFilingStatusForAgent,
   getJevPromptForAgent,
@@ -235,7 +236,9 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
         description: z.string().describe("判定したい摘要（例: ヨドバシカメラ キーボード購入）"),
       }),
       execute: async ({ description }) =>
-        runSettings("classify_account", { description }, () => classifyAccountForAgent(description)),
+        runSettings("classify_account", { description }, async () =>
+          classifyAccount(description, await loadClassifyDeps()),
+        ),
     }),
     get_classification_rules: tool({
       description:

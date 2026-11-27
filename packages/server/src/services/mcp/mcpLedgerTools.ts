@@ -8,11 +8,8 @@
 import { normalizeBusinessRatio } from "@etax/shared";
 import { createStorageClient, receiptObjectKey } from "../../gateways/storageGateway";
 import { loadStorageConfig } from "../../lib/config";
-import { getJevPromptOverride, getRegexRulesOverride, loadSystemOneConfig } from "../../lib/config";
-import { createSystemOneClient } from "../../gateways/systemOneGateway";
 import { getDb } from "../../lib/db";
 import { isAllowedUploadContentType, normalizeContentType } from "../../lib/uploadTypes";
-import { loadClassificationHistory } from "../../repositories/classificationHistoryRepository";
 import {
   getReceiptRowByFileId,
   listReceiptRowsForTransaction,
@@ -31,6 +28,7 @@ import {
 } from "../../repositories/transactionRepository";
 import { ReplaceYearTransactionsRequestSchema } from "../../schemas/transaction";
 import { MAX_CLASSIFY_BATCH_ITEMS, classifyAccount } from "../classification/classifyAccount";
+import { loadClassifyDeps } from "../classification/loadClassifyDeps";
 import { buildLedgerPdf } from "../pdf/buildLedgerPdf";
 import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
 import { analyzeReceiptDraft } from "../receipts/analyzeReceiptDraft";
@@ -314,8 +312,7 @@ export const mcpLedgerTools: McpToolModule = {
       if (items.length > MAX_CLASSIFY_BATCH_ITEMS) {
         throw new Error(`items は${MAX_CLASSIFY_BATCH_ITEMS}件までにしてください`);
       }
-      const history = await loadClassificationHistory();
-      const systemOne = createSystemOneClient(loadSystemOneConfig());
+      const deps = await loadClassifyDeps();
       const results = [];
       for (const item of items) {
         const rec = (typeof item === "object" && item !== null ? item : {}) as Record<
@@ -326,14 +323,7 @@ export const mcpLedgerTools: McpToolModule = {
         if (typeof description !== "string" || description === "") {
           throw new Error("items の各要素に description（摘要）が必要です");
         }
-        results.push(
-          await classifyAccount(description, {
-            history,
-            systemOne,
-            jevPromptOverride: getJevPromptOverride(),
-            regexRulesOverride: getRegexRulesOverride(),
-          }),
-        );
+        results.push(await classifyAccount(description, deps));
       }
       return textResult({ results });
     },
