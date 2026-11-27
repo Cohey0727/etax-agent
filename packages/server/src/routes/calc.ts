@@ -10,6 +10,7 @@ import {
 import {
   calculateTrialBalanceHandler,
   calculateTrialBalanceRoute,
+  calculateTrialBalanceValidationMessage,
 } from "../usecases/calculateTrialBalance";
 import {
   calculateAmendmentHandler,
@@ -34,7 +35,7 @@ app.openapi(
 app.openapi(
   calculateTrialBalanceRoute,
   calculateTrialBalanceHandler,
-  validationHook(() => "JSONボディが必要です"),
+  validationHook(calculateTrialBalanceValidationMessage),
 );
 app.openapi(
   calculateConsumptionRoute,
