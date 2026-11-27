@@ -1,6 +1,6 @@
 import * as WebBrowser from "expo-web-browser";
 import { View } from "react-native";
-import { ApiError, fetchMe, saveSessionToken } from "@/api";
+import { ApiError } from "@/api";
 import { API_URL } from "@/config";
 import { AppButton } from "@/components/AppButton";
 import { space } from "@/theme";
@@ -8,7 +8,8 @@ import { space } from "@/theme";
 export type OAuthProviderKey = "google" | "github";
 
 export type OAuthOutcome =
-  | { kind: "signedIn"; token: string }
+  /** 外部ログインに成功し、セッショントークンを受け取った（ログインへの適用は呼び出し側）。 */
+  | { kind: "token"; token: string }
   | { kind: "totp"; challenge: string }
   | { kind: "error"; message: string }
   | { kind: "cancelled" };
@@ -42,12 +43,7 @@ export async function runOAuth(provider: OAuthProviderKey): Promise<OAuthOutcome
   const challenge = params.get("totp_challenge");
   if (challenge) return { kind: "totp", challenge };
   const token = params.get("token");
-  if (token) {
-    await saveSessionToken(token);
-    const me = await fetchMe().catch(() => null);
-    if (me) return { kind: "signedIn", token };
-    return { kind: "error", message: "ユーザー情報の取得に失敗しました。" };
-  }
+  if (token) return { kind: "token", token };
   return { kind: "error", message: "外部ログインの結果を受け取れませんでした。" };
 }
 

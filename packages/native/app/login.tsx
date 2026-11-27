@@ -168,16 +168,30 @@ export default function LoginScreen() {
     }
   };
 
-  const handleOAuthOutcome = (outcome: OAuthOutcome) => {
-    if (outcome.kind === "signedIn") {
-      void applyLoginResponse({ token: outcome.token }).then((o) => {
-        if (o.kind === "signedIn") goHome();
-      });
-    } else if (outcome.kind === "totp") {
-      setChallenge(outcome.challenge);
-      setMode("totp");
-    } else if (outcome.kind === "error") {
-      setError(outcome.message);
+  const handleOAuthOutcome = async (outcome: OAuthOutcome) => {
+    switch (outcome.kind) {
+      case "token":
+        setBusy(true);
+        setError(null);
+        try {
+          await acceptLogin({ token: outcome.token });
+        } catch (e) {
+          setError(errorMessage(e, "外部ログインに失敗しました"));
+        } finally {
+          setBusy(false);
+        }
+        return;
+      case "totp":
+        setChallenge(outcome.challenge);
+        setMode("totp");
+        return;
+      case "error":
+        setError(outcome.message);
+        return;
+      case "cancelled":
+        return;
+      default:
+        return outcome satisfies never;
     }
   };
 
@@ -228,7 +242,7 @@ export default function LoginScreen() {
                   <OAuthButtons
                     providers={oauthProviders}
                     busy={busy}
-                    onOutcome={handleOAuthOutcome}
+                    onOutcome={(outcome) => void handleOAuthOutcome(outcome)}
                     onError={setError}
                   />
                   {methods.magic_link ? (
