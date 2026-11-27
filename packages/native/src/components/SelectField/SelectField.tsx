@@ -4,12 +4,12 @@ import { colors, radius } from "@/theme";
 import { AppText } from "../AppText";
 import { Sheet } from "../Sheet";
 
-export interface SelectOption<T extends string> {
+export interface SelectOption<T extends string | number> {
   value: T;
   label: string;
 }
 
-export interface SelectFieldProps<T extends string> {
+export interface SelectFieldProps<T extends string | number> {
   label: string;
   value: T;
   options: readonly SelectOption<T>[];
@@ -21,7 +21,7 @@ export interface SelectFieldProps<T extends string> {
  * タップでボトムシートの選択肢を開くセレクト欄。
  * セレクターは反応速度優先でバウンスアニメーションを使わない。
  */
-export function SelectField<T extends string>({
+export function SelectField<T extends string | number>({
   label,
   value,
   options,
@@ -56,7 +56,7 @@ export function SelectField<T extends string>({
       <Sheet onClose={() => setOpen(false)} title={label} visible={open}>
         <FlatList
           data={[...options]}
-          keyExtractor={(item) => item.value}
+          keyExtractor={(item) => String(item.value)}
           style={styles.list}
           renderItem={({ item }) => (
             <Pressable

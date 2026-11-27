@@ -79,17 +79,14 @@ export function AppSidebar() {
     else router.dismissTo(target);
   };
 
-  // 年度の追加はセレクタの中の選択肢で行う（最大年度+1 / 最小年度-1）。
+  // 年度の追加はセレクタの中の選択肢で行う（最大年度+1 / 最小年度-1 を選ぶと、その年度が加わる）。
   const nextYear = (years[0] ?? new Date().getFullYear()) + 1;
   const prevYear = years.length > 0 ? years[years.length - 1] - 1 : null;
   const yearOptions = [
-    { value: `add:${nextYear}`, label: `${nextYear}年度を追加` },
-    ...years.map((y) => ({ value: String(y), label: `${y}年度` })),
-    ...(prevYear !== null ? [{ value: `add:${prevYear}`, label: `${prevYear}年度を追加` }] : []),
+    { value: nextYear, label: `${nextYear}年度を追加` },
+    ...years.map((y) => ({ value: y, label: `${y}年度` })),
+    ...(prevYear !== null ? [{ value: prevYear, label: `${prevYear}年度を追加` }] : []),
   ];
-  const handleYearSelect = (raw: string) => {
-    setYear(Number(raw.startsWith("add:") ? raw.slice("add:".length) : raw));
-  };
 
   const filingTab = pathname === "/filing" ? (tabParam ?? "overview") : null;
 
@@ -141,12 +138,7 @@ export function AppSidebar() {
               <Fragment key={item.label}>
                 {item.href === "/filing" ? (
                   <View style={styles.yearBlock}>
-                    <SelectField
-                      label="年度"
-                      value={String(year)}
-                      options={yearOptions}
-                      onChange={handleYearSelect}
-                    />
+                    <SelectField label="年度" value={year} options={yearOptions} onChange={setYear} />
                   </View>
                 ) : null}
                 <Pressable

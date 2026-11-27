@@ -9,15 +9,13 @@ import {
 import { AlertBox, AppButton, AppText, Card, DateField, Field, ScreenContainer, SelectField, SkeletonCard } from "@/components";
 import { useAppState } from "@/state/AppContext";
 import { parseAmount } from "@/utils";
+import { classificationSourceLabels } from "@/features/import/classificationSourceLabels";
 import { ReceiptLibrary } from "../ReceiptLibrary";
-
-const SOURCE_LABELS: Record<string, string> = {
-  generated: "生成ルール", systemone: "AI判定", rules: "キーワードルール", none: "判定なし",
-};
 
 interface ReceiptDraft {
   date: string;
-  amount: string;
+  /** 税込の金額（円）。読み取れなかった・未入力は null。 */
+  amount: number | null;
   description: string;
   account: string;
   classification: AnalyzeReceiptResponse["classification"];
@@ -56,7 +54,7 @@ export function ReceiptScreen() {
       const description = [res.payee, res.description].filter(Boolean).join(" ");
       setDraft({
         date: res.date ?? "",
-        amount: res.amount !== null ? String(res.amount) : "",
+        amount: res.amount,
         description,
         account: res.classification.account,
         classification: res.classification,
@@ -84,8 +82,8 @@ export function ReceiptScreen() {
 
   const handleAdd = async () => {
     if (!draft || busy) return;
-    const amount = parseAmount(draft.amount);
-    if (!draft.date || !Number.isFinite(amount) || amount === 0) {
+    const amount = draft.amount;
+    if (!draft.date || amount === null || amount === 0) {
       setError("日付と金額を確認してください");
       return;
     }
@@ -167,7 +165,13 @@ export function ReceiptScreen() {
         <Card>
           <AppText size="lg" weight="bold">読み取り結果（帳簿ドラフト）</AppText>
           <DateField label="日付" value={draft.date} onChange={(date) => setDraft({ ...draft, date })} />
-          <Field label="金額（税込・円）" value={draft.amount} onChangeText={(amount) => setDraft({ ...draft, amount })} keyboardType="number-pad" inputMode="numeric" />
+          <Field
+            label="金額（税込・円）"
+            value={draft.amount === null ? "" : String(draft.amount)}
+            onChangeText={(text) => setDraft({ ...draft, amount: text.trim() === "" ? null : parseAmount(text) })}
+            keyboardType="number-pad"
+            inputMode="numeric"
+          />
           <Field label="摘要" value={draft.description} onChangeText={(description) => setDraft({ ...draft, description })} />
           <SelectField
             label="勘定科目"
@@ -176,7 +180,7 @@ export function ReceiptScreen() {
             onChange={(account) => setDraft({ ...draft, account })}
           />
           <AppText size="sm" tone="muted">
-            科目の根拠: {SOURCE_LABELS[draft.classification.source] ?? draft.classification.source}
+            科目の根拠: {classificationSourceLabels[draft.classification.source]}
             {draft.classification.confidence !== null ? `（確信度 ${Math.round(draft.classification.confidence * 100)}%）` : ""}
             {draft.classification.candidates.length > 1
               ? ` ／ 候補: ${draft.classification.candidates.map((c) => `${c.account} ${Math.round(c.probability * 100)}%`).join("、")}`

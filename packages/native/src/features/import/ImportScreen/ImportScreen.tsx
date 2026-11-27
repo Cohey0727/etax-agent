@@ -1,24 +1,24 @@
 import {
-  ACCOUNT_NAMES, applyCsvClassificationEdits, guessIncomeType, sampleTransactions, Transaction,
+  ACCOUNT_NAMES, applyCsvClassificationEdits, guessIncomeType, IncomeType, sampleTransactions, Transaction,
 } from "@etax/shared";
 import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
 import { View } from "react-native";
 import {
-  classifyAccountsBatch, createLedgerTransaction, fetchLedgerTransactions, ImportCsvResponse,
+  ClassificationSource, classifyAccountsBatch, createLedgerTransaction, fetchLedgerTransactions, ImportCsvResponse,
   importCsvBytes, ledgerRowToTransaction, readLocalFileBytes, recordClassificationFeedback,
   transactionToLedgerInput, updateLedgerTransaction,
 } from "@/api";
 import { AlertBox, AppButton, AppText, Card, ScreenContainer, SelectField } from "@/components";
 import { useAppState } from "@/state/AppContext";
 import { formatDate, formatYen } from "@/utils";
+import { classificationSourceLabels } from "../classificationSourceLabels";
 import { MappingSummaryCard } from "../MappingSummaryCard";
 import { planSampleRegistration, SampleRegistrationPlan } from "./ImportScreen.utils";
 
-const INCOME_TYPE_LABELS: Record<string, string> = { business: "事業", real_estate: "不動産", other: "その他" };
-const SOURCE_LABELS: Record<string, string> = { generated: "生成ルール", systemone: "AI判定", rules: "キーワードルール", none: "判定なし" };
+const incomeTypeLabels: Record<IncomeType, string> = { business: "事業", real_estate: "不動産", other: "その他" };
 
-interface Suggestion { index: number; account: string; source: string; confidence: number | null }
+interface Suggestion { index: number; account: string; source: ClassificationSource; confidence: number | null }
 
 /** CSV取込画面。ファイル選択→自動マッピング→科目判定→帳簿登録までを行う。 */
 export function ImportScreen() {
@@ -190,7 +190,7 @@ export function ImportScreen() {
                   {suggestions.map((s) => (
                     <View key={s.index} style={{ gap: 4 }}>
                       <AppText size="sm">
-                        {txs[s.index]?.description}（{SOURCE_LABELS[s.source] ?? s.source}
+                        {txs[s.index]?.description}（{classificationSourceLabels[s.source]}
                         {s.confidence !== null ? ` ${Math.round(s.confidence * 100)}%` : ""}）
                       </AppText>
                       <SelectField
@@ -211,7 +211,7 @@ export function ImportScreen() {
             <AppText size="lg" weight="bold">取込結果（先頭200件）</AppText>
             {txs.slice(0, 200).map((tx, i) => (
               <View key={i} style={{ gap: 2, paddingVertical: 4 }}>
-                <AppText size="sm" tone="muted">{formatDate(tx.date)}／{INCOME_TYPE_LABELS[tx.income_type] ?? tx.income_type}／{tx.account}</AppText>
+                <AppText size="sm" tone="muted">{formatDate(tx.date)}／{incomeTypeLabels[tx.income_type]}／{tx.account}</AppText>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                   <AppText size="md" style={{ flex: 1 }}>{tx.description}（{tx.category}）</AppText>
                   <AppText size="md" weight="bold" tone={tx.amount < 0 ? "negative" : "positive"}>{formatYen(tx.amount)}</AppText>
