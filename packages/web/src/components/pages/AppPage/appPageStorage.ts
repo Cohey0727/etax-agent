@@ -18,11 +18,19 @@ export const readStoredThemeMode = (): ThemeMode => {
   return "system";
 };
 
+const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+
 export const applyThemeMode = (mode: ThemeMode) => {
-  const dark =
-    mode === "dark" ||
-    (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const dark = mode === "dark" || (mode === "system" && window.matchMedia(DARK_SCHEME_QUERY).matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
+};
+
+/** 端末の外観設定が変わるたびに「端末に合わせる」のテーマを適用し直す。解除する関数を返す。 */
+export const followSystemTheme = (): (() => void) => {
+  const media = window.matchMedia(DARK_SCHEME_QUERY);
+  const onChange = () => applyThemeMode("system");
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
 };
 
 export const SEND_KEY_STORAGE_KEY = "etax-send-key";

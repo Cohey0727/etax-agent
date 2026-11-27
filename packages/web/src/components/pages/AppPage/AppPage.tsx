@@ -30,6 +30,7 @@ import { LoginPage } from "../LoginPage";
 import { withEntryIds } from "./appPageHelpers";
 import {
   applyThemeMode,
+  followSystemTheme,
   readStoredSendKeyMode,
   readStoredThemeMode,
   SEND_KEY_STORAGE_KEY,
@@ -119,6 +120,9 @@ export const AppPage = () => {
       // 保存できなくても切替自体は有効にする
     }
   };
+
+  // 「端末に合わせる」の間は、開いたまま端末の外観設定が変わっても追随する。
+  useEffect(() => (themeMode === "system" ? followSystemTheme() : undefined), [themeMode]);
 
   // 画面・年度（と確定申告タブ）の状態をURLへ反映する。初回だけ履歴を汚さず置き換える。
   // 帳簿を読み終えるまでは年度が決まらない（取引のある年度から選び直される）ので反映しない。
