@@ -378,26 +378,34 @@ export async function applySchema(db: Db): Promise<void> {
 }
 
 let tablesEnsured = false;
+let ensuring: Promise<void> | null = null;
 
-/** 本番 DB のテーブルが無ければ作る（冪等）。起動時に呼ぶ。 */
-export async function ensureTables(): Promise<void> {
-  if (tablesEnsured) return;
-  const db = getDb();
-  if (!db) {
-    // DB 未設定なら用意すべきものは無い（完了扱いにして待機側を進める）。
-    tablesEnsured = true;
-    return;
-  }
-  await applySchema(db);
-  tablesEnsured = true;
+/**
+ * 本番 DB のテーブルが無ければ作る（冪等）。起動時に呼ぶ。
+ * 起動処理と初回リクエストの待機から同時に呼ばれても、実行中の初期化を
+ * 共有して DDL を1回だけ流す（並行した CREATE … IF NOT EXISTS は
+ * 一意制約違反で失敗しうる）。失敗したら次の呼び出しでやり直す。
+ */
+export function ensureTables(): Promise<void> {
+  if (tablesEnsured) return Promise.resolve();
+  ensuring ??= (async () => {
+    try {
+      // DB 未設定なら用意すべきものは無い（完了扱いにして待機側を進める）。
+      const db = getDb();
+      if (db) await applySchema(db);
+      tablesEnsured = true;
+    } finally {
+      ensuring = null;
+    }
+  })();
+  return ensuring;
 }
 
 let readyPromise: Promise<void> | null = null;
 
 /**
- * テーブル初期化の完了を待つ共有 Promise（Issue #11: 起動時初期化と
- * 初回リクエストの競合対策）。初期化はバックグラウンドで進むため、
- * DB を使う処理はこれを await してから走ると安全になる。
+ * テーブル初期化の完了を待つ共有 Promise。初期化はバックグラウンドで
+ * 進むため、DB を使う処理はこれを await してから走ると安全になる。
  * DB が落ちている場合は上限まで待ってから諦める（各リクエスト側で
  * さらに短いタイムアウトを併用すること）。
  */
