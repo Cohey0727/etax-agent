@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  EMPTY_AGRICULTURE_INPUT,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_MISC_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
@@ -167,6 +168,19 @@ describe("buildTrialBalance の損益計算書（XTX決算書との一致）", (
     const sum = (lines: { amount: number }[]) => lines.reduce((a, l) => a + l.amount, 0);
     expect(sum(tb.business.revenue_lines)).toBe(tb.business.revenue);
     expect(sum(tb.real_estate.revenue_lines)).toBe(tb.real_estate.revenue);
+  });
+});
+
+describe("buildTrialBalance: 農業所得がある場合の青色申告特別控除", () => {
+  test("農業所得を含めて配分し、XTX と同じ不動産分になる", () => {
+    const rentOnly: Transaction[] = [
+      tx({ description: "家賃", amount: 1_200_000, category: "家賃収入", income_type: "real_estate" }),
+    ];
+    const agriculture = { ...EMPTY_AGRICULTURE_INPUT, salesAmount: 2_000_000, expenseTotals: { 肥料費: 500_000 } };
+    const tb = buildTrialBalance(rentOnly, 2023, { agriculture });
+    const figures = computeCorrectedFigures(rentOnly, 2023, { agriculture });
+    expect(tb.real_estate.blue_deduction).toBe(figures._detail.blue_deduction_real_estate);
+    expect(tb.real_estate.blue_deduction).toBe(650_000);
   });
 });
 

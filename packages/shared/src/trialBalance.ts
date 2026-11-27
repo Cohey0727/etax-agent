@@ -13,6 +13,7 @@
  * 表示するために例外にせずフラグで返す）。
  */
 
+import type { AgricultureInput } from "./agriculture";
 import { filterYear, statementCategoryTotals } from "./ledger";
 import {
   aggregateIncome,
@@ -118,6 +119,8 @@ export interface TrialBalanceOptions {
   filingType?: FilingType;
   realEstateBusinessScale?: boolean;
   balanceSheet?: XtxBalanceSheetInput;
+  /** 農業所得の入力。青色申告特別控除の配分を XTX（決算書）と同じにするために渡す */
+  agriculture?: AgricultureInput;
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +403,7 @@ export function buildTrialBalance(
   const figures = computeCorrectedFigures(yearTx, year, {
     filingType: options.filingType,
     realEstateBusinessScale: options.realEstateBusinessScale,
+    agriculture: options.agriculture,
   });
   const breakdown = aggregateIncome(yearTx);
   return {
