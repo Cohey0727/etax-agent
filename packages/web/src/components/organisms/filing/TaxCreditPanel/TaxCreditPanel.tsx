@@ -1,4 +1,9 @@
-import { IncomeTaxResult, TaxCreditBreakdown, TaxCreditInputs } from "@etax/shared";
+import {
+  IncomeTaxResult,
+  TaxCreditBreakdown,
+  TaxCreditInputs,
+  flatReductionInputApplies,
+} from "@etax/shared";
 import { Card, Col, Row, Select, Text } from "@components/atoms";
 import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import { formatNumber } from "@utils";
@@ -16,6 +21,8 @@ const CREDIT_LABELS: readonly { key: keyof TaxCreditBreakdown; label: string }[]
 ];
 
 export interface TaxCreditPanelProps {
+  /** 選択中の年度（定額減税の入力は対象の年分だけ出す） */
+  year: number;
   taxCredits: TaxCreditInputs;
   /** 所得税額の計算結果（税額控除の内訳と確定税額を含む） */
   result: IncomeTaxResult;
@@ -24,7 +31,13 @@ export interface TaxCreditPanelProps {
   onChange: (next: TaxCreditInputs) => void;
 }
 
-export const TaxCreditPanel = ({ taxCredits, result, dividendCreditDerived, onChange }: TaxCreditPanelProps) => {
+export const TaxCreditPanel = ({
+  year,
+  taxCredits,
+  result,
+  dividendCreditDerived,
+  onChange,
+}: TaxCreditPanelProps) => {
   const set = (patch: Partial<TaxCreditInputs>) => onChange({ ...taxCredits, ...patch });
   const credits = result.taxCredits;
 
@@ -64,12 +77,16 @@ export const TaxCreditPanel = ({ taxCredits, result, dividendCreditDerived, onCh
           </Select>
         </Row>
 
-        <Text className={styles.subhead}>定額減税（令和6年分のみ）</Text>
-        <LabeledAmountField
-          label="定額減税額（本人・配偶者・扶養親族の人数 × 30,000円）"
-          value={taxCredits.flatReduction}
-          onChange={(v) => set({ flatReduction: v })}
-        />
+        {flatReductionInputApplies(year) ? (
+          <>
+            <Text className={styles.subhead}>定額減税（令和6年分のみ）</Text>
+            <LabeledAmountField
+              label="定額減税額（本人・配偶者・扶養親族の人数 × 30,000円）"
+              value={taxCredits.flatReduction}
+              onChange={(v) => set({ flatReduction: v })}
+            />
+          </>
+        ) : null}
 
         <Text className={styles.subhead}>配当控除</Text>
         {dividendCreditDerived ? (

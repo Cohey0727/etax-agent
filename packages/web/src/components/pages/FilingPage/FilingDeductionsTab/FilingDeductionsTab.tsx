@@ -61,6 +61,7 @@ export const FilingDeductionsTab = ({
         }
       />
       <TaxCreditPanel
+        year={year}
         taxCredits={state.taxCredits}
         result={figures.taxResult}
         dividendCreditDerived={figures.expanded.dividendDeclared}

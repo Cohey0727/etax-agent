@@ -136,6 +136,7 @@ export function FilingDeductionsTab({ model, update }: FilingTabProps) {
         }
       />
       <TaxCreditPanel
+        year={year}
         taxCredits={state.taxCredits}
         result={taxResult}
         dividendCreditDerived={expandedBreakdown.dividendDeclared}
