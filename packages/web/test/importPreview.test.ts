@@ -7,7 +7,7 @@
  */
 import { Transaction } from "@etax/shared";
 import { describe, expect, test } from "bun:test";
-import { mergeImportedPreview } from "../src/components/pages/AppPage/useLedgerSync";
+import { mergeImportedPreview } from "../src/components/pages/AppPage/hooks/useLedgerSync";
 
 const tx = (year: number, description: string): Transaction => ({
   date: `${year}-05-01`,

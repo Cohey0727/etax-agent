@@ -7,7 +7,7 @@
  * - 追加の選択肢は、並んだ年度の最大＋1と最小−1
  */
 import { describe, expect, test } from "bun:test";
-import { yearSelectOptions } from "../src/components/templates/AppTemplate/appTemplateUtils";
+import { yearSelectOptions } from "../src/components/templates/AppTemplate/AppTemplate.utils";
 
 describe("yearSelectOptions", () => {
   test("取引が無いときは表示中の年度と、その前後の追加を出す", () => {

@@ -41,9 +41,9 @@ import {
   THEME_STORAGE_KEY,
 } from "./appPageStorage";
 import { appViews, filingNavChildren } from "./appViews";
-import { useAuthGate } from "./useAuthGate";
-import { useLedgerSync } from "./useLedgerSync";
-import { useYearSelection } from "./useYearSelection";
+import { useAuthGate } from "./hooks/useAuthGate";
+import { useLedgerSync } from "./hooks/useLedgerSync";
+import { useYearSelection } from "./hooks/useYearSelection";
 
 export const AppPage = () => {
   const sample = useMemo(() => sampleTransactions(), []);

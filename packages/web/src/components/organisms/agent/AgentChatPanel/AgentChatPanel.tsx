@@ -8,7 +8,7 @@ import { MessageBubbles } from "./MessageBubbles";
 import { PendingAttachmentChips } from "./PendingAttachmentChips";
 import { sessionExcerpt } from "./agentChatHelpers";
 import { ATTACH_ACCEPT, PendingAttachment } from "./chatAttachments";
-import { useChatAttachments } from "./useChatAttachments";
+import { useChatAttachments } from "../hooks/useChatAttachments";
 import styles from "./AgentChatPanel.css";
 
 export interface AgentChatPanelProps {

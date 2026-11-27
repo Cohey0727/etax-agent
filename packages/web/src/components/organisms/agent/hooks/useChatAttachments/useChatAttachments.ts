@@ -3,7 +3,7 @@ import {
   MAX_CHAT_ATTACHMENTS,
   PendingAttachment,
   readAttachment,
-} from "./chatAttachments";
+} from "../../AgentChatPanel/chatAttachments";
 
 /**
  * 送信前の添付ファイルの保持・追加・取り消し。

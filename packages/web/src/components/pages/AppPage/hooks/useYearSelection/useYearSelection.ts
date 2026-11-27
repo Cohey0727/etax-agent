@@ -5,7 +5,7 @@ import {
   readStoredYear,
   saveExtraYears,
   saveStoredYear,
-} from "./appPageStorage";
+} from "../../appPageStorage";
 
 /**
  * useYearSelection.ts — 年度選択の状態（AppPage 用フック）。

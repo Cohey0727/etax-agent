@@ -3,14 +3,14 @@ import { clsx } from "clsx";
 import { Button, Col, Icon, IconName, Logo, Row, Select, Text } from "@components/atoms";
 import { AppView } from "@types";
 import styles from "./AppTemplate.css";
+import { useMatchMedia } from "../hooks/useMatchMedia";
 import {
   AGENT_OPEN_KEY,
   SIDEBAR_OPEN_KEY,
   loadPanelOpen,
   savePanelOpen,
-  useMediaQuery,
   yearSelectOptions,
-} from "./appTemplateUtils";
+} from "./AppTemplate.utils";
 
 export interface AppTemplateProps<NavChildKey extends string> {
   /** 全画面の登録。nav が false の画面はサイドバーに出さず、他画面からの遷移専用。 */
@@ -88,7 +88,7 @@ export const AppTemplate = <NavChildKey extends string>({
   const activeLabel = views.find((view) => view.id === activeView)?.label ?? "";
   const navViews = views.filter((view) => view.nav);
   // 狭い画面ではサイドバーはドロワーになる（初期は閉じる／遷移したら閉じる）。
-  const isNarrow = useMediaQuery("(max-width: 900px)");
+  const isNarrow = useMatchMedia("(max-width: 900px)");
   const handleViewChange = (view: AppView) => {
     onViewChange(view);
     if (isNarrow) setSidebarOpen(false);

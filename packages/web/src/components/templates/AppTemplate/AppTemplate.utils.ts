@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
-
 /**
- * appTemplateUtils.ts — アプリ枠の開閉状態の端末保存とメディアクエリ購読。
+ * AppTemplate.utils.ts — アプリ枠の開閉状態の端末保存と、年度セレクタの選択肢。
  */
 
 export const SIDEBAR_OPEN_KEY = "etax-sidebar-open";
@@ -25,20 +23,6 @@ export const savePanelOpen = (key: string, open: boolean): void => {
   }
 };
 
-/** メディアクエリの一致を購読する（モバイルではナビの向きを切り替えるため）。 */
-export const useMediaQuery = (query: string): boolean => {
-  const [matches, setMatches] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const onChange = () => setMatches(media.matches);
-    onChange();
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, [query]);
-  return matches;
-};
 
 /**
  * 年度セレクタの選択肢。表示中の年度は取引が無くても必ず含める（一致する選択肢が無いと、
