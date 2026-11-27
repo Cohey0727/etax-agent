@@ -9,25 +9,7 @@
  *     という本アプリの原則は外部エージェント相手でも同じ）。
  *   - e-Tax への最終提出は本ツール群でも行わない（納税者本人の操作）。
  */
-import {
-  buildConsumptionXtx,
-  buildSimplifiedConsumptionXtx,
-  buildSpecial20ConsumptionXtx,
-  buildXtxFiling,
-  computeAgricultureStatement,
-  computeConsumptionReturn,
-  computeSimplifiedConsumptionReturn,
-  computeSpecial20ConsumptionReturn,
-  computeCorrectedFigures,
-  computeExpandedIncomes,
-  computeIncomeTax,
-  expandedWithholdingTotal,
-  isAgricultureEmpty,
-  resolveTaxCreditInputs,
-  computeManualIncomes,
-  statementCategoryTotals,
-  xtxSupportedYears,
-} from "@etax/shared";
+import { xtxSupportedYears } from "@etax/shared";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { billingEnabled } from "../../gateways/stripeGateway";
 import { errorMessage } from "../../lib/errors";
@@ -37,9 +19,12 @@ import {
   depreciationDetailRowsForYear,
   listFixedAssetRows,
 } from "../../repositories/fixedAssetRepository";
+import { ExportConsumptionXtxRequestSchema } from "../../schemas/etax";
+import { generateConsumptionTaxXtx } from "../etax/generateConsumptionTaxXtx";
+import { generateIncomeTaxXtx } from "../etax/generateIncomeTaxXtx";
 import { mcpAssetTools } from "./mcpAssetTools";
-import { mcpBusinessStartTools } from "./mcpBusinessStartTools";
-import { mcpCalcTools } from "./mcpCalcTools";
+import { mcpBusinessStartTools, savedTaxpayerProfile } from "./mcpBusinessStartTools";
+import { incomeTaxReturnFromArgs, mcpCalcTools } from "./mcpCalcTools";
 import { mcpCashFlowTools } from "./mcpCashFlowTools";
 import { mcpImportTools } from "./mcpImportTools";
 import { mcpInvoiceTools } from "./mcpInvoiceTools";
@@ -47,29 +32,17 @@ import { mcpLedgerTools } from "./mcpLedgerTools";
 import { mcpMetaTools } from "./mcpMetaTools";
 import { mcpProfileTools } from "./mcpProfileTools";
 import { mcpSubmissionTools } from "./mcpSubmissionTools";
-import { toTaxpayer } from "../etax/xtxInputs";
 import {
   McpToolDef,
   McpToolHandler,
   McpToolModule,
   McpToolResult,
-  agricultureArg,
-  expandedIncomeArg,
-  filingOptionsArg,
   filingTypeProperty,
-  ledgerTransactions,
-  mergeDeductionInputs,
-  mergeTaxCreditInputs,
-  miscIncomeArg,
-  numArg,
-  nullableNumArg,
   realEstateScaleProperty,
   requireDb,
-  salaryIncomeArg,
   taxpayerArg,
   textResult,
   todayInTokyo,
-  yearArg,
   yearProperty,
 } from "./mcpToolKit";
 
@@ -78,7 +51,7 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
   {
     name: "export_xtx",
     description:
-      `帳簿DBの指定年の取引から、e-Tax ソフト/WEB版に組み込める申告等データ（XTX）を生成する。対応年分は${xtxSupportedYears()[0]}〜${xtxSupportedYears().at(-1)}。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。`,
+      `帳簿DBの指定年の取引から、e-Tax ソフト/WEB版に組み込める申告等データ（XTX）を生成する。対応年分は${xtxSupportedYears()[0]}〜${xtxSupportedYears().at(-1)}。計算は income_tax と同じ。固定資産台帳の減価償却明細を決算書に載せる。REST の XTX 出力と同じ公式 XSD の検証を行い、違反ならエラー、検証できなければ理由を xsd_warning に入れて返す。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。`,
     inputSchema: {
       type: "object",
       properties: {
@@ -88,7 +61,7 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
         taxpayer: {
           type: "object",
           description:
-            "納税者情報（snake_case）: name, name_kana, zip_code, address, birth_date が主な項目。my_number 等は任意。",
+            "納税者情報（snake_case）: name, name_kana, zip_code, address, birth_date が主な項目。my_number 等は任意。省略時は対象年の保存済みプロフィールを使う。",
         },
         deductions: { type: "object", description: "所得控除の入力（任意）" },
         tax_credits: { type: "object", description: "税額控除の入力（任意）" },
@@ -121,13 +94,13 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
           description: "修正申告のときの修正前の税額（任意）",
         },
       },
-      required: ["year", "taxpayer"],
+      required: ["year"],
     },
   },
   {
     name: "export_consumption_xtx",
     description:
-      "消費税申告書の e-Tax 申告等データ（XTX）を生成する。method 省略時は一般用・本則（RSH0010）、method=simplified で簡易課税用（RSH0030、SHA020+付表4-3/5-3）。金額は税区分まで確定した税込金額で渡すこと（帳簿の概算は使わない）。本則は課税売上割合95%以上で全額控除、それ以外は一括比例配分。簡易は business_category（省略時5=サービス業）に全売上を寄せて専業者計算する。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。",
+      "消費税申告書の e-Tax 申告等データ（XTX）を生成する。method 省略時は一般用・本則（RSH0010）、method=simplified で簡易課税用（RSH0030、SHA020+付表4-3/5-3）、method=special20 で2割特例（SHA010+付表6）。金額は税区分まで確定した税込金額で渡すこと（帳簿の概算は使わない）。本則は課税売上割合95%以上で全額控除、それ以外は一括比例配分。簡易は sales_by_category（事業区分ごとの売上）か、無ければ business_category（省略時5=サービス業）に全売上を寄せる。REST の消費税 XTX 出力と同じ計算・公式 XSD の検証を行い、検証できなければ理由を xsd_warning に入れて返す。生成物は署名なしの下書きで、送信は e-Tax 側で本人が行う。",
     inputSchema: {
       type: "object",
       properties: {
@@ -144,8 +117,19 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
         taxpayer: {
           type: "object",
           description:
-            "納税者情報（snake_case）: name, name_kana, zip_code, address, birth_date, tax_office_name, tax_office_code 等。",
+            "納税者情報（snake_case）: name, name_kana, zip_code, address, birth_date, tax_office_name, tax_office_code 等。省略時は課税期間の年の保存済みプロフィールを使う。",
         },
+        sales_by_category: {
+          type: "object",
+          description:
+            "簡易課税の事業区分ごとの課税売上（任意）: {\"1\"〜\"6\": {incl_10, incl_8}}（税込）。指定すると business_category と sales_incl_* より優先する",
+        },
+        returns_incl_10: { type: "number", description: "売上対価の返還等（税込）・税率10%分（簡易課税・2割特例、任意）" },
+        returns_incl_8: { type: "number", description: "売上対価の返還等（税込）・軽減税率8%分（簡易課税・2割特例、任意）" },
+        bad_debt_recovery_tax_10: { type: "number", description: "貸倒回収に係る消費税額・税率10%分（簡易課税・2割特例、任意）" },
+        bad_debt_recovery_tax_8: { type: "number", description: "貸倒回収に係る消費税額・軽減税率8%分（簡易課税・2割特例、任意）" },
+        bad_debt_tax_10: { type: "number", description: "貸倒れに係る税額・税率10%分（簡易課税・2割特例、任意）" },
+        bad_debt_tax_8: { type: "number", description: "貸倒れに係る税額・軽減税率8%分（簡易課税・2割特例、任意）" },
         period_from: { type: "string", description: "課税期間の開始日（YYYY-MM-DD）" },
         period_to: { type: "string", description: "課税期間の終了日（YYYY-MM-DD）" },
         submission_date: { type: "string", description: "提出日（YYYY-MM-DD、任意）" },
@@ -154,25 +138,18 @@ const CORE_MCP_TOOLS: McpToolDef[] = [
           type: "number",
           description: "基準期間の課税売上高（千円単位）",
         },
-        sales_incl_10: { type: "number", description: "課税売上（税込）・税率10%分" },
+        sales_incl_10: { type: "number", description: "課税売上（税込）・税率10%分（任意）" },
         sales_incl_8: { type: "number", description: "課税売上（税込）・軽減税率8%分（任意）" },
         nontaxable_sales: { type: "number", description: "非課税売上（対価の額、任意）" },
         exempt_sales: { type: "number", description: "免税売上（対価の額、任意）" },
-        purchases_incl_10: { type: "number", description: "課税仕入の支払対価（税込）・税率10%分" },
+        purchases_incl_10: { type: "number", description: "課税仕入の支払対価（税込）・税率10%分（本則、任意）" },
         purchases_incl_8: { type: "number", description: "課税仕入の支払対価（税込）・軽減税率8%分（任意）" },
         interim_national: { type: "number", description: "中間納付税額（国税、任意）" },
         interim_local: { type: "number", description: "中間納付譲渡割額（任意）" },
         original_national: { type: "number", description: "修正申告のときの既確定税額（国税、任意）" },
         original_local: { type: "number", description: "修正申告のときの既確定譲渡割額（任意）" },
       },
-      required: [
-        "taxpayer",
-        "period_from",
-        "period_to",
-        "base_period_sales_thousands",
-        "sales_incl_10",
-        "purchases_incl_10",
-      ],
+      required: ["period_from", "period_to", "base_period_sales_thousands"],
     },
   },
 ];
@@ -237,220 +214,59 @@ export async function dispatchMcpTool(
     switch (name) {
       case "export_xtx": {
         const db = requireDb();
-        const year = yearArg(args);
-        if (typeof args["taxpayer"] !== "object" || args["taxpayer"] === null) {
-          throw new Error("taxpayer（納税者情報）が必要です");
-        }
-        const tx = await ledgerTransactions(db, year);
-        const deductions = mergeDeductionInputs(args["deductions"]);
-        const taxCredits = mergeTaxCreditInputs(args["tax_credits"]);
-        const agricultureInput = agricultureArg(args);
-        const agricultureStatement =
-          agricultureInput && !isAgricultureEmpty(agricultureInput)
-            ? computeAgricultureStatement(agricultureInput)
-            : undefined;
-        const figures = computeCorrectedFigures(tx, year, {
-          ...filingOptionsArg(args),
-          agriculture: agricultureInput,
-        });
-        const miscIncome = miscIncomeArg(args);
-        const salaryIncome = salaryIncomeArg(args);
-        const manual = computeManualIncomes(
-          year,
-          salaryIncome,
-          miscIncome,
-          figures._detail.business_income +
-            figures._detail.real_estate_income +
-            figures._detail.agriculture_income,
-        );
-        const expandedInput = expandedIncomeArg(args);
-        const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
-        const tax = computeIncomeTax({
-          year,
-          totalIncome:
-            figures._detail.business_income +
-            figures._detail.real_estate_income +
-            figures._detail.agriculture_income +
-            manual.total +
-            (expanded?.comprehensiveAddition ?? 0),
-          deductions,
-          taxCredits: expanded ? resolveTaxCreditInputs(taxCredits, expanded) : taxCredits,
-          separateTaxation: expanded
-            ? { stockIncome: expanded.separateStockIncome, dividendIncome: expanded.separateDividendIncome }
-            : undefined,
-        });
-        const amendment = args["amendment"] === true;
-        const assetRows = await listFixedAssetRows(db);
-        const depreciation = depreciationDetailRowsForYear(assetRows, year);
-        const xtx = buildXtxFiling({
-          year,
-          amendment,
-          submissionDate: typeof args["submission_date"] === "string"
-            ? args["submission_date"]
-            : todayInTokyo(),
-          taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
-          figures,
-          filingType: filingOptionsArg(args).filingType,
+        const request = await incomeTaxReturnFromArgs(db, args);
+        const depreciation = depreciationDetailRowsForYear(await listFixedAssetRows(db), request.filing.year);
+        const generated = await generateIncomeTaxXtx({
+          ...request,
           depreciation:
             depreciation.business.length > 0 ||
             depreciation.realEstate.length > 0 ||
             depreciation.agriculture.length > 0
               ? depreciation
               : undefined,
-          deductionInputs: deductions,
-          miscIncome,
-          salaryIncome,
-          expandedIncome: expandedInput,
-          agriculture: agricultureStatement
-            ? {
-                statement: agricultureStatement,
-                blueDeduction: figures._detail.blue_deduction_agriculture,
-              }
-            : undefined,
-          tax,
-          categoryTotals: {
-            business: statementCategoryTotals(tx, "business"),
-            realEstate: statementCategoryTotals(tx, "real_estate"),
-          },
-          withholdingTax:
-            (typeof args["withholding_tax"] === "number" ? args["withholding_tax"] : 0) +
-            (expanded ? expandedWithholdingTotal(expanded) : 0),
-          prepaidTax: typeof args["prepaid_tax"] === "number" ? args["prepaid_tax"] : 0,
-          originalThirdPeriodTax: typeof args["original_third_period_tax"] === "number"
-            ? args["original_third_period_tax"]
-            : null,
         });
         return textResult({
-          filename: `etax-shotoku-${year}${amendment ? "-shusei" : "-kakutei"}.xtx`,
-          xtx,
+          filename: generated.filename,
+          xsd_warning: generated.xsdWarning,
+          xtx: generated.xtx,
         });
       }
       case "export_consumption_xtx": {
-        if (typeof args["taxpayer"] !== "object" || args["taxpayer"] === null) {
-          throw new Error("taxpayer（納税者情報）が必要です");
-        }
-        const periodFrom = String(args["period_from"] ?? "");
-        const periodTo = String(args["period_to"] ?? "");
-        if (!periodFrom || !periodTo) throw new Error("period_from と period_to が必要です");
-        const filingKind = numArg(args, "filing_kind", 1);
-        if (filingKind !== 1 && filingKind !== 3) {
-          throw new Error("filing_kind は 1（確定）か 3（修正確定）で渡してください");
-        }
-        const submissionDate = typeof args["submission_date"] === "string"
-          ? args["submission_date"]
-          : todayInTokyo();
-        if (args["method"] === "simplified") {
-          const category = numArg(args, "business_category", 5);
-          if (category < 1 || category > 6) {
-            throw new Error("business_category は 1〜6 で渡してください");
-          }
-          const simplifiedInput = {
-            salesByCategory: {
-              [category]: {
-                incl10: numArg(args, "sales_incl_10"),
-                incl8: numArg(args, "sales_incl_8"),
-              },
-            },
-            nontaxableSales: numArg(args, "nontaxable_sales"),
-            exemptSales: numArg(args, "exempt_sales"),
-            returnsIncl10: numArg(args, "returns_incl_10"),
-            returnsIncl8: numArg(args, "returns_incl_8"),
-            badDebtRecoveryTax10: numArg(args, "bad_debt_recovery_tax_10"),
-            badDebtRecoveryTax8: numArg(args, "bad_debt_recovery_tax_8"),
-            badDebtTax10: numArg(args, "bad_debt_tax_10"),
-            badDebtTax8: numArg(args, "bad_debt_tax_8"),
-            interimNational: numArg(args, "interim_national"),
-            interimLocal: numArg(args, "interim_local"),
-          };
-          const simplifiedResult = computeSimplifiedConsumptionReturn(simplifiedInput);
-          const xtx = buildSimplifiedConsumptionXtx({
-            taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
-            periodFrom,
-            periodTo,
-            submissionDate,
-            filingKind: filingKind as 1 | 3,
-            basePeriodSales: numArg(args, "base_period_sales_thousands") * 1000,
-            input: simplifiedInput,
-            result: simplifiedResult,
-            originalNational: nullableNumArg(args, "original_national"),
-            originalLocal: nullableNumArg(args, "original_local"),
-          });
-          return textResult({
-            filename: `etax-shohi-${periodFrom.slice(0, 4)}-kanni${filingKind === 3 ? "-shusei" : "-kakutei"}.xtx`,
-            total_payable: simplifiedResult.totalPayable,
-            method: "simplified",
-            business_category: category,
-            input_tax: simplifiedResult.inputTax,
-            xtx,
-          });
-        }
-        if (args["method"] === "special20") {
-          const specialInput = {
-            salesIncl10: numArg(args, "sales_incl_10"),
-            salesIncl8: numArg(args, "sales_incl_8"),
-            nontaxableSales: numArg(args, "nontaxable_sales"),
-            exemptSales: numArg(args, "exempt_sales"),
-            returnsIncl10: numArg(args, "returns_incl_10"),
-            returnsIncl8: numArg(args, "returns_incl_8"),
-            badDebtRecoveryTax10: numArg(args, "bad_debt_recovery_tax_10"),
-            badDebtRecoveryTax8: numArg(args, "bad_debt_recovery_tax_8"),
-            badDebtTax10: numArg(args, "bad_debt_tax_10"),
-            badDebtTax8: numArg(args, "bad_debt_tax_8"),
-            interimNational: numArg(args, "interim_national"),
-            interimLocal: numArg(args, "interim_local"),
-          };
-          const specialResult = computeSpecial20ConsumptionReturn(specialInput);
-          const xtx = buildSpecial20ConsumptionXtx({
-            taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
-            periodFrom,
-            periodTo,
-            submissionDate,
-            filingKind: filingKind as 1 | 3,
-            basePeriodSalesThousands: numArg(args, "base_period_sales_thousands"),
-            input: specialInput,
-            result: specialResult,
-            originalNational: nullableNumArg(args, "original_national"),
-            originalLocal: nullableNumArg(args, "original_local"),
-          });
-          return textResult({
-            filename: `etax-shohi-${periodFrom.slice(0, 4)}-special20${filingKind === 3 ? "-shusei" : "-kakutei"}.xtx`,
-            total_payable: specialResult.totalPayable,
-            method: "special20",
-            special_credit: specialResult.specialCredit,
-            xtx,
-          });
-        }
-        const input = {
-          salesIncl10: numArg(args, "sales_incl_10"),
-          salesIncl8: numArg(args, "sales_incl_8"),
-          nontaxableSales: numArg(args, "nontaxable_sales"),
-          exemptSales: numArg(args, "exempt_sales"),
-          purchasesIncl10: numArg(args, "purchases_incl_10"),
-          purchasesIncl8: numArg(args, "purchases_incl_8"),
-          interimNational: numArg(args, "interim_national"),
-          interimLocal: numArg(args, "interim_local"),
-        };
-        const result = computeConsumptionReturn(input);
-        const xtx = buildConsumptionXtx({
-          taxpayer: toTaxpayer(taxpayerArg(args["taxpayer"])),
-          periodFrom,
-          periodTo,
-          submissionDate: typeof args["submission_date"] === "string"
-            ? args["submission_date"]
-            : todayInTokyo(),
-          filingKind: filingKind as 1 | 3,
-          basePeriodSalesThousands: numArg(args, "base_period_sales_thousands"),
-          input,
-          result,
-          originalNational: nullableNumArg(args, "original_national"),
-          originalLocal: nullableNumArg(args, "original_local"),
+        const periodFrom = typeof args["period_from"] === "string" ? args["period_from"] : "";
+        // 納税者情報を省いたら、課税期間の年の保存済みプロフィールを使う
+        const taxpayer = taxpayerArg(
+          args["taxpayer"] !== undefined
+            ? args["taxpayer"]
+            : await savedTaxpayerProfile(requireDb(), Number(periodFrom.slice(0, 4))),
+        );
+        const amountOrZero = (key: string): unknown => args[key] ?? 0;
+        const parsed = ExportConsumptionXtxRequestSchema.safeParse({
+          ...args,
+          taxpayer,
+          submission_date: args["submission_date"] ?? todayInTokyo(),
+          filing_kind: args["filing_kind"] ?? 1,
+          sales_incl_10: amountOrZero("sales_incl_10"),
+          sales_incl_8: amountOrZero("sales_incl_8"),
+          nontaxable_sales: amountOrZero("nontaxable_sales"),
+          exempt_sales: amountOrZero("exempt_sales"),
+          purchases_incl_10: amountOrZero("purchases_incl_10"),
+          purchases_incl_8: amountOrZero("purchases_incl_8"),
+          interim_national: amountOrZero("interim_national"),
+          interim_local: amountOrZero("interim_local"),
+          original_national: args["original_national"] ?? null,
+          original_local: args["original_local"] ?? null,
         });
+        if (!parsed.success) {
+          const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join(".")))];
+          throw new Error(`消費税XTXの入力が不正です（${fields.join("、")}）`);
+        }
+        const generated = await generateConsumptionTaxXtx(parsed.data);
         return textResult({
-          filename: `etax-shohi-${periodFrom.slice(0, 4)}${filingKind === 3 ? "-shusei" : "-kakutei"}.xtx`,
-          total_payable: result.totalPayable,
-          ratio: result.ratio,
-          full_deduction: result.fullDeduction,
-          xtx,
+          filename: generated.filename,
+          method: parsed.data.method ?? "standard",
+          total_payable: generated.totalPayable,
+          xsd_warning: generated.xsdWarning,
+          xtx: generated.xtx,
         });
       }
       default: {

@@ -298,8 +298,9 @@ export const ExportConsumptionXtxRequestSchema = z
       .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)])
       .optional(),
     /** 簡易課税: 事業区分ごとの課税売上（税込）。キーは区分番号の文字列 */
+    // 売上のある区分だけを渡せるよう、全区分を必須にしない partialRecord にする
     sales_by_category: z
-      .record(
+      .partialRecord(
         z.enum(["1", "2", "3", "4", "5", "6"]),
         z.object({ incl_10: z.number(), incl_8: z.number() }),
       )

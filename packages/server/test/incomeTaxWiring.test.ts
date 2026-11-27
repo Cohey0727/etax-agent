@@ -138,7 +138,7 @@ describe("合計所得金額は事業の損失と一時所得を通算してか�
     expect(String(r.body.xtx)).toContain("<ABB00410>250000</ABB00410>");
   }, 30_000);
 
-  test("MCP の income_tax", async () => {
+  test("MCP の income_tax と export_xtx", async () => {
     for (const t of LOSS_TRANSACTIONS) {
       const added = await call("add_transaction", { ...t, income_type: "business" });
       expect(added.isError).toBeUndefined();
@@ -146,5 +146,73 @@ describe("合計所得金額は事業の損失と一時所得を通算してか�
     const tax = await call("income_tax", { year: 2025, expanded_income: TEMP_CAMEL });
     expect(tax.isError).toBeUndefined();
     expect(json(tax).totalIncome).toBe(250_000);
+
+    const xtx = await call("export_xtx", { year: 2025, taxpayer: TAXPAYER, expanded_income: TEMP_CAMEL });
+    expect(xtx.isError).toBeUndefined();
+    expect(String(json(xtx).xtx)).toContain("<ABB00410>250000</ABB00410>");
+  }, 30_000);
+});
+
+describe("MCP の XTX 出力は REST と同じ生成・XSD 検証を使う", () => {
+  test("export_xtx は taxpayer を省くと保存済みプロフィールを使い、xsd_warning を返す", async () => {
+    const saved = await call("save_taxpayer_profile", { year: 2025, taxpayer: TAXPAYER });
+    expect(saved.isError).toBeUndefined();
+    await call("add_transaction", { date: "2025-03-01", description: "売上", amount: 1_000_000, category: "売上高", income_type: "business" });
+    const result = await call("export_xtx", { year: 2025 });
+    expect(result.isError).toBeUndefined();
+    const body = json(result);
+    expect(body.filename).toBe("etax-shotoku-2025-kakutei.xtx");
+    expect(body).toHaveProperty("xsd_warning");
+    expect(String(body.xtx)).toContain("<NOZEISHA_NM ID=\"NOZEISHA_NM\">テスト太郎</NOZEISHA_NM>");
+  }, 30_000);
+
+  test("export_consumption_xtx は事業区分ごとの売上を受け、REST と同じ合計税額とファイル名を返す", async () => {
+    const args = {
+      taxpayer: TAXPAYER,
+      period_from: "2025-01-01",
+      period_to: "2025-12-31",
+      submission_date: "2026-03-10",
+      base_period_sales_thousands: 9_000,
+      method: "simplified",
+      sales_by_category: { "1": { incl_10: 1_100_000, incl_8: 0 }, "5": { incl_10: 1_100_000, incl_8: 0 } },
+    };
+    const mcp = await call("export_consumption_xtx", args);
+    expect(mcp.isError).toBeUndefined();
+    const rest = await requestJson("/api/etax/export-consumption-xtx", {
+      ...args,
+      filing_kind: 1,
+      sales_incl_10: 0,
+      sales_incl_8: 0,
+      nontaxable_sales: 0,
+      exempt_sales: 0,
+      purchases_incl_10: 0,
+      purchases_incl_8: 0,
+      interim_national: 0,
+      interim_local: 0,
+      original_national: null,
+      original_local: null,
+    });
+    expect(rest.status).toBe(200);
+    const body = json(mcp);
+    expect(body.filename).toBe(rest.body.filename);
+    expect(body.total_payable).toBe(rest.body.total_payable);
+    expect(body.xsd_warning).toBe(rest.body.xsd_warning);
+    expect(body.xtx).toBe(rest.body.xtx);
+    // 第1種（90%）と第5種（50%）の2事業: 付表5-3 に事業区分ごとの売上が出る
+    expect(String(body.xtx)).toContain("<DVD00060>");
+    expect(String(body.xtx)).toContain("<DVD00300>");
+  }, 30_000);
+
+  test("export_consumption_xtx は taxpayer を省くと課税期間の年の保存済みプロフィールを使う", async () => {
+    await call("save_taxpayer_profile", { year: 2025, taxpayer: TAXPAYER });
+    const result = await call("export_consumption_xtx", {
+      period_from: "2025-01-01",
+      period_to: "2025-12-31",
+      base_period_sales_thousands: 5_000,
+      sales_incl_10: 1_100_000,
+      purchases_incl_10: 550_000,
+    });
+    expect(result.isError).toBeUndefined();
+    expect(String(json(result).xtx)).toContain("テスト太郎");
   }, 30_000);
 });
