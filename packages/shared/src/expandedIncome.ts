@@ -278,13 +278,6 @@ export interface StockTransferInput {
   specialAccounts: SpecialAccountInput[];
 }
 
-export const EMPTY_STOCK_TRANSFER: StockTransferInput = {
-  general: { ...EMPTY_STOCK_CATEGORY },
-  listed: { ...EMPTY_STOCK_CATEGORY },
-  listedWithholding: 0,
-  specialAccounts: [],
-};
-
 export interface StockCategoryBreakdown extends StockTransferCategoryInput {
   /** 収入金額の小計（譲渡＋その他） */
   revenueTotal: number;

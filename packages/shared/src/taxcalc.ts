@@ -33,11 +33,6 @@ import {
 import type { AgricultureInput } from "./agriculture";
 import { TAX_PARAMETERS } from "./taxParameters";
 
-/** 消費税 標準税率 */
-export const TAX_RATE = 0.1;
-
-/** 青色申告特別控除の上限（65万円控除。不動産・事業の合算限度） */
-export const BLUE_MAX_BUSINESS = 650_000;
 /** 不動産所得のみで事業的規模でない場合の青色申告特別控除の上限 */
 export const BLUE_MAX_REAL_ESTATE = 100_000;
 
@@ -127,14 +122,6 @@ return Math.floor((incl * 78) / 1100);
 // 家事按分（事業分金額の算出）
 // ---------------------------------------------------------------------------
 
-/**
- * 按分の端数処理方式（定数）。事業分は取引単位で、金額の絶対値に割合を
- * 掛けた余りを切り捨てる（端数は私用分に寄せる）。この方式により
- * 事業分＋私用分＝元の金額 が常に成り立つ。方式を変える場合は
- * この定数と businessPortionAmount の1か所だけを変更する。
- */
-export const BUSINESS_PORTION_ROUNDING = "truncate" as const;
-
 /** 事業割合（0〜100）に正規化する。未指定・不正値は 100（全額事業分）。 */
 export function normalizeBusinessRatio(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 100;
@@ -148,7 +135,8 @@ export function businessRatioOf(transaction: Transaction): number {
 
 /**
  * 金額（符号つき）と事業割合から事業分金額を求める（符号つき）。
- * 端数処理は BUSINESS_PORTION_ROUNDING（取引単位・絶対値の切り捨て）。
+ * 端数処理は取引単位で、金額の絶対値に割合を掛けた余りを切り捨てる（端数は
+ * 私用分に寄せる）。これにより 事業分＋私用分＝元の金額 が常に成り立つ。
  */
 export function businessPortionAmount(amount: number, businessRatioPercent: number): number {
   const truncated = Math.trunc(amount || 0);

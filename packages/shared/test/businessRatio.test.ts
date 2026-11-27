@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  BUSINESS_PORTION_ROUNDING,
   Transaction,
   aggregateIncome,
   buildTrialBalance,
@@ -28,10 +27,6 @@ function tx(partial: Partial<Transaction>): Transaction {
 }
 
 describe("businessPortionAmount（端数処理の一貫性）", () => {
-  test("端数処理方式は定数で切り捨てに固定されている", () => {
-    expect(BUSINESS_PORTION_ROUNDING).toBe("truncate");
-  });
-
   test("取引単位で絶対値を切り捨てる（端数は私用分に寄る）", () => {
     expect(businessPortionAmount(10_001, 50)).toBe(5_000);
     expect(businessPortionAmount(-10_001, 50)).toBe(-5_000);

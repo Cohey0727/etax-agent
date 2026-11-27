@@ -14,5 +14,3 @@ export function sampleTransactions(): Transaction[] {
 }
 
 export const SAMPLE_ORIGINAL_2024: Record<string, unknown> = {"blue_deduction": 650000, "business_expenses": 1826500, "business_revenue": 13164000, "housing_loan_credit": 150000, "income_tax": 1480000, "real_estate_expenses": 0, "real_estate_revenue": 0, "year": 2024};
-
-export const SAMPLE_CORRECTED_2024: Record<string, unknown> = {"blue_deduction": 650000, "business_expenses": 1549500, "business_revenue": 11400000, "housing_loan_credit": 0, "income_tax": 1615000, "real_estate_expenses": 277000, "real_estate_revenue": 1764000, "year": 2024};
