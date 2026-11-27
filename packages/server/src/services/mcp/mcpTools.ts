@@ -85,9 +85,11 @@ import { mcpSubmissionTools } from "./mcpSubmissionTools";
 import { statementCategoryTotals, toTaxpayer } from "../../usecases/exportXtx";
 import { CreateFixedAssetRequestSchema } from "../../schemas/fixedAsset";
 
-export type { McpToolDef, McpToolResult } from "./mcpToolKit";
-import type { McpToolDef, McpToolHandler, McpToolModule, McpToolResult } from "./mcpToolKit";
 import {
+  McpToolDef,
+  McpToolHandler,
+  McpToolModule,
+  McpToolResult,
   agricultureArg,
   expandedIncomeArg,
   filingOptionsArg,

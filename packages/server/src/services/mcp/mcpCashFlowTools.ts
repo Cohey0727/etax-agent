@@ -5,7 +5,7 @@
  * 経路で結果がずれないようにする。数値は「登録済みの取引実績と未入金の
  * 請求書に基づく試算」で、税務判断は含まない（読み取り専用ツール）。
  */
-import { fetchCashFlowReport, type CashFlowReportParams } from "../cashFlow/getCashFlowReportData";
+import { CashFlowReportParams, fetchCashFlowReport } from "../cashFlow/getCashFlowReportData";
 import { McpToolModule, requireDb, textResult } from "./mcpToolKit";
 
 const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;

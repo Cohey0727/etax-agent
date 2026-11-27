@@ -13,7 +13,8 @@ import { Db } from "../src/lib/db";
 import { runWithTenant } from "../src/lib/tenantContext";
 import { createUser } from "../src/repositories/userRepository";
 import { listTransactionRows } from "../src/repositories/transactionRepository";
-import { dispatchMcpTool, McpToolResult } from "../src/services/mcp/mcpTools";
+import { McpToolResult } from "../src/services/mcp/mcpToolKit";
+import { dispatchMcpTool } from "../src/services/mcp/mcpTools";
 
 const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ?? "postgres://etax:etax@127.0.0.1:5432/etaxagent_test";

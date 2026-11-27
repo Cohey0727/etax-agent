@@ -16,6 +16,7 @@ import {
   ExpandedIncomeInput,
   FilingType,
   IncomeType,
+  ListedDividendMode,
   MiscIncomeInput,
   SalaryIncomeInput,
   StockTransferCategoryInput,
@@ -199,6 +200,11 @@ export function salaryIncomeArg(args: Record<string, unknown>): SalaryIncomeInpu
   };
 }
 
+/** 上場分の配当の課税方式。未指定・不正な値は総合課税として扱う（正規化と同じ既定）。 */
+function listedDividendModeArg(value: unknown): ListedDividendMode {
+  return value === "separate" || value === "none" ? value : "comprehensive";
+}
+
 /**
  * 拡張所得（配当・一時・株式等譲渡）の引数を入力形式に変換する。
  * 内側は雑所得・給与と同じ camelCase 形式。未指定なら undefined、
@@ -235,7 +241,7 @@ export function expandedIncomeArg(args: Record<string, unknown>): ExpandedIncome
       listedRevenue: num(dividend["listedRevenue"]),
       listedTrustRevenue: num(dividend["listedTrustRevenue"]),
       listedWithholding: num(dividend["listedWithholding"]),
-      listedMode: dividend["listedMode"] as never,
+      listedMode: listedDividendModeArg(dividend["listedMode"]),
       generalRevenue: num(dividend["generalRevenue"]),
       generalTrustRevenue: num(dividend["generalTrustRevenue"]),
       generalWithholding: num(dividend["generalWithholding"]),
