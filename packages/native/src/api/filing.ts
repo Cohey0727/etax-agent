@@ -44,15 +44,54 @@ export async function updateFilingStatus(
   return data?.status ?? null;
 }
 
+/* ---------- 保存値の取得結果 ---------- */
+
+/**
+ * 保存値の取得結果。未保存（unsaved）と取得できなかった（failed）を分ける。
+ * 取得の失敗を未保存と読んで空の入力から保存すると、サーバーの値を
+ * 全体置換で消してしまうため、編集を始めてよいのは saved / unsaved のときだけ。
+ */
+export type SavedValueResult<T> =
+  | { kind: "saved"; value: T }
+  | { kind: "unsaved" }
+  | { kind: "failed" };
+
+/**
+ * GET の応答を SavedValueResult にする。pick は応答の形を確かめて保存値を返し、
+ * 未保存なら null、形が違えば undefined を返す（JSON でない応答や途中の
+ * プロキシの応答を未保存と読まないため）。
+ */
+async function fetchSavedValue<T>(
+  path: string,
+  pick: (data: Record<string, unknown>) => T | null | undefined,
+): Promise<SavedValueResult<T>> {
+  let data: unknown;
+  try {
+    data = await apiJson<unknown>(path);
+  } catch {
+    return { kind: "failed" };
+  }
+  if (typeof data !== "object" || data === null) return { kind: "failed" };
+  const value = pick(data as Record<string, unknown>);
+  if (value === undefined) return { kind: "failed" };
+  return value === null ? { kind: "unsaved" } : { kind: "saved", value };
+}
+
 /* ---------- 申告入力（控除等） ---------- */
 
-/** 対象年の申告入力をDBから取得する。未保存・失敗時は null。 */
+/** 対象年の申告入力をDBから取得する。 */
+export async function fetchFilingInputsResult(year: number): Promise<SavedValueResult<unknown>> {
+  return fetchSavedValue(`/api/filing-inputs/${year}`, (data) =>
+    "state" in data ? (data.state ?? null) : undefined,
+  );
+}
+
+/** 対象年の申告入力の保存値。未保存と取得失敗はどちらも null（有無の表示だけに使う）。 */
 export async function fetchFilingInputs(
   year: number,
 ): Promise<{ state: unknown } | null> {
-  const data = await apiJsonOrNull<{ state: unknown }>(`/api/filing-inputs/${year}`);
-  if (!data || data.state === null || data.state === undefined) return null;
-  return { state: data.state };
+  const result = await fetchFilingInputsResult(year);
+  return result.kind === "saved" ? { state: result.value } : null;
 }
 
 /** 対象年の申告入力をDBへ保存する。失敗した場合は false。 */
@@ -156,11 +195,26 @@ export async function fetchFilingSubmissionHistory(
 
 /* ---------- 納税者プロフィール ---------- */
 
-/** 納税者プロフィール（年度別・DB保存）を取得する。取得できない場合は null。 */
+/**
+ * 納税者プロフィール（年度別・DB保存）を取得する。対象年の保存が無ければ
+ * サーバーが過去年の引き継ぎか空のプロフィールを返すので、成功は常に saved。
+ */
+export async function fetchTaxpayerProfileResult(
+  year: number,
+): Promise<SavedValueResult<TaxpayerProfileResult>> {
+  return fetchSavedValue(`/api/taxpayer/${year}`, (data) =>
+    typeof data.taxpayer === "object" && data.taxpayer !== null
+      ? (data as unknown as TaxpayerProfileResult)
+      : undefined,
+  );
+}
+
+/** 納税者プロフィール。取得できない場合は null（有無の表示だけに使う）。 */
 export async function fetchTaxpayerProfile(
   year: number,
 ): Promise<TaxpayerProfileResult | null> {
-  return apiJsonOrNull<TaxpayerProfileResult>(`/api/taxpayer/${year}`);
+  const result = await fetchTaxpayerProfileResult(year);
+  return result.kind === "saved" ? result.value : null;
 }
 
 /** 納税者プロフィールを対象年としてDBへ保存する。失敗した場合は false。 */
@@ -177,9 +231,13 @@ export async function saveTaxpayerProfile(
 
 /* ---------- 開業入力 ---------- */
 
-/** 開業の専用入力を取得する。失敗時は null。 */
-export async function fetchBusinessStartInputs(): Promise<BusinessStartInputsResponse | null> {
-  return apiJsonOrNull<BusinessStartInputsResponse>("/api/business-start-inputs");
+/** 開業の専用入力を取得する。 */
+export async function fetchBusinessStartInputsResult(): Promise<
+  SavedValueResult<BusinessStartInputs>
+> {
+  return fetchSavedValue("/api/business-start-inputs", (data) =>
+    "state" in data ? ((data as unknown as BusinessStartInputsResponse).state ?? null) : undefined,
+  );
 }
 
 /** 開業の専用入力をDBへ保存する。失敗した場合は false。 */

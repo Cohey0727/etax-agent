@@ -17,14 +17,12 @@ import {
   exportBlueReturnPdfFile,
   exportOpeningNoticePdfFile,
   saveBase64ToCacheFile,
+  saveBusinessStartInputs,
   shareFile,
 } from "@/api";
 import { space } from "@/theme";
-import {
-  emptyBusinessStartInputs,
-  loadBusinessStartInputs,
-  saveBusinessStartInputs,
-} from "../businessStartData";
+import { emptyBusinessStartInputs, loadBusinessStartInputs } from "../businessStartData";
+import { LoadFailedNotice } from "../fields";
 import { loadTaxpayer, todayIso } from "../taxpayerData";
 import {
   CheckRow,
@@ -40,6 +38,8 @@ export interface BusinessStartPanelProps {
 
 const SAVE_DELAY_MS = 600;
 const SKELETON_ROWS: readonly number[] = [1, 2, 3];
+
+type LoadStatus = "loading" | "failed" | "ready";
 
 const INCOME_TYPE_OPTIONS: readonly { key: BusinessStartIncomeType; label: string }[] = [
   { key: "business", label: "事業（農業）所得" },
@@ -58,7 +58,8 @@ const INCOME_TYPE_OPTIONS: readonly { key: BusinessStartIncomeType; label: strin
  */
 export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
   const [inputs, setInputs] = useState<BusinessStartInputs>(() => emptyBusinessStartInputs());
-  const [loaded, setLoaded] = useState(false);
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput | null>(null);
   const [exporting, setExporting] = useState<"opening" | "blue" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -71,12 +72,17 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
     void loadBusinessStartInputs().then((saved) => {
       if (cancelled) return;
       if (saved) setInputs(saved);
-      setLoaded(true);
+      setLoadStatus(saved ? "ready" : "failed");
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
+
+  const retryLoad = () => {
+    setLoadStatus("loading");
+    setLoadAttempt((n) => n + 1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -99,9 +105,9 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
   }, []);
 
   const update = (patch: Partial<BusinessStartInputs>) => {
+    if (loadStatus !== "ready") return;
     const next = { ...inputs, ...patch };
     setInputs(next);
-    if (!loaded) return;
     pendingRef.current = next;
     if (timerRef.current !== null) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -145,19 +151,26 @@ export function BusinessStartPanel({ year }: BusinessStartPanelProps) {
     }
   };
 
-  if (!loaded) {
+  if (loadStatus !== "ready") {
     return (
       <Card>
         <View style={styles.wrap}>
           <AppText size="lg" weight="bold">
             開業届・青色申告承認申請書
           </AppText>
-          {SKELETON_ROWS.map((row) => (
-            <View key={row} style={styles.skeletonRow}>
-              <SkeletonBar width="30%" height={14} />
-              <SkeletonBar height={36} />
-            </View>
-          ))}
+          {loadStatus === "failed" ? (
+            <LoadFailedNotice
+              message="開業届・青色申告承認申請書の入力を取得できませんでした。"
+              onRetry={retryLoad}
+            />
+          ) : (
+            SKELETON_ROWS.map((row) => (
+              <View key={row} style={styles.skeletonRow}>
+                <SkeletonBar width="30%" height={14} />
+                <SkeletonBar height={36} />
+              </View>
+            ))
+          )}
         </View>
       </Card>
     );

@@ -1,16 +1,10 @@
 /**
- * businessStartData.ts — 開業届・青色申告承認申請書の専用入力の読み書き。
+ * businessStartData.ts — 開業届・青色申告承認申請書の専用入力の読み込み。
  *
  * 保存先はサーバーのDB（所有者ごとに1件）。開業は一度きりの手続きで
  * 年度に属さないため、プロフィール（年度別）とは別の保存になる。
- * 読み込みに失敗した場合は null を返し、呼び出し側が空の入力で始める。
  */
-import {
-  BusinessStartInputs,
-  SalarySituationRow,
-  fetchBusinessStartInputs,
-  saveBusinessStartInputs as saveBusinessStartInputsToServer,
-} from "@/api";
+import { BusinessStartInputs, SalarySituationRow, fetchBusinessStartInputsResult } from "@/api";
 
 function emptySalaryRow(): SalarySituationRow {
   return { count: null, terms: "", has_tax: null };
@@ -52,15 +46,14 @@ export function emptyBusinessStartInputs(): BusinessStartInputs {
   };
 }
 
-/** 保存済みの専用入力を読み込む。未保存・失敗時は null。 */
+/**
+ * 保存済みの専用入力を読み込む。未保存なら空の入力、取得できなければ null
+ * （空の入力で始めると、保存したときにサーバーの値を消してしまう）。
+ */
 export async function loadBusinessStartInputs(): Promise<BusinessStartInputs | null> {
-  const result = await fetchBusinessStartInputs().catch(() => null);
-  if (!result?.state) return null;
+  const result = await fetchBusinessStartInputsResult();
+  if (result.kind === "failed") return null;
+  if (result.kind === "unsaved") return emptyBusinessStartInputs();
   // 保存値に欠けた項目があっても空の入力で補って使う。
-  return { ...emptyBusinessStartInputs(), ...result.state };
-}
-
-/** 専用入力をDBへ保存する。失敗した場合は false。 */
-export async function saveBusinessStartInputs(state: BusinessStartInputs): Promise<boolean> {
-  return saveBusinessStartInputsToServer(state);
+  return { ...emptyBusinessStartInputs(), ...result.value };
 }
