@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
+import { ConsumptionLedgerSummary } from "@components/organisms/filing/ConsumptionLedgerSummary";
 import { EtaxImportGuide } from "@components/organisms/filing/EtaxImportGuide";
 import {
   emptyTaxpayer,
@@ -24,7 +25,6 @@ import {
   EDITABLE_FIELDS,
   EditableForm,
   EditableKey,
-  SUMMARY_ROWS,
 } from "./consumptionTaxFields";
 import { ConsumptionResultUnit, buildResultRows } from "./consumptionTaxHelpers";
 import styles from "./ConsumptionTaxPanel.css";
@@ -208,49 +208,7 @@ export const ConsumptionTaxPanel = ({
           />
         </Row>
 
-        <Text className={styles.subhead}>帳簿からの集計（自動）</Text>
-        {SUMMARY_ROWS.map((row) => (
-          <Row key={row.key} gap="sm">
-            <div className={styles.fieldLabel}>
-              <Text variant="muted">{row.label}</Text>
-            </div>
-            <Text className={styles.amountValue}>{formatYen(summary[row.key])}</Text>
-          </Row>
-        ))}
-        {summary.unsetCount > 0 ? (
-          <AlertBox variant="notice">
-            <Row gap="sm" align="center" justify="spaceBetween" wrap>
-              <Text>
-                税区分が未設定の取引が {summary.unsetCount} 件（合計 {formatYen(summary.unsetAmount)}
-                ）あります。集計に含まれていません。
-              </Text>
-              {onOpenLedger ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onOpenLedger("taxUnset")}
-                >
-                  帳簿で確認する →
-                </Button>
-              ) : null}
-            </Row>
-          </AlertBox>
-        ) : null}
-        {summary.excludedCount > 0 ? (
-          <AlertBox variant="notice">
-            <Row gap="sm" align="center" justify="spaceBetween" wrap>
-              <Text>
-                税区分と金額の符号が不一致の取引が {summary.excludedCount} 件（合計{" "}
-                {formatYen(summary.excludedAmount)}）あります。集計に含まれていません。
-              </Text>
-              {onOpenLedger ? (
-                <Button variant="ghost" size="sm" onClick={() => onOpenLedger("mismatch")}>
-                  帳簿で確認する →
-                </Button>
-              ) : null}
-            </Row>
-          </AlertBox>
-        ) : null}
+        <ConsumptionLedgerSummary summary={summary} onOpenLedger={onOpenLedger} />
 
         <Text className={styles.subhead}>帳簿の外の数字（入力）</Text>
         {EDITABLE_FIELDS.map((field) => (

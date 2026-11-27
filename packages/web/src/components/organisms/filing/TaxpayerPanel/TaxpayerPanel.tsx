@@ -1,35 +1,28 @@
 import {
-  AgricultureInput,
-  DeductionInputs,
-  ExpandedIncomeInput,
-  FilingType,
+  DeductionState,
   IncomeTaxPaymentInputs,
-  MiscIncomeInput,
-  SalaryIncomeInput,
-  TaxCreditInputs,
   Transaction,
-  XtxBalanceSheetInput,
   agricultureToWire,
   balanceSheetToWire,
   buildTrialBalanceSheet,
-  computeCorrectedFigures,
   expandedIncomeToWire,
   isAgricultureEmpty,
   isBalanceSheetEmpty,
   isExpandedIncomeEmpty,
   xtxSupportedYears,
 } from "@etax/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
+import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
-import { toAmount } from "@utils/amountInput";
 import { exportDomicilePdfFile, exportReturnPdfFile, exportXtxFile } from "@utils/api";
 import { downloadPdfFile, downloadTextFile } from "@utils/fileDownload";
 import { todayIso } from "@utils/localDate";
 import { EtaxImportGuide } from "@components/organisms/filing/EtaxImportGuide";
 import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingSection } from "../FilingPanel";
+import { TaxpayerProfileSummary } from "../TaxpayerProfileSummary";
 import { emptyTaxpayer, loadTaxpayer } from "../TaxpayerProfilePanel";
 import styles from "./TaxpayerPanel.css";
 
@@ -37,27 +30,13 @@ export interface TaxpayerPanelProps {
   year: number;
   /** 対象年分の取引（帳簿）。XTXはこの取引データから生成される。 */
   transactions: Transaction[];
-  deductions: DeductionInputs;
-  taxCredits: TaxCreditInputs;
-  /** 雑所得（その他）。帳簿に載らない所得として申告数値に含める。 */
-  miscIncome?: MiscIncomeInput;
-  /** 給与所得。帳簿に載らない給与として申告数値に含める。 */
-  salaryIncome?: SalaryIncomeInput;
-  /** 配当・一時・株式等譲渡。申告数値とXTX（第三表・計算明細書）に含める。 */
-  expandedIncome?: ExpandedIncomeInput;
-  /** 農業所得。申告数値とXTX（農業所得用の決算書）に含める。 */
-  agriculture?: AgricultureInput;
-  /** 申告の種類（青色申告特別控除の区分）。出力する申告数値の計算に使う。 */
-  filingType?: FilingType;
-  /** 不動産貸付けが事業的規模か */
-  realEstateBusinessScale?: boolean;
-  /** 貸借対照表の入力（申告入力に保存されたもの）。XTXの決算書4面に反映する。 */
-  balanceSheet?: XtxBalanceSheetInput | null;
-  /** 源泉徴収税額・予定納税額（申告入力に保存されたもの）。 */
-  incomeTaxPayments: IncomeTaxPaymentInputs;
+  /** 対象年の申告入力。控除・所得・申告の種類・貸借対照表・源泉徴収税額を出力に使う。 */
+  state: DeductionState;
+  /** 青色申告特別控除前の事業所得（貸借対照表の貸借チェックに使う）。 */
+  incomeBeforeBlue: number;
   onIncomeTaxPaymentsChange: (next: IncomeTaxPaymentInputs) => void;
-  /** 納税者情報タブへの遷移（確定申告画面の総合でのみ渡される）。 */
-  onOpenSection?: (section: FilingSection) => void;
+  /** 納税者情報タブへの遷移。 */
+  onOpenSection: (section: FilingSection) => void;
 }
 
 /**
@@ -68,22 +47,13 @@ export interface TaxpayerPanelProps {
 export const TaxpayerPanel = ({
   year,
   transactions,
-  deductions,
-  taxCredits,
-  miscIncome,
-  salaryIncome,
-  expandedIncome,
-  agriculture,
-  filingType,
-  realEstateBusinessScale,
-  balanceSheet,
-  incomeTaxPayments,
+  state,
+  incomeBeforeBlue,
   onIncomeTaxPaymentsChange,
   onOpenSection,
 }: TaxpayerPanelProps) => {
   const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput>(() => emptyTaxpayer());
   const [submissionDate, setSubmissionDate] = useState<string>(() => todayIso());
-  const { withholdingTax, prepaidTax } = incomeTaxPayments;
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingDomicile, setExportingDomicile] = useState(false);
@@ -94,12 +64,12 @@ export const TaxpayerPanel = ({
   const [xsdWarning, setXsdWarning] = useState<string | null>(null);
 
   const supported = xtxSupportedYears().includes(year);
+  const { incomeTaxPayments, expandedIncome, agriculture, balanceSheet } = state;
 
-  // 年度が切り替わったら、その年度のプロフィールを読み直す。
   // 納税者情報タブで編集して戻ってきた場合も、マウントし直しで最新を読む。
   useEffect(() => {
     let cancelled = false;
-    loadTaxpayer(year).then((loadedProfile) => {
+    void loadTaxpayer(year).then((loadedProfile) => {
       if (!cancelled && loadedProfile) setTaxpayer(loadedProfile.taxpayer);
     });
     return () => {
@@ -113,46 +83,24 @@ export const TaxpayerPanel = ({
     submission_date: submissionDate,
     taxpayer,
     transactions,
-    deductions,
-    tax_credits: taxCredits,
-    misc_income: miscIncome,
-    salary_income: salaryIncome,
-    expanded_income:
-      expandedIncome && !isExpandedIncomeEmpty(expandedIncome)
-        ? expandedIncomeToWire(expandedIncome)
-        : undefined,
-    agriculture:
-      agriculture && !isAgricultureEmpty(agriculture)
-        ? agricultureToWire(agriculture)
-        : undefined,
-    filing_type: filingType,
-    real_estate_business_scale: realEstateBusinessScale,
-    withholding_tax: withholdingTax,
-    prepaid_tax: prepaidTax,
+    deductions: state.deductions,
+    tax_credits: state.taxCredits,
+    misc_income: state.miscIncome,
+    salary_income: state.salaryIncome,
+    expanded_income: isExpandedIncomeEmpty(expandedIncome) ? undefined : expandedIncomeToWire(expandedIncome),
+    agriculture: isAgricultureEmpty(agriculture) ? undefined : agricultureToWire(agriculture),
+    filing_type: state.filingType,
+    real_estate_business_scale: state.realEstateBusinessScale,
+    withholding_tax: incomeTaxPayments.withholdingTax,
+    prepaid_tax: incomeTaxPayments.prepaidTax,
     original_third_period_tax: null,
     balance_sheet:
-      balanceSheet && !isBalanceSheetEmpty(balanceSheet)
-        ? balanceSheetToWire(balanceSheet)
-        : undefined,
+      balanceSheet && !isBalanceSheetEmpty(balanceSheet) ? balanceSheetToWire(balanceSheet) : undefined,
   });
 
   // 貸借対照表の貸借チェック（警告のみ。出力ボタンは止めないが、
   // 不一致のまま出力するとサーバー側で不整合としてエラーになる）。
-  const balanceSheetCheck = useMemo(() => {
-    if (!balanceSheet || isBalanceSheetEmpty(balanceSheet)) return null;
-    const figures = computeCorrectedFigures(transactions, year, {
-      filingType,
-      realEstateBusinessScale,
-    });
-    const sheet = buildTrialBalanceSheet(
-      balanceSheet,
-      figures._detail.business_income_before_deduction,
-    );
-    const sides: string[] = [];
-    if (!sheet.opening_balanced) sides.push("期首");
-    if (!sheet.closing_balanced) sides.push("期末");
-    return sides.length > 0 ? sides.join("・") : null;
-  }, [balanceSheet, transactions, year, filingType, realEstateBusinessScale]);
+  const unbalancedSides = balanceSheetUnbalancedSides(balanceSheet, incomeBeforeBlue);
 
   const handleExport = async () => {
     setExporting(true);
@@ -213,33 +161,6 @@ export const TaxpayerPanel = ({
     }
   };
 
-  const summaryRows: readonly { label: string; value: string }[] = [
-    {
-      label: "氏名",
-      value: taxpayer.name
-        ? taxpayer.name_kana
-          ? `${taxpayer.name}（${taxpayer.name_kana}）`
-          : taxpayer.name
-        : "",
-    },
-    {
-      label: "住所",
-      value: [
-        taxpayer.zip_code ? `〒${taxpayer.zip_code}` : "",
-        taxpayer.address,
-        taxpayer.address_line2,
-      ]
-        .filter((part) => part.length > 0)
-        .join(" "),
-    },
-    { label: "電話番号", value: taxpayer.phone },
-    {
-      label: "提出先の税務署",
-      value: taxpayer.tax_office_name ? `${taxpayer.tax_office_name}税務署` : "",
-    },
-    { label: "インボイス登録番号", value: taxpayer.invoice_number },
-  ];
-
   return (
     <Card>
       <Col gap="md">
@@ -251,22 +172,7 @@ export const TaxpayerPanel = ({
           </Text>
         </Col>
 
-        <Text className={styles.subhead}>納税者情報</Text>
-        {summaryRows.map((row) => (
-          <Row key={row.label} gap="sm">
-            <div className={styles.fieldLabel}>
-              <Text variant="muted">{row.label}</Text>
-            </div>
-            {row.value ? <Text>{row.value}</Text> : <Text variant="muted">未入力</Text>}
-          </Row>
-        ))}
-        {onOpenSection ? (
-          <Row gap="sm">
-            <Button variant="ghost" size="sm" onClick={() => onOpenSection("taxpayer")}>
-              納税者情報タブを開く
-            </Button>
-          </Row>
-        ) : null}
+        <TaxpayerProfileSummary taxpayer={taxpayer} onOpenProfile={() => onOpenSection("taxpayer")} />
 
         <Text className={styles.subhead}>出力の条件</Text>
         <Row gap="sm">
@@ -287,46 +193,25 @@ export const TaxpayerPanel = ({
             aria-label="提出日"
           />
         </Row>
-        <Row gap="sm">
-          <div className={styles.fieldLabel}>
-            <Text variant="muted">源泉徴収税額</Text>
-          </div>
-          <Input
-            className={styles.fieldNumber}
-            type="number"
-            value={withholdingTax}
-            onChange={(e) =>
-              onIncomeTaxPaymentsChange({
-                ...incomeTaxPayments,
-                withholdingTax: toAmount(e.target.value),
-              })
-            }
-            aria-label="源泉徴収税額"
-          />
-        </Row>
-        {expandedIncome && !isExpandedIncomeEmpty(expandedIncome) ? (
+        <LabeledAmountField
+          label="源泉徴収税額"
+          value={incomeTaxPayments.withholdingTax}
+          onChange={(v) => onIncomeTaxPaymentsChange({ ...incomeTaxPayments, withholdingTax: v })}
+        />
+        {isExpandedIncomeEmpty(expandedIncome) ? null : (
           <Text variant="muted">
             配当・株式等譲渡の源泉徴収税額は、各所得の入力欄で入れた金額が自動で加算されます（ここには含めないでください）。
           </Text>
-        ) : null}
-        <Row gap="sm">
-          <div className={styles.fieldLabel}>
-            <Text variant="muted">予定納税額</Text>
-          </div>
-          <Input
-            className={styles.fieldNumber}
-            type="number"
-            value={prepaidTax}
-            onChange={(e) =>
-              onIncomeTaxPaymentsChange({ ...incomeTaxPayments, prepaidTax: toAmount(e.target.value) })
-            }
-            aria-label="予定納税額"
-          />
-        </Row>
+        )}
+        <LabeledAmountField
+          label="予定納税額"
+          value={incomeTaxPayments.prepaidTax}
+          onChange={(v) => onIncomeTaxPaymentsChange({ ...incomeTaxPayments, prepaidTax: v })}
+        />
 
-        {balanceSheetCheck ? (
+        {unbalancedSides ? (
           <AlertBox variant="notice">
-            貸借対照表の貸借が一致していません（{balanceSheetCheck}）。
+            貸借対照表の貸借が一致していません（{unbalancedSides}）。
             このまま出力するとエラーになります。収支タブの貸借対照表で金額を確認してください。
           </AlertBox>
         ) : null}
@@ -372,3 +257,16 @@ export const TaxpayerPanel = ({
     </Card>
   );
 };
+
+/** 貸借対照表の貸借が一致していない側（「期首・期末」など）。入力が無い・一致していれば null。 */
+function balanceSheetUnbalancedSides(
+  balanceSheet: DeductionState["balanceSheet"],
+  incomeBeforeBlue: number,
+): string | null {
+  if (!balanceSheet || isBalanceSheetEmpty(balanceSheet)) return null;
+  const sheet = buildTrialBalanceSheet(balanceSheet, incomeBeforeBlue);
+  const sides: string[] = [];
+  if (!sheet.opening_balanced) sides.push("期首");
+  if (!sheet.closing_balanced) sides.push("期末");
+  return sides.length > 0 ? sides.join("・") : null;
+}

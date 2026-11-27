@@ -42,7 +42,7 @@ const { emptyTaxpayer, loadTaxpayer } = await import(
   "../src/components/organisms/filing/TaxpayerProfilePanel/taxpayerStorage"
 );
 const { loadBusinessStartInputs } = await import(
-  "../src/components/organisms/filing/BusinessStartPanel/businessStartStorage"
+  "../src/components/organisms/filing/hooks/useBusinessStartInputs/businessStartStorage"
 );
 
 interface Call {

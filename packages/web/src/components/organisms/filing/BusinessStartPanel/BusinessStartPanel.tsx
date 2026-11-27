@@ -1,5 +1,5 @@
 import { BLUE_BOOK_OPTIONS, businessStartDeadlines } from "@etax/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Col, Row, SkeletonBar, Text, Textarea } from "@components/atoms";
 import { RetryNotice } from "@components/molecules/RetryNotice";
 import {
@@ -17,18 +17,11 @@ import {
   TextField,
   formatJapaneseDate,
 } from "./businessStartFields";
-import {
-  exportBlueReturnPdfFile,
-  exportOpeningNoticePdfFile,
-  saveBusinessStartInputsToServer,
-} from "@utils/api";
+import { exportBlueReturnPdfFile, exportOpeningNoticePdfFile } from "@utils/api";
 import { downloadPdfFile } from "@utils/fileDownload";
 import { todayIso } from "@utils/localDate";
 import { loadTaxpayer } from "@components/organisms/filing/TaxpayerProfilePanel";
-import {
-  emptyBusinessStartInputs,
-  loadBusinessStartInputs,
-} from "./businessStartStorage";
+import { useBusinessStartInputs } from "../hooks";
 import styles from "./BusinessStartPanel.css";
 
 export interface BusinessStartPanelProps {
@@ -37,7 +30,6 @@ export interface BusinessStartPanelProps {
 
 type SalaryRowKey = "salary_family" | "salary_employee" | "salary_other";
 
-const SAVE_DELAY_MS = 600;
 const SKELETON_ROWS: readonly number[] = [1, 2, 3];
 
 const INCOME_TYPE_OPTIONS: readonly { key: BusinessStartIncomeType; label: string }[] = [
@@ -67,33 +59,11 @@ const BOOKKEEPING_OPTIONS: readonly { value: string; label: string }[] = [
  * e-Tax 等で本人が行う（アプリ内送信はしない）。
  */
 export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
-  const [inputs, setInputs] = useState<BusinessStartInputs>(() => emptyBusinessStartInputs());
-  const [loaded, setLoaded] = useState(false);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [loadAttempt, setLoadAttempt] = useState(0);
+  const { inputs, loaded, loadFailed, update, retry } = useBusinessStartInputs();
   const [taxpayer, setTaxpayer] = useState<XtxTaxpayerInput | null>(null);
   const [exporting, setExporting] = useState<"opening" | "blue" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const pendingRef = useRef<BusinessStartInputs | null>(null);
-  const timerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadBusinessStartInputs().then((result) => {
-      if (cancelled) return;
-      if (result.status === "failed") {
-        setLoadFailed(true);
-        return;
-      }
-      if (result.status === "loaded") setInputs(result.value);
-      setLoaded(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [loadAttempt]);
-
   useEffect(() => {
     let cancelled = false;
     void loadTaxpayer(year).then((next) => {
@@ -104,37 +74,12 @@ export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
     };
   }, [year]);
 
-  // 画面を離れるとき、保存待ちの入力があれば即座に保存する。
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-      if (pending) void saveBusinessStartInputsToServer(pending);
-    };
-  }, []);
-
-  const update = (patch: Partial<BusinessStartInputs>) => {
-    const next = { ...inputs, ...patch };
-    setInputs(next);
-    if (!loaded) return;
-    pendingRef.current = next;
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-      if (pending) void saveBusinessStartInputsToServer(pending);
-    }, SAVE_DELAY_MS);
-  };
-
   const toggleIncomeType = (key: BusinessStartIncomeType, checked: boolean) => {
     const next = checked
       ? [...inputs.income_types, key]
       : inputs.income_types.filter((type) => type !== key);
     update({ income_types: next });
   };
-
 
   const toggleBook = (key: string, checked: boolean) => {
     const next = checked ? [...inputs.books, key] : inputs.books.filter((book) => book !== key);
@@ -178,10 +123,7 @@ export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
           {loadFailed ? (
             <RetryNotice
               message="開業届・青色申告承認申請書の入力をサーバーから読み込めませんでした。"
-              onRetry={() => {
-                setLoadFailed(false);
-                setLoadAttempt((n) => n + 1);
-              }}
+              onRetry={retry}
             />
           ) : (
             SKELETON_ROWS.map((row) => (

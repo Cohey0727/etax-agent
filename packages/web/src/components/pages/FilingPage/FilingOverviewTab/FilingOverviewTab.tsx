@@ -30,16 +30,8 @@ export const FilingOverviewTab = ({
       <TaxpayerPanel
         year={year}
         transactions={yearTransactions}
-        deductions={state.deductions}
-        taxCredits={state.taxCredits}
-        miscIncome={state.miscIncome}
-        salaryIncome={state.salaryIncome}
-        expandedIncome={state.expandedIncome}
-        agriculture={state.agriculture}
-        filingType={state.filingType}
-        realEstateBusinessScale={state.realEstateBusinessScale}
-        balanceSheet={state.balanceSheet}
-        incomeTaxPayments={state.incomeTaxPayments}
+        state={state}
+        incomeBeforeBlue={figures.corrected._detail.business_income_before_deduction}
         onIncomeTaxPaymentsChange={(next) => deduction.update({ incomeTaxPayments: next })}
         onOpenSection={onOpenSection}
       />
