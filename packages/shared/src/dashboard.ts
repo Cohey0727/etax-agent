@@ -89,7 +89,7 @@ export interface CategoryAmount {
 }
 
 /** 円グラフに出すスライスの上限。超えた分は「その他」にまとめる。 */
-export const BREAKDOWN_MAX_SLICES = 6;
+const BREAKDOWN_MAX_SLICES = 6;
 
 /**
  * 主要科目の固定色（パレットの番号）。収入・支出の両方で同じ科目は同じ色にする。
