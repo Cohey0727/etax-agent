@@ -1,4 +1,4 @@
-import { Transaction, aggregateIncome, filterYear } from "@etax/shared";
+import { Transaction, yearlyIncomeTotals } from "@etax/shared";
 import { useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import Svg, { G, Line, Rect, Text as SvgText } from "react-native-svg";
@@ -6,13 +6,6 @@ import { AppText, Card, LabeledValue } from "@/components";
 import { colors, space } from "@/theme";
 import { formatYen } from "@/utils";
 import { formatCompactYen } from "../format";
-
-interface YearTotals {
-  year: number;
-  revenue: number;
-  expenses: number;
-  balance: number;
-}
 
 type SeriesKey = "revenue" | "expenses" | "balance";
 
@@ -35,15 +28,7 @@ export interface YearlyTrendPanelProps {
 
 /** 年度を跨ぐ推移（売上・経費・収支）。事業＋不動産の集計を棒グラフ＋金額で並べる。 */
 export function YearlyTrendPanel({ transactions }: YearlyTrendPanelProps) {
-  const years = useMemo<YearTotals[]>(() => {
-    const distinctYears = [...new Set(transactions.map((t) => t.year))].sort((a, b) => a - b);
-    return distinctYears.map((year) => {
-      const breakdown = aggregateIncome(filterYear(transactions, year));
-      const revenue = breakdown.businessRevenue + breakdown.realEstateRevenue;
-      const expenses = breakdown.businessExpenses + breakdown.realEstateExpenses;
-      return { year, revenue, expenses, balance: revenue - expenses };
-    });
-  }, [transactions]);
+  const years = useMemo(() => yearlyIncomeTotals(transactions), [transactions]);
 
   if (years.length === 0) return null;
 

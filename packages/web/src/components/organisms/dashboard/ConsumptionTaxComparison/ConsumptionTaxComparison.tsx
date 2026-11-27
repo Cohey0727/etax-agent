@@ -1,22 +1,15 @@
-import { ConsumptionMethod } from "@etax/shared";
+import { ConsumptionComparisonRow, ConsumptionMethod } from "@etax/shared";
 import { clsx } from "clsx";
 import { Card, Col, Table, TableCell, TableHeaderCell, Text } from "@components/atoms";
 import { formatNumber, formatYen } from "@utils";
 import styles from "./ConsumptionTaxComparison.css";
-
-export interface ConsumptionTaxRow {
-  method: ConsumptionMethod;
-  outputTax: number;
-  inputTax: number;
-  payable: number;
-}
 
 export interface ConsumptionTaxComparisonProps {
   year: number;
   taxable: number;
   nontaxable: number;
   inputTax: number;
-  results: readonly ConsumptionTaxRow[];
+  results: readonly ConsumptionComparisonRow[];
 }
 
 const methodDetails = {

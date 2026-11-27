@@ -1,23 +1,16 @@
-import { ConsumptionMethod } from "@etax/shared";
+import { ConsumptionComparisonRow, ConsumptionMethod } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeInRight } from "react-native-reanimated";
 import { AppText, Card, LabeledValue } from "@/components";
 import { colors, radius, space, springs } from "@/theme";
 import { formatNumber, formatYen } from "@/utils";
 
-export interface ConsumptionTaxRow {
-  method: ConsumptionMethod;
-  outputTax: number;
-  inputTax: number;
-  payable: number;
-}
-
 export interface ConsumptionTaxComparisonProps {
   year: number;
   taxable: number;
   nontaxable: number;
   inputTax: number;
-  results: readonly ConsumptionTaxRow[];
+  results: readonly ConsumptionComparisonRow[];
 }
 
 const methodDetails = {

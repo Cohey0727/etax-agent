@@ -1,4 +1,4 @@
-import { Transaction, filterYear, transactionBusinessAmount } from "@etax/shared";
+import { CategoryBreakdown, Transaction, categoryBreakdown, filterYear } from "@etax/shared";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
@@ -6,13 +6,6 @@ import { AppText, Card } from "@/components";
 import { colors, radius, space } from "@/theme";
 import { formatYen } from "@/utils";
 import { formatCompactYen } from "../format";
-
-interface CategoryAmount {
-  category: string;
-  amount: number;
-}
-
-const MAX_SLICES = 6;
 
 const SLICE_COLORS: readonly string[] = [
   "#4a3aff",
@@ -26,15 +19,6 @@ const SLICE_COLORS: readonly string[] = [
 ];
 const OTHER_COLOR = "#9ca3af";
 
-const CATEGORY_COLOR_INDEX: Record<string, number> = {
-  売上高: 0,
-  家賃収入: 1,
-  雑費: 2,
-  消耗品費: 3,
-  旅費交通費: 4,
-  通信費: 5,
-};
-
 export interface BreakdownPanelProps {
   transactions: Transaction[];
   year: number;
@@ -47,48 +31,30 @@ export interface BreakdownPanelProps {
  */
 export function BreakdownPanel({ transactions, year }: BreakdownPanelProps) {
   const yearTransactions = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  const scoped = useMemo(
-    () => yearTransactions.filter((t) => t.income_type !== "other"),
+  const income = useMemo(() => categoryBreakdown(yearTransactions, "income"), [yearTransactions]);
+  const expenses = useMemo(
+    () => categoryBreakdown(yearTransactions, "expense"),
     [yearTransactions],
   );
-  const income = useMemo(
-    () => sumByCategory(scoped.filter((t) => transactionBusinessAmount(t) > 0), false),
-    [scoped],
-  );
-  const expenses = useMemo(
-    () => sumByCategory(scoped.filter((t) => transactionBusinessAmount(t) < 0), true),
-    [scoped],
-  );
   if (yearTransactions.length === 0) return null;
-  const incomeTotal = income.reduce((sum, row) => sum + row.amount, 0);
-  const expenseTotal = expenses.reduce((sum, row) => sum + row.amount, 0);
   return (
     <Card>
       <AppText size="lg" weight="bold">
         収入・支出の内訳 — {year}年
       </AppText>
-      <BreakdownColumn title="収入の内訳" rows={income} total={incomeTotal} />
-      <BreakdownColumn title="支出の内訳" rows={expenses} total={expenseTotal} />
+      <BreakdownColumn title="収入の内訳" breakdown={income} />
+      <BreakdownColumn title="支出の内訳" breakdown={expenses} />
     </Card>
   );
 }
 
 interface BreakdownColumnProps {
   title: string;
-  rows: readonly CategoryAmount[];
-  total: number;
+  breakdown: CategoryBreakdown;
 }
 
-function BreakdownColumn({ title, rows, total }: BreakdownColumnProps) {
-  const slices = groupSlices(rows);
-  const colorIndexes = assignColorIndexes(slices);
-  let accumulated = 0;
-  const arcs = slices.map((slice, index) => {
-    const share = total > 0 ? (slice.amount / total) * 100 : 0;
-    const start = accumulated;
-    accumulated += share;
-    return { ...slice, share, start, colorIndex: colorIndexes[index] ?? -1 };
-  });
+function BreakdownColumn({ title, breakdown }: BreakdownColumnProps) {
+  const { rows, total, slices: arcs } = breakdown;
   return (
     <View style={styles.column}>
       <AppText size="sm" weight="semibold" tone="subtle">
@@ -111,12 +77,12 @@ function BreakdownColumn({ title, rows, total }: BreakdownColumnProps) {
                 );
                 return (
                   <Circle
-                    key={arc.category}
+                    key={arc.key}
                     cx={60}
                     cy={60}
                     r={46}
                     fill="none"
-                    stroke={arc.colorIndex < 0 ? OTHER_COLOR : (SLICE_COLORS[arc.colorIndex] ?? OTHER_COLOR)}
+                    stroke={arc.colorIndex === null ? OTHER_COLOR : (SLICE_COLORS[arc.colorIndex] ?? OTHER_COLOR)}
                     strokeWidth={20}
                     strokeDasharray={`${dash} ${circumference - dash}`}
                     strokeDashoffset={-(arc.start / 100) * circumference}
@@ -133,11 +99,11 @@ function BreakdownColumn({ title, rows, total }: BreakdownColumnProps) {
             </Svg>
           </View>
           {arcs.map((arc) => (
-            <View key={arc.category} style={styles.legendRow}>
+            <View key={arc.key} style={styles.legendRow}>
               <View
                 style={[
                   styles.swatch,
-                  { backgroundColor: arc.colorIndex < 0 ? OTHER_COLOR : (SLICE_COLORS[arc.colorIndex] ?? OTHER_COLOR) },
+                  { backgroundColor: arc.colorIndex === null ? OTHER_COLOR : (SLICE_COLORS[arc.colorIndex] ?? OTHER_COLOR) },
                 ]}
               />
               <AppText size="sm" style={styles.rowName} numberOfLines={1}>
@@ -153,46 +119,6 @@ function BreakdownColumn({ title, rows, total }: BreakdownColumnProps) {
       )}
     </View>
   );
-}
-
-function sumByCategory(transactions: Transaction[], absolute: boolean): CategoryAmount[] {
-  const totals = new Map<string, number>();
-  for (const t of transactions) {
-    const businessAmount = transactionBusinessAmount(t);
-    const amount = absolute ? Math.abs(businessAmount) : businessAmount;
-    totals.set(t.category, (totals.get(t.category) ?? 0) + amount);
-  }
-  return [...totals.entries()]
-    .map(([category, amount]) => ({ category, amount }))
-    .sort((a, b) => b.amount - a.amount);
-}
-
-function assignColorIndexes(slices: readonly CategoryAmount[]): number[] {
-  const used = new Set<number>();
-  const result = slices.map((slice) => {
-    if (slice.category === "その他") return -1;
-    const fixed = CATEGORY_COLOR_INDEX[slice.category];
-    if (fixed !== undefined && !used.has(fixed)) {
-      used.add(fixed);
-      return fixed;
-    }
-    return -2;
-  });
-  let next = 0;
-  return result.map((index) => {
-    if (index !== -2) return index;
-    while (used.has(next)) next += 1;
-    used.add(next);
-    return next % SLICE_COLORS.length;
-  });
-}
-
-function groupSlices(rows: readonly CategoryAmount[]): CategoryAmount[] {
-  if (rows.length <= MAX_SLICES) return [...rows];
-  const head = rows.slice(0, MAX_SLICES - 1);
-  const rest = rows.slice(MAX_SLICES - 1);
-  const restTotal = rest.reduce((sum, row) => sum + row.amount, 0);
-  return [...head, { category: "その他", amount: restTotal }];
 }
 
 const styles = StyleSheet.create({

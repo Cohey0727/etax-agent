@@ -21,3 +21,4 @@ export * from "./cashFlow";
 export * from "./filingInputs";
 export * from "./csvClassificationEdits";
 export * from "./fixedAssetLedger";
+export * from "./dashboard";

@@ -1,15 +1,8 @@
-import { aggregateIncome, filterYear, Transaction } from "@etax/shared";
+import { Transaction, yearlyIncomeTotals } from "@etax/shared";
 import { Fragment, useMemo } from "react";
 import { Card, Col, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
 import styles from "./YearlyTrendPanel.css";
-
-interface YearTotals {
-  year: number;
-  revenue: number;
-  expenses: number;
-  balance: number;
-}
 
 type SeriesKey = "revenue" | "expenses" | "balance";
 
@@ -43,15 +36,7 @@ export interface YearlyTrendPanelProps {
  * 資金の移動（その他区分）は収支ではないので含めない（他画面と同じ範囲）。
  */
 export const YearlyTrendPanel = ({ transactions }: YearlyTrendPanelProps) => {
-  const years = useMemo<YearTotals[]>(() => {
-    const distinctYears = [...new Set(transactions.map((t) => t.year))].sort((a, b) => a - b);
-    return distinctYears.map((year) => {
-      const breakdown = aggregateIncome(filterYear(transactions, year));
-      const revenue = breakdown.businessRevenue + breakdown.realEstateRevenue;
-      const expenses = breakdown.businessExpenses + breakdown.realEstateExpenses;
-      return { year, revenue, expenses, balance: revenue - expenses };
-    });
-  }, [transactions]);
+  const years = useMemo(() => yearlyIncomeTotals(transactions), [transactions]);
 
   if (years.length === 0) return null;
 
