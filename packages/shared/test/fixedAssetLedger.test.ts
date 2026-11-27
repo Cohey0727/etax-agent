@@ -86,6 +86,19 @@ describe("summarizeFixedAssets", () => {
       totalBookValue: 200_000,
     });
   });
+
+  test("対象年より後に取得した資産は件数・取得価額・未償却残高に含めない", () => {
+    const summary = summarizeFixedAssets(
+      [asset({}), asset({ acquisition_date: "2026-03-01", cost: 300_000 })],
+      2024,
+    );
+    expect(summary).toEqual({
+      count: 1,
+      disposedCount: 0,
+      totalCost: 400_000,
+      totalBookValue: 200_000,
+    });
+  });
 });
 
 describe("validateFixedAssetInput", () => {

@@ -130,7 +130,10 @@ export function isFixedAssetInYear(asset: FixedAssetLedgerEntry, year: number): 
   return fixedAssetSchedule(asset).some((row) => row.year === year);
 }
 
-/** 対象年のサマリ（件数・取得価額の合計・年末の未償却残高の合計）。 */
+/**
+ * 対象年のサマリ（件数・取得価額の合計・年末の未償却残高の合計）。
+ * 対象年の台帳に載るのは、対象年までに取得し、対象年より前に除却していない資産。
+ */
 export interface FixedAssetLedgerSummary {
   /** 対象年の台帳に載る資産の件数 */
   count: number;
@@ -144,13 +147,15 @@ export function summarizeFixedAssets(
   assets: readonly FixedAssetLedgerEntry[],
   year: number,
 ): FixedAssetLedgerSummary {
-  const active = assets.filter((asset) => {
+  const acquired = assets.filter((asset) => Number(asset.acquisition_date.slice(0, 4)) <= year);
+  const isDisposedBefore = (asset: FixedAssetLedgerEntry) => {
     const disposedYear = disposedYearOf(asset);
-    return disposedYear === null || disposedYear >= year;
-  });
+    return disposedYear !== null && disposedYear < year;
+  };
+  const active = acquired.filter((asset) => !isDisposedBefore(asset));
   return {
     count: active.length,
-    disposedCount: assets.length - active.length,
+    disposedCount: acquired.length - active.length,
     totalCost: active.reduce((sum, asset) => sum + asset.cost, 0),
     totalBookValue: active.reduce(
       (sum, asset) => sum + fixedAssetYearFigures(asset, year).bookValue,
