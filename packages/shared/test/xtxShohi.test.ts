@@ -70,6 +70,17 @@ describe("computeConsumptionReturn", () => {
     expect(result.inputTax).toBe(7_800);
   });
 
+  test("課税売上割合は整数で計算し、浮動小数の誤差で 57% が 56.99% にならない", () => {
+    const result = computeConsumptionReturn(
+      input({ salesIncl10: 6_270_000, nontaxableSales: 4_300_000, purchasesIncl10: 1_100_000 }),
+    );
+    expect(result.salesExcl).toBe(5_700_000);
+    expect(result.totalSalesExcl).toBe(10_000_000);
+    expect(result.ratio).toBe(57);
+    // 一括比例配分: 78,000 × 5,700,000 / 10,000,000
+    expect(result.inputTax10).toBe(44_460);
+  });
+
   test("課税売上割合95%未満なら一括比例配分する", () => {
     const result = computeConsumptionReturn(
       input({
@@ -238,21 +249,21 @@ describe("summarizeConsumptionTax", () => {
         tx({ amount: 999, tax_category: "" }),
         tx({ amount: 777, tax_category: "不明な区分" }),
         tx({ amount: 555, tax_category: "課税売上10%", year: 2024, date: "2024-06-01" }),
-        // 符号が合わない付け間違いは集計から外れる
+        // 符号が逆の取引（売上の返品・仕入の返金）は同じ区分の中で差し引く
         tx({ amount: -3_000, tax_category: "課税売上10%" }),
         tx({ amount: 4_000, tax_category: "課対仕入10%" }),
       ],
       2025,
     );
-    expect(summary.salesIncl10).toBe(110_000);
+    expect(summary.salesIncl10).toBe(107_000);
     expect(summary.salesIncl8).toBe(108_000);
     expect(summary.nontaxableSales).toBe(147_000);
     expect(summary.exemptSales).toBe(50_000);
-    expect(summary.purchasesIncl10).toBe(55_000);
+    expect(summary.purchasesIncl10).toBe(51_000);
     expect(summary.purchasesIncl8).toBe(54_000);
     expect(summary.unsetCount).toBe(2);
     expect(summary.unsetAmount).toBe(999 + 777);
-    expect(summary.excludedCount).toBe(2);
-    expect(summary.excludedAmount).toBe(-3_000 + 4_000);
+    expect(summary.excludedCount).toBe(0);
+    expect(summary.excludedAmount).toBe(0);
   });
 });

@@ -128,11 +128,11 @@ export interface ConsumptionTaxSummary {
   /** 税区分が未設定の取引の金額合計（符号つき）。 */
   unsetAmount: number;
   /**
-   * 税区分と金額の符号が合わない取引件数（例: 支出なのに課税売上の区分）。
-   * 集計に含まれない。帳簿の税区分の付け間違いとして表面化させる。
+   * 集計から外した取引の件数。符号が逆の取引（売上の返品・仕入の返金）も
+   * 同じ区分の中で差し引くため、外す取引はなく常に 0。
    */
   excludedCount: number;
-  /** 符号不一致で集計から外れた取引の金額合計（符号つき）。 */
+  /** 集計から外した取引の金額合計。常に 0。 */
   excludedAmount: number;
 }
 
@@ -156,9 +156,9 @@ const TAX_CATEGORY_BUCKETS: Record<string, ConsumptionBucket | null> = {
 };
 
 /**
- * 税区分と金額の符号が合わない取引か（例: 支出なのに課税売上の区分）。
- * 消費税の集計から外れる取引の判定で、帳簿の絞り込みでも使う。
- * 税区分が未設定・対象外の取引は不一致ではない。
+ * 税区分と金額の符号が逆の取引か（例: 支出なのに課税売上の区分）。
+ * 返品・返金として同じ区分の中で差し引かれる取引で、帳簿の絞り込みで
+ * 付け間違いがないかを確かめるのに使う。税区分が未設定・対象外の取引は該当しない。
  */
 export function taxCategorySignMismatch(t: Pick<Transaction, "tax_category" | "amount">): boolean {
   const bucket = TAX_CATEGORY_BUCKETS[t.tax_category];
@@ -171,9 +171,9 @@ export function taxCategorySignMismatch(t: Pick<Transaction, "tax_category" | "a
 /**
  * 帳簿（取引の税区分）から消費税申告の入力金額を集計する。
  * 消費税の金額は自由入力ではなく、この集計で決めるのが原則。
- * 売上バケツは収入（正の金額）だけ、仕入バケツは支出（負の金額）を
- * 正の税込額として合計する。符号が合わない取引は付け間違いとして
- * 集計から外し、件数を返して画面で警告できるようにする。
+ * 各区分は符号付きの純額で合計する。売上は収入を正、仕入は支出を正の
+ * 税込額として数え、符号が逆の取引（売上の返品・仕入の返金）は同じ区分の
+ * 中で差し引く（仕入の返還は控除できる仕入税額を減らす。消費税法32条）。
  */
 export function summarizeConsumptionTax(
   transactions: Transaction[],
@@ -201,14 +201,9 @@ export function summarizeConsumptionTax(
       continue;
     }
     if (bucket === null) continue;
-    if (taxCategorySignMismatch(t)) {
-      summary.excludedCount += 1;
-      summary.excludedAmount += amount;
-      continue;
-    }
     // 申告金額に算入するのは事業分のみ（家事按分後。課税仕入れは
-    // 事業供用部分に限られるため。消基通11-1-5）。未設定・除外の
-    // 診断金額は取引そのものの金額（総額）のまま返す。
+    // 事業供用部分に限られるため。消基通11-1-5）。未設定の診断金額は
+    // 取引そのものの金額（総額）のまま返す。
     const businessAmount = transactionBusinessAmount(t);
     if (bucket === "purchasesIncl10" || bucket === "purchasesIncl8") {
       summary[bucket] += -businessAmount;
@@ -281,12 +276,14 @@ const salesExcl = salesExcl10 + salesExcl8;
 const exemptSales = Math.trunc(input.exemptSales || 0);
 const totalSalesExcl =
 salesExcl + Math.trunc(input.nontaxableSales || 0) + exemptSales;
-// 課税売上割合の分子は課税売上＋免税売上（付表2の計算と同一）
+// 課税売上割合の分子は課税売上＋免税売上（付表2の計算と同一）。浮動小数の誤差で
+// 切り捨てが1つずれないよう、先に整数で割る
+const ratioNumerator = salesExcl + exemptSales;
 const ratio =
 totalSalesExcl > 0
-? Math.floor(((salesExcl + exemptSales) / totalSalesExcl) * 10000) / 100
+? Math.floor((ratioNumerator * 10000) / totalSalesExcl) / 100
 : 100;
-const fullDeduction = salesExcl + exemptSales <= 500_000_000 && ratio >= 95;
+const fullDeduction = ratioNumerator <= 500_000_000 && ratio >= 95;
 
 const base10 = floor1000(salesExcl10);
 const base8 = floor1000(salesExcl8);
@@ -296,8 +293,12 @@ const outputTax8 = Math.floor((base8 * 624) / 10000);
 // 控除対象仕入税額は国税分（10%: 7.8/110、8%: 6.24/108）で計算する
 const inputTaxRaw10 = nationalTaxFromIncl(input.purchasesIncl10, 10);
 const inputTaxRaw8 = nationalTaxFromIncl(input.purchasesIncl8, 8);
+// 一括比例配分は課税売上割合の分数そのもの（付表2-3 の ④/⑦）で按分する。
+// 積は 2^53 を超えうるため BigInt で切り捨てる
 const applyRatio = (raw: number) =>
-fullDeduction? raw: Math.floor((raw * ratio) / 100);
+fullDeduction
+? raw
+: Number((BigInt(raw) * BigInt(ratioNumerator)) / BigInt(totalSalesExcl));
 const inputTax10 = applyRatio(inputTaxRaw10);
 const inputTax8 = applyRatio(inputTaxRaw8);
 
