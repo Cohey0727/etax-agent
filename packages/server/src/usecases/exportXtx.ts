@@ -8,7 +8,7 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { GeneratedXtx, generateIncomeTaxXtx } from "../services/etax/generateIncomeTaxXtx";
 import { XtxXsdInvalidError } from "../services/etax/xsdValidator";
-import { XtxInputError } from "../services/etax/xtxInputs";
+import { XtxInputError, incomeTaxXtxRequestFromWire } from "../services/etax/xtxInputs";
 import {
   ExportXtxRequestSchema,
   ExportXtxResponse,
@@ -44,7 +44,7 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
   const body = c.req.valid("json");
   let generated: GeneratedXtx;
   try {
-    generated = await generateIncomeTaxXtx(body);
+    generated = await generateIncomeTaxXtx(incomeTaxXtxRequestFromWire(body));
   } catch (e) {
     if (e instanceof XtxInputError || e instanceof XtxXsdInvalidError) {
       throw new HTTPException(400, { message: e.message });

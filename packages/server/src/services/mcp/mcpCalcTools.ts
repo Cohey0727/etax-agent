@@ -7,23 +7,23 @@
  * 比べる。
  */
 import {
+  IncomeTaxFilingInput,
+  Transaction,
+  XtxTaxpayer,
   aggregateIncome,
   amendmentDelta,
   blueDeduction,
   categoryTotals,
-  computeAgricultureStatement,
-  computeCorrectedFigures,
-  computeExpandedIncomes,
-  computeIncomeTax,
-  computeManualIncomes,
+  computeIncomeTaxFiling,
   consumptionTax,
   estimateInputTax,
-  isAgricultureEmpty,
   residentialRentTotal,
-  resolveTaxCreditInputs,
   taxableSalesFromBreakdown,
 } from "@etax/shared";
+import { Db } from "../../lib/db";
+import { IncomeTaxReturnRequest, toTaxpayer } from "../etax/xtxInputs";
 import { searchTaxKnowledge } from "../knowledge/searchTaxKnowledge";
+import { savedTaxpayerProfile } from "./mcpBusinessStartTools";
 import {
   McpToolModule,
   agricultureArg,
@@ -37,10 +37,66 @@ import {
   realEstateScaleProperty,
   requireDb,
   salaryIncomeArg,
+  taxpayerArg,
   textResult,
+  todayInTokyo,
   yearArg,
   yearProperty,
 } from "./mcpToolKit";
+
+/**
+ * MCP の引数と帳簿の取引から所得税の計算の入力を作る。income_tax・export_xtx・
+ * export_return_pdf が同じ入力で shared の computeIncomeTaxFiling を使う。
+ */
+export function incomeTaxFilingFromArgs(
+  args: Record<string, unknown>,
+  year: number,
+  transactions: Transaction[],
+): IncomeTaxFilingInput {
+  const options = filingOptionsArg(args);
+  return {
+    year,
+    transactions,
+    filingType: options.filingType,
+    realEstateBusinessScale: options.realEstateBusinessScale,
+    agriculture: agricultureArg(args),
+    salaryIncome: salaryIncomeArg(args),
+    miscIncome: miscIncomeArg(args),
+    expandedIncome: expandedIncomeArg(args),
+    deductions: mergeDeductionInputs(args["deductions"]),
+    taxCredits: mergeTaxCreditInputs(args["tax_credits"]),
+  };
+}
+
+/** taxpayer 引数の納税者情報。省略時は対象年の保存済みプロフィールを使う。 */
+export async function taxpayerForYear(
+  db: Db,
+  args: Record<string, unknown>,
+  year: number,
+): Promise<XtxTaxpayer> {
+  return toTaxpayer(
+    taxpayerArg(args["taxpayer"] !== undefined ? args["taxpayer"] : await savedTaxpayerProfile(db, year)),
+  );
+}
+
+/** 申告書（XTX・紙イメージ PDF）の出力の入力を、帳簿DBの取引と引数から作る。 */
+export async function incomeTaxReturnFromArgs(
+  db: Db,
+  args: Record<string, unknown>,
+): Promise<IncomeTaxReturnRequest> {
+  const year = yearArg(args);
+  const number = (key: string): number => (typeof args[key] === "number" ? (args[key] as number) : 0);
+  return {
+    filing: incomeTaxFilingFromArgs(args, year, await ledgerTransactions(db, year)),
+    amendment: args["amendment"] === true,
+    submissionDate: typeof args["submission_date"] === "string" ? args["submission_date"] : todayInTokyo(),
+    taxpayer: await taxpayerForYear(db, args, year),
+    withholdingTax: number("withholding_tax"),
+    prepaidTax: number("prepaid_tax"),
+    originalThirdPeriodTax:
+      typeof args["original_third_period_tax"] === "number" ? args["original_third_period_tax"] : null,
+  };
+}
 
 export const mcpCalcTools: McpToolModule = {
   tools: [
@@ -177,45 +233,13 @@ export const mcpCalcTools: McpToolModule = {
     income_tax: async (args) => {
       const db = requireDb();
       const year = yearArg(args);
-      const tx = await ledgerTransactions(db, year);
-      const agricultureInput = agricultureArg(args);
-      const agriculture =
-        agricultureInput && !isAgricultureEmpty(agricultureInput)
-          ? computeAgricultureStatement(agricultureInput)
-          : undefined;
-      const figures = computeCorrectedFigures(tx, year, {
-        ...filingOptionsArg(args),
-        agriculture: agricultureInput,
-      });
-      const manual = computeManualIncomes(
-        year,
-        salaryIncomeArg(args),
-        miscIncomeArg(args),
-        figures._detail.business_income +
-          figures._detail.real_estate_income +
-          figures._detail.agriculture_income,
+      const filing = computeIncomeTaxFiling(
+        incomeTaxFilingFromArgs(args, year, await ledgerTransactions(db, year)),
       );
-      const expandedInput = expandedIncomeArg(args);
-      const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
-      const baseTaxCredits = mergeTaxCreditInputs(args["tax_credits"]);
-      const result = computeIncomeTax({
-        year,
-        totalIncome:
-          figures._detail.business_income +
-          figures._detail.real_estate_income +
-          figures._detail.agriculture_income +
-          manual.total +
-          (expanded?.comprehensiveAddition ?? 0),
-        deductions: mergeDeductionInputs(args["deductions"]),
-        taxCredits: expanded ? resolveTaxCreditInputs(baseTaxCredits, expanded) : baseTaxCredits,
-        separateTaxation: expanded
-          ? { stockIncome: expanded.separateStockIncome, dividendIncome: expanded.separateDividendIncome }
-          : undefined,
-      });
       return textResult({
-        ...result,
-        ...(expanded ? { expanded_income: expanded } : {}),
-        ...(agriculture ? { agriculture } : {}),
+        ...filing.tax,
+        ...(filing.expanded ? { expanded_income: filing.expanded } : {}),
+        ...(filing.agricultureStatement ? { agriculture: filing.agricultureStatement } : {}),
       });
     },
     amendment_delta: async (args) => {

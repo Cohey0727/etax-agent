@@ -10,14 +10,6 @@
  * （送信は本人が行う）。
  */
 import {
-  computeCorrectedFigures,
-  computeExpandedIncomes,
-  computeIncomeTax,
-  computeManualIncomes,
-  expandedWithholdingTotal,
-  resolveTaxCreditInputs,
-} from "@etax/shared";
-import {
   createStorageClient,
   filingReceiptObjectKey,
 } from "../../gateways/storageGateway";
@@ -40,28 +32,14 @@ import {
   getFilingReceiptBytes,
   saveFilingSubmissionRecord,
 } from "../filingSubmission/filingSubmissionRecords";
-import { buildReturnPdf } from "../pdf/buildReturnPdf";
-import { loadJapaneseFont } from "../pdf/loadJapaneseFont";
-import { loadReturnFormTemplate } from "../pdf/loadReturnFormTemplate";
-import { buildReturnFormValues } from "../pdf/returnFormValues";
-import { toTaxpayer } from "../etax/xtxInputs";
-import { savedTaxpayerProfile } from "./mcpBusinessStartTools";
+import { buildReturnPdfExport } from "../pdf/formPdfExports";
+import { incomeTaxReturnFromArgs } from "./mcpCalcTools";
 import {
   McpToolModule,
-  agricultureArg,
-  expandedIncomeArg,
-  filingOptionsArg,
   filingTypeProperty,
-  ledgerTransactions,
-  mergeDeductionInputs,
-  mergeTaxCreditInputs,
-  miscIncomeArg,
   realEstateScaleProperty,
   requireDb,
-  salaryIncomeArg,
-  taxpayerArg,
   textResult,
-  todayInTokyo,
   yearArg,
 } from "./mcpToolKit";
 
@@ -271,94 +249,8 @@ export const mcpSubmissionTools: McpToolModule = {
     },
     export_return_pdf: async (args) => {
       const db = requireDb();
-      const year = yearArg(args);
-      const taxpayer = taxpayerArg(
-        args["taxpayer"] !== undefined ? args["taxpayer"] : await savedTaxpayerProfile(db, year),
-      );
-      // 計算は income_tax / export_xtx と同じ部品・同じ順序で行う。
-      const tx = await ledgerTransactions(db, year);
-      const agricultureInput = agricultureArg(args);
-      const figures = computeCorrectedFigures(tx, year, {
-        ...filingOptionsArg(args),
-        agriculture: agricultureInput,
-      });
-      const miscIncome = miscIncomeArg(args);
-      const salaryIncome = salaryIncomeArg(args);
-      const manual = computeManualIncomes(
-        year,
-        salaryIncome,
-        miscIncome,
-        figures._detail.business_income +
-          figures._detail.real_estate_income +
-          figures._detail.agriculture_income,
-      );
-      const expandedInput = expandedIncomeArg(args);
-      const expanded = expandedInput ? computeExpandedIncomes(expandedInput) : undefined;
-      const deductions = mergeDeductionInputs(args["deductions"]);
-      const baseTaxCredits = mergeTaxCreditInputs(args["tax_credits"]);
-      const tax = computeIncomeTax({
-        year,
-        totalIncome:
-          figures._detail.business_income +
-          figures._detail.real_estate_income +
-          figures._detail.agriculture_income +
-          manual.total +
-          (expanded?.comprehensiveAddition ?? 0),
-        deductions,
-        taxCredits: expanded ? resolveTaxCreditInputs(baseTaxCredits, expanded) : baseTaxCredits,
-        separateTaxation: expanded
-          ? {
-              stockIncome: expanded.separateStockIncome,
-              dividendIncome: expanded.separateDividendIncome,
-            }
-          : undefined,
-      });
-      const [template, font] = await Promise.all([
-        loadReturnFormTemplate(),
-        loadJapaneseFont(),
-      ]);
-      if (!template) {
-        throw new Error(
-          "申告書の様式 PDF を用意できませんでした。サーバーのデータフォルダ forms へ公式様式を配置するか、ネットワーク接続を確認してください。",
-        );
-      }
-      if (!font) {
-        throw new Error(
-          "日本語フォントがサーバーに配置されていないため、紙イメージ PDF を生成できません。データフォルダの fonts へ IPAex ゴシック等を配置してください。",
-        );
-      }
-      const amendment = args["amendment"] === true;
-      const values = buildReturnFormValues({
-        year,
-        amendment,
-        submissionDate:
-          typeof args["submission_date"] === "string" ? args["submission_date"] : todayInTokyo(),
-        taxpayer: toTaxpayer(taxpayer),
-        figures,
-        tax,
-        miscIncome,
-        salaryIncome,
-        manual,
-        deductionInputs: deductions,
-        withholdingTax:
-          (typeof args["withholding_tax"] === "number" ? args["withholding_tax"] : 0) +
-          (expanded ? expandedWithholdingTotal(expanded) : 0),
-        prepaidTax: typeof args["prepaid_tax"] === "number" ? args["prepaid_tax"] : 0,
-        originalThirdPeriodTax:
-          typeof args["original_third_period_tax"] === "number"
-            ? args["original_third_period_tax"]
-            : null,
-      });
-      let pdf: Uint8Array;
-      try {
-        pdf = await buildReturnPdf(values, template, font);
-      } catch (e) {
-        throw new Error(e instanceof Error ? e.message : "紙イメージ PDF の生成に失敗しました");
-      }
-      return textResult({
-        filename: `shinkokusho-${year}${amendment ? "-shusei" : "-kakutei"}.pdf`,
-        pdf_base64: Buffer.from(pdf).toString("base64"),
-      });
+      // 計算は income_tax / export_xtx と同じ入力（帳簿＋引数）で行う。
+      return textResult(await buildReturnPdfExport(await incomeTaxReturnFromArgs(db, args)));
     },
   },
 };

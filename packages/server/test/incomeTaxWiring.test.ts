@@ -1,0 +1,150 @@
+/**
+ * incomeTaxWiring.test.ts — 所得税の計算の配線（REST・MCP）が同じ合計所得金額を出すことの検証。
+ *
+ * 事業所得の損失は一時所得と損益通算してから一時所得を1/2にする（所得税法22条2項2号・
+ * 同法施行令198条）。事業所得 −1,000,000・一時所得の金額 1,500,000 なら
+ * 合計所得金額は (1,500,000 − 1,000,000) × 1/2 = 250,000。
+ */
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import {
+  EMPTY_DEDUCTION_INPUTS,
+  EMPTY_EXPANDED_INCOME,
+  EMPTY_TAX_CREDIT_INPUTS,
+} from "@etax/shared";
+import { createTestDb } from "./testDb";
+import { runWithTenant } from "../src/lib/tenantContext";
+import { createUser } from "../src/repositories/userRepository";
+import { McpToolResult } from "../src/services/mcp/mcpToolKit";
+import { dispatchMcpTool } from "../src/services/mcp/mcpTools";
+
+process.env.DATABASE_URL =
+  process.env.TEST_DATABASE_URL ?? "postgres://etax:etax@127.0.0.1:5432/etaxagent_test";
+delete process.env.ETAX_AUTH_MODE;
+delete process.env.ETAX_XSD_DIR;
+
+type AppFetch = (req: Request) => Promise<Response>;
+let appFetch: AppFetch;
+let userId: number;
+
+beforeAll(async () => {
+  const mod = await import("../src/index");
+  appFetch = mod.default.fetch as AppFetch;
+});
+
+beforeEach(async () => {
+  const db = await createTestDb();
+  userId = (await createUser(db, "income-tax-wiring@example.com", "password-123")).id;
+});
+
+async function requestJson(path: string, json: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await appFetch(
+    new Request(`http://localhost${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(json),
+    }),
+  );
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+}
+
+function call(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
+  return runWithTenant(userId, () => dispatchMcpTool(name, args));
+}
+
+function json(result: McpToolResult): Record<string, unknown> {
+  return JSON.parse(result.content[0]?.text ?? "") as Record<string, unknown>;
+}
+
+const TAXPAYER = {
+  name: "テスト太郎",
+  name_kana: "テストタロウ",
+  zip_code: "7220062",
+  address: "広島県尾道市向東町3567-1",
+  address_line2: "",
+  birth_date: "1980-04-01",
+  phone: "080-2500-7879",
+  tax_office_name: "尾道",
+  tax_office_code: "08121",
+  my_number: "",
+  user_id: "1234567890123456",
+  occupation: "システムエンジニア",
+  shop_name: "",
+  jan1_address: "",
+};
+
+/** 事業所得 −1,000,000（売上 500,000・外注費 1,500,000） */
+const LOSS_TRANSACTIONS = [
+  { date: "2025-03-01", description: "売上", amount: 500_000, category: "売上高" },
+  { date: "2025-04-01", description: "外注", amount: -1_500_000, category: "外注費" },
+];
+
+/** 一時所得の金額 1,500,000（収入 2,000,000 − 特別控除 500,000） */
+const TEMP_CAMEL = { ...EMPTY_EXPANDED_INCOME, temp: { revenue: 2_000_000, expenses: 0 } };
+const TEMP_WIRE = {
+  temp: { revenue: 2_000_000, expenses: 0 },
+  dividend: {
+    listed_revenue: 0,
+    listed_trust_revenue: 0,
+    listed_withholding: 0,
+    listed_mode: "comprehensive",
+    general_revenue: 0,
+    general_trust_revenue: 0,
+    general_withholding: 0,
+    interest_expense: 0,
+  },
+  stocks: {
+    general: { revenue: 0, other_revenue: 0, acquisition_cost: 0, transfer_fees: 0, other_expenses: 0 },
+    listed: { revenue: 0, other_revenue: 0, acquisition_cost: 0, transfer_fees: 0, other_expenses: 0 },
+    listed_withholding: 0,
+    special_accounts: [],
+  },
+};
+
+describe("合計所得金額は事業の損失と一時所得を通算してから1/2にする", () => {
+  test("POST /api/calc/income-tax", async () => {
+    const r = await requestJson("/api/calc/income-tax", {
+      year: 2025,
+      totalIncome: -1_000_000,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+      expandedIncome: TEMP_CAMEL,
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.total_income).toBe(250_000);
+  });
+
+  test("POST /api/etax/export-xtx", async () => {
+    const r = await requestJson("/api/etax/export-xtx", {
+      year: 2025,
+      amendment: false,
+      submission_date: "2026-03-10",
+      taxpayer: TAXPAYER,
+      transactions: LOSS_TRANSACTIONS.map((t) => ({
+        ...t,
+        year: 2025,
+        account: "普通預金",
+        income_type: "business",
+        tax_category: "",
+      })),
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      tax_credits: EMPTY_TAX_CREDIT_INPUTS,
+      expanded_income: TEMP_WIRE,
+      filing_type: "blue65",
+      withholding_tax: 0,
+      prepaid_tax: 0,
+      original_third_period_tax: null,
+    });
+    expect(r.status).toBe(200);
+    expect(String(r.body.xtx)).toContain("<ABB00410>250000</ABB00410>");
+  }, 30_000);
+
+  test("MCP の income_tax", async () => {
+    for (const t of LOSS_TRANSACTIONS) {
+      const added = await call("add_transaction", { ...t, income_type: "business" });
+      expect(added.isError).toBeUndefined();
+    }
+    const tax = await call("income_tax", { year: 2025, expanded_income: TEMP_CAMEL });
+    expect(tax.isError).toBeUndefined();
+    expect(json(tax).totalIncome).toBe(250_000);
+  }, 30_000);
+});

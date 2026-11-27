@@ -5,11 +5,10 @@
  */
 import {
   computeAgricultureStatement,
+  computeComprehensiveIncomeTax,
   computeExpandedIncomes,
-  computeIncomeTax,
   normalizeAgricultureInput,
   normalizeExpandedIncomeInput,
-  resolveTaxCreditInputs,
 } from "@etax/shared";
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import {
@@ -45,7 +44,7 @@ export const calculateIncomeTaxRoute = createRoute({
 
 export const calculateIncomeTaxHandler: RouteHandler<typeof calculateIncomeTaxRoute> = (c) => {
   const body = c.req.valid("json");
-  // 拡張所得（配当・一時・株式等譲渡）がある場合は、総合課税分への加算・
+  // 拡張所得（配当・一時・株式等譲渡）がある場合は、一時所得との損益通算・
   // 配当控除の対象額の解決・申告分離課税を共通の配線で反映する
   const expanded = body.expandedIncome
     ? computeExpandedIncomes(normalizeExpandedIncomeInput(body.expandedIncome))
@@ -56,14 +55,13 @@ export const calculateIncomeTaxHandler: RouteHandler<typeof calculateIncomeTaxRo
   const agriculture = body.agriculture
     ? computeAgricultureStatement(normalizeAgricultureInput(body.agriculture))
     : undefined;
-  const result = computeIncomeTax({
+  // totalIncome は配当・一時所得を除く経常所得の合計として受ける
+  const result = computeComprehensiveIncomeTax({
     year: body.year,
-    totalIncome: body.totalIncome + (expanded?.comprehensiveAddition ?? 0),
+    ordinaryIncome: body.totalIncome,
+    expanded,
     deductions: body.deductions,
-    taxCredits: expanded ? resolveTaxCreditInputs(body.taxCredits, expanded) : body.taxCredits,
-    separateTaxation: expanded
-      ? { stockIncome: expanded.separateStockIncome, dividendIncome: expanded.separateDividendIncome }
-      : undefined,
+    taxCredits: body.taxCredits,
   });
   const response: CalculateIncomeTaxResponse = {
     year: result.year,

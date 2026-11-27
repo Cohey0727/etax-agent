@@ -1,31 +1,23 @@
 /**
- * xtxInputs.ts — XTX 出力リクエスト（ワイヤ形式）を @etax/shared の計算・
- * XTX ビルダーの入力に詰め替える（services/etax）。
- * 所得税 XTX・申告書 PDF・試算表・MCP が同じ詰め替えを使う。
+ * xtxInputs.ts — 所得税の申告書（XTX・紙イメージ PDF）の出力リクエストを、
+ * REST のワイヤ形式から @etax/shared の計算・XTX ビルダーの入力に詰め替える
+ * （services/etax）。MCP は同じ IncomeTaxReturnRequest を引数から組み立てる。
  */
 import {
-  AgricultureInput,
-  AgricultureStatement,
-  AgricultureWire,
   BS_ASSET_ACCOUNTS,
   BS_LIABILITY_ACCOUNTS,
   BalanceSheetAccount,
   DepreciationDetailRow,
-  ExpandedIncomeBreakdown,
-  ExpandedIncomeInput,
-  ExpandedIncomeWire,
-  SeparateTaxationAmounts,
-  TaxCreditInputs,
+  IncomeTaxFilingInput,
   XtxBalanceSheetInput,
   XtxTaxpayer,
   agricultureFromWire,
-  computeAgricultureStatement,
-  computeExpandedIncomes,
   depreciationDetailRow,
   expandedIncomeFromWire,
-  expandedWithholdingTotal,
-  isAgricultureEmpty,
-  resolveTaxCreditInputs,
+  filterYear,
+  normalizeMiscIncomeInput,
+  normalizeSalaryIncomeInput,
+  normalizeTransactions,
 } from "@etax/shared";
 import { ExportXtxRequest } from "../../schemas/etax";
 
@@ -37,68 +29,68 @@ export class XtxInputError extends Error {
   }
 }
 
-/** 拡張所得の配線結果（所得税計算・XTX生成への入力）。 */
-export interface ExpandedTaxWiring {
-  /** 正規化済みの拡張所得入力（XTXビルダーへ渡す。未指定なら undefined） */
-  input?: ExpandedIncomeInput;
-  /** 拡張所得の計算内訳 */
-  breakdown?: ExpandedIncomeBreakdown;
-  /** 総合課税分へ加算する所得金額（配当の総合分＋一時の1/2算入額） */
-  comprehensiveAddition: number;
-  /** 配当控除の対象額を解決済みの税額控除入力 */
-  taxCredits: TaxCreditInputs;
-  /** 申告分離課税の所得（拡張所得がない場合は undefined） */
-  separateTaxation?: SeparateTaxationAmounts;
-  /** 拡張所得分の源泉徴収税額（申告する配当＋株式等譲渡分） */
-  withholdingAddition: number;
+/** 所得税の申告書（XTX・紙イメージ PDF）の出力に使う入力一式。 */
+export interface IncomeTaxReturnRequest {
+  /** 帳簿の取引と申告入力（所得税の計算に使う分） */
+  filing: IncomeTaxFilingInput;
+  amendment: boolean;
+  submissionDate: string;
+  taxpayer: XtxTaxpayer;
+  /** 源泉徴収税額。配当・株式等の分は拡張所得の入力から自動で加える */
+  withholdingTax: number;
+  prepaidTax: number;
+  /** 修正申告: 修正前の第3期分の税額。修正でなければ null */
+  originalThirdPeriodTax: number | null;
 }
 
-/**
- * 拡張所得入力（ワイヤ形式）を所得税計算・XTX生成で使う形に解決する。
- * 配当の入力がある場合、配当控除の対象額は配当所得の内訳から導出した額が
- * 優先し、手入力との二重適用を防ぐ。
- */
-export function resolveExpandedTax(
-  wire: ExpandedIncomeWire | undefined,
-  taxCredits: TaxCreditInputs,
-): ExpandedTaxWiring {
-  if (!wire) {
-    return { comprehensiveAddition: 0, taxCredits, withholdingAddition: 0 };
-  }
-  const input = expandedIncomeFromWire(wire);
-  const breakdown = computeExpandedIncomes(input);
+/** 所得税の XTX の出力に使う入力一式（申告書の入力＋減価償却明細・貸借対照表）。 */
+export interface IncomeTaxXtxRequest extends IncomeTaxReturnRequest {
+  depreciation?: {
+    business: DepreciationDetailRow[];
+    realEstate: DepreciationDetailRow[];
+    agriculture: DepreciationDetailRow[];
+  };
+  balanceSheet?: XtxBalanceSheetInput;
+}
+
+/** REST のワイヤ形式から申告書の出力の入力一式を作る。取引は対象年の分だけを使う。 */
+export function incomeTaxReturnFromWire(body: ExportXtxRequest): IncomeTaxReturnRequest {
   return {
-    input,
-    breakdown,
-    comprehensiveAddition: breakdown.comprehensiveAddition,
-    taxCredits: resolveTaxCreditInputs(taxCredits, breakdown),
-    separateTaxation: {
-      stockIncome: breakdown.separateStockIncome,
-      dividendIncome: breakdown.separateDividendIncome,
+    filing: {
+      year: body.year,
+      transactions: filterYear(normalizeTransactions(body.transactions ?? []), body.year),
+      filingType: body.filing_type,
+      realEstateBusinessScale: body.real_estate_business_scale,
+      agriculture: body.agriculture ? agricultureFromWire(body.agriculture) : undefined,
+      salaryIncome: normalizeSalaryIncomeInput(body.salary_income),
+      miscIncome: normalizeMiscIncomeInput(body.misc_income),
+      expandedIncome: body.expanded_income ? expandedIncomeFromWire(body.expanded_income) : undefined,
+      deductions: body.deductions,
+      taxCredits: body.tax_credits,
     },
-    withholdingAddition: expandedWithholdingTotal(breakdown),
+    amendment: body.amendment,
+    submissionDate: body.submission_date,
+    taxpayer: toTaxpayer(body.taxpayer),
+    withholdingTax: body.withholding_tax,
+    prepaidTax: body.prepaid_tax,
+    originalThirdPeriodTax: body.original_third_period_tax,
   };
 }
 
-/** 農業所得の配線（入力と計算済みの決算書内訳）。 */
-export interface AgricultureWiring {
-  /** 正規化済みの農業所得入力（空の場合は undefined） */
-  input?: AgricultureInput;
-  /** 決算書の計算内訳（XTX ビルダーへ渡す） */
-  statement?: AgricultureStatement;
-}
-
 /**
- * 農業所得入力（ワイヤ形式）を計算・XTX生成で使う形に解決する。
- * 農業所得は帳簿の取引とは混ぜず、申告入力として独立に扱う。
+ * REST のワイヤ形式から XTX の出力の入力一式を作る。償却計算の失敗と、
+ * 貸借対照表の不明な勘定キーは XtxInputError にする。
  */
-export function resolveAgriculture(
-  wire: AgricultureWire | undefined,
-): AgricultureWiring {
-  if (!wire) return {};
-  const input = agricultureFromWire(wire);
-  if (isAgricultureEmpty(input)) return {};
-  return { input, statement: computeAgricultureStatement(input) };
+export function incomeTaxXtxRequestFromWire(body: ExportXtxRequest): IncomeTaxXtxRequest {
+  const unknownAccounts = unknownBalanceSheetKeys(body);
+  if (unknownAccounts.length > 0) {
+    throw new XtxInputError(`貸借対照表に不明な勘定があります: ${unknownAccounts.join("、")}`);
+  }
+  return {
+    ...incomeTaxReturnFromWire(body),
+    depreciation: depreciationFromWire(body),
+    balanceSheet: balanceSheetFromWire(body),
+  };
 }
 
 /**
