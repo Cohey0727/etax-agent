@@ -12,35 +12,30 @@ import { type AgricultureInput, EMPTY_AGRICULTURE_INPUT, normalizeAgricultureInp
 import { normalizeBalanceSheetInput } from "./balanceSheet";
 import { smallBusinessSpecialLabel } from "./dashboard";
 import {
-  computeIncomeTax,
-  computeManualIncomes,
   type DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_MISC_INCOME,
   EMPTY_SALARY_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
   type IncomeTaxResult,
+  type IncomeTaxSettlement,
+  incomeTaxSettlementOf,
   type ManualIncomeBreakdown,
   type MiscIncomeInput,
   type SalaryIncomeInput,
   type TaxCreditInputs,
 } from "./deductions";
 import {
-  comprehensiveTotalIncome,
   computeExpandedIncomes,
   expandedWithholdingTotal,
   EMPTY_EXPANDED_INCOME,
   type ExpandedIncomeBreakdown,
   type ExpandedIncomeInput,
   normalizeExpandedIncomeInput,
-  resolveTaxCreditInputs,
 } from "./expandedIncome";
+import { computeIncomeTaxFiling } from "./incomeTaxFiling";
 import { filterYear } from "./ledger";
-import {
-  computeCorrectedFigures,
-  type CorrectedFigures,
-  type FilingType,
-} from "./taxcalc";
+import { type CorrectedFigures, type FilingType } from "./taxcalc";
 import { TAX_PARAMETERS } from "./taxParameters";
 import type { Transaction } from "./types";
 import type { XtxBalanceSheetInput } from "./xtx";
@@ -434,35 +429,32 @@ export function computeFilingFigures(
   year: number,
   state: DeductionState,
 ): FilingFigures {
-  const corrected = computeCorrectedFigures(filterYear(transactions, year), year, {
+  const filing = computeIncomeTaxFiling({
+    year,
+    transactions: filterYear(transactions, year),
     filingType: state.filingType,
     realEstateBusinessScale: state.realEstateBusinessScale,
     agriculture: state.agriculture,
+    salaryIncome: state.salaryIncome,
+    miscIncome: state.miscIncome,
+    expandedIncome: state.expandedIncome,
+    deductions: state.deductions,
+    taxCredits: state.taxCredits,
   });
-  const ledgerIncome = ledgerIncomeOf(corrected);
-  const manual = computeManualIncomes(year, state.salaryIncome, state.miscIncome, ledgerIncome);
-  const expanded = computeExpandedIncomes(state.expandedIncome);
+  const expanded = filing.expanded ?? computeExpandedIncomes(state.expandedIncome);
   // 配当所得の赤字は損益通算の対象外（所得税法69条）なので 0 で止めて経常所得に入れる
   const ordinaryIncome =
-    ledgerIncome + manual.total + Math.max(expanded.dividend.comprehensiveIncome, 0);
-  const totalIncome = comprehensiveTotalIncome(ordinaryIncome, expanded.temp.amount);
-  const taxResult = computeIncomeTax({
-    year,
-    totalIncome,
-    deductions: state.deductions,
-    taxCredits: resolveTaxCreditInputs(state.taxCredits, expanded),
-    separateTaxation: {
-      stockIncome: expanded.separateStockIncome,
-      dividendIncome: expanded.separateDividendIncome,
-    },
-  });
+    ledgerIncomeOf(filing.figures) +
+    filing.manual.total +
+    Math.max(expanded.dividend.comprehensiveIncome, 0);
+  const totalIncome = filing.tax.totalIncome;
   return {
-    corrected,
-    manual,
+    corrected: filing.figures,
+    manual: filing.manual,
     expanded,
     totalIncome,
     tempIncomeAddition: totalIncome - ordinaryIncome,
-    taxResult,
+    taxResult: filing.tax,
   };
 }
 
@@ -545,27 +537,20 @@ export function filingIncomeBridgeRows(figures: FilingFigures, isWhite: boolean)
 }
 
 /** 提出パネルに出す申告納税額と第3期分の税額。 */
-export interface DeclaredIncomeTax {
-  /** 申告納税額。100円未満切捨て。源泉徴収税額の方が多い（還付になる）ときは切り捨てず負のまま */
-  declaredTax: number;
-  /** 第3期分の税額（申告納税額 − 予定納税額）。正は納める税金、負は還付される税金 */
-  thirdPeriodTax: number;
-}
-
 /**
- * 所得税及び復興特別所得税の額（外国税額控除後）から源泉徴収税額・予定納税額を
- * 精算する。源泉徴収税額には、提出パネルの入力に加えて配当・株式等譲渡の入力の
- * 源泉徴収税額を含める（XTX の源泉徴収税額と同じ）。
+ * 申告入力の源泉徴収税額・予定納税額で、所得税及び復興特別所得税の額を精算する。
+ * 源泉徴収税額には、提出パネルの入力に加えて配当・株式等譲渡の入力の源泉徴収税額を
+ * 含める（XTX の源泉徴収税額と同じ）。
  */
 export function declaredIncomeTaxOf(
   figures: FilingFigures,
   payments: IncomeTaxPaymentInputs,
-): DeclaredIncomeTax {
-  const { taxResult } = figures;
-  const withholding = payments.withholdingTax + expandedWithholdingTotal(figures.expanded);
-  const raw = taxResult.incomeTaxAfterForeignCredit + taxResult.reconstructionTax - withholding;
-  const declaredTax = raw > 0 ? Math.floor(raw / 100) * 100 : raw;
-  return { declaredTax, thirdPeriodTax: declaredTax - payments.prepaidTax };
+): IncomeTaxSettlement {
+  return incomeTaxSettlementOf(
+    figures.taxResult,
+    payments.withholdingTax + expandedWithholdingTotal(figures.expanded),
+    payments.prepaidTax,
+  );
 }
 
 /** 確定スナップショットの数値（computeFilingFigures の結果から作る）。 */
