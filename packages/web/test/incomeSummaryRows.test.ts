@@ -44,7 +44,7 @@ describe("incomeBridgeRows / incomeStatCards", () => {
     expect(rows.map((row) => row.label)).toContain("一時所得（2分の1）");
   });
 
-  test("雑所得（業務）の赤字も行に出し、内訳の合計と所得合計が合う", () => {
+  test("雑所得（業務）の赤字も行に出し、通算しない分を戻して内訳の合計と所得合計が合う", () => {
     const figures = computeFilingFigures(
       [tx("2025-04-01", 5_000_000, "売上高", "business"), tx("2025-04-02", -1_000_000, "外注費", "business")],
       2025,
@@ -52,8 +52,10 @@ describe("incomeBridgeRows / incomeStatCards", () => {
     );
     const rows = incomeBridgeRows(figures, false);
     expect(rows).toContainEqual({ label: "雑所得（業務）", amount: -300_000 });
+    expect(rows).toContainEqual({ label: "雑所得の赤字のうち他の所得と通算しない額", amount: 300_000 });
     expect(rows.reduce((sum, row) => sum + row.amount, 0)).toBe(figures.totalIncome);
-    expect(figures.totalIncome).toBe(3_050_000);
+    // 雑所得の赤字は事業所得と損益通算しない（所得税法69条1項）
+    expect(figures.totalIncome).toBe(3_350_000);
   });
 
   test("帳簿に取引が無い年（給与だけ）でも所得合計を出す", () => {

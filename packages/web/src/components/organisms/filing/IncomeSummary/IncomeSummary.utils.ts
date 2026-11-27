@@ -25,7 +25,8 @@ export function incomeStatCards(figures: FilingFigures, isWhite: boolean): Incom
 
 /**
  * 収支から所得合計までの内訳。行を足すと所得合計（合計所得金額の総合課税分）に
- * なる。給与・雑所得・農業・配当・一時は金額があるときだけ出す（雑所得の赤字も出す）。
+ * なる。給与・雑所得・農業・配当・一時は金額があるときだけ出す。雑所得の赤字は
+ * 区分ごとの行に出し、他の所得と通算しない分を別の行で戻す。
  */
 export function incomeBridgeRows(figures: FilingFigures, isWhite: boolean): IncomeSummaryRow[] {
   const c = figures.corrected;
@@ -36,11 +37,14 @@ export function incomeBridgeRows(figures: FilingFigures, isWhite: boolean): Inco
       amount: c._detail.agriculture_income_before_deduction,
     },
   ];
+  // 雑所得の計が区分ごとの金額の和と違う分（他の所得と通算しない赤字）
+  const miscRest = manual.miscTotal - (manual.pension + manual.miscBusiness + manual.miscOther);
   const additions: IncomeSummaryRow[] = [
     { label: "給与所得", amount: manual.salary },
     { label: "雑所得（公的年金等）", amount: manual.pension },
     { label: "雑所得（業務）", amount: manual.miscBusiness },
     { label: "雑所得（その他）", amount: manual.miscOther },
+    { label: "雑所得の赤字のうち他の所得と通算しない額", amount: miscRest },
     { label: "配当所得（総合課税分）", amount: expanded.dividend.comprehensiveIncome },
     { label: "一時所得（2分の1）", amount: expanded.temp.includedAmount },
   ];
