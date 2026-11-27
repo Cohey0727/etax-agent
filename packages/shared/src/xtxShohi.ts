@@ -250,6 +250,140 @@ export function amendmentIncrease(current: number, original: number): number {
   return floor100(Math.max(current - original, 0));
 }
 
+/** 課税標準額（千円未満切捨て）と、それに対する消費税額（国税分）。 */
+export interface OutputTaxes {
+  base10: number;
+  base8: number;
+  taxBase: number;
+  outputTax10: number;
+  outputTax8: number;
+  outputTax: number;
+}
+
+/** 課税売上（税抜）から課税標準額と消費税額を求める（10%: 7.8%、8%: 6.24%）。 */
+export function outputTaxesFromExcl(salesExcl10: number, salesExcl8: number): OutputTaxes {
+  const base10 = floor1000(salesExcl10);
+  const base8 = floor1000(salesExcl8);
+  const outputTax10 = Math.floor((base10 * 78) / 1000);
+  const outputTax8 = Math.floor((base8 * 624) / 10000);
+  return {
+    base10,
+    base8,
+    taxBase: base10 + base8,
+    outputTax10,
+    outputTax8,
+    outputTax: outputTax10 + outputTax8,
+  };
+}
+
+/** 申告書の差引税額・譲渡割額と、納付・還付の各欄（3方式で共通）。 */
+export interface ConsumptionSettlementDetail extends ConsumptionSettlement {
+  /** 差引税額（国税・100円未満切捨て。納付の場合） */
+  diffNational: number;
+  /** 譲渡割額（地方・中間納付控除前、100円未満切捨て） */
+  localTaxGross: number;
+  /** 消費税及び地方消費税の合計（納付は正、還付は負） */
+  totalPayable: number;
+}
+
+/**
+ * 差引税額（100円未満切捨て前。マイナスは還付側）と中間納付額から、
+ * 申告書の納付・還付と地方消費税（国税 × 22/78）を決める。
+ */
+export function settleConsumptionTax(
+  diffRaw: number,
+  interimNationalInput: number,
+  interimLocalInput: number,
+): ConsumptionSettlementDetail {
+  const interimNational = Math.trunc(interimNationalInput || 0);
+  const interimLocal = Math.trunc(interimLocalInput || 0);
+  let refundNational = 0;
+  let diffNational = 0;
+  let payableNational = 0;
+  let interimRefundNational = 0;
+  let refundLocal = 0;
+  let localTaxGross = 0;
+  let payableLocal = 0;
+  let interimRefundLocal = 0;
+  if (diffRaw >= 0) {
+    diffNational = floor100(diffRaw);
+    if (diffNational >= interimNational) {
+      payableNational = floor100(diffNational - interimNational);
+    } else {
+      interimRefundNational = interimNational - diffNational;
+    }
+    // 地方消費税: 譲渡割額は差引税額（国税）× 22/78。中間納付の差引は
+    // 100円未満切捨て後の譲渡割額（localTaxGross）を基準にする
+    localTaxGross = floor100(Math.floor((diffNational * 22) / 78));
+    if (localTaxGross >= interimLocal) {
+      payableLocal = floor100(localTaxGross - interimLocal);
+    } else {
+      interimRefundLocal = interimLocal - localTaxGross;
+    }
+  } else {
+    refundNational = -diffRaw;
+    refundLocal = Math.floor((refundNational * 22) / 78);
+    // 還付側の中間納付還付額は差額そのもの（100円未満切捨てはしない）
+    if (interimNational > 0) interimRefundNational = interimNational;
+    if (interimLocal > 0) interimRefundLocal = interimLocal;
+  }
+  return {
+    refundNational,
+    diffNational,
+    payableNational,
+    interimRefundNational,
+    refundLocal,
+    localTaxGross,
+    payableLocal,
+    interimRefundLocal,
+    totalPayable:
+      payableNational + payableLocal - refundNational - refundLocal - interimRefundNational - interimRefundLocal,
+  };
+}
+
+/** 売上対価の返還等・貸倒回収・貸倒れの入力（簡易課税・2割特例で共通）。 */
+export interface ConsumptionAdjustmentInput {
+  returnsIncl10: number;
+  returnsIncl8: number;
+  badDebtRecoveryTax10: number;
+  badDebtRecoveryTax8: number;
+  badDebtTax10: number;
+  badDebtTax8: number;
+}
+
+/** 返還等・貸倒回収・貸倒れの税額（国税分）。返還等は税込額から割り戻す。 */
+export interface ConsumptionAdjustmentTaxes {
+  returnsTax10: number;
+  returnsTax8: number;
+  returnsTax: number;
+  badDebtRecoveryTax10: number;
+  badDebtRecoveryTax8: number;
+  badDebtRecoveryTax: number;
+  badDebtTax10: number;
+  badDebtTax8: number;
+  badDebtTax: number;
+}
+
+export function consumptionAdjustmentTaxes(input: ConsumptionAdjustmentInput): ConsumptionAdjustmentTaxes {
+  const returnsTax10 = nationalTaxFromIncl(input.returnsIncl10, 10);
+  const returnsTax8 = nationalTaxFromIncl(input.returnsIncl8, 8);
+  const badDebtRecoveryTax10 = Math.trunc(input.badDebtRecoveryTax10 || 0);
+  const badDebtRecoveryTax8 = Math.trunc(input.badDebtRecoveryTax8 || 0);
+  const badDebtTax10 = Math.trunc(input.badDebtTax10 || 0);
+  const badDebtTax8 = Math.trunc(input.badDebtTax8 || 0);
+  return {
+    returnsTax10,
+    returnsTax8,
+    returnsTax: returnsTax10 + returnsTax8,
+    badDebtRecoveryTax10,
+    badDebtRecoveryTax8,
+    badDebtRecoveryTax: badDebtRecoveryTax10 + badDebtRecoveryTax8,
+    badDebtTax10,
+    badDebtTax8,
+    badDebtTax: badDebtTax10 + badDebtTax8,
+  };
+}
+
 /** 税込金額 → 税抜金額（10%: ×100/110、8%: ×100/108、円未満切捨て）。 */
 export function exclFromIncl(incl: number, ratePercent: number): number {
 const i = Math.trunc(incl || 0);
@@ -285,10 +419,7 @@ totalSalesExcl > 0
 : 100;
 const fullDeduction = ratioNumerator <= 500_000_000 && ratio >= 95;
 
-const base10 = floor1000(salesExcl10);
-const base8 = floor1000(salesExcl8);
-const outputTax10 = Math.floor((base10 * 78) / 1000);
-const outputTax8 = Math.floor((base8 * 624) / 10000);
+const outputTaxes = outputTaxesFromExcl(salesExcl10, salesExcl8);
 
 // 控除対象仕入税額は国税分（10%: 7.8/110、8%: 6.24/108）で計算する
 const inputTaxRaw10 = nationalTaxFromIncl(input.purchasesIncl10, 10);
@@ -301,54 +432,8 @@ fullDeduction
 : Number((BigInt(raw) * BigInt(ratioNumerator)) / BigInt(totalSalesExcl));
 const inputTax10 = applyRatio(inputTaxRaw10);
 const inputTax8 = applyRatio(inputTaxRaw8);
-
-const outputTax = outputTax10 + outputTax8;
 const inputTax = inputTax10 + inputTax8;
-const diffRaw = outputTax - inputTax;
-
-const interimNational = Math.trunc(input.interimNational || 0);
-const interimLocal = Math.trunc(input.interimLocal || 0);
-
-let refundNational = 0;
-let diffNational = 0;
-let payableNational = 0;
-let interimRefundNational = 0;
-let refundLocal = 0;
-let localTaxGross = 0;
-let payableLocal = 0;
-let interimRefundLocal = 0;
-
-if (diffRaw >= 0) {
-diffNational = floor100(diffRaw);
-if (diffNational >= interimNational) {
-payableNational = floor100(diffNational - interimNational);
-} else {
-interimRefundNational = interimNational - diffNational;
-}
-// 地方消費税: 譲渡割額は差引税額（国税）× 22/78。中間納付の差引は
-// 100円未満切捨て後の譲渡割額（localTaxGross）を基準にする
-const localRaw = Math.floor((diffNational * 22) / 78);
-localTaxGross = floor100(localRaw);
-if (localTaxGross >= interimLocal) {
-payableLocal = floor100(localTaxGross - interimLocal);
-} else {
-interimRefundLocal = interimLocal - localTaxGross;
-}
-} else {
-refundNational = -diffRaw;
-refundLocal = Math.floor((refundNational * 22) / 78);
-// 還付側の中間納付還付額は差額そのもの（100円未満切捨てはしない）
-if (interimNational > 0) interimRefundNational = interimNational;
-if (interimLocal > 0) interimRefundLocal = interimLocal;
-}
-
-const totalPayable =
-payableNational +
-payableLocal -
-refundNational -
-refundLocal -
-interimRefundNational -
-interimRefundLocal;
+const diffRaw = outputTaxes.outputTax - inputTax;
 
 return {
 salesExcl10,
@@ -357,27 +442,14 @@ salesExcl,
 totalSalesExcl,
 ratio,
 fullDeduction,
-base10,
-base8,
-taxBase: base10 + base8,
-outputTax10,
-outputTax8,
-outputTax,
+...outputTaxes,
 inputTaxRaw10,
 inputTaxRaw8,
 inputTax10,
 inputTax8,
 inputTax,
 diffRaw,
-refundNational,
-diffNational,
-payableNational,
-interimRefundNational,
-refundLocal,
-localTaxGross,
-payableLocal,
-interimRefundLocal,
-totalPayable,
+...settleConsumptionTax(diffRaw, input.interimNational, input.interimLocal),
 };
 }
 
@@ -456,22 +528,51 @@ return `<IT VR="1.0" id="IT">${items.join("")}</IT>`;
 // SHA010 申告書（一般用）
 // ---------------------------------------------------------------------------
 
-function buildSha010(
-data: ConsumptionXtxData,
-options?: {
-creditMethodKubun?: number;
-creditSubtotal?: number;
-/** 返還等対価に係る税額（2割特例など、入力に返還等がある場合） */
-returnsTax?: number;
+/** 申告書（一般用）に転記する計算結果。本則・2割特例の計算結果がそのまま当てはまる。 */
+type Sha010Figures = OutputTaxes &
+ConsumptionSettlementDetail & {
+/** 課税売上額（税抜）合計 */
+salesExcl: number;
+/** 資産の譲渡等の対価の額（税抜・非課税/免税込み） */
+totalSalesExcl: number;
+};
+
+/** 申告書（一般用）の控除税額の欄。 */
+interface Sha010Credit {
+/** 控除税額の計算方法（AAM00020）: 2=一括比例配分、3=全額控除、8=2割特例 */
+methodKubun: number;
+/** 控除対象仕入税額（2割特例は特別控除税額） */
+inputTax: number;
+/** 返還等対価に係る税額 */
+returnsTax: number;
 /** 貸倒れに係る税額 */
-badDebtTax?: number;
+badDebtTax: number;
 /** 控除過大調整税額（貸倒回収に係る消費税額） */
-badDebtRecoveryTax?: number;
-},
-): string {
-const r = data.result;
-const interimNational = Math.trunc(data.input.interimNational || 0);
-const interimLocal = Math.trunc(data.input.interimLocal || 0);
+badDebtRecoveryTax: number;
+/** 控除税額小計 */
+subtotal: number;
+}
+
+interface Sha010Data {
+taxpayer: XtxTaxpayer;
+submissionDate: string;
+filingKind: 1 | 3;
+/** 基準期間の課税売上高（千円単位） */
+basePeriodSalesThousands: number;
+exemptSales: number;
+interimNational: number;
+interimLocal: number;
+originalNational: number | null;
+originalLocal: number | null;
+figures: Sha010Figures;
+credit: Sha010Credit;
+}
+
+function buildSha010(data: Sha010Data): string {
+const r = data.figures;
+const credit = data.credit;
+const interimNational = Math.trunc(data.interimNational || 0);
+const interimLocal = Math.trunc(data.interimLocal || 0);
 
 // ---- 第1表 ----
 const aai: string[] = [];
@@ -492,12 +593,12 @@ aai.push(ref("AAI00150", "SHINKOKU_KBN"));
 const aaj: string[] = [];
 aaj.push(amountAlways("AAJ00010", r.taxBase));
 aaj.push(amountAlways("AAJ00020", r.outputTax));
-aaj.push(amount("AAJ00030", options?.badDebtRecoveryTax ?? 0));
+aaj.push(amount("AAJ00030", credit.badDebtRecoveryTax));
 const creditBlock: string[] = [];
-creditBlock.push(amount("AAJ00050", r.inputTax));
-creditBlock.push(amount("AAJ00060", options?.returnsTax ?? 0));
-creditBlock.push(amount("AAJ00070", options?.badDebtTax ?? 0));
-creditBlock.push(amountAlways("AAJ00080", options?.creditSubtotal ?? r.inputTax));
+creditBlock.push(amount("AAJ00050", credit.inputTax));
+creditBlock.push(amount("AAJ00060", credit.returnsTax));
+creditBlock.push(amount("AAJ00070", credit.badDebtTax));
+creditBlock.push(amountAlways("AAJ00080", credit.subtotal));
 aaj.push(`<AAJ00040>${creditBlock.join("")}</AAJ00040>`);
 aaj.push(amount("AAJ00090", r.refundNational));
 aaj.push(amountAlways("AAJ00100", r.diffNational));
@@ -512,7 +613,7 @@ aaj.push(
 );
 }
 aaj.push(
-`<AAJ00170>${amountAlways("AAJ00180", r.salesExcl + Math.trunc(data.input.exemptSales || 0))}${amountAlways("AAJ00190", r.totalSalesExcl)}</AAJ00170>`,
+`<AAJ00170>${amountAlways("AAJ00180", r.salesExcl + Math.trunc(data.exemptSales || 0))}${amountAlways("AAJ00190", r.totalSalesExcl)}</AAJ00170>`,
 );
 
 const aak: string[] = [];
@@ -540,7 +641,7 @@ amountAlways("AAK00130", data.filingKind === 3? amendmentNational + amendmentLoc
 );
 
 const aam: string[] = [];
-aam.push(kubun("AAM00020", options?.creditMethodKubun ?? (r.fullDeduction? 3: 2)));
+aam.push(kubun("AAM00020", credit.methodKubun));
 aam.push(amount("AAM00030", data.basePeriodSalesThousands));
 
 const page1 =
@@ -584,9 +685,9 @@ amountAlways("AAP00000", r.taxBase) +
 `<AAQ00000>${aaq.join("")}</AAQ00000>` +
 amountAlways("AAS00000", r.outputTax) +
 `<AAT00000>${aat.join("")}</AAT00000>` +
-amount("AAU00000", options?.returnsTax ?? 0) +
-(options?.returnsTax
-? `<AAV00000>${amount("AAV00010", options.returnsTax)}</AAV00000>`
+amount("AAU00000", credit.returnsTax) +
+(credit.returnsTax
+? `<AAV00000>${amount("AAV00010", credit.returnsTax)}</AAV00000>`
 : "") +
 `<AAW00000>${aaw.join("")}</AAW00000>` +
 `</SHA010-2>`;
@@ -716,8 +817,29 @@ periodTo: data.periodTo,
 filingKind: data.filingKind,
 });
 const normalized: ConsumptionXtxData = { ...data, taxpayer };
+const r = data.result;
+const sha010 = buildSha010({
+taxpayer,
+submissionDate: data.submissionDate,
+filingKind: data.filingKind,
+basePeriodSalesThousands: data.basePeriodSalesThousands,
+exemptSales: data.input.exemptSales,
+interimNational: data.input.interimNational,
+interimLocal: data.input.interimLocal,
+originalNational: data.originalNational,
+originalLocal: data.originalLocal,
+figures: r,
+credit: {
+methodKubun: r.fullDeduction? 3: 2,
+inputTax: r.inputTax,
+returnsTax: 0,
+badDebtTax: 0,
+badDebtRecoveryTax: 0,
+subtotal: r.inputTax,
+},
+});
 const forms: { id: string; xml: string }[] = [
-{ id: "SHA010", xml: buildSha010(normalized) },
+{ id: "SHA010", xml: sha010 },
 { id: "SHB017", xml: buildShb017(normalized) },
 { id: "SHB033", xml: buildShb033(normalized) },
 ];
@@ -853,104 +975,35 @@ const salesExcl8 = exclFromIncl(input.salesIncl8, 8);
 const salesExcl = salesExcl10 + salesExcl8;
 const totalSalesExcl =
 salesExcl + Math.trunc(input.nontaxableSales || 0) + Math.trunc(input.exemptSales || 0);
-const base10 = floor1000(salesExcl10);
-const base8 = floor1000(salesExcl8);
-const outputTax10 = Math.floor((base10 * 78) / 1000);
-const outputTax8 = Math.floor((base8 * 624) / 10000);
-const outputTax = outputTax10 + outputTax8;
+const outputTaxes = outputTaxesFromExcl(salesExcl10, salesExcl8);
+const adjustments = consumptionAdjustmentTaxes(input);
 
-const returnsTax10 = nationalTaxFromIncl(input.returnsIncl10, 10);
-const returnsTax8 = nationalTaxFromIncl(input.returnsIncl8, 8);
-const returnsTax = returnsTax10 + returnsTax8;
-const badDebtRecoveryTax10 = Math.trunc(input.badDebtRecoveryTax10 || 0);
-const badDebtRecoveryTax8 = Math.trunc(input.badDebtRecoveryTax8 || 0);
-const badDebtRecoveryTax = badDebtRecoveryTax10 + badDebtRecoveryTax8;
-const badDebtTax10 = Math.trunc(input.badDebtTax10 || 0);
-const badDebtTax8 = Math.trunc(input.badDebtTax8 || 0);
-const badDebtTax = badDebtTax10 + badDebtTax8;
-
-const basis10 = Math.max(outputTax10 + badDebtRecoveryTax10 - returnsTax10, 0);
-const basis8 = Math.max(outputTax8 + badDebtRecoveryTax8 - returnsTax8, 0);
+const basis10 = Math.max(outputTaxes.outputTax10 + adjustments.badDebtRecoveryTax10 - adjustments.returnsTax10, 0);
+const basis8 = Math.max(outputTaxes.outputTax8 + adjustments.badDebtRecoveryTax8 - adjustments.returnsTax8, 0);
 const specialCredit10 = Math.floor((basis10 * 80) / 100);
 const specialCredit8 = Math.floor((basis8 * 80) / 100);
 const specialCredit = specialCredit10 + specialCredit8;
-const creditSubtotal = specialCredit + returnsTax + badDebtTax;
-
-const diffRaw = outputTax + badDebtRecoveryTax - creditSubtotal;
-const interimNational = Math.trunc(input.interimNational || 0);
-const interimLocal = Math.trunc(input.interimLocal || 0);
-
-let refundNational = 0;
-let diffNational = 0;
-let payableNational = 0;
-let interimRefundNational = 0;
-let refundLocal = 0;
-let localTaxGross = 0;
-let payableLocal = 0;
-let interimRefundLocal = 0;
-
-if (diffRaw >= 0) {
-diffNational = floor100(diffRaw);
-if (diffNational >= interimNational) {
-payableNational = floor100(diffNational - interimNational);
-} else {
-interimRefundNational = interimNational - diffNational;
-}
-// 地方消費税: 中間納付の差引は切捨て後の譲渡割額（localTaxGross）基準
-const localRaw = Math.floor((diffNational * 22) / 78);
-localTaxGross = floor100(localRaw);
-if (localTaxGross >= interimLocal) {
-payableLocal = floor100(localTaxGross - interimLocal);
-} else {
-interimRefundLocal = interimLocal - localTaxGross;
-}
-} else {
-refundNational = -diffRaw;
-refundLocal = Math.floor((refundNational * 22) / 78);
-// 還付側の中間納付還付額は差額そのもの（100円未満切捨てはしない）
-if (interimNational > 0) interimRefundNational = interimNational;
-if (interimLocal > 0) interimRefundLocal = interimLocal;
-}
-
-const totalPayable =
-payableNational +
-payableLocal -
-refundNational -
-refundLocal -
-interimRefundNational -
-interimRefundLocal;
+const creditSubtotal = specialCredit + adjustments.returnsTax + adjustments.badDebtTax;
+const diffRaw = outputTaxes.outputTax + adjustments.badDebtRecoveryTax - creditSubtotal;
 
 return {
 salesExcl10,
 salesExcl8,
 salesExcl,
 totalSalesExcl,
-base10,
-base8,
-taxBase: base10 + base8,
-outputTax10,
-outputTax8,
-outputTax,
-returnsTax10,
-returnsTax8,
-returnsTax,
-badDebtRecoveryTax,
-badDebtTax,
+...outputTaxes,
+returnsTax10: adjustments.returnsTax10,
+returnsTax8: adjustments.returnsTax8,
+returnsTax: adjustments.returnsTax,
+badDebtRecoveryTax: adjustments.badDebtRecoveryTax,
+badDebtTax: adjustments.badDebtTax,
 basis10,
 basis8,
 specialCredit10,
 specialCredit8,
 specialCredit,
 creditSubtotal,
-refundNational,
-diffNational,
-payableNational,
-interimRefundNational,
-refundLocal,
-localTaxGross,
-payableLocal,
-interimRefundLocal,
-totalPayable,
+...settleConsumptionTax(diffRaw, input.interimNational, input.interimLocal),
 };
 }
 
@@ -1033,68 +1086,30 @@ periodTo: data.periodTo,
 filingKind: data.filingKind,
 });
 const r = data.result;
-// SHA010 の生成は本則と共用する。控除対象仕入税額には特別控除税額を渡す。
-const shaData: ConsumptionXtxData = {
+const normalized: Special20ConsumptionXtxData = { ...data, taxpayer };
+// 申告書は本則と同じ SHA010。控除対象仕入税額の欄には特別控除税額を書く
+const sha010 = buildSha010({
 taxpayer,
-periodFrom: data.periodFrom,
-periodTo: data.periodTo,
 submissionDate: data.submissionDate,
 filingKind: data.filingKind,
 basePeriodSalesThousands: data.basePeriodSalesThousands,
-input: {
-salesIncl10: data.input.salesIncl10,
-salesIncl8: data.input.salesIncl8,
-nontaxableSales: data.input.nontaxableSales,
 exemptSales: data.input.exemptSales,
-purchasesIncl10: 0,
-purchasesIncl8: 0,
 interimNational: data.input.interimNational,
 interimLocal: data.input.interimLocal,
-},
-result: {
-salesExcl10: r.salesExcl10,
-salesExcl8: r.salesExcl8,
-salesExcl: r.salesExcl,
-totalSalesExcl: r.totalSalesExcl,
-ratio: 100,
-fullDeduction: false,
-base10: r.base10,
-base8: r.base8,
-taxBase: r.taxBase,
-outputTax10: r.outputTax10,
-outputTax8: r.outputTax8,
-outputTax: r.outputTax,
-inputTaxRaw10: 0,
-inputTaxRaw8: 0,
-inputTax10: r.specialCredit10,
-inputTax8: r.specialCredit8,
-inputTax: r.specialCredit,
-diffRaw: r.outputTax + r.badDebtRecoveryTax - r.creditSubtotal,
-refundNational: r.refundNational,
-diffNational: r.diffNational,
-payableNational: r.payableNational,
-interimRefundNational: r.interimRefundNational,
-refundLocal: r.refundLocal,
-localTaxGross: r.localTaxGross,
-payableLocal: r.payableLocal,
-interimRefundLocal: r.interimRefundLocal,
-totalPayable: r.totalPayable,
-},
 originalNational: data.originalNational,
 originalLocal: data.originalLocal,
-};
-const normalized: Special20ConsumptionXtxData = { ...data, taxpayer };
-const forms: { id: string; xml: string }[] = [
-{
-id: "SHA010",
-xml: buildSha010(shaData, {
-creditMethodKubun: 8,
-creditSubtotal: r.creditSubtotal,
+figures: r,
+credit: {
+methodKubun: 8,
+inputTax: r.specialCredit,
 returnsTax: r.returnsTax,
 badDebtTax: r.badDebtTax,
 badDebtRecoveryTax: r.badDebtRecoveryTax,
-}),
+subtotal: r.creditSubtotal,
 },
+});
+const forms: { id: string; xml: string }[] = [
+{ id: "SHA010", xml: sha010 },
 { id: "SHB070", xml: buildShb070(normalized) },
 ];
 const catalog =
@@ -1116,7 +1131,7 @@ return (
 `<DATA id="DATA" xmlns="${SHOHI_NS}">` +
 `<RSH0010 VR="26.0.0" id="RSH0010" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
 catalog +
-`<CONTENTS id="CONTENTS">${buildShohiIt(shaData, "RSH0010")}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
+`<CONTENTS id="CONTENTS">${buildShohiIt(normalized, "RSH0010")}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
 `</RSH0010></DATA>`
 );
 }

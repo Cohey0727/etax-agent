@@ -28,10 +28,11 @@ import { XtxTaxpayer, amount, amountAlways, esc, kubun, ref} from "./xtx";
 import {
 amendmentIncrease,
 buildShohiIt,
+consumptionAdjustmentTaxes,
 exclFromIncl,
-floor100,
-floor1000,
 nationalTaxFromIncl,
+outputTaxesFromExcl,
+settleConsumptionTax,
 signedLocalTax,
 signedNationalTax,
 } from "./xtxShohi";
@@ -264,21 +265,19 @@ for (const c of categories) c.sharePercent = percent1(c.exclTotal, salesExcl);
 const totalSalesExcl =
 salesExcl + Math.trunc(input.nontaxableSales || 0) + Math.trunc(input.exemptSales || 0);
 
-const base10 = floor1000(salesExcl10);
-const base8 = floor1000(salesExcl8);
-const outputTax10 = Math.floor((base10 * 78) / 1000);
-const outputTax8 = Math.floor((base8 * 624) / 10000);
-const outputTax = outputTax10 + outputTax8;
-
-const returnsTax10 = nationalTaxFromIncl(input.returnsIncl10, 10);
-const returnsTax8 = nationalTaxFromIncl(input.returnsIncl8, 8);
-const returnsTax = returnsTax10 + returnsTax8;
-const badDebtRecoveryTax10 = Math.trunc(input.badDebtRecoveryTax10 || 0);
-const badDebtRecoveryTax8 = Math.trunc(input.badDebtRecoveryTax8 || 0);
-const badDebtRecoveryTax = badDebtRecoveryTax10 + badDebtRecoveryTax8;
-const badDebtTax10 = Math.trunc(input.badDebtTax10 || 0);
-const badDebtTax8 = Math.trunc(input.badDebtTax8 || 0);
-const badDebtTax = badDebtTax10 + badDebtTax8;
+const outputTaxes = outputTaxesFromExcl(salesExcl10, salesExcl8);
+const { outputTax10, outputTax8, outputTax } = outputTaxes;
+const {
+returnsTax10,
+returnsTax8,
+returnsTax,
+badDebtRecoveryTax10,
+badDebtRecoveryTax8,
+badDebtRecoveryTax,
+badDebtTax10,
+badDebtTax8,
+badDebtTax,
+} = consumptionAdjustmentTaxes(input);
 
 const basis10 = Math.max(outputTax10 + badDebtRecoveryTax10 - returnsTax10, 0);
 const basis8 = Math.max(outputTax8 + badDebtRecoveryTax8 - returnsTax8, 0);
@@ -369,49 +368,6 @@ const creditSubtotal8 = inputTax8 + returnsTax8 + badDebtTax8;
 const creditSubtotal = creditSubtotal10 + creditSubtotal8;
 
 const diffRaw = outputTax + badDebtRecoveryTax - creditSubtotal;
-const interimNational = Math.trunc(input.interimNational || 0);
-const interimLocal = Math.trunc(input.interimLocal || 0);
-
-let refundNational = 0;
-let diffNational = 0;
-let payableNational = 0;
-let interimRefundNational = 0;
-let refundLocal = 0;
-let localTaxGross = 0;
-let payableLocal = 0;
-let interimRefundLocal = 0;
-
-if (diffRaw >= 0) {
-diffNational = floor100(diffRaw);
-if (diffNational >= interimNational) {
-payableNational = floor100(diffNational - interimNational);
-} else {
-interimRefundNational = interimNational - diffNational;
-}
-// 地方消費税: 譲渡割額は差引税額（国税）× 22/78。中間納付の差引は
-// 100円未満切捨て後の譲渡割額（localTaxGross）を基準にする
-const localRaw = Math.floor((diffNational * 22) / 78);
-localTaxGross = floor100(localRaw);
-if (localTaxGross >= interimLocal) {
-payableLocal = floor100(localTaxGross - interimLocal);
-} else {
-interimRefundLocal = interimLocal - localTaxGross;
-}
-} else {
-refundNational = -diffRaw;
-refundLocal = Math.floor((refundNational * 22) / 78);
-// 還付側の中間納付還付額は差額そのもの（100円未満切捨てはしない）
-if (interimNational > 0) interimRefundNational = interimNational;
-if (interimLocal > 0) interimRefundLocal = interimLocal;
-}
-
-const totalPayable =
-payableNational +
-payableLocal -
-refundNational -
-refundLocal -
-interimRefundNational -
-interimRefundLocal;
 
 return {
 categories,
@@ -420,12 +376,7 @@ salesExcl10,
 salesExcl8,
 salesExcl,
 totalSalesExcl,
-base10,
-base8,
-taxBase: base10 + base8,
-outputTax10,
-outputTax8,
-outputTax,
+...outputTaxes,
 returnsTax10,
 returnsTax8,
 returnsTax,
@@ -445,15 +396,7 @@ inputTax,
 creditSubtotal10,
 creditSubtotal8,
 creditSubtotal,
-refundNational,
-diffNational,
-payableNational,
-interimRefundNational,
-refundLocal,
-localTaxGross,
-payableLocal,
-interimRefundLocal,
-totalPayable,
+...settleConsumptionTax(diffRaw, input.interimNational, input.interimLocal),
 };
 }
 
