@@ -594,8 +594,10 @@ export type NewDocumentLineRow = typeof documentLinesTable.$inferInsert;
  * 1件の請求書を消し込んだり（多対1）できるよう、充当額をレコードごとに持つ。
  * kind:
  * - payment: 入金取引の充当（transaction_id は入金取引）
- * - fee: 振込手数料の差額調整（transaction_id は自動生成した支払手数料の支出取引）
- * - discount: 売上値引の差額調整（transaction_id は自動生成した売上値引の取引）
+ * - fee: 振込手数料の差額調整（transaction_id は自動生成した支払手数料の支出取引、
+ *   adjustment_transaction_id は対で自動生成した差額分の売上高の取引）
+ * - discount: 売上値引の差額調整（transaction_id は自動生成した売上値引の取引、
+ *   adjustment_transaction_id は対で自動生成した差額分の売上高の取引）
  * - overpayment: 過入金の預り金処理（transaction_id は入金取引、
  *   adjustment_transaction_id は自動生成した預り金の取引。消込済み額には数えない）
  * 消込・解除の履歴は、紐付く取引側の変更履歴（transaction_history）と
@@ -610,7 +612,7 @@ export const invoicePaymentsTable = pgTable("invoice_payments", {
   transactionId: integer("transaction_id")
     .notNull()
     .references(() => transactionsTable.id),
-  /** 過入金の預り金処理で自動生成した取引。overpayment のときだけ入る */
+  /** 自動生成した対の取引（overpayment は預り金、fee / discount は差額分の売上高） */
   adjustmentTransactionId: integer("adjustment_transaction_id").references(
     () => transactionsTable.id,
   ),

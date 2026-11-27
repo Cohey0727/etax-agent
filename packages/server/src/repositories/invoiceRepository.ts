@@ -16,7 +16,7 @@ import {
   InvoiceTaxRounding,
 } from "@etax/shared";
 import { settlementSummaries } from "./reconciliationRepository";
-import { Db } from "../lib/db";
+import { Db, DbOrTx } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import {
   InvoiceIssuer,
@@ -147,6 +147,20 @@ function invoiceIdCondition(id: number) {
 
 export async function getInvoiceRow(db: Db, id: number): Promise<DocumentRow | null> {
   const rows = await db.select().from(documentsTable).where(invoiceIdCondition(id));
+  return rows[0] ?? null;
+}
+
+/**
+ * 帳票を行ロックして取得する（トランザクション内で使う）。同じ請求書への
+ * 消込を直列にし、請求残額の検証から記録までの間に他の消込が割り込まない
+ * ようにする。
+ */
+export async function lockInvoiceRow(tx: DbOrTx, id: number): Promise<DocumentRow | null> {
+  const rows = await tx
+    .select()
+    .from(documentsTable)
+    .where(invoiceIdCondition(id))
+    .for("update");
   return rows[0] ?? null;
 }
 

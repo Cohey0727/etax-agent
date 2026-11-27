@@ -19,7 +19,7 @@ export const InvoicePaymentSchema = z
     id: z.number(),
     document_id: z.number(),
     transaction_id: z.number(),
-    /** 過入金の預り金処理で自動生成した取引のID。それ以外は null */
+    /** 自動生成した対の取引のID（過入金は預り金、手数料・値引は差額分の売上高）。入金の充当は null */
     adjustment_transaction_id: z.number().nullable(),
     kind: InvoicePaymentKindSchema,
     amount: z.number(),

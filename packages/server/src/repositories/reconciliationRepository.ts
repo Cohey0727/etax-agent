@@ -2,9 +2,13 @@
  * reconciliationRepository.ts — 入金消込テーブルへのデータアクセス（repositories）。
  *
  * 消込の作成は「入金の充当＋差額調整の取引生成＋過入金の預り金生成」を
- * 1トランザクションで行う。差額調整の標準形（freee公式ヘルプの会計処理）:
- * - 振込手数料: 支払手数料の支出取引を自動生成し、その分も消込済みに数える
- * - 売上値引: 売上値引の取引（負額）を自動生成し、その分も消込済みに数える
+ * 1トランザクションで行う。帳簿は入金額そのものを収入として持ち、請求書の
+ * 発行では売上を計上しないため、差額は入金額に含まれていない:
+ * - 振込手数料: 差額分の売上高（正額）と支払手数料（負額）を対で自動生成し、
+ *   その分も消込済みに数える
+ * - 売上値引: 差額分の売上高（正額）と売上値引（負額）を対で自動生成し、
+ *   その分も消込済みに数える
+ *   （対の合計は 0 なので、帳簿の合計は入金額のまま変わらない）
  * - 過入金: 充当しきれない分を預り金の取引（負額）として自動生成し、
  *   入金取引を使い切る（消込済み額には数えない）
  * 解除時は、自動生成した調整取引も一緒に論理削除し、帳簿に残骸を残さない
@@ -16,7 +20,7 @@ import {
   InvoicePaymentKind,
   InvoiceSettlement,
 } from "@etax/shared";
-import { Db } from "../lib/db";
+import { Db, DbOrTx } from "../lib/db";
 import { currentUserId, ownerIdForWrite } from "../lib/tenantContext";
 import {
   InvoicePaymentResponse,
@@ -118,7 +122,7 @@ export function settlementToApi(
  * totals は documentId → 税込合計。
  */
 export async function settlementSummaries(
-  db: Db,
+  db: DbOrTx,
   totals: ReadonlyMap<number, number>,
 ): Promise<Map<number, InvoiceSettlement>> {
   const result = new Map<number, InvoiceSettlement>();
@@ -154,7 +158,7 @@ export async function settlementSummaries(
 
 /** 取引ごとに、すでに消し込まれた額（充当＋過入金で使い切った分）を集計する。 */
 export async function appliedAmountsByTransaction(
-  db: Db,
+  db: DbOrTx,
   transactionIds: readonly number[],
 ): Promise<Map<number, number>> {
   const result = new Map<number, number>();
@@ -218,16 +222,37 @@ function adjustmentValues(
 }
 
 /**
+ * 消込対象の入金取引（削除されていない自分の取引）を行ロックして取得する。
+ * 同じ入金を同時に充当するリクエストを直列にし、未消込額の検証から記録
+ * までの間に他の充当が割り込まないようにする。無ければ null。
+ */
+export async function lockPaymentTransactionRow(
+  tx: DbOrTx,
+  id: number,
+): Promise<TransactionRow | null> {
+  const owner = currentUserId();
+  const conditions = [eq(transactionsTable.id, id), isNull(transactionsTable.deletedAt)];
+  if (owner !== undefined) conditions.push(eq(transactionsTable.ownerUserId, owner));
+  const [row] = await tx
+    .select()
+    .from(transactionsTable)
+    .where(and(...conditions))
+    .for("update");
+  return row ?? null;
+}
+
+/**
  * 消込を1件作成する。充当・差額調整・預り金の生成を1トランザクションで
  * 行い、作成した消込レコードを返す。金額の妥当性（残額・未消込額の範囲）は
- * 呼び出し側（usecases）が検証済みである前提。
+ * 呼び出し側が、同じトランザクション内で請求書と入金取引をロックしたうえで
+ * 検証済みである前提。
  */
 export async function insertReconciliation(
-  db: Db,
+  executor: DbOrTx,
   input: ReconciliationInput,
 ): Promise<InvoicePaymentRow[]> {
   const label = input.document.documentNumber ?? `#${input.document.id}`;
-  return db.transaction(async (tx) => {
+  return executor.transaction(async (tx) => {
     const created: InvoicePaymentRow[] = [];
     const insertRow = async (
       values: Omit<InvoicePaymentRow, "id" | "createdAt" | "ownerUserId">,
@@ -238,6 +263,35 @@ export async function insertReconciliation(
         .returning();
       if (row) created.push(row);
     };
+    /**
+     * 差額調整の対（差額分の売上高と、支払手数料／売上値引）を作り、消込
+     * レコードに紐付ける。transaction_id は負額の調整取引、
+     * adjustment_transaction_id は対の売上高の取引。
+     */
+    const insertAdjustmentPair = async (
+      kind: InvoicePaymentKind,
+      amount: number,
+      category: string,
+      description: string,
+      revenueDescription: string,
+    ) => {
+      const revenueTx = await insertTransactionRowWith(
+        tx,
+        adjustmentValues(input, amount, "売上高", revenueDescription),
+      );
+      const adjustmentTx = await insertTransactionRowWith(
+        tx,
+        adjustmentValues(input, -amount, category, description),
+      );
+      if (!adjustmentTx) return;
+      await insertRow({
+        documentId: input.document.id,
+        transactionId: adjustmentTx.id,
+        adjustmentTransactionId: revenueTx?.id ?? null,
+        kind,
+        amount,
+      });
+    };
     await insertRow({
       documentId: input.document.id,
       transactionId: input.paymentTransaction.id,
@@ -246,39 +300,22 @@ export async function insertReconciliation(
       amount: input.amount,
     });
     if (input.feeAmount > 0) {
-      const feeTx = await insertTransactionRowWith(
-        tx,
-        adjustmentValues(
-          input,
-          -input.feeAmount,
-          "支払手数料",
-          `振込手数料（請求書 ${label} の差額調整）`,
-        ),
+      await insertAdjustmentPair(
+        InvoicePaymentKind.Fee,
+        input.feeAmount,
+        "支払手数料",
+        `振込手数料（請求書 ${label} の差額調整）`,
+        `請求書 ${label} の売上（振込手数料の差額調整）`,
       );
-      if (feeTx) {
-        await insertRow({
-          documentId: input.document.id,
-          transactionId: feeTx.id,
-          adjustmentTransactionId: null,
-          kind: InvoicePaymentKind.Fee,
-          amount: input.feeAmount,
-        });
-      }
     }
     if (input.discountAmount > 0) {
-      const discountTx = await insertTransactionRowWith(
-        tx,
-        adjustmentValues(input, -input.discountAmount, "売上値引", `売上値引（請求書 ${label}）`),
+      await insertAdjustmentPair(
+        InvoicePaymentKind.Discount,
+        input.discountAmount,
+        "売上値引",
+        `売上値引（請求書 ${label}）`,
+        `請求書 ${label} の売上（売上値引の差額調整）`,
       );
-      if (discountTx) {
-        await insertRow({
-          documentId: input.document.id,
-          transactionId: discountTx.id,
-          adjustmentTransactionId: null,
-          kind: InvoicePaymentKind.Discount,
-          amount: input.discountAmount,
-        });
-      }
     }
     if (input.excessAsDeposit > 0) {
       const depositTx = await insertTransactionRowWith(
@@ -303,7 +340,7 @@ export async function insertReconciliation(
 }
 
 /**
- * 消込を解除する。自動生成した差額調整・預り金の取引は一緒に論理削除する。
+ * 消込を解除する。自動生成した差額調整の対・預り金の取引は一緒に論理削除する。
  * 対象が無ければ false。
  */
 export async function deleteReconciliation(

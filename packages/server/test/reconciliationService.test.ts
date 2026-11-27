@@ -19,6 +19,7 @@ import { DocumentRow } from "../src/repositories/schema";
 import { fetchPaymentsResponse } from "../src/repositories/reconciliationRepository";
 import {
   insertTransactionRow,
+  listTransactionRows,
   TransactionRow,
   updateTransactionRow,
 } from "../src/repositories/transactionRepository";
@@ -244,5 +245,101 @@ describe("消込の所有者分離", () => {
       applyInvoicePayment(db, { invoiceId: invoiceA.id, transaction_id: incomeA.id }),
     );
     expect(applied.settlement.status).toBe("paid");
+  });
+});
+
+/** 帳簿（削除済みを除く）の金額の合計と、収入（正の額）の合計。 */
+async function ledgerSums(db: Db): Promise<{ net: number; revenue: number; rows: number }> {
+  const rows = await listTransactionRows(db);
+  return {
+    net: rows.reduce((sum, row) => sum + row.amount, 0),
+    revenue: rows.reduce((sum, row) => (row.amount > 0 ? sum + row.amount : sum), 0),
+    rows: rows.length,
+  };
+}
+
+describe("差額調整の取引は帳簿の合計を入金額に保つ", () => {
+  test("振込手数料: 売上高の計上分と支払手数料を対で作り、解除で対ごと消す", async () => {
+    const db = await createTestDb();
+    const invoice = await makeInvoice(db, 110000);
+    const income = await makeTx(db, 109560, "振込 株式会社テスト商事");
+    const applied = await applyInvoicePayment(db, {
+      invoiceId: invoice.id,
+      transaction_id: income.id,
+      amount: 109560,
+      fee_amount: 440,
+    });
+    expect(applied.settlement.status).toBe("paid");
+    const sums = await ledgerSums(db);
+    // 帳簿の合計は入金額のまま、収入は請求額、手数料は経費に載る
+    expect(sums.net).toBe(109560);
+    expect(sums.revenue).toBe(110000);
+    const rows = await listTransactionRows(db);
+    expect(rows.map((row) => [row.category, row.amount]).sort()).toEqual(
+      [
+        ["売上高", 109560],
+        ["売上高", 440],
+        ["支払手数料", -440],
+      ].sort(),
+    );
+
+    const feeRow = applied.payments.find((p) => p.kind === "fee");
+    await releaseInvoicePayment(db, invoice.id, feeRow?.id ?? 0);
+    const afterRelease = await ledgerSums(db);
+    expect(afterRelease).toEqual({ net: 109560, revenue: 109560, rows: 1 });
+  });
+
+  test("売上値引: 売上高の計上分と売上値引を対で作り、帳簿の合計は入金額のまま", async () => {
+    const db = await createTestDb();
+    const invoice = await makeInvoice(db, 110000);
+    const income = await makeTx(db, 100000, "振込 株式会社テスト商事");
+    const applied = await applyInvoicePayment(db, {
+      invoiceId: invoice.id,
+      transaction_id: income.id,
+      amount: 100000,
+      discount_amount: 10000,
+    });
+    expect(applied.settlement.status).toBe("paid");
+    const sums = await ledgerSums(db);
+    expect(sums.net).toBe(100000);
+    expect(sums.revenue).toBe(110000);
+  });
+});
+
+describe("消込の同時実行", () => {
+  test("同じ入金を同じ請求書へ同時に充当しても、請求残額を超えて消し込まない", async () => {
+    const db = await createTestDb();
+    const invoice = await makeInvoice(db, 11000);
+    const income = await makeTx(db, 22000, "振込 株式会社テスト商事");
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () =>
+        applyInvoicePayment(db, { invoiceId: invoice.id, transaction_id: income.id, amount: 11000 }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of results) {
+      if (r.status === "rejected") expect(r.reason).toBeInstanceOf(ReconciliationError);
+    }
+    const after = await fetchPaymentsResponse(db, invoice);
+    expect(after.payments).toHaveLength(1);
+    expect(after.settlement.settled_amount).toBe(11000);
+  });
+
+  test("手数料つきの同時充当でも、支払手数料の取引は1件だけ作る", async () => {
+    const db = await createTestDb();
+    const invoice = await makeInvoice(db, 11000);
+    const income = await makeTx(db, 10670, "振込 株式会社テスト商事");
+    await Promise.allSettled(
+      Array.from({ length: 3 }, () =>
+        applyInvoicePayment(db, {
+          invoiceId: invoice.id,
+          transaction_id: income.id,
+          amount: 10670,
+          fee_amount: 330,
+        }),
+      ),
+    );
+    const rows = await listTransactionRows(db);
+    expect(rows.filter((row) => row.category === "支払手数料")).toHaveLength(1);
   });
 });

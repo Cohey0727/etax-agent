@@ -8,19 +8,16 @@
  */
 import { suggestReconciliations } from "@etax/shared";
 import { Db } from "../../lib/db";
-import { getInvoiceRow } from "../../repositories/invoiceRepository";
+import { getInvoiceRow, lockInvoiceRow } from "../../repositories/invoiceRepository";
 import {
   appliedAmountsByTransaction,
   deleteReconciliation,
   fetchPaymentsResponse,
   insertReconciliation,
+  lockPaymentTransactionRow,
   settlementSummaries,
 } from "../../repositories/reconciliationRepository";
-import {
-  getTransactionRow,
-  listTransactionRows,
-  transactionToApi,
-} from "../../repositories/transactionRepository";
+import { listTransactionRows, transactionToApi } from "../../repositories/transactionRepository";
 import {
   CreateInvoicePaymentRequest,
   InvoicePaymentsResponse,
@@ -45,48 +42,53 @@ export interface ApplyInvoicePaymentInput extends CreateInvoicePaymentRequest {
 /**
  * 消込を作成する。発行済み請求書・入金取引（プラスの有効な取引）であること、
  * 充当額が入金の未消込額と請求残額の範囲内であることを検証してから、
- * 充当・差額調整・預り金を1トランザクションで記録する。
+ * 充当・差額調整・預り金を記録する。検証から記録までを1トランザクションで
+ * 行い、請求書と入金取引の行をロックして同時の消込を直列にする（二度押し・
+ * 再送で請求残額や入金の未消込額を超えて充当しないため）。
  */
 export async function applyInvoicePayment(
   db: Db,
   input: ApplyInvoicePaymentInput,
 ): Promise<InvoicePaymentsResponse> {
-  const invoice = await getInvoiceRow(db, input.invoiceId);
-  if (!invoice) throw new ReconciliationError(404, "請求書が見つかりません");
-  if (invoice.status !== "issued") {
-    throw new ReconciliationError(400, "発行済みの請求書にだけ消込できます");
-  }
-  const transaction = await getTransactionRow(db, input.transaction_id);
-  if (!transaction || transaction.amount <= 0) {
-    throw new ReconciliationError(400, "入金取引（プラスの取引）を指定してください");
-  }
-  const summaries = await settlementSummaries(db, new Map([[invoice.id, invoice.totalAmount]]));
-  const settlement = summaries.get(invoice.id);
-  if (!settlement || settlement.remainingAmount <= 0) {
-    throw new ReconciliationError(400, "この請求書はすでに消込済みです");
-  }
-  const applied = await appliedAmountsByTransaction(db, [transaction.id]);
-  const unapplied = transaction.amount - (applied.get(transaction.id) ?? 0);
-  if (unapplied <= 0) {
-    throw new ReconciliationError(400, "この入金取引はすでに全額消込済みです");
-  }
-  const feeAmount = input.fee_amount ?? 0;
-  const discountAmount = input.discount_amount ?? 0;
-  const amount = input.amount ?? Math.min(unapplied, settlement.remainingAmount);
-  if (amount > unapplied) {
-    throw new ReconciliationError(400, "充当額が入金取引の未消込額を超えています");
-  }
-  if (amount + feeAmount + discountAmount > settlement.remainingAmount) {
-    throw new ReconciliationError(400, "充当額と差額調整の合計が請求残額を超えています");
-  }
-  const excessAsDeposit = input.treat_excess_as_deposit ? unapplied - amount : 0;
-  await insertReconciliation(db, {
-    document: invoice,
-    paymentTransaction: transaction,
-    amount,
-    feeAmount,
-    discountAmount,
-    excessAsDeposit,
+  const invoice = await db.transaction(async (tx) => {
+    const invoice = await lockInvoiceRow(tx, input.invoiceId);
+    if (!invoice) throw new ReconciliationError(404, "請求書が見つかりません");
+    if (invoice.status !== "issued") {
+      throw new ReconciliationError(400, "発行済みの請求書にだけ消込できます");
+    }
+    const transaction = await lockPaymentTransactionRow(tx, input.transaction_id);
+    if (!transaction || transaction.amount <= 0) {
+      throw new ReconciliationError(400, "入金取引（プラスの取引）を指定してください");
+    }
+    const summaries = await settlementSummaries(tx, new Map([[invoice.id, invoice.totalAmount]]));
+    const settlement = summaries.get(invoice.id);
+    if (!settlement || settlement.remainingAmount <= 0) {
+      throw new ReconciliationError(400, "この請求書はすでに消込済みです");
+    }
+    const applied = await appliedAmountsByTransaction(tx, [transaction.id]);
+    const unapplied = transaction.amount - (applied.get(transaction.id) ?? 0);
+    if (unapplied <= 0) {
+      throw new ReconciliationError(400, "この入金取引はすでに全額消込済みです");
+    }
+    const feeAmount = input.fee_amount ?? 0;
+    const discountAmount = input.discount_amount ?? 0;
+    const amount = input.amount ?? Math.min(unapplied, settlement.remainingAmount);
+    if (amount > unapplied) {
+      throw new ReconciliationError(400, "充当額が入金取引の未消込額を超えています");
+    }
+    if (amount + feeAmount + discountAmount > settlement.remainingAmount) {
+      throw new ReconciliationError(400, "充当額と差額調整の合計が請求残額を超えています");
+    }
+    const excessAsDeposit = input.treat_excess_as_deposit ? unapplied - amount : 0;
+    await insertReconciliation(tx, {
+      document: invoice,
+      paymentTransaction: transaction,
+      amount,
+      feeAmount,
+      discountAmount,
+      excessAsDeposit,
+    });
+    return invoice;
   });
   return fetchPaymentsResponse(db, invoice);
 }
