@@ -1,8 +1,4 @@
-import { Transaction } from "@etax/shared";
-import {
-  BreakdownEntry,
-  DeductionPatch,
-} from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import { BreakdownEntry, DeductionPatch, Transaction } from "@etax/shared";
 import { LedgerTransaction } from "@types";
 import {
   ledgerRowToTransaction,

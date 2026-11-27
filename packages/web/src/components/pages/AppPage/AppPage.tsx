@@ -1,11 +1,10 @@
-import { sampleTransactions, Transaction } from "@etax/shared";
+import { applyDeductionPatch, sampleTransactions, Transaction } from "@etax/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@components/atoms";
 import { PageSkeleton, TableSkeleton } from "@components/molecules";
 import { DashboardSkeleton } from "@components/organisms/dashboard";
 import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
 import {
-  applyDeductionPatch,
   loadDeductionState,
   saveDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";

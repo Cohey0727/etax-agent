@@ -1,4 +1,6 @@
 import {
+  BreakdownEntriesKey,
+  BreakdownEntry,
   CasualtyLossInput,
   DeductionInputs,
   EarthquakeInsurancePremiums,
@@ -9,7 +11,6 @@ import {
 import { StyleSheet, View } from "react-native";
 import { Card, SelectField, SwitchRow } from "@/components";
 import { space } from "@/theme";
-import { BreakdownEntriesKey, BreakdownEntry } from "../deductionState";
 import { BreakdownEntriesFields } from "../BreakdownEntriesFields";
 import { AmountField, NullableAmountField, ResultRow, SectionHead } from "../fields";
 import { DEDUCTION_LABELS } from "./deductionFields";

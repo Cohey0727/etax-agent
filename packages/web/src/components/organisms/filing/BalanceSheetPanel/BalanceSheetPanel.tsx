@@ -4,20 +4,18 @@ import {
   BS_LIABILITY_ACCOUNTS,
   BalanceSheetAccount,
   BalanceSheetWireExtra,
+  DeductionState,
   FilingType,
   XtxBalanceSheetInput,
   buildTrialBalanceSheet,
   carryOverBalanceSheet,
   emptyBalanceSheetInput,
   isBalanceSheetEmpty,
+  parseDeductionState,
 } from "@etax/shared";
 import { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import {
-  DeductionState,
-  parseDeductionState,
-} from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { fetchFilingInputs, formatYen } from "@utils";
 import { AmountRow, ExtraRow, TotalRow, toAmount } from "./BalanceSheetRows";
 import styles from "./BalanceSheetPanel.css";

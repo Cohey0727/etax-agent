@@ -4,6 +4,7 @@ import {
   MiscIncomeInput,
   SalaryIncomeInput,
   Transaction,
+  buildSnapshotFigures,
 } from "@etax/shared";
 import { Fragment, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
@@ -11,7 +12,7 @@ import { AppButton, AppText, Card, Chip } from "@/components";
 import { createFilingSnapshot } from "@/api";
 import { space } from "@/theme";
 import { formatDate } from "@/utils";
-import { ConfirmComparePanel, buildSnapshotFigures } from "../ConfirmComparePanel";
+import { ConfirmComparePanel } from "../ConfirmComparePanel";
 import { IncomeSummary } from "../IncomeSummary";
 import { TaxSummary } from "../TaxSummary";
 import { FilingStatusKey, useFilingStatus } from "../useFilingStatus";

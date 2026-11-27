@@ -10,6 +10,7 @@ import {
   carryOverBalanceSheet,
   emptyBalanceSheetInput,
   isBalanceSheetEmpty,
+  parseDeductionState,
 } from "@etax/shared";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -17,7 +18,6 @@ import { AlertBox, AppButton, AppText, Card } from "@/components";
 import { fetchFilingInputs } from "@/api";
 import { space } from "@/theme";
 import { formatYen } from "@/utils";
-import { parseDeductionState } from "../deductionState";
 import { MoneyInput, ResultRow, SectionHead } from "../fields";
 import { AccountRow, ClosingOnlyRow, ExtraRow } from "./BalanceSheetRows";
 

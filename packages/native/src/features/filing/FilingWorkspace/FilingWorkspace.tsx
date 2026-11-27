@@ -1,17 +1,23 @@
 import {
   AgricultureInput,
   BlueDeductionOptions,
+  BreakdownEntriesKey,
+  BreakdownEntry,
   DeductionInputs,
+  DeductionState,
   ExpandedIncomeInput,
   MiscIncomeInput,
   SalaryIncomeInput,
   TaxCreditInputs,
   XtxBalanceSheetInput,
+  applyBreakdownEntries,
+  buildSnapshotFigures,
   computeCorrectedFigures,
   computeExpandedIncomes,
   computeIncomeTax,
   computeManualIncomes,
   filterYear,
+  freshDeductionState,
   resolveTaxCreditInputs,
 } from "@etax/shared";
 import { useRouter } from "expo-router";
@@ -23,11 +29,6 @@ import { useAuth } from "@/auth/AuthContext";
 import { useAppState } from "@/state/AppContext";
 import { space } from "@/theme";
 import {
-  BreakdownEntriesKey,
-  BreakdownEntry,
-  DeductionState,
-  applyBreakdownEntries,
-  freshDeductionState,
   hydrateDeductionStateFromServer,
   loadDeductionState,
   saveDeductionState,
@@ -36,7 +37,7 @@ import { AgriculturePanel } from "../AgriculturePanel";
 import { BalanceRecords } from "../BalanceRecords";
 import { BalanceSheetPanel } from "../BalanceSheetPanel";
 import { BalanceSummary } from "../BalanceSummary";
-import { ConfirmComparePanel, buildSnapshotFigures } from "../ConfirmComparePanel";
+import { ConfirmComparePanel } from "../ConfirmComparePanel";
 import { ConsumptionTaxPanel } from "../ConsumptionTaxPanel";
 import { DeductionPanel } from "../DeductionPanel";
 import { ExpandedIncomePanel } from "../ExpandedIncomePanel";

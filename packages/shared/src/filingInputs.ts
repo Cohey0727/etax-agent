@@ -1,0 +1,365 @@
+/**
+ * filingInputs.ts — 申告入力（年度別の DeductionState）の形と、保存先に
+ * 依存しない操作。
+ *
+ * DeductionState はサーバーの申告入力（filing_inputs）に年度ごとに
+ * そのまま保存される。保存値は画面の版によって項目が欠けていたり
+ * 壊れていたりするので、読み出しは必ず parseDeductionState を通し、
+ * 欠けた項目は空の入力で補う。端末のキャッシュ・API の読み書きは
+ * web / native の各パッケージが持つ。
+ */
+import { type AgricultureInput, EMPTY_AGRICULTURE_INPUT, normalizeAgricultureInput } from "./agriculture";
+import { normalizeBalanceSheetInput } from "./balanceSheet";
+import {
+  computeManualIncomes,
+  type DeductionInputs,
+  EMPTY_DEDUCTION_INPUTS,
+  EMPTY_MISC_INCOME,
+  EMPTY_SALARY_INCOME,
+  EMPTY_TAX_CREDIT_INPUTS,
+  type IncomeTaxResult,
+  type MiscIncomeInput,
+  type SalaryIncomeInput,
+  type TaxCreditInputs,
+} from "./deductions";
+import { EMPTY_EXPANDED_INCOME, type ExpandedIncomeInput, normalizeExpandedIncomeInput } from "./expandedIncome";
+import { filterYear } from "./ledger";
+import { type ComputeCorrectedFiguresOptions, computeCorrectedFigures, type FilingType } from "./taxcalc";
+import type { Transaction } from "./types";
+import type { XtxBalanceSheetInput } from "./xtx";
+import { summarizeConsumptionTax } from "./xtxShohi";
+
+// ---------------------------------------------------------------------------
+// 型
+// ---------------------------------------------------------------------------
+
+/**
+ * 内訳の1件（名称と金額）。寄附金・社会保険料・小規模企業共済等・医療費の
+ * ように「内訳があって合計が控除の元になる」入力で共有する。
+ * 合計は対応する deductions の金額フィールドに同期する。
+ */
+export interface BreakdownEntry {
+  id: string;
+  /** 名称（寄附先・保険の種類・医療機関名など） */
+  recipient: string;
+  amount: number;
+}
+
+/** 内訳を持つ控除入力のキー。 */
+export type BreakdownEntriesKey = "donations" | "socialInsurance" | "mutualAid" | "medical";
+
+export interface DeductionState {
+  deductions: DeductionInputs;
+  taxCredits: TaxCreditInputs;
+  /** 雑所得。帳簿に載らない所得の手入力 */
+  miscIncome: MiscIncomeInput;
+  /** 給与所得。帳簿に載らない給与の手入力（収入金額のみ） */
+  salaryIncome: SalaryIncomeInput;
+  /** 配当・一時・株式等譲渡の入力 */
+  expandedIncome: ExpandedIncomeInput;
+  /** 農業所得の入力。帳簿の取引とは混ぜない申告入力 */
+  agriculture: AgricultureInput;
+  /** 申告の種類（青色申告特別控除の区分） */
+  filingType: FilingType;
+  /** 不動産貸付けが事業的規模か */
+  realEstateBusinessScale: boolean;
+  /** 寄附金の内訳 */
+  donationEntries: BreakdownEntry[];
+  /** 社会保険料の内訳 */
+  socialInsuranceEntries: BreakdownEntry[];
+  /** 小規模企業共済等掛金の内訳 */
+  mutualAidEntries: BreakdownEntry[];
+  /** 医療費の内訳 */
+  medicalEntries: BreakdownEntry[];
+  /**
+   * 貸借対照表（青色申告決算書4面）の入力。ドメイン形式
+   * （XtxBalanceSheetInput）で保持し、APIへ渡すときだけワイヤ形式へ
+   * 変換する。未入力は null。
+   */
+  balanceSheet: XtxBalanceSheetInput | null;
+}
+
+/** エージェント（set_deductions ツール）から適用される申告入力の変更分。 */
+export interface DeductionPatch {
+  /** 控除入力の部分上書き（DeductionInputs の形）。 */
+  deductions?: Partial<DeductionInputs>;
+  /** 税額控除の入力の部分上書き。 */
+  taxCredits?: Partial<TaxCreditInputs>;
+  /** 申告の種類。 */
+  filingType?: FilingType;
+  /** 雑所得の部分上書き。 */
+  miscIncome?: Partial<MiscIncomeInput>;
+  /** 配当・一時・株式等譲渡の部分上書き（区分ごとに浅くマージ、特定口座の明細は差し替え）。 */
+  expandedIncome?: Partial<ExpandedIncomeInput>;
+  /** 農業所得の部分上書き（科目別合計は指定があれば差し替え）。 */
+  agriculture?: Partial<AgricultureInput>;
+  /** 内訳の差し替え（キーごとに全件差し替え、合計は自動同期）。 */
+  entries?: Partial<Record<BreakdownEntriesKey, BreakdownEntry[]>>;
+}
+
+/** 「控除・計算」を確定した時点の計算結果の控え（金額はすべて円）。 */
+export interface FilingSnapshotFigures {
+  business_income: number;
+  real_estate_income: number;
+  misc_income: number;
+  total_income: number;
+  total_deductions: number;
+  taxable_income: number;
+  final_tax: number;
+}
+
+// ---------------------------------------------------------------------------
+// 空の状態・保存値の復元
+// ---------------------------------------------------------------------------
+
+const BREAKDOWN_STATE_FIELDS: Record<
+  BreakdownEntriesKey,
+  "donationEntries" | "socialInsuranceEntries" | "mutualAidEntries" | "medicalEntries"
+> = {
+  donations: "donationEntries",
+  socialInsurance: "socialInsuranceEntries",
+  mutualAid: "mutualAidEntries",
+  medical: "medicalEntries",
+};
+
+const BREAKDOWN_TOTAL_FIELDS: Record<
+  BreakdownEntriesKey,
+  "donationsTotal" | "socialInsurancePaid" | "smallBusinessMutualAidPaid" | "medicalExpensesPaid"
+> = {
+  donations: "donationsTotal",
+  socialInsurance: "socialInsurancePaid",
+  mutualAid: "smallBusinessMutualAidPaid",
+  medical: "medicalExpensesPaid",
+};
+
+const FILING_TYPES: readonly FilingType[] = ["blue65", "blue55", "blue10", "white"];
+
+/** 空の入力状態（EMPTY 定数をそのまま共有しないよう複製する）。 */
+export function freshDeductionState(): DeductionState {
+  return {
+    deductions: {
+      ...EMPTY_DEDUCTION_INPUTS,
+      lifeInsurance: { ...EMPTY_DEDUCTION_INPUTS.lifeInsurance },
+      earthquakeInsurance: { ...EMPTY_DEDUCTION_INPUTS.earthquakeInsurance },
+      dependents: { ...EMPTY_DEDUCTION_INPUTS.dependents },
+      disability: { ...EMPTY_DEDUCTION_INPUTS.disability },
+      casualtyLoss: null,
+    },
+    taxCredits: { ...EMPTY_TAX_CREDIT_INPUTS },
+    miscIncome: { ...EMPTY_MISC_INCOME },
+    salaryIncome: { ...EMPTY_SALARY_INCOME },
+    expandedIncome: normalizeExpandedIncomeInput(EMPTY_EXPANDED_INCOME),
+    agriculture: normalizeAgricultureInput(EMPTY_AGRICULTURE_INPUT),
+    filingType: "blue65",
+    realEstateBusinessScale: false,
+    donationEntries: [],
+    socialInsuranceEntries: [],
+    mutualAidEntries: [],
+    medicalEntries: [],
+    balanceSheet: null,
+  };
+}
+
+/** 有限の数値なら整数に切り捨てて返し、数値でない項目は 0 にする。 */
+function integerOrZero(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
+}
+
+function asRecord(raw: unknown): Record<string, unknown> | null {
+  return typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : null;
+}
+
+function parseSalaryIncome(raw: unknown): SalaryIncomeInput {
+  const s = asRecord(raw);
+  if (!s) return { ...EMPTY_SALARY_INCOME };
+  return {
+    revenue: integerOrZero(s.revenue),
+    adjustmentEligible: s.adjustmentEligible === true,
+  };
+}
+
+function parseMiscIncome(raw: unknown): MiscIncomeInput {
+  const m = asRecord(raw);
+  if (!m) return { ...EMPTY_MISC_INCOME };
+  return {
+    revenue: integerOrZero(m.revenue),
+    income: integerOrZero(m.income),
+    kubun: integerOrZero(m.kubun),
+    pensionRevenue: integerOrZero(m.pensionRevenue),
+    pensionOver65: m.pensionOver65 === true,
+    businessRevenue: integerOrZero(m.businessRevenue),
+    businessIncome: integerOrZero(m.businessIncome),
+    businessKubun: integerOrZero(m.businessKubun),
+  };
+}
+
+/** 保存済みの内訳を検証して取り出す。壊れた要素は捨てる。 */
+function parseBreakdownEntries(raw: unknown): BreakdownEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const entries: BreakdownEntry[] = [];
+  raw.forEach((item, index) => {
+    const e = asRecord(item);
+    if (!e) return;
+    entries.push({
+      id: typeof e.id === "string" && e.id ? e.id : `breakdown-loaded-${index}`,
+      recipient: typeof e.recipient === "string" ? e.recipient : "",
+      amount: integerOrZero(e.amount),
+    });
+  });
+  return entries;
+}
+
+/** パース済みの保存値を検証して DeductionState にする。欠けた項目は空の入力で補う。 */
+export function parseDeductionState(parsed: Partial<DeductionState>): DeductionState {
+  const base = freshDeductionState();
+  const d = (parsed.deductions ?? {}) as Partial<DeductionInputs>;
+  const deductions: DeductionInputs = {
+    ...base.deductions,
+    ...d,
+    lifeInsurance: { ...base.deductions.lifeInsurance, ...d.lifeInsurance },
+    earthquakeInsurance: { ...base.deductions.earthquakeInsurance, ...d.earthquakeInsurance },
+    dependents: { ...base.deductions.dependents, ...d.dependents },
+    disability: { ...base.deductions.disability, ...d.disability },
+    casualtyLoss: d.casualtyLoss ?? null,
+    spouseCategory:
+      d.spouseCategory === "general" || d.spouseCategory === "elderly" ? d.spouseCategory : "none",
+  };
+  return {
+    deductions,
+    taxCredits: { ...base.taxCredits, ...parsed.taxCredits },
+    miscIncome: parseMiscIncome(parsed.miscIncome),
+    salaryIncome: parseSalaryIncome(parsed.salaryIncome),
+    expandedIncome: normalizeExpandedIncomeInput(parsed.expandedIncome),
+    agriculture: normalizeAgricultureInput(parsed.agriculture),
+    filingType: FILING_TYPES.includes(parsed.filingType as FilingType)
+      ? (parsed.filingType as FilingType)
+      : "blue65",
+    realEstateBusinessScale: parsed.realEstateBusinessScale === true,
+    donationEntries: parseBreakdownEntries(parsed.donationEntries),
+    socialInsuranceEntries: parseBreakdownEntries(parsed.socialInsuranceEntries),
+    mutualAidEntries: parseBreakdownEntries(parsed.mutualAidEntries),
+    medicalEntries: parseBreakdownEntries(parsed.medicalEntries),
+    balanceSheet: normalizeBalanceSheetInput(parsed.balanceSheet),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 変更
+// ---------------------------------------------------------------------------
+
+/** 内訳を差し替え、合計を対応する金額フィールドへ同期した新しい状態を返す。 */
+export function applyBreakdownEntries(
+  state: DeductionState,
+  key: BreakdownEntriesKey,
+  entries: BreakdownEntry[],
+): DeductionState {
+  const total = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
+  return {
+    ...state,
+    [BREAKDOWN_STATE_FIELDS[key]]: entries,
+    deductions: { ...state.deductions, [BREAKDOWN_TOTAL_FIELDS[key]]: total },
+  };
+}
+
+/** 変更分を現在の状態へ適用した新しい状態を返す（エージェント経由の編集用）。 */
+export function applyDeductionPatch(state: DeductionState, patch: DeductionPatch): DeductionState {
+  let next = state;
+  if (patch.deductions) {
+    const d = patch.deductions;
+    next = {
+      ...next,
+      deductions: {
+        ...next.deductions,
+        ...d,
+        lifeInsurance: { ...next.deductions.lifeInsurance, ...d.lifeInsurance },
+        earthquakeInsurance: { ...next.deductions.earthquakeInsurance, ...d.earthquakeInsurance },
+        dependents: { ...next.deductions.dependents, ...d.dependents },
+        disability: { ...next.deductions.disability, ...d.disability },
+      },
+    };
+  }
+  if (patch.taxCredits) next = { ...next, taxCredits: { ...next.taxCredits, ...patch.taxCredits } };
+  if (patch.agriculture) {
+    next = {
+      ...next,
+      agriculture: normalizeAgricultureInput({ ...next.agriculture, ...patch.agriculture }),
+    };
+  }
+  if (patch.filingType) next = { ...next, filingType: patch.filingType };
+  if (patch.miscIncome) next = { ...next, miscIncome: { ...next.miscIncome, ...patch.miscIncome } };
+  if (patch.expandedIncome) {
+    const p = patch.expandedIncome;
+    const cur = next.expandedIncome;
+    next = {
+      ...next,
+      expandedIncome: normalizeExpandedIncomeInput({
+        temp: { ...cur.temp, ...p.temp },
+        dividend: { ...cur.dividend, ...p.dividend },
+        stocks: {
+          ...cur.stocks,
+          ...p.stocks,
+          general: { ...cur.stocks.general, ...p.stocks?.general },
+          listed: { ...cur.stocks.listed, ...p.stocks?.listed },
+        },
+      }),
+    };
+  }
+  if (patch.entries) {
+    for (const key of Object.keys(patch.entries) as BreakdownEntriesKey[]) {
+      const entries = patch.entries[key];
+      if (entries) next = applyBreakdownEntries(next, key, entries);
+    }
+  }
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// 申告入力から求める値
+// ---------------------------------------------------------------------------
+
+/**
+ * 確定スナップショット用の計算結果を組み立てる。
+ * 所得の内訳は帳簿から、税額は計算結果から取る。
+ * 取引が無い年や計算結果が無い場合は null（スナップショットを作らない）。
+ */
+export function buildSnapshotFigures(
+  transactions: Transaction[],
+  year: number,
+  filingOptions: ComputeCorrectedFiguresOptions | undefined,
+  miscIncome: MiscIncomeInput | undefined,
+  taxResult: IncomeTaxResult | undefined,
+  salaryIncome?: SalaryIncomeInput,
+): FilingSnapshotFigures | null {
+  if (!taxResult) return null;
+  const yearTransactions = filterYear(transactions, year);
+  if (yearTransactions.length === 0) return null;
+  const figures = computeCorrectedFigures(yearTransactions, year, filingOptions);
+  const manual = computeManualIncomes(
+    year,
+    salaryIncome ?? EMPTY_SALARY_INCOME,
+    miscIncome ?? EMPTY_MISC_INCOME,
+    figures._detail.business_income +
+      figures._detail.real_estate_income +
+      figures._detail.agriculture_income,
+  );
+  return {
+    business_income: figures._detail.business_income,
+    real_estate_income: figures._detail.real_estate_income,
+    misc_income: manual.miscTotal,
+    total_income: taxResult.totalIncome,
+    total_deductions: taxResult.deductionsTotal,
+    taxable_income: taxResult.taxableIncome,
+    final_tax: taxResult.finalTax,
+  };
+}
+
+/**
+ * 基準期間（2年前）の課税売上高（千円・税抜）を帳簿から出す。
+ * 2年前の帳簿が無ければ 0（手入力で直す前提）。
+ */
+export function deriveBasePeriodSalesThousands(transactions: Transaction[], year: number): number {
+  const base = summarizeConsumptionTax(transactions, year - 2);
+  const excl10 = Math.floor((base.salesIncl10 * 100) / 110);
+  const excl8 = Math.floor((base.salesIncl8 * 100) / 108);
+  return Math.floor((excl10 + excl8) / 1000);
+}

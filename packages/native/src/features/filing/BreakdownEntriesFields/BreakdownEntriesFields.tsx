@@ -1,9 +1,10 @@
+import { BreakdownEntry } from "@etax/shared";
 import { ReactNode, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppButton, AppText, BouncePressable, Field } from "@/components";
 import { space } from "@/theme";
 import { formatYen } from "@/utils";
-import { BreakdownEntry, newBreakdownEntryId } from "../deductionState";
+import { newBreakdownEntryId } from "../deductionState";
 import { MoneyInput } from "../fields";
 
 export interface BreakdownEntriesFieldsProps {

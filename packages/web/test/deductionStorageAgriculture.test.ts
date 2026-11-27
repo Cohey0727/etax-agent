@@ -9,11 +9,7 @@
  * - エージェントの部分パッチ（applyDeductionPatch）が農業へ適用される
  */
 import { describe, expect, test } from "bun:test";
-import {
-  applyDeductionPatch,
-  freshDeductionState,
-  parseDeductionState,
-} from "../src/components/organisms/filing/DeductionPanel/deductionStorage";
+import { applyDeductionPatch, freshDeductionState, parseDeductionState } from "@etax/shared";
 
 const AGRICULTURE = {
   farmName: "テスト農園",

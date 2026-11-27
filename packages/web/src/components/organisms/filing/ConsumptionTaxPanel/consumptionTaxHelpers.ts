@@ -1,4 +1,4 @@
-import { ConsumptionReturn, Transaction, summarizeConsumptionTax } from "@etax/shared";
+import { ConsumptionReturn } from "@etax/shared";
 import { formatYen } from "@utils";
 
 /**
@@ -11,20 +11,6 @@ export function outputTaxBacking(preview: ConsumptionReturn): string {
   if (preview.base10 > 0) parts.push(`10%分 ${formatYen(preview.base10)} × 7.8%`);
   if (preview.base8 > 0) parts.push(`軽減8%分 ${formatYen(preview.base8)} × 6.24%`);
   return parts.length > 0 ? `課税標準額 ${parts.join(" ＋ ")}` : "課税標準額なし";
-}
-
-/**
- * 基準期間（2年前）の課税売上高（千円・税抜）を帳簿から出す。
- * 2年前の帳簿が無ければ 0（手入力で直す前提）。
- */
-export function deriveBasePeriodSalesThousands(
-  transactions: Transaction[],
-  year: number,
-): number {
-  const base = summarizeConsumptionTax(transactions, year - 2);
-  const excl10 = Math.floor((base.salesIncl10 * 100) / 110);
-  const excl8 = Math.floor((base.salesIncl8 * 100) / 108);
-  return Math.floor((excl10 + excl8) / 1000);
 }
 
 /** 計算結果の各項目と、その裏付け（どう計算したか）を並べた表示行を作る。 */

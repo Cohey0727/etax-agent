@@ -1,9 +1,15 @@
-import { BlueDeductionOptions, IncomeTaxResult, MiscIncomeInput, SalaryIncomeInput, Transaction } from "@etax/shared";
+import {
+  BlueDeductionOptions,
+  IncomeTaxResult,
+  MiscIncomeInput,
+  SalaryIncomeInput,
+  Transaction,
+  buildSnapshotFigures,
+} from "@etax/shared";
 import { Fragment, useMemo } from "react";
 import { Badge, Button, Card, Col, Row, Text } from "@components/atoms";
 import {
   ConfirmComparePanel,
-  buildSnapshotFigures,
   useFilingSnapshots,
 } from "@components/organisms/filing/ConfirmComparePanel";
 import { FilingStatusKey, useFilingStatus } from "@components/organisms/filing/FilingStatusToggle";

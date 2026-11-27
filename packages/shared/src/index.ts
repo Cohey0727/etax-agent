@@ -18,3 +18,4 @@ export * from "./businessStart";
 export * from "./invoice";
 export * from "./reconciliation";
 export * from "./cashFlow";
+export * from "./filingInputs";

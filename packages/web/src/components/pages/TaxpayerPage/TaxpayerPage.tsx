@@ -1,8 +1,7 @@
-import { FilingType } from "@etax/shared";
+import { DeductionState, FilingType } from "@etax/shared";
 import { useEffect, useState } from "react";
 import { Card, Col, Text } from "@components/atoms";
 import {
-  DeductionState,
   hydrateDeductionStateFromServer,
   loadDeductionState,
   saveDeductionState,

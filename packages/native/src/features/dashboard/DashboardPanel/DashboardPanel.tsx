@@ -1,11 +1,13 @@
 import {
   ConsumptionMethod,
+  DeductionState,
   Transaction,
   aggregateIncome,
   blueDeduction,
   consumptionTax,
   estimateInputTax,
   filterYear,
+  freshDeductionState,
   residentialRentTotal,
   taxableSalesFromBreakdown,
 } from "@etax/shared";
@@ -13,11 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components";
 import { useAuth } from "@/auth/AuthContext";
-import {
-  DeductionState,
-  freshDeductionState,
-  hydrateDeductionStateFromServer,
-} from "@/features/filing/deductionState";
+import { hydrateDeductionStateFromServer } from "@/features/filing/deductionState";
 import { space } from "@/theme";
 import { ConsumptionTaxComparison, ConsumptionTaxRow } from "../ConsumptionTaxComparison";
 import { IncomeSummary } from "../IncomeSummary";

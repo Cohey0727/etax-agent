@@ -1,11 +1,16 @@
 import {
   AgricultureInput,
+  applyBreakdownEntries,
   BlueDeductionOptions,
+  BreakdownEntriesKey,
+  BreakdownEntry,
+  buildSnapshotFigures,
   computeCorrectedFigures,
   computeExpandedIncomes,
   computeIncomeTax,
   computeManualIncomes,
   DeductionInputs,
+  DeductionState,
   ExpandedIncomeInput,
   MiscIncomeInput,
   SalaryIncomeInput,
@@ -38,14 +43,9 @@ import {
 } from "@components/organisms/filing";
 import {
   ConfirmComparePanel,
-  buildSnapshotFigures,
   useFilingSnapshots,
 } from "@components/organisms/filing/ConfirmComparePanel";
 import {
-  BreakdownEntriesKey,
-  BreakdownEntry,
-  DeductionState,
-  applyBreakdownEntries,
   hydrateDeductionStateFromServer,
   loadDeductionState,
   saveDeductionState,

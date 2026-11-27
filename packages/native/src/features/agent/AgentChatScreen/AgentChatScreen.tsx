@@ -1,9 +1,10 @@
+import { applyDeductionPatch } from "@etax/shared";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { AgentConnectionConfig } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 import { AgentChatPanel } from "../AgentChatPanel";
-import { AgentUiAction, applyDeductionPatch } from "../agentChatHelpers";
+import { AgentUiAction } from "../agentChatHelpers";
 import { loadDeductionState, saveDeductionState } from "@/features/filing/deductionState";
 import {
   EMPTY_AGENT_CONNECTION,

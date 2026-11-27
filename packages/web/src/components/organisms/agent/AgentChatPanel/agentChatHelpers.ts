@@ -1,4 +1,4 @@
-import { DeductionPatch } from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import { DeductionPatch } from "@etax/shared";
 import { AppView, ChatRole, ThemeMode } from "@types";
 import { ChatSession } from "@utils";
 

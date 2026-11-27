@@ -3,6 +3,7 @@ import {
   blueDeduction,
   consumptionTax,
   ConsumptionMethod,
+  DeductionState,
   estimateInputTax,
   filterYear,
   residentialRentTotal,
@@ -11,10 +12,7 @@ import {
 } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Col, Text } from "@components/atoms";
-import {
-  DeductionState,
-  loadDeductionState,
-} from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import { loadDeductionState } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { ConsumptionTaxComparison, ConsumptionTaxRow } from "../ConsumptionTaxComparison";
 import { IncomeSummary } from "../IncomeSummary";
 

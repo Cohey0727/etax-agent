@@ -2,6 +2,7 @@ import {
   Transaction,
   computeConsumptionReturn,
   computeCorrectedFigures,
+  deriveBasePeriodSalesThousands,
   filterYear,
   summarizeConsumptionTax,
 } from "@etax/shared";
@@ -27,7 +28,7 @@ import {
   EditableKey,
   SUMMARY_ROWS,
 } from "./consumptionTaxFields";
-import { buildResultRows, deriveBasePeriodSalesThousands } from "./consumptionTaxHelpers";
+import { buildResultRows } from "./consumptionTaxHelpers";
 
 export interface ConsumptionTaxPanelProps {
   transactions: Transaction[];

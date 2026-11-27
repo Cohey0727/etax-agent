@@ -1,4 +1,6 @@
 import {
+  BreakdownEntriesKey,
+  BreakdownEntry,
   CasualtyLossInput,
   DeductionInputs,
   EarthquakeInsurancePremiums,
@@ -16,7 +18,6 @@ import {
   ToggleButton,
   toAmount,
 } from "./deductionFields";
-import { BreakdownEntriesKey, BreakdownEntry } from "./deductionStorage";
 import styles from "./DeductionPanel.css";
 
 export interface DeductionPanelProps {

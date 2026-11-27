@@ -3,6 +3,7 @@ import {
   ConsumptionTaxSummary,
   Transaction,
   computeConsumptionReturn,
+  deriveBasePeriodSalesThousands,
   summarizeConsumptionTax,
 } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
@@ -26,7 +27,6 @@ import {
 } from "./consumptionTaxFields";
 import {
   buildResultRows,
-  deriveBasePeriodSalesThousands,
   downloadTextFile,
   toAmount,
   todayIso,

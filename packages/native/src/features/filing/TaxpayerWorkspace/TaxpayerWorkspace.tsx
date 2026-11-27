@@ -1,4 +1,4 @@
-import { FilingType } from "@etax/shared";
+import { DeductionState, FilingType, freshDeductionState } from "@etax/shared";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText, Card } from "@/components";
@@ -6,8 +6,6 @@ import { useAuth } from "@/auth/AuthContext";
 import { useAppState } from "@/state/AppContext";
 import { space } from "@/theme";
 import {
-  DeductionState,
-  freshDeductionState,
   hydrateDeductionStateFromServer,
   loadDeductionState,
   saveDeductionState,

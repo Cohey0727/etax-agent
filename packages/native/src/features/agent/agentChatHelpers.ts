@@ -1,17 +1,4 @@
-import {
-  DeductionInputs,
-  FilingType,
-  MiscIncomeInput,
-  TaxCreditInputs,
-  normalizeAgricultureInput,
-  normalizeExpandedIncomeInput,
-} from "@etax/shared";
-import {
-  BreakdownEntriesKey,
-  BreakdownEntry,
-  DeductionState,
-  applyBreakdownEntries,
-} from "@/features/filing/deductionState";
+import { DeductionPatch } from "@etax/shared";
 
 /** エージェントが代行する画面操作（Web の agentChatHelpers と同じ導出規則）。 */
 export type AgentUiAction =
@@ -20,17 +7,6 @@ export type AgentUiAction =
   | { type: "reloadTransactions" }
   | { type: "applyDeductions"; year: number; patch: DeductionPatch }
   | { type: "reloadView" };
-
-/** エージェント（set_deductions ツール）から適用される控除入力の変更分。 */
-export interface DeductionPatch {
-  deductions?: Partial<DeductionInputs>;
-  taxCredits?: Partial<TaxCreditInputs>;
-  filingType?: FilingType;
-  miscIncome?: Partial<MiscIncomeInput>;
-  expandedIncome?: Parameters<typeof normalizeExpandedIncomeInput>[0];
-  agriculture?: Parameters<typeof normalizeAgricultureInput>[0];
-  entries?: Partial<Record<BreakdownEntriesKey, BreakdownEntry[]>>;
-}
 
 const WRITE_TOOL_NAMES = new Set(["update_transactions", "add_transaction", "delete_transaction"]);
 const SETTINGS_WRITE_TOOL_NAMES = new Set([
@@ -96,65 +72,6 @@ export function deriveUiActions(toolCalls: ToolCallLike[]): AgentUiAction[] {
     // set_theme はネイティブにテーマ切替の相当物がないため適用しない
   }
   return actions;
-}
-
-/** 変更分を現在の控除状態へ適用した新しい状態を返す。 */
-export function applyDeductionPatch(state: DeductionState, patch: DeductionPatch): DeductionState {
-  let next = state;
-  if (patch.deductions) {
-    const d = patch.deductions;
-    next = {
-      ...next,
-      deductions: {
-        ...next.deductions,
-        ...d,
-        lifeInsurance: { ...next.deductions.lifeInsurance, ...(d.lifeInsurance ?? {}) },
-        earthquakeInsurance: {
-          ...next.deductions.earthquakeInsurance,
-          ...(d.earthquakeInsurance ?? {}),
-        },
-        dependents: { ...next.deductions.dependents, ...(d.dependents ?? {}) },
-        disability: { ...next.deductions.disability, ...(d.disability ?? {}) },
-      },
-    };
-  }
-  if (patch.taxCredits) next = { ...next, taxCredits: { ...next.taxCredits, ...patch.taxCredits } };
-  if (patch.agriculture) {
-    next = {
-      ...next,
-      agriculture: normalizeAgricultureInput({ ...next.agriculture, ...patch.agriculture }),
-    };
-  }
-  if (patch.filingType) next = { ...next, filingType: patch.filingType };
-  if (patch.miscIncome) next = { ...next, miscIncome: { ...next.miscIncome, ...patch.miscIncome } };
-  if (patch.expandedIncome) {
-    const p = patch.expandedIncome as {
-      temp?: Record<string, unknown>;
-      dividend?: Record<string, unknown>;
-      stocks?: { general?: Record<string, unknown>; listed?: Record<string, unknown> } & Record<string, unknown>;
-    };
-    const cur = next.expandedIncome;
-    next = {
-      ...next,
-      expandedIncome: normalizeExpandedIncomeInput({
-        temp: { ...cur.temp, ...(p.temp ?? {}) },
-        dividend: { ...cur.dividend, ...(p.dividend ?? {}) },
-        stocks: {
-          ...cur.stocks,
-          ...(p.stocks ?? {}),
-          general: { ...cur.stocks.general, ...(p.stocks?.general ?? {}) },
-          listed: { ...cur.stocks.listed, ...(p.stocks?.listed ?? {}) },
-        },
-      } as Parameters<typeof normalizeExpandedIncomeInput>[0]),
-    };
-  }
-  if (patch.entries) {
-    for (const key of Object.keys(patch.entries) as BreakdownEntriesKey[]) {
-      const entries = patch.entries[key];
-      if (entries) next = applyBreakdownEntries(next, key, entries);
-    }
-  }
-  return next;
 }
 
 /** ツール名の日本語ラベル（チャットのツールチップ表示用）。 */
