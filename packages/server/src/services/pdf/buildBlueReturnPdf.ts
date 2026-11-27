@@ -18,6 +18,7 @@ import {
   drawText,
   drawTextFitted,
   drawTextRight,
+  drawTextRightFitted,
 } from "./pdfDraw";
 
 /** 備付帳簿名の○の位置（様式の印字順。中心 x と半径 x は比率、y は行の中心）。 */
@@ -56,7 +57,7 @@ function drawForm(ctx: DrawContext, values: BlueReturnFormValues): void {
     drawText(ctx, String(values.submission.day), 0.371, 0.1067, 10);
   }
   // 提出先（＿＿税務署長）
-  drawTextRight(ctx, values.taxOfficeName, 0.33, 0.1329, 11);
+  drawTextRightFitted(ctx, values.taxOfficeName, 0.33, 0.1329, 11, 0.17);
   // 生年月日（元号・年・月・日）
   if (values.birth) {
     drawTextFitted(ctx, values.birth.eraName, 0.637, 0.1319, 9.5, 0.078);
@@ -65,10 +66,10 @@ function drawForm(ctx: DrawContext, values: BlueReturnFormValues): void {
     drawText(ctx, String(values.birth.day), 0.899, 0.1326, 10);
   }
   // フリガナ・氏名・職業・屋号フリガナ・屋号
-  drawText(ctx, values.nameKana, 0.161, 0.1638, 10);
-  drawText(ctx, values.name, 0.161, 0.1935, 12);
+  drawTextFitted(ctx, values.nameKana, 0.161, 0.1638, 10, 0.34);
+  drawTextFitted(ctx, values.name, 0.161, 0.1935, 12, 0.34);
   drawTextFitted(ctx, values.occupation, 0.638, 0.1626, 10, 0.335);
-  drawText(ctx, values.shopNameKana, 0.636, 0.1941, 10);
+  drawTextFitted(ctx, values.shopNameKana, 0.636, 0.1941, 10, 0.34);
   drawTextFitted(ctx, values.shopName, 0.639, 0.2247, 11, 0.335);
   // 納税地の区分（番号）
   drawText(ctx, values.domicileKindNumber, 0.13, 0.2259, 11);

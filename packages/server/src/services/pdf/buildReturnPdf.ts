@@ -130,7 +130,7 @@ function drawHeader(ctx: DrawContext, values: ReturnFormValues): void {
   }
   // 提出先（税務署コード・税務署名）
   drawText(ctx, t.taxOfficeCode, 0.545, 0.1016, 9);
-  drawText(ctx, t.taxOfficeName, 0.598, 0.1016, 12);
+  drawTextFitted(ctx, t.taxOfficeName, 0.598, 0.1016, 12, 0.1);
   // 生年月日（元号は頭の1文字: 明・大・昭・平・令）
   const birth = eraDateOf(t.birthDate);
   if (birth) {
@@ -151,8 +151,8 @@ function drawHeader(ctx: DrawContext, values: ReturnFormValues): void {
   // 住所・フリガナ・氏名
   const address = [t.address, t.addressLine2].filter(Boolean).join(" ");
   drawTextFitted(ctx, address, 0.14, 0.1436, 11, 0.465);
-  drawText(ctx, t.nameKana, 0.7, 0.1436, 11);
-  drawText(ctx, t.name, 0.7, 0.167, 13);
+  drawTextFitted(ctx, t.nameKana, 0.7, 0.1436, 11, 0.25);
+  drawTextFitted(ctx, t.name, 0.7, 0.167, 13, 0.25);
   // 1月1日の住所・職業・屋号
   drawTextFitted(ctx, t.jan1Address || address, 0.14, 0.1894, 11, 0.465);
   drawTextFitted(ctx, t.occupation, 0.7, 0.1894, 10.5, 0.11);
@@ -190,10 +190,11 @@ function drawSecondPage(ctx: DrawContext, values: ReturnFormValues): void {
   const t = values.taxpayer;
   // 左上の見出しブロック
   const address = [t.address, t.addressLine2].filter(Boolean).join(" ");
-  drawText(ctx, address, 0.118, 0.0643, 10.5);
-  drawText(ctx, t.shopName, 0.118, 0.0785, 10.5);
-  drawText(ctx, t.nameKana, 0.118, 0.0855, 7.5);
-  drawText(ctx, t.name, 0.118, 0.0965, 11);
+  // 見出しブロックの右端は、下の保険料の表の右端（0.494）にそろえる
+  drawTextFitted(ctx, address, 0.118, 0.0643, 10.5, 0.37);
+  drawTextFitted(ctx, t.shopName, 0.118, 0.0785, 10.5, 0.37);
+  drawTextFitted(ctx, t.nameKana, 0.118, 0.0855, 7.5, 0.37);
+  drawTextFitted(ctx, t.name, 0.118, 0.0965, 11, 0.37);
 
   // 保険料等の内訳表: 支払計の右端 0.359 / 年末調整等以外の右端 0.494
   const paidEdge = 0.359;

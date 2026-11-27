@@ -50,6 +50,12 @@ function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
 }
 
+/** 幅に収まるフォントサイズ（交付先名・発行者名は省略せず縮めて収める）。 */
+function fitSize(font: PDFFont, text: string, size: number, maxWidth: number, minSize = 6): number {
+  const width = font.widthOfTextAtSize(toSingleLine(text), size);
+  return width > maxWidth ? Math.max((size * maxWidth) / width, minSize) : size;
+}
+
 /** 1行にして、列幅に収まるよう末尾を … で詰める。 */
 function fitText(font: PDFFont, text: string, maxWidth: number, size: number): string {
   const line = toSingleLine(text);
@@ -138,9 +144,11 @@ export async function buildInvoicePdf(
 
   // 交付先（左）と発行者（右）
   y -= 18;
-  drawLeft(page, font, MARGIN, y, `${invoice.counterparty_name} 御中`, 13);
+  // 交付先名（左）と発行者名（右）は同じ行に並ぶため、それぞれ半分の幅に収める
+  const counterpartyLabel = `${invoice.counterparty_name} 御中`;
+  drawLeft(page, font, MARGIN, y, counterpartyLabel, fitSize(font, counterpartyLabel, 13, 250));
   if (issuer) {
-    drawRight(page, font, PAGE_WIDTH - MARGIN, y + 2, issuer.name, 11);
+    drawRight(page, font, PAGE_WIDTH - MARGIN, y + 2, issuer.name, fitSize(font, issuer.name, 11, 240));
   }
   y -= 14;
   if (invoice.counterparty_address) {

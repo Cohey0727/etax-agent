@@ -16,6 +16,7 @@ import {
   drawText,
   drawTextFitted,
   drawTextRight,
+  drawTextRightFitted,
 } from "./pdfDraw";
 
 /** 職業欄は狭いため、括弧書きがあればそこで、無ければ半分で2行に分ける。 */
@@ -32,7 +33,7 @@ function splitOccupation(occupation: string): readonly string[] {
 
 function drawForm(ctx: DrawContext, values: DomicileFormValues): void {
   // 提出先（＿＿税務署長）
-  drawTextRight(ctx, values.taxOfficeName, 0.2788, 0.18783, 11);
+  drawTextRightFitted(ctx, values.taxOfficeName, 0.2788, 0.18783, 11, 0.12);
   // 提出日（令和）
   if (values.submission) {
     drawTextRight(ctx, String(values.submission.reiwaYear), 0.17638, 0.22924, 10);
@@ -49,8 +50,9 @@ function drawForm(ctx: DrawContext, values: DomicileFormValues): void {
     drawText(ctx, part, phoneX[i] ?? phoneX[0], 0.18053, 10);
   });
   // フリガナ・氏名・生年月日
-  drawText(ctx, values.nameKana, 0.50393, 0.26549, 10);
-  drawText(ctx, values.name, 0.50393, 0.29312, 12);
+  // 氏名・フリガナの右には生年月日の欄（0.72 付近から）がある
+  drawTextFitted(ctx, values.nameKana, 0.50393, 0.26549, 10, 0.2);
+  drawTextFitted(ctx, values.name, 0.50393, 0.29312, 12, 0.2);
   if (values.birth) {
     drawTextRight(
       ctx,

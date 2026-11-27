@@ -83,6 +83,14 @@ export function drawTextCentered(
   });
 }
 
+/** 枠の幅（比率）に収まるフォントサイズ。収まるなら size のまま、下限は 4.2。 */
+function fittedSize(ctx: DrawContext, text: string, size: number, maxWidthRatio: number): number {
+  const width = ctx.font.widthOfTextAtSize(text, size * ctx.scale);
+  return width > maxWidthRatio * ctx.width
+    ? Math.max(size * ((maxWidthRatio * ctx.width) / width), 4.2)
+    : size;
+}
+
 /** 枠の幅に収まるよう、必要ならフォントを縮めて左寄せで描く。 */
 export function drawTextFitted(
   ctx: DrawContext,
@@ -93,11 +101,20 @@ export function drawTextFitted(
   maxWidthRatio: number,
 ): void {
   if (!text) return;
-  const width = ctx.font.widthOfTextAtSize(text, size * ctx.scale);
-  const fitted = width > maxWidthRatio * ctx.width
-    ? Math.max(size * ((maxWidthRatio * ctx.width) / width), 4.2)
-    : size;
-  drawText(ctx, text, xRatio, center, fitted);
+  drawText(ctx, text, xRatio, center, fittedSize(ctx, text, size, maxWidthRatio));
+}
+
+/** 枠の幅に収まるよう、必要ならフォントを縮めて右寄せで描く。 */
+export function drawTextRightFitted(
+  ctx: DrawContext,
+  text: string,
+  rightRatio: number,
+  center: number,
+  size: number,
+  maxWidthRatio: number,
+): void {
+  if (!text) return;
+  drawTextRight(ctx, text, rightRatio, center, fittedSize(ctx, text, size, maxWidthRatio));
 }
 
 /** 複数行テキストを、枠幅で折り返しながら行ごとに左寄せで描く。 */

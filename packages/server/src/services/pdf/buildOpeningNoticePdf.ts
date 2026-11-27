@@ -29,6 +29,7 @@ import {
   drawText,
   drawTextFitted,
   drawTextRight,
+  drawTextRightFitted,
 } from "./pdfDraw";
 
 /** チェックボックスのフィールド名（様式 r06 の注釈名）。 */
@@ -141,12 +142,12 @@ function drawForm(
     drawText(ctx, String(values.submission.day), 0.181, 0.0939, 10);
   }
   // 提出先（＿＿税務署長）
-  drawTextRight(ctx, values.taxOfficeName, 0.338, 0.1151, 11);
+  drawTextRightFitted(ctx, values.taxOfficeName, 0.338, 0.1151, 11, 0.18);
   // マイナンバー（個人番号）
   drawText(ctx, values.myNumber, 0.548, 0.1151, 11);
   // フリガナ・氏名
-  drawText(ctx, values.nameKana, 0.155, 0.1439, 10);
-  drawText(ctx, values.name, 0.155, 0.1724, 12);
+  drawTextFitted(ctx, values.nameKana, 0.155, 0.1439, 10, 0.255);
+  drawTextFitted(ctx, values.name, 0.155, 0.1724, 12, 0.255);
   // 生年月日（元号・年・月・日）
   if (values.birth) {
     drawTextFitted(ctx, values.birth.eraName, 0.509, 0.1495, 9.5, 0.048);
