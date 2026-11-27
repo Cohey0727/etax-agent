@@ -8,7 +8,7 @@ import {
 import { FilingSnapshot } from "@types";
 
 /** 確定申告画面から帳簿画面を開くときの絞り込み（各タブの警告の種類）。 */
-export type LedgerFilterKind = "mismatch" | "taxUnset" | "unclassified";
+export type LedgerFilterKind = "taxUnset" | "unclassified";
 
 /** 確定申告画面の各タブが受け取る値。タブの表のコンポーネントはこの形にそろえる。 */
 export interface FilingTabProps {

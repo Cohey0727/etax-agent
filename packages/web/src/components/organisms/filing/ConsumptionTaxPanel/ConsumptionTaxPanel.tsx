@@ -32,11 +32,8 @@ import styles from "./ConsumptionTaxPanel.css";
 export interface ConsumptionTaxPanelProps {
   transactions: Transaction[];
   year: number;
-  /**
-   * 帳簿画面をこの年度＋警告種別のフィルターで開く（税区分の警告からの遷移）。
-   * kind: "mismatch" = 税区分と符号の不一致、"taxUnset" = 税区分が未設定。
-   */
-  onOpenLedger?: (kind: "mismatch" | "taxUnset") => void;
+  /** 帳簿画面をこの年度＋税区分が未設定の取引のフィルターで開く（税区分の警告からの遷移）。 */
+  onOpenLedger?: (kind: "taxUnset") => void;
   /** 申告の種類と帳簿の外にある数字の手入力（申告入力に保存されたもの）。 */
   consumptionFiling: ConsumptionFilingInputs;
   onConsumptionFilingChange: (next: ConsumptionFilingInputs) => void;

@@ -50,7 +50,6 @@ const FILING_TABS = [
 
 /** 帳簿画面を開くときの URL の絞り込み（各タブの警告の種類ごと）。 */
 const LEDGER_FILTER_SEARCH: Record<LedgerFilterKind, (year: number) => string> = {
-  mismatch: (year) => `?filters=year,mismatch&year=${year}`,
   taxUnset: (year) => `?filters=year,taxCategory&year=${year}&tax=`,
   unclassified: (year) => `?filters=year,category&year=${year}&cat=${encodeURIComponent(UNCLASSIFIED_CATEGORY)}`,
 };

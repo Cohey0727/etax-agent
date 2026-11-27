@@ -1,10 +1,12 @@
 import {
   ConsumptionFilingInputs,
+  ConsumptionMethod,
   Transaction,
   computeConsumptionReturn,
   computeCorrectedFigures,
   deriveBasePeriodSalesThousands,
   filterYear,
+  smallBusinessSpecialName,
   summarizeConsumptionTax,
 } from "@etax/shared";
 import { useMemo, useState } from "react";
@@ -50,7 +52,7 @@ const filingKindOptions: readonly { value: "final" | "amended"; label: string; k
  * （帳簿と申告が食い違わないようにするため）。手入力するのは
  * 基準期間・中間納付・既確定税額など、帳簿の外にある数字だけ。
  * 課税売上割合95%以上は全額控除、それ以外は一括比例配分で計算される。
- * あわせて、帳簿ベースの3方式（本則・簡易・2割特例）の税額比較も出す。
+ * あわせて、帳簿ベースの消費税の方式（本則課税・簡易課税・その年分の特例）の税額比較も出す。
  */
 export function ConsumptionTaxPanel({
   transactions,
@@ -97,15 +99,20 @@ export function ConsumptionTaxPanel({
   // 計算結果の各項目と、その裏付け（どう計算したか）を直下に並べる。
   const resultRows = buildResultRows(preview, consumptionFiling);
 
-  // 3方式の比較（帳簿から計算した申告数値の消費税3方式）。
+  // 消費税の方式の比較（帳簿から計算した申告数値）。小規模事業者の特例は、
+  // その年分の率で名前を付け（2割特例・3割特例）、特例の無い年分は出さない。
+  const specialName = smallBusinessSpecialName(year);
   const comparison = useMemo(() => {
     const figures = computeCorrectedFigures(filterYear(transactions, year), year);
-    return [
+    const rows: { key: ConsumptionMethod; label: string; value: number }[] = [
       { key: "standard", label: "本則課税", value: figures.consumption_tax_standard },
       { key: "simplified", label: "簡易課税", value: figures.consumption_tax_simplified },
-      { key: "special20", label: "2割特例", value: figures.consumption_tax_special20 },
-    ] as const;
-  }, [transactions, year]);
+    ];
+    if (specialName !== null) {
+      rows.push({ key: "special20", label: specialName, value: figures.consumption_tax_special20 });
+    }
+    return rows;
+  }, [transactions, year, specialName]);
 
   const update = (key: ConsumptionAmountKey, value: number) =>
     onConsumptionFilingChange({ ...consumptionFiling, [key]: value });
@@ -192,12 +199,6 @@ export function ConsumptionTaxPanel({
             message={`税区分が未設定の取引が ${summary.unsetCount} 件（合計 ${formatYen(summary.unsetAmount)}）あります。集計に含まれていません。帳簿で税区分を付けてください。`}
           />
         ) : null}
-        {summary.excludedCount > 0 ? (
-          <AlertBox
-            tone="warn"
-            message={`税区分と金額の符号が不一致の取引が ${summary.excludedCount} 件（合計 ${formatYen(summary.excludedAmount)}）あります。集計に含まれていません。帳簿で税区分を確認してください。`}
-          />
-        ) : null}
 
         <SectionHead title="帳簿の外の数字（入力）" />
         <AmountField
@@ -236,8 +237,8 @@ export function ConsumptionTaxPanel({
         ))}
 
         <SectionHead
-          title="3方式の比較（概算）"
-          description="帳簿から計算した、本則・簡易・2割特例の納付税額の比較です。申告書の作成とXTX出力は上の本則で行います。"
+          title="消費税の方式の比較（概算）"
+          description={`帳簿から計算した、${comparison.map((row) => row.label).join("・")}の納付税額の比較です。申告書の作成とXTX出力は上の本則課税で行います。`}
         />
         <View>
           {comparison.map((row) => (

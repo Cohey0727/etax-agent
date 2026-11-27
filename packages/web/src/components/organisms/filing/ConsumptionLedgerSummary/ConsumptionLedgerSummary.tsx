@@ -7,11 +7,8 @@ import styles from "./ConsumptionLedgerSummary.css";
 export interface ConsumptionLedgerSummaryProps {
   /** 帳簿の税区分ごとの集計 */
   summary: ConsumptionTaxSummary;
-  /**
-   * 帳簿画面をこの年度＋警告種別のフィルターで開く。
-   * kind: "mismatch" = 税区分と符号の不一致、"taxUnset" = 税区分が未設定。
-   */
-  onOpenLedger?: (kind: "mismatch" | "taxUnset") => void;
+  /** 帳簿画面をこの年度＋税区分が未設定の取引のフィルターで開く。 */
+  onOpenLedger?: (kind: "taxUnset") => void;
 }
 
 const SUMMARY_ROWS: readonly { key: keyof ConsumptionTaxSummary; label: string }[] = [
@@ -47,21 +44,6 @@ export const ConsumptionLedgerSummary = ({ summary, onOpenLedger }: ConsumptionL
           </Text>
           {onOpenLedger ? (
             <Button variant="ghost" size="sm" onClick={() => onOpenLedger("taxUnset")}>
-              帳簿で確認する →
-            </Button>
-          ) : null}
-        </Row>
-      </AlertBox>
-    ) : null}
-    {summary.excludedCount > 0 ? (
-      <AlertBox variant="notice">
-        <Row gap="sm" align="center" justify="spaceBetween" wrap>
-          <Text>
-            税区分と金額の符号が不一致の取引が {summary.excludedCount} 件（合計{" "}
-            {formatYen(summary.excludedAmount)}）あります。集計に含まれていません。
-          </Text>
-          {onOpenLedger ? (
-            <Button variant="ghost" size="sm" onClick={() => onOpenLedger("mismatch")}>
               帳簿で確認する →
             </Button>
           ) : null}
