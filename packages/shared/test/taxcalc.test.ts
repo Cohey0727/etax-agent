@@ -14,6 +14,7 @@ import {
   amendmentDelta,
   blueDeduction,
   classifyTransactionRow,
+  compareConsumptionMethods,
   computeConsumptionReturn,
   computeCorrectedFigures,
   computeSimplifiedConsumptionReturn,
@@ -124,6 +125,44 @@ describe("小規模事業者の特例（2割特例・3割特例）と簡易課�
       consumptionTax({ taxableSalesIncl: 15_000_000, method: "simplified", businessKind: "retail" }).payable,
     );
     expect(retail.consumption_tax_simplified).toBeLessThan(services.consumption_tax_simplified);
+  });
+});
+
+describe("compareConsumptionMethods（3方式の比較）", () => {
+  const tx = (year: number) =>
+    normalizeTransactions([
+      { date: `${year}-03-01`, year, description: "売上", amount: 11_000_000, category: "売上高", income_type: "business" },
+      { date: `${year}-04-01`, year, description: "家賃", amount: 9_000_000, category: "家賃収入", income_type: "real_estate" },
+      { date: `${year}-05-01`, year, description: "仕入", amount: -5_500_000, category: "仕入高", income_type: "business" },
+    ]);
+
+  test("computeCorrectedFigures の3方式の納付税額と同じ結果を、国税分・地方分つきで返す", () => {
+    const comparison = compareConsumptionMethods(tx(2026), 2026, "retail");
+    const figures = computeCorrectedFigures(tx(2026), 2026, { businessKind: "retail" });
+    expect(comparison.standard.payable).toBe(figures.consumption_tax_standard);
+    expect(comparison.simplified.payable).toBe(figures.consumption_tax_simplified);
+    expect(comparison.special?.payable).toBe(figures.consumption_tax_special20);
+    for (const r of [comparison.standard, comparison.simplified, comparison.special!]) {
+      expect(r.nationalPayable + r.localPayable).toBe(r.payable);
+    }
+    expect(comparison.simplified.detail.deemed_purchase_rate).toBe(0.8);
+  });
+
+  test("本則は課税売上割合が95%未満なら仕入税額を按分する", () => {
+    const comparison = compareConsumptionMethods(tx(2026), 2026);
+    // 課税売上（税抜）10,000,000・非課税売上（住宅家賃）9,000,000 → 課税売上割合 52.63%
+    expect(comparison.nontaxableSalesIncl).toBe(9_000_000);
+    expect(comparison.standard.detail.taxable_sales_ratio_percent).toBe(52.63);
+    expect(comparison.standard.inputTax).toBe(Math.floor((comparison.inputTaxEstimate * 52.63) / 100));
+    expect(comparison.standard.inputTax).toBeLessThan(comparison.inputTaxEstimate);
+  });
+
+  test("令和9年分は3割特例、特例の無い年分は special が null", () => {
+    expect(compareConsumptionMethods(tx(2027), 2027).special?.detail.special_rate).toBe(0.3);
+    expect(compareConsumptionMethods(tx(2027), 2027).smallBusinessSpecialRate).toBe(0.3);
+    const none = compareConsumptionMethods(tx(2022), 2022);
+    expect(none.special).toBeNull();
+    expect(none.smallBusinessSpecialRate).toBeNull();
   });
 });
 

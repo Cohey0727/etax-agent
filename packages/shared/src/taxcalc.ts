@@ -100,6 +100,16 @@ real_estate: 0.4, // 第6種 不動産業
 } as const;
 
 export type BusinessKind = keyof typeof SIMPLIFIED_RATES;
+
+/** 簡易課税の事業区分（第1種〜第6種の順） */
+export const BUSINESS_KINDS = [
+  "wholesale",
+  "retail",
+  "manufacturing",
+  "other",
+  "services",
+  "real_estate",
+] as const satisfies readonly BusinessKind[];
 export type ConsumptionMethod = "standard" | "simplified" | "special20";
 
 /**
@@ -539,12 +549,64 @@ export interface CorrectedFigures {
   _detail: CorrectedFiguresDetail;
 }
 
+/** 帳簿の取引から求めた消費税3方式の比較。 */
+export interface ConsumptionComparison {
+  /** 課税売上（税込） */
+  taxableSalesIncl: number;
+  /** 非課税売上（税込）— 住宅家賃 */
+  nontaxableSalesIncl: number;
+  /** 経費から概算した仕入税額（国税分、課税売上割合による按分の前） */
+  inputTaxEstimate: number;
+  /** 小規模事業者の特例の率（2割特例 0.2・3割特例 0.3）。特例の無い年分は null */
+  smallBusinessSpecialRate: number | null;
+  standard: ConsumptionTaxResult;
+  simplified: ConsumptionTaxResult;
+  /** 小規模事業者の特例。特例の無い年分は null */
+  special: ConsumptionTaxResult | null;
+}
+
+/**
+ * 対象年の取引（filterYear 済み）から消費税を本則・簡易課税・小規模事業者の特例の
+ * 3方式で計算する。本則は課税売上割合95%未満なら仕入税額を按分し、簡易課税は
+ * businessKind のみなし仕入率（既定は第5種）、特例は年分の率で計算する。
+ */
+export function compareConsumptionMethods(
+  transactions: Transaction[],
+  year: number,
+  businessKind?: BusinessKind,
+): ConsumptionComparison {
+  const [taxable, nontaxable] = taxableSalesFromBreakdown(
+    aggregateIncome(transactions),
+    residentialRentTotal(transactions),
+  );
+  const inputTax = estimateInputTax(transactions);
+  const specialRate = TAX_PARAMETERS[year]?.smallBusinessSpecialRate ?? null;
+  const consumption = (method: ConsumptionMethod, rate?: number) =>
+    consumptionTax({
+      taxableSalesIncl: taxable,
+      nontaxableSalesIncl: nontaxable,
+      inputTax,
+      method,
+      businessKind,
+      specialRate: rate,
+    });
+  return {
+    taxableSalesIncl: taxable,
+    nontaxableSalesIncl: nontaxable,
+    inputTaxEstimate: inputTax,
+    smallBusinessSpecialRate: specialRate,
+    standard: consumption("standard"),
+    simplified: consumption("simplified"),
+    special: specialRate === null ? null : consumption("special20", specialRate),
+  };
+}
+
 /**
  * 対象年の取引リストから「修正後の申告数値」を計算して返す。
  *
  * パイプライン: 所得の切り分け（aggregateIncome）
  *   → 青色申告特別控除（blueDeduction、不動産→事業の順）
- *   → 消費税3方式の比較（consumptionTax × standard/simplified/special20）。
+ *   → 消費税3方式の比較（compareConsumptionMethods）。
  *
  * 所得税額そのもの（income_tax）や住宅借入金等特別控除の額は取引データからは
  * 計算できないため含めない（呼び出し側で申告済み値を引き継ぐ等で扱う）。
@@ -590,19 +652,7 @@ export function computeCorrectedFigures(
     agricultureBeforeDeduction,
   );
 
-  const [taxable, nontaxable] = taxableSalesFromBreakdown(b, residentialRentTotal(transactions));
-  const inputTax = estimateInputTax(transactions);
-  // 年分パラメータに無い年分（特例の制度が無い年分）は特例を計算しない
-  const specialRate = TAX_PARAMETERS[year]?.smallBusinessSpecialRate ?? null;
-  const consumption = (method: ConsumptionMethod) =>
-    consumptionTax({
-      taxableSalesIncl: taxable,
-      nontaxableSalesIncl: nontaxable,
-      inputTax,
-      method,
-      businessKind: options.businessKind,
-      specialRate: specialRate ?? undefined,
-    }).payable;
+  const consumption = compareConsumptionMethods(transactions, year, options.businessKind);
 
   return {
     year: Math.trunc(year),
@@ -613,12 +663,13 @@ export function computeCorrectedFigures(
     agriculture_revenue: agricultureStatement?.revenueTotal ?? 0,
     agriculture_expenses: agricultureStatement?.expensesTotal ?? 0,
     blue_deduction: blue.total,
-    taxable_sales: taxable,
-    nontaxable_sales: nontaxable,
-    input_tax_estimate: inputTax,
-    consumption_tax_standard: consumption("standard"),
-    consumption_tax_simplified: consumption("simplified"),
-    consumption_tax_special20: specialRate === null ? 0 : consumption("special20"),
+    taxable_sales: consumption.taxableSalesIncl,
+    nontaxable_sales: consumption.nontaxableSalesIncl,
+    input_tax_estimate: consumption.inputTaxEstimate,
+    consumption_tax_standard: consumption.standard.payable,
+    consumption_tax_simplified: consumption.simplified.payable,
+    // 年分パラメータに無い年分（特例の制度が無い年分）は特例を計算しない
+    consumption_tax_special20: consumption.special?.payable ?? 0,
     _detail: {
       business_income_before_deduction: b.businessIncome,
       real_estate_income_before_deduction: b.realEstateIncome,
@@ -629,7 +680,7 @@ export function computeCorrectedFigures(
       agriculture_income_before_deduction: agricultureBeforeDeduction,
       blue_deduction_agriculture: blue.agriculture,
       agriculture_income: agricultureBeforeDeduction - blue.agriculture,
-      small_business_special_rate: specialRate,
+      small_business_special_rate: consumption.smallBusinessSpecialRate,
     },
   };
 }

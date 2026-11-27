@@ -14,11 +14,8 @@ import {
   amendmentDelta,
   blueDeduction,
   categoryTotals,
+  compareConsumptionMethods,
   computeIncomeTaxFiling,
-  consumptionTax,
-  estimateInputTax,
-  residentialRentTotal,
-  taxableSalesFromBreakdown,
 } from "@etax/shared";
 import { Db } from "../../lib/db";
 import { IncomeTaxReturnRequest, toTaxpayer } from "../etax/xtxInputs";
@@ -27,6 +24,8 @@ import { savedTaxpayerProfile } from "./mcpBusinessStartTools";
 import {
   McpToolModule,
   agricultureArg,
+  businessKindArg,
+  businessKindProperty,
   expandedIncomeArg,
   filingOptionsArg,
   filingTypeProperty,
@@ -117,8 +116,15 @@ export const mcpCalcTools: McpToolModule = {
     {
       name: "consumption_tax",
       description:
-        "帳簿DBの指定年の消費税を、本則（standard）・簡易課税（simplified）・2割特例（special20）の3方式すべて計算して返す。家賃収入は非課税として扱う。",
-      inputSchema: { type: "object", properties: { year: yearProperty }, required: ["year"] },
+        "帳簿DBの指定年の消費税を、本則（standard）・簡易課税（simplified）・小規模事業者の特例（special20。令和8年分までは2割特例、令和9・10年分は3割特例、特例の無い年分は出さない）の3方式で計算して返す。家賃収入は非課税として扱い、本則は課税売上割合95%未満なら仕入税額を按分する。各方式の output_tax は売上税額（国税分）、input_tax は控除する仕入税額（国税分）、national_payable は納付税額の国税分（100円未満切捨て）、local_payable は地方消費税（国税分×22/78）、payable はその合計。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          year: yearProperty,
+          business_kind: businessKindProperty,
+        },
+        required: ["year"],
+      },
     },
     {
       name: "income_tax",
@@ -203,29 +209,27 @@ export const mcpCalcTools: McpToolModule = {
     consumption_tax: async (args) => {
       const db = requireDb();
       const year = yearArg(args);
-      const tx = await ledgerTransactions(db, year);
-      const b = aggregateIncome(tx);
-      const rent = residentialRentTotal(tx);
-      const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
-      const methods = (["standard", "simplified", "special20"] as const).map((method) => {
-        const r = consumptionTax({
-          taxableSalesIncl: taxable,
-          nontaxableSalesIncl: nontaxable,
-          inputTax: method === "standard" ? estimateInputTax(tx) : 0,
-          method,
-        });
-        return {
+      const comparison = compareConsumptionMethods(
+        await ledgerTransactions(db, year),
+        year,
+        businessKindArg(args),
+      );
+      const methods = [comparison.standard, comparison.simplified, comparison.special]
+        .filter((r) => r !== null)
+        .map((r) => ({
           method: r.method,
           output_tax: r.outputTax,
           input_tax: r.inputTax,
+          national_payable: r.nationalPayable,
+          local_payable: r.localPayable,
           payable: r.payable,
           detail: r.detail,
-        };
-      });
+        }));
       return textResult({
         year,
-        taxable_sales_incl_tax: taxable,
-        nontaxable_sales_incl_tax: nontaxable,
+        taxable_sales_incl_tax: comparison.taxableSalesIncl,
+        nontaxable_sales_incl_tax: comparison.nontaxableSalesIncl,
+        small_business_special_rate: comparison.smallBusinessSpecialRate,
         methods,
         note: "本則の仕入税額は経費からの概算です。正式には請求書等で確定してください。",
       });

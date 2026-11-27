@@ -5,6 +5,7 @@
  * 委ねる。ここでは入力スキーマ（zod）と説明文を持ち、実行結果を
  * ToolCallLog に積んで呼び出し側（画面操作の導出用）へ渡す。
  */
+import { BUSINESS_KINDS } from "@etax/shared";
 import { tool } from "ai";
 import { z } from "zod";
 import { TaxpayerProfile } from "../../schemas/taxpayer";
@@ -108,12 +109,19 @@ export function createAgentTools(ctx: AgentContext, log: ToolCallLog[]) {
     }),
     consumption_tax: tool({
       description:
-        "指定年の消費税を計算する。method は standard（本則）/ simplified（簡易課税）/ special20（2割特例）。",
+        "指定年の消費税を計算する。method は standard（本則。課税売上割合95%未満なら仕入税額を按分）/ simplified（簡易課税）/ special20（小規模事業者の特例。令和8年分までは2割特例、令和9・10年分は3割特例。特例の無い年分はエラー）。output_tax は売上税額（国税分）、input_tax は控除する仕入税額（国税分）、national_payable は納付税額の国税分、local_payable は地方消費税、payable はその合計。",
       inputSchema: z.object({
         year: z.number().int(),
         method: z.enum(["standard", "simplified", "special20"]),
+        business_kind: z
+          .enum(BUSINESS_KINDS)
+          .optional()
+          .describe(
+            "簡易課税の事業区分（省略時は services）: wholesale 第1種 90% / retail 第2種 80% / manufacturing 第3種 70% / other 第4種 60% / services 第5種 50% / real_estate 第6種 40%",
+          ),
       }),
-      execute: async ({ year, method }) => run("consumption_tax", { year, method }),
+      execute: async ({ year, method, business_kind }) =>
+        run("consumption_tax", { year, method, business_kind }),
     }),
     set_theme: tool({
       description:

@@ -7,7 +7,9 @@
  */
 import {
   AgricultureInput,
+  BUSINESS_KINDS,
   BlueDeductionOptions,
+  BusinessKind,
   DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_MISC_INCOME,
@@ -72,6 +74,19 @@ export const realEstateScaleProperty = {
   type: "boolean",
   description: "不動産貸付けが事業的規模か（任意。既定は false）",
 };
+
+export const businessKindProperty = {
+  type: "string",
+  enum: [...BUSINESS_KINDS],
+  description:
+    "簡易課税の事業区分（任意。既定は services）: wholesale 第1種・卸売業 90% / retail 第2種・小売業 80% / manufacturing 第3種・製造業等 70% / other 第4種・その他 60% / services 第5種・サービス業等 50% / real_estate 第6種・不動産業 40%",
+};
+
+/** 簡易課税の事業区分の引数。未指定・不正なら undefined（既定の第5種）。 */
+export function businessKindArg(args: Record<string, unknown>): BusinessKind | undefined {
+  const kind = args["business_kind"];
+  return BUSINESS_KINDS.find((k) => k === kind);
+}
 
 /** DB を必須とするツール用。接続できなければエラーを投げる。 */
 export function requireDb(): Db {

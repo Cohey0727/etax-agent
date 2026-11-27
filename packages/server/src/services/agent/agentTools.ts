@@ -17,17 +17,13 @@ import {
   amendmentDelta,
   BlueDeductionOptions,
   blueDeduction,
-  consumptionTax,
-  estimateInputTax,
+  compareConsumptionMethods,
   filterYear,
   importCsvText,
   normalizeSearchText,
-  residentialRentTotal,
-  taxableSalesFromBreakdown,
-  ConsumptionMethod,
   Transaction,
 } from "@etax/shared";
-import { filingOptionsArg } from "../mcp/mcpToolKit";
+import { businessKindArg, filingOptionsArg } from "../mcp/mcpToolKit";
 
 export const SYSTEM_PROMPT = `あなたは日本の個人事業主（フリーランス）向けの確定申告「準備」アシスタントです。
 
@@ -220,18 +216,26 @@ export function dispatchTool(
       }
       case "consumption_tax": {
         const year = Number(args["year"]);
-        const method = (typeof args["method"] === "string" ? args["method"] : "standard") as ConsumptionMethod;
-        const tx = yearTransactions(ctx, year);
-        const b = aggregateIncome(tx);
-        const rent = residentialRentTotal(tx);
-        const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
-        const inputTax = method === "standard" ? estimateInputTax(tx) : 0;
-        const r = consumptionTax({
-          taxableSalesIncl: taxable,
-          nontaxableSalesIncl: nontaxable,
-          inputTax,
-          method,
-        });
+        const method = typeof args["method"] === "string" ? args["method"] : "standard";
+        const comparison = compareConsumptionMethods(
+          yearTransactions(ctx, year),
+          year,
+          businessKindArg(args),
+        );
+        const r =
+          method === "standard"
+            ? comparison.standard
+            : method === "simplified"
+              ? comparison.simplified
+              : method === "special20"
+                ? comparison.special
+                : undefined;
+        if (r === undefined) {
+          throw new Error(`未知の計算方式です: ${JSON.stringify(method)} (standard / simplified / special20)`);
+        }
+        if (r === null) {
+          throw new Error(`${year}年分には小規模事業者の特例（2割特例・3割特例）がありません。本則か簡易課税で計算してください。`);
+        }
         return {
           year,
           method: r.method,
@@ -239,6 +243,8 @@ export function dispatchTool(
           nontaxable_sales_incl_tax: r.nontaxableSalesIncl,
           output_tax: r.outputTax,
           input_tax: r.inputTax,
+          national_payable: r.nationalPayable,
+          local_payable: r.localPayable,
           payable: r.payable,
           detail: r.detail,
           note: "仕入税額は経費からの概算です（本則の場合）。正式には請求書等で確定してください。",

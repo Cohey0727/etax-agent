@@ -6,6 +6,7 @@
  * 数値のときだけ採用する）。そのため該当フィールドは z.unknown() とし、
  * 検証で弾くのは「JSONオブジェクトでないボディ」だけに留める。
  */
+import { BUSINESS_KINDS } from "@etax/shared";
 import { z } from "@hono/zod-openapi";
 import { TaxYearSchema } from "./common";
 
@@ -52,7 +53,10 @@ export type CalculateAggregateResponse = z.infer<typeof CalculateAggregateRespon
 export const CalculateConsumptionRequestSchema = z
   .object({
     transactions: z.unknown().optional(),
+    /** 対象年。小規模事業者の特例の率は年分で決まり、省略時は特例を計算しない */
     year: z.unknown().optional(),
+    /** 簡易課税の事業区分（既定: services＝第5種） */
+    business_kind: z.enum(BUSINESS_KINDS).optional(),
   })
   .openapi("CalculateConsumptionRequest");
 
@@ -60,11 +64,21 @@ export type CalculateConsumptionRequest = z.infer<typeof CalculateConsumptionReq
 
 export const ConsumptionTaxResultSchema = z
   .object({
+    /** standard（本則）・simplified（簡易課税）・special20（小規模事業者の特例。率は detail.special_rate） */
     method: z.enum(["standard", "simplified", "special20"]),
+    /** 課税売上（税込） */
     taxableSalesIncl: z.number(),
+    /** 非課税売上（税込）— 住宅家賃 */
     nontaxableSalesIncl: z.number(),
+    /** 売上税額（国税分 = 課税標準額 × 7.8%・軽減 6.24%） */
     outputTax: z.number(),
+    /** 控除する仕入税額（国税分。本則は経費からの概算を課税売上割合で按分、簡易課税・特例はみなしの額） */
     inputTax: z.number(),
+    /** 納付税額のうち国税（100円未満切捨て。マイナスは控除不足還付税額） */
+    nationalPayable: z.number(),
+    /** 納付税額のうち地方消費税（国税 × 22/78、100円未満切捨て） */
+    localPayable: z.number(),
+    /** 納付税額（国税＋地方消費税） */
     payable: z.number(),
     detail: z.record(z.string(), z.unknown()),
   })
@@ -78,7 +92,10 @@ export const CalculateConsumptionResponseSchema = z
     count: z.number(),
     taxable_sales_incl: z.number(),
     nontaxable_sales_incl: z.number(),
+    /** 経費から概算した仕入税額（国税分、課税売上割合による按分の前） */
     estimated_input_tax: z.number(),
+    /** 小規模事業者の特例の率（2割特例 0.2・3割特例 0.3）。特例の無い年分は null で、results に特例を含めない */
+    small_business_special_rate: z.number().nullable(),
     results: z.array(ConsumptionTaxResultSchema),
     note: z.string(),
   })
