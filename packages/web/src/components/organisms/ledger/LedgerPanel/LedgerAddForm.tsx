@@ -11,6 +11,16 @@ import {
 } from "./ledgerOptions";
 import styles from "./LedgerPanel.css";
 
+export interface LedgerAddFormProps {
+  draft: LedgerRowDraft;
+  yearOptions: readonly number[];
+  busy: boolean;
+  formRef: RefObject<HTMLDivElement | null>;
+  onDraftChange: (next: LedgerRowDraft) => void;
+  onAdd: () => void;
+  onClose: () => void;
+}
+
 /**
  * LedgerAddForm.tsx — 取引の手動追加フォーム（カード）。
  * 入力値（draft）は親が持ち、追加の実行も親へ委ねる。
@@ -23,15 +33,7 @@ export const LedgerAddForm = ({
   onDraftChange,
   onAdd,
   onClose,
-}: {
-  draft: LedgerRowDraft;
-  yearOptions: readonly number[];
-  busy: boolean;
-  formRef: RefObject<HTMLDivElement | null>;
-  onDraftChange: (next: LedgerRowDraft) => void;
-  onAdd: () => void;
-  onClose: () => void;
-}) => {
+}: LedgerAddFormProps) => {
   return (
     <div ref={formRef}>
       <Card>

@@ -11,6 +11,27 @@ import {
 } from "./ledgerFilters";
 import styles from "./LedgerPanel.css";
 
+export interface LedgerToolbarProps {
+  stats: readonly { label: string; value: string }[];
+  downloading: boolean;
+  query: string;
+  filters: readonly LedgerFilter[];
+  periodFilter: LedgerFilter | undefined;
+  otherFilters: readonly LedgerFilter[];
+  yearOptions: readonly number[];
+  categoryOptions: readonly string[];
+  onDownloadPdf: () => void;
+  onDownloadCsv: () => void;
+  onOpenHistory: () => void;
+  onIntakeNavigate: (view: AppView) => void;
+  onManualAdd: () => void;
+  onQueryChange: (query: string) => void;
+  onFilterChange: (next: LedgerFilter) => void;
+  onFilterRemove: (field: LedgerFilterField) => void;
+  onAddFilter: (field: LedgerFilterField) => void;
+  onClearFilters: () => void;
+}
+
 /**
  * LedgerToolbar.tsx — 帳簿画面の見出し・集計・検索・フィルター行。
  * ドロップダウンメニューの開閉はこの部品の中で閉じる（表示だけの状態）。
@@ -34,26 +55,7 @@ export const LedgerToolbar = ({
   onFilterRemove,
   onAddFilter,
   onClearFilters,
-}: {
-  stats: readonly { label: string; value: string }[];
-  downloading: boolean;
-  query: string;
-  filters: readonly LedgerFilter[];
-  periodFilter: LedgerFilter | undefined;
-  otherFilters: readonly LedgerFilter[];
-  yearOptions: readonly number[];
-  categoryOptions: readonly string[];
-  onDownloadPdf: () => void;
-  onDownloadCsv: () => void;
-  onOpenHistory: () => void;
-  onIntakeNavigate: (view: AppView) => void;
-  onManualAdd: () => void;
-  onQueryChange: (query: string) => void;
-  onFilterChange: (next: LedgerFilter) => void;
-  onFilterRemove: (field: LedgerFilterField) => void;
-  onAddFilter: (field: LedgerFilterField) => void;
-  onClearFilters: () => void;
-}) => {
+}: LedgerToolbarProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
