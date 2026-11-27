@@ -1872,20 +1872,21 @@ export function buildXtxFiling(data: XtxFilingData): string {
     xml:
       `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}${buildKoa020Face3(normalized)}</KOA020>`,
   });
-  // 白色申告では青色申告決算書は添付せず、収支内訳書を添付する
-  // （従来は申告種別によらず決算書が含まれていた不整合をここで解消）。
+  // 白色申告では青色申告決算書は添付せず、収支内訳書を添付する。
+  // 固定資産だけがある区分も、減価償却明細を落とさないよう様式を添付する。
   const white = data.filingType === "white";
-  if (data.figures.business_revenue > 0 || data.figures.business_expenses > 0) {
+  const hasBusinessDepreciation = (data.depreciation?.business.length ?? 0) > 0;
+  const hasRealEstateDepreciation = (data.depreciation?.realEstate.length ?? 0) > 0;
+  if (data.figures.business_revenue > 0 || data.figures.business_expenses > 0 || hasBusinessDepreciation) {
     forms.push(
       white
         ? { id: "KOA110", xml: buildKoa110(normalized, versions.koa110) }
         : { id: "KOA210", xml: buildKoa210(normalized, versions.koa210) },
     );
   }
-  // 農業所得がある場合は農業所得用の様式を添付する（Issue #24）。
-  // 農業分は一般用の決算書には混ぜず、専用様式でのみ申告する。
-  // 農業区分の固定資産だけがある場合も、減価償却明細を落とさないよう
-  // 空の決算書で様式を添付する（事業所得側の明細添付と同じ扱い）。
+  // 農業所得がある場合は農業所得用の様式を添付する。農業分は一般用の
+  // 決算書には混ぜず、専用様式でのみ申告する。農業区分の固定資産だけが
+  // ある場合も、減価償却明細を落とさないよう空の決算書で様式を添付する。
   const agricultureDepRows = data.depreciation?.agriculture ?? [];
   let agricultureData = normalized;
   if (!agricultureData.agriculture && agricultureDepRows.length > 0) {
@@ -1911,7 +1912,7 @@ export function buildXtxFiling(data: XtxFilingData): string {
         : { id: "KOA240", xml: buildKoa240(agricultureData, versions.koa240) },
     );
   }
-  if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0) {
+  if (data.figures.real_estate_revenue > 0 || data.figures.real_estate_expenses > 0 || hasRealEstateDepreciation) {
     forms.push(
       white
         ? { id: "KOA130", xml: buildKoa130(normalized, versions.koa130) }

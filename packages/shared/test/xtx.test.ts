@@ -1091,3 +1091,51 @@ describe("自由記述の正規化と様式の桁数", () => {
     expect(build({ depreciationName: "あ".repeat(16) })).toContain(`<AMF01610>${"あ".repeat(16)}</AMF01610>`);
   });
 });
+
+describe("減価償却明細だけがある場合の様式の添付", () => {
+  test("事業・不動産の固定資産だけがあっても決算書・収支内訳書を添付して明細を落とさない", () => {
+    const row = depreciationDetailRow(
+      "車両",
+      { acquisitionDate: "2025-04-01", cost: 600_000, usefulLifeYears: 4, method: "straight_line", businessRatioPercent: 100 },
+      2025,
+    );
+    expect(row).not.toBeNull();
+    for (const filingType of ["blue65", "white"] as const) {
+      const figures = computeCorrectedFigures([], 2025, { filingType });
+      const tax = computeIncomeTax({
+        year: 2025,
+        totalIncome: 0,
+        deductions: EMPTY_DEDUCTION_INPUTS,
+        taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+      });
+      const xtx = buildXtxFiling({
+        year: 2025,
+        amendment: false,
+        submissionDate: "2026-03-10",
+        taxpayer: {
+          name: "テスト太郎", nameKana: "テストタロウ", zipCode: "7220062",
+          address: "広島県尾道市向東町3567-1", addressLine2: "", birthDate: "1980-04-01",
+          phone: "080-2500-7879", taxOfficeName: "尾道", taxOfficeCode: "08121",
+          myNumber: "", userId: "1234567890123456", occupation: "", shopName: "", jan1Address: "",
+        },
+        figures,
+        filingType,
+        deductionInputs: EMPTY_DEDUCTION_INPUTS,
+        miscIncome: EMPTY_MISC_INCOME,
+        tax,
+        categoryTotals: { business: {}, realEstate: {} },
+        withholdingTax: 0,
+        prepaidTax: 0,
+        originalThirdPeriodTax: null,
+        depreciation: { business: row ? [row] : [], realEstate: row ? [row] : [] },
+      });
+      if (filingType === "blue65") {
+        expect(xtx).toContain("<KOA210-3 page=\"3\"><AMF01590>");
+        expect(xtx).toContain("<KOA220-3 page=\"3\"><ANF00880>");
+      } else {
+        expect(xtx).toContain("<KOA110-2 page=\"2\"><AIM00000>");
+        expect(xtx).toContain("<KOA130-2 page=\"2\"><AKK00000>");
+      }
+    }
+  });
+});
