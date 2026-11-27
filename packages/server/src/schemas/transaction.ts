@@ -1,10 +1,9 @@
 /**
  * transaction.ts — 取引エンドポイントのスキーマ（schemas）。
  *
- * リクエスト検証はハンドラ側で行う（DBゲートの 503 をバリデーションの
- * 400 より先に返す従来順序を保つため）。文字列フィールドは
- * 「型が違う値は未指定として扱う」従来挙動に合わせ、z.catch で
- * undefined へ落とす。date / amount の不正は従来どおり 400 にする。
+ * リクエスト検証はハンドラ側で行う（DB 未設定の 503 をバリデーションの
+ * 400 より先に返すため）。文字列フィールドは型が違う値を未指定として扱い
+ * （z.catch で undefined へ落とす）、date と amount の不正は 400 にする。
  */
 import { z } from "@hono/zod-openapi";
 import { IdSchema, IncomeTypeSchema, YearSchema } from "./common";
@@ -124,7 +123,7 @@ export const UpdateTransactionRequestSchema = z
     date: z.string().optional().catch(undefined),
     fiscal_year: z.number().optional().catch(undefined),
     description: z.string().optional().catch(undefined),
-    amount: z.number().optional().catch(undefined),
+    amount: z.number().optional(),
     account: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
     /** 未知の値・型違いは未指定として扱う（登録では「その他」になる）。 */

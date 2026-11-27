@@ -376,3 +376,33 @@ describe("取引・固定資産の日付と収入区分", () => {
     expect((known.body["transaction"] as { income_type: string }).income_type).toBe("real_estate");
   });
 });
+
+describe("取引の更新: 金額の型違い", () => {
+  test("amount が数値でなければ 400 で、金額は変わらない", async () => {
+    await createTestDb();
+    const created = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-02-01", amount: 1000, description: "a" },
+    });
+    const id = (created.body["transaction"] as { id: number }).id;
+    const r = await req(`/api/transactions/${id}`, { method: "PUT", json: { amount: "5000" } });
+    expect(r.status).toBe(400);
+    expect(r.body["error"]).toBe("amount は数値で指定してください");
+    const listed = await req("/api/transactions?year=2025");
+    const rows = listed.body["transactions"] as { amount: number }[];
+    expect(rows[0]?.amount).toBe(1000);
+  });
+});
+
+describe("ボディの上限", () => {
+  test("上限を超えたボディは理由を示す 413", async () => {
+    const big = JSON.stringify({ transactions: [], pad: "a".repeat(26 * 1024 * 1024) });
+    const r = await req("/api/calc/aggregate", {
+      method: "POST",
+      body: big,
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(r.status).toBe(413);
+    expect(String(r.body["error"])).not.toBe("");
+  });
+});

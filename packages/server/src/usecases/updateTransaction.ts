@@ -53,7 +53,13 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
   const raw = await readJsonBody(c);
   if (!raw) throw new HTTPException(400, { message: "JSONボディが必要です" });
   const parsed = UpdateTransactionRequestSchema.safeParse(raw);
-  if (!parsed.success) throw new HTTPException(400, { message: "JSONボディが必要です" });
+  if (!parsed.success) {
+    // 厳格に弾くのは amount の型だけ（他フィールドは未指定扱いに寄せる）
+    const amountIssue = parsed.error.issues.some((i) => i.path[0] === "amount");
+    throw new HTTPException(400, {
+      message: amountIssue ? "amount は数値で指定してください" : "JSONボディが必要です",
+    });
+  }
   const body = parsed.data;
   const patch: Partial<TransactionRow> = {};
   if (body.date !== undefined) {
