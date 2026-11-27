@@ -1,5 +1,6 @@
 import { MiscIncomeInput } from "@etax/shared";
-import { Card, Col, Input, Row, Text } from "@components/atoms";
+import { Card, Col, Row, Text } from "@components/atoms";
+import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import styles from "./MiscIncomePanel.css";
 
 export interface MiscIncomePanelProps {
@@ -28,7 +29,7 @@ export const MiscIncomePanel = ({ miscIncome, onChange }: MiscIncomePanelProps) 
           </Text>
         </Col>
         <Text variant="sectionTitle">公的年金等</Text>
-        <AmountField
+        <LabeledAmountField
           label="公的年金等の収入金額"
           value={miscIncome.pensionRevenue}
           onChange={(v) => set({ pensionRevenue: v })}
@@ -53,17 +54,17 @@ export const MiscIncomePanel = ({ miscIncome, onChange }: MiscIncomePanelProps) 
         <Text variant="muted">
           副業など、営利を目的とした継続的な業務に係る雑所得です。
         </Text>
-        <AmountField
+        <LabeledAmountField
           label="業務の収入金額"
           value={miscIncome.businessRevenue}
           onChange={(v) => set({ businessRevenue: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="業務の所得金額（必要経費を引いた後）"
           value={miscIncome.businessIncome}
           onChange={(v) => set({ businessIncome: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="業務区分（申告書「キ」の区分番号。現金主義の特例は 1、なければ 0）"
           value={miscIncome.businessKubun}
           onChange={(v) => set({ businessKubun: v })}
@@ -72,17 +73,17 @@ export const MiscIncomePanel = ({ miscIncome, onChange }: MiscIncomePanelProps) 
         <Text variant="muted">
           仮想通貨の売却益など、上記以外の雑所得です。
         </Text>
-        <AmountField
+        <LabeledAmountField
           label="その他の収入金額"
           value={miscIncome.revenue}
           onChange={(v) => set({ revenue: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="その他の所得金額（必要経費を引いた後）"
           value={miscIncome.income}
           onChange={(v) => set({ income: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="その他区分（申告書「ク」の区分番号。なければ 0）"
           value={miscIncome.kubun}
           onChange={(v) => set({ kubun: v })}
@@ -91,30 +92,3 @@ export const MiscIncomePanel = ({ miscIncome, onChange }: MiscIncomePanelProps) 
     </Card>
   );
 };
-
-interface AmountFieldProps {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}
-
-const AmountField = ({ label, value, onChange }: AmountFieldProps) => (
-  <Row gap="sm">
-    <div className={styles.fieldLabel}>
-      <Text variant="muted">{label}</Text>
-    </div>
-    <Input
-      className={styles.fieldInput}
-      type="number"
-      value={value}
-      onChange={(e) => onChange(toAmount(e.target.value))}
-      aria-label={label}
-    />
-  </Row>
-);
-
-/** 金額入力の文字列を数値へ寄せる（空・不正は 0）。 */
-function toAmount(raw: string): number {
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
-}

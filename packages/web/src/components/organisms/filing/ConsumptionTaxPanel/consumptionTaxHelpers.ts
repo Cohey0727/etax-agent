@@ -2,7 +2,7 @@ import { ConsumptionReturn } from "@etax/shared";
 import { formatYen } from "@utils";
 
 /**
- * consumptionTaxHelpers.ts — 消費税画面の計算補助と汎用ヘルパー。
+ * consumptionTaxHelpers.ts — 消費税画面の計算結果の表示行。
  */
 
 /** 消費税額の裏付け表記（課税標準額 × 税率の内訳）。 */
@@ -76,26 +76,4 @@ export function buildResultRows(
       backing: `国税 ${formatYen(preview.payableNational)} ＋ 地方 ${formatYen(preview.payableLocal)}`,
     },
   ];
-}
-
-export function todayIso(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${mm}-${dd}`;
-}
-
-export function toAmount(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
-}
-
-export function downloadTextFile(filename: string, content: string): void {
-  const blob = new Blob([content], { type: "application/xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }

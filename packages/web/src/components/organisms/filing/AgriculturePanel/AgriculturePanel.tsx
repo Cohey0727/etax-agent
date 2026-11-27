@@ -7,9 +7,11 @@ import {
   computeAgricultureStatement,
 } from "@etax/shared";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
+import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import { formatYen } from "@utils";
+import { toAmount } from "@utils/amountInput";
 import { removeAgricultureExpense, setAgricultureExpense } from "./AgriculturePanel.utils";
-import { AmountField, ResultRow, TextField, toAmount } from "./fields";
+import { ResultRow, TextField } from "./fields";
 import styles from "./AgriculturePanel.css";
 
 export interface AgriculturePanelProps {
@@ -71,27 +73,27 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
         />
 
         <Text variant="sectionTitle">収入金額</Text>
-        <AmountField
+        <LabeledAmountField
           label="販売金額"
           value={agriculture.salesAmount}
           onChange={(v) => set({ salesAmount: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="家事消費・事業消費金額"
           value={agriculture.householdConsumption}
           onChange={(v) => set({ householdConsumption: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="雑収入"
           value={agriculture.miscRevenue}
           onChange={(v) => set({ miscRevenue: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="農産物の棚卸高（期首）"
           value={agriculture.produceOpeningInventory}
           onChange={(v) => set({ produceOpeningInventory: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="農産物の棚卸高（期末）"
           value={agriculture.produceClosingInventory}
           onChange={(v) => set({ produceClosingInventory: v })}
@@ -100,7 +102,7 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
 
         <Text variant="sectionTitle">経費</Text>
         {AGRICULTURE_EXPENSE_CATEGORIES.map((category) => (
-          <AmountField
+          <LabeledAmountField
             key={category}
             label={category === "地代賃借料" && white ? "小作料・賃借料" : category}
             value={agriculture.expenseTotals[category] ?? 0}
@@ -147,17 +149,17 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
             追加
           </Button>
         </Row>
-        <AmountField
+        <LabeledAmountField
           label="農産物以外の棚卸高（期首）"
           value={agriculture.otherOpeningInventory}
           onChange={(v) => set({ otherOpeningInventory: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="農産物以外の棚卸高（期末）"
           value={agriculture.otherClosingInventory}
           onChange={(v) => set({ otherClosingInventory: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="経費から差し引く育成費用"
           value={agriculture.cultivationCostDeduction}
           onChange={(v) => set({ cultivationCostDeduction: v })}
@@ -168,7 +170,7 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
         {white ? (
           <>
             <Text variant="sectionTitle">専従者控除</Text>
-            <AmountField
+            <LabeledAmountField
               label="専従者控除"
               value={agriculture.familyWorkerDeduction}
               onChange={(v) => set({ familyWorkerDeduction: v })}
@@ -177,24 +179,24 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
         ) : (
           <>
             <Text variant="sectionTitle">引当金・専従者給与</Text>
-            <AmountField
+            <LabeledAmountField
               label="専従者給与"
               value={agriculture.familyWorkerSalary}
               onChange={(v) => set({ familyWorkerSalary: v })}
             />
-            <AmountField
+            <LabeledAmountField
               label="貸倒引当金繰入額"
               value={agriculture.badDebtProvisionIn}
               onChange={(v) => set({ badDebtProvisionIn: v })}
             />
-            <AmountField
+            <LabeledAmountField
               label="貸倒引当金繰戻額"
               value={agriculture.badDebtProvisionBack}
               onChange={(v) => set({ badDebtProvisionBack: v })}
             />
           </>
         )}
-        <AmountField
+        <LabeledAmountField
           label="肉用牛特例金額（表示のみ）"
           value={agriculture.beefCattleExemptionAmount}
           onChange={(v) => set({ beefCattleExemptionAmount: v })}

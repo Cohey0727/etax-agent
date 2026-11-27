@@ -1,6 +1,7 @@
 import { BalanceSheetWireExtra } from "@etax/shared";
 import { Input, Text } from "@components/atoms";
 import { formatYen } from "@utils";
+import { toAmount } from "@utils/amountInput";
 import styles from "./BalanceSheetPanel.css";
 
 export interface AmountRowProps {
@@ -85,9 +86,3 @@ export const TotalRow = ({
     <span className={styles.cell}>{formatYen(closing)}</span>
   </div>
 );
-
-/** 金額入力の文字列を数値へ寄せる（空・不正は 0）。 */
-export function toAmount(raw: string): number {
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
-}

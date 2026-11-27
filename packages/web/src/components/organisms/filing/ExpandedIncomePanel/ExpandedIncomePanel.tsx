@@ -8,7 +8,8 @@ import {
 } from "@etax/shared";
 import { Card, Col, Row, Select, Text } from "@components/atoms";
 import { formatYen } from "@utils";
-import { AmountField, ResultRow } from "./fields";
+import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
+import { ResultRow } from "./fields";
 import { StockTransferFields } from "./StockTransferFields";
 import styles from "./ExpandedIncomePanel.css";
 
@@ -60,12 +61,12 @@ export const ExpandedIncomePanel = ({ expandedIncome, breakdown, taxResult, onCh
             懸賞金・競馬等の払戻金・生命保険の一時金など。特別控除50万円を
             引いた金額の2分の1が総合課税の所得に算入されます。
           </Text>
-          <AmountField
+          <LabeledAmountField
             label="一時所得の収入金額"
             value={expandedIncome.temp.revenue}
             onChange={(v) => setTemp({ revenue: v })}
           />
-          <AmountField
+          <LabeledAmountField
             label="収入を得るために支出した金額"
             value={expandedIncome.temp.expenses}
             onChange={(v) => setTemp({ expenses: v })}
@@ -97,37 +98,37 @@ export const ExpandedIncomePanel = ({ expandedIncome, breakdown, taxResult, onCh
             税額控除パネルの配当控除の手入力より優先します。源泉徴収税額は
             提出パネルの源泉徴収税額へ自動で加算されます。
           </Text>
-          <AmountField
+          <LabeledAmountField
             label="上場株式等の配当等の収入金額"
             value={expandedIncome.dividend.listedRevenue}
             onChange={(v) => setDividend({ listedRevenue: v })}
           />
-          <AmountField
+          <LabeledAmountField
             label="うち証券投資信託の収益の分配"
             value={expandedIncome.dividend.listedTrustRevenue}
             onChange={(v) => setDividend({ listedTrustRevenue: v })}
           />
-          <AmountField
+          <LabeledAmountField
             label="上場配当等の源泉徴収税額"
             value={expandedIncome.dividend.listedWithholding}
             onChange={(v) => setDividend({ listedWithholding: v })}
           />
-          <AmountField
+          <LabeledAmountField
             label="一般の配当等（非上場）の収入金額"
             value={expandedIncome.dividend.generalRevenue}
             onChange={(v) => setDividend({ generalRevenue: v })}
           />
-          <AmountField
+          <LabeledAmountField
             label="うち証券投資信託の収益の分配"
             value={expandedIncome.dividend.generalTrustRevenue}
             onChange={(v) => setDividend({ generalTrustRevenue: v })}
           />
-          <AmountField
+          <LabeledAmountField
             label="一般の配当等の源泉徴収税額"
             value={expandedIncome.dividend.generalWithholding}
             onChange={(v) => setDividend({ generalWithholding: v })}
           />
-          <AmountField
+          <LabeledAmountField
             label="配当を得るために要した負債の利子"
             value={expandedIncome.dividend.interestExpense}
             onChange={(v) => setDividend({ interestExpense: v })}

@@ -41,9 +41,6 @@ const styles = {
     borderTop: `2px solid ${theme.color.borderStrong}`,
     fontWeight: theme.fontWeight.semibold,
   }),
-  amountNegative: style({
-    color: theme.color.negative,
-  }),
 };
 
 export default styles;

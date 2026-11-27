@@ -19,14 +19,6 @@ const styles = {
       "(max-width: 640px)": { flex: "1 1 100%" },
     },
   }),
-  // 金額の入力欄。数字を右寄せにする。
-  fieldNumber: style({
-    flex: "1 1 auto",
-    "@media": {
-      "(max-width: 640px)": { flex: "1 1 100%" },
-    },
-    textAlign: "right",
-  }),
   // グループ見出し。
   subhead: style({
     fontWeight: theme.fontWeight.semibold,

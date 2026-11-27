@@ -5,6 +5,7 @@ import {
   salaryIncomeAmount,
 } from "@etax/shared";
 import { Card, Col, Input, Row, Text } from "@components/atoms";
+import { toAmount } from "@utils/amountInput";
 import styles from "./SalaryPanel.css";
 
 export interface SalaryPanelProps {
@@ -79,9 +80,3 @@ export const SalaryPanel = ({ year, salaryIncome, onChange }: SalaryPanelProps) 
     </Card>
   );
 };
-
-/** 金額入力の文字列を数値へ寄せる（空・不正は 0）。 */
-function toAmount(raw: string): number {
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
-}

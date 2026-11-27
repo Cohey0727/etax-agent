@@ -2,6 +2,7 @@ import { BreakdownEntry } from "@etax/shared";
 import { ReactNode, useState } from "react";
 import { Button, Col, Icon, Input, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
+import { toAmount } from "@utils/amountInput";
 import styles from "./BreakdownEntriesFields.css";
 
 export interface BreakdownEntriesFieldsProps {
@@ -120,8 +121,3 @@ export const BreakdownEntriesFields = ({
     </Col>
   );
 };
-
-function toAmount(raw: string): number {
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
-}

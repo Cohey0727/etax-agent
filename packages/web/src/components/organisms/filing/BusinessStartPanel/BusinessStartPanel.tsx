@@ -21,7 +21,8 @@ import {
   exportBlueReturnPdfFile,
   exportOpeningNoticePdfFile,
 } from "@utils/api";
-import { downloadPdfFile } from "@components/organisms/filing/TaxpayerPanel/taxpayerHelpers";
+import { downloadPdfFile } from "@utils/fileDownload";
+import { todayIso } from "@utils/localDate";
 import { loadTaxpayer } from "@components/organisms/filing/TaxpayerProfilePanel/taxpayerStorage";
 import {
   emptyBusinessStartInputs,
@@ -304,11 +305,3 @@ export const BusinessStartPanel = ({ year }: BusinessStartPanelProps) => {
     </Card>
   );
 };
-
-/** 今日の日付（ローカル）を YYYY-MM-DD で返す。 */
-function todayIso(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
-}

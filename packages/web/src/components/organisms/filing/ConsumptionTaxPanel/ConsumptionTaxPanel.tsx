@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
+import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import { EtaxImportGuide } from "@components/organisms/filing/EtaxImportGuide";
 import {
   emptyTaxpayer,
@@ -18,7 +19,8 @@ import {
 import { ExportConsumptionXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportConsumptionXtxFile } from "@utils/api";
 import { formatNumber, formatYen } from "@utils";
-import { AmountField } from "./AmountField";
+import { downloadTextFile } from "@utils/fileDownload";
+import { todayIso } from "@utils/localDate";
 import {
   AMENDMENT_FIELDS,
   EDITABLE_FIELDS,
@@ -26,12 +28,7 @@ import {
   EditableKey,
   SUMMARY_ROWS,
 } from "./consumptionTaxFields";
-import {
-  buildResultRows,
-  downloadTextFile,
-  toAmount,
-  todayIso,
-} from "./consumptionTaxHelpers";
+import { buildResultRows } from "./consumptionTaxHelpers";
 import styles from "./ConsumptionTaxPanel.css";
 
 export interface ConsumptionTaxPanelProps {
@@ -253,7 +250,7 @@ export const ConsumptionTaxPanel = ({
 
         <Text className={styles.subhead}>帳簿の外の数字（入力）</Text>
         {EDITABLE_FIELDS.map((field) => (
-          <AmountField
+          <LabeledAmountField
             key={field.key}
             label={field.label}
             value={form[field.key]}
@@ -262,7 +259,7 @@ export const ConsumptionTaxPanel = ({
         ))}
         {filingKind === 3
           ? AMENDMENT_FIELDS.map((field) => (
-              <AmountField
+              <LabeledAmountField
                 key={field.key}
                 label={field.label}
                 value={form[field.key]}

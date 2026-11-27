@@ -7,7 +7,8 @@ import {
 } from "@etax/shared";
 import { Button, Card, Col, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
-import { AmountField, ResultRow, TextField } from "./fields";
+import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
+import { ResultRow, TextField } from "./fields";
 
 export interface StockTransferFieldsProps {
   stocks: StockTransferInput;
@@ -68,7 +69,7 @@ export const StockTransferFields = ({ stocks, breakdown, taxResult, onChange }: 
           category={stocks.listed}
           onPatch={(patch) => setCategory("listed", patch)}
         />
-        <AmountField
+        <LabeledAmountField
           label="上場株式等（特定口座以外）の源泉徴収税額"
           value={stocks.listedWithholding}
           onChange={(v) => onChange({ ...stocks, listedWithholding: v })}
@@ -97,17 +98,17 @@ export const StockTransferFields = ({ stocks, breakdown, taxResult, onChange }: 
               value={account.branchName}
               onChange={(v) => setAccount(index, { branchName: v })}
             />
-            <AmountField
+            <LabeledAmountField
               label="譲渡の対価の額"
               value={account.revenue}
               onChange={(v) => setAccount(index, { revenue: v })}
             />
-            <AmountField
+            <LabeledAmountField
               label="取得費等"
               value={account.cost}
               onChange={(v) => setAccount(index, { cost: v })}
             />
-            <AmountField
+            <LabeledAmountField
               label="源泉徴収税額"
               value={account.withholding}
               onChange={(v) => setAccount(index, { withholding: v })}
@@ -146,10 +147,10 @@ interface CategoryFieldsProps {
 /** 区分（一般／上場）共通の金額入力5項目。 */
 const CategoryFields = ({ category, onPatch }: CategoryFieldsProps) => (
   <>
-    <AmountField label="譲渡による収入金額" value={category.revenue} onChange={(v) => onPatch({ revenue: v })} />
-    <AmountField label="その他の収入金額" value={category.otherRevenue} onChange={(v) => onPatch({ otherRevenue: v })} />
-    <AmountField label="取得費（取得価額）" value={category.acquisitionCost} onChange={(v) => onPatch({ acquisitionCost: v })} />
-    <AmountField label="譲渡のための委託手数料" value={category.transferFees} onChange={(v) => onPatch({ transferFees: v })} />
-    <AmountField label="その他の費用" value={category.otherExpenses} onChange={(v) => onPatch({ otherExpenses: v })} />
+    <LabeledAmountField label="譲渡による収入金額" value={category.revenue} onChange={(v) => onPatch({ revenue: v })} />
+    <LabeledAmountField label="その他の収入金額" value={category.otherRevenue} onChange={(v) => onPatch({ otherRevenue: v })} />
+    <LabeledAmountField label="取得費（取得価額）" value={category.acquisitionCost} onChange={(v) => onPatch({ acquisitionCost: v })} />
+    <LabeledAmountField label="譲渡のための委託手数料" value={category.transferFees} onChange={(v) => onPatch({ transferFees: v })} />
+    <LabeledAmountField label="その他の費用" value={category.otherExpenses} onChange={(v) => onPatch({ otherExpenses: v })} />
   </>
 );

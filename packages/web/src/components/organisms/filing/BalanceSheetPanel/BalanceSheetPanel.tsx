@@ -17,7 +17,8 @@ import { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { fetchFilingInputs, formatYen } from "@utils";
-import { AmountRow, ExtraRow, TotalRow, toAmount } from "./BalanceSheetRows";
+import { toAmount } from "@utils/amountInput";
+import { AmountRow, ExtraRow, TotalRow } from "./BalanceSheetRows";
 import styles from "./BalanceSheetPanel.css";
 
 type ExtraField = "extraAsset" | "extraLiability1" | "extraLiability2";

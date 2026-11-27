@@ -1,9 +1,10 @@
 import { IncomeDeductionBreakdown } from "@etax/shared";
 import { Button, Input, Row, Text } from "@components/atoms";
+import { toAmount } from "@utils/amountInput";
 import styles from "./DeductionPanel.css";
 
 /**
- * deductionFields.tsx — 控除画面の入力部品（金額・空欄可金額・切替ボタン）と
+ * deductionFields.tsx — 控除画面の入力部品（空欄可金額・切替ボタン）と
  * 所得控除の内訳表示ラベル。
  */
 
@@ -26,37 +27,6 @@ export const DEDUCTION_LABELS: readonly { key: keyof IncomeDeductionBreakdown; l
   { key: "specialRelative", label: "特定親族特別控除" },
   { key: "basic", label: "基礎控除" },
 ];
-
-export function toAmount(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
-}
-
-interface AmountFieldProps {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  /** 単位表示（人数は「人」）。金額は表示しない（円は内訳側で付ける）。 */
-  suffix?: string;
-}
-
-export const AmountField = ({ label, value, onChange, suffix }: AmountFieldProps) => (
-  <Row gap="sm">
-    <div className={styles.fieldLabel}>
-      <Text variant="muted">
-        {label}
-        {suffix ? `（${suffix}）` : ""}
-      </Text>
-    </div>
-    <Input
-      className={styles.fieldInput}
-      type="number"
-      value={value}
-      onChange={(e) => onChange(toAmount(e.target.value))}
-      aria-label={label}
-    />
-  </Row>
-);
 
 interface NullableAmountFieldProps {
   label: string;

@@ -23,13 +23,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
+import { toAmount } from "@utils/amountInput";
 import { exportDomicilePdfFile, exportReturnPdfFile, exportXtxFile } from "@utils/api";
+import { downloadPdfFile, downloadTextFile } from "@utils/fileDownload";
+import { todayIso } from "@utils/localDate";
 import { EtaxImportGuide } from "@components/organisms/filing/EtaxImportGuide";
 import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
 import { FilingSection } from "../FilingPanel";
 import { emptyTaxpayer, loadTaxpayer } from "../TaxpayerProfilePanel";
 import styles from "./TaxpayerPanel.css";
-import { downloadPdfFile, downloadTextFile, toAmount, todayIso } from "./taxpayerHelpers";
 
 export interface TaxpayerPanelProps {
   year: number;

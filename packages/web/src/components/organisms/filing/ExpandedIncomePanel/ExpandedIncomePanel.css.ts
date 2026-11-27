@@ -10,14 +10,6 @@ const styles = {
       "(max-width: 640px)": { flex: "1 1 100%" },
     },
   }),
-  // 金額の入力欄。数字を右寄せにする。
-  fieldInput: style({
-    flex: "1 1 auto",
-    "@media": {
-      "(max-width: 640px)": { flex: "1 1 100%" },
-    },
-    textAlign: "right",
-  }),
   // テキストの入力欄（名称など、左寄せ）。
   fieldText: style({
     flex: "1 1 auto",

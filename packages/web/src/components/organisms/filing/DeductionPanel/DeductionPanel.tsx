@@ -9,16 +9,11 @@ import {
   SpouseCategory,
   specialRelativeInputApplies,
 } from "@etax/shared";
-import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
+import { Card, Col, Row, Select, Text } from "@components/atoms";
+import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import { formatNumber } from "@utils";
 import { BreakdownEntriesFields } from "../BreakdownEntriesFields";
-import {
-  AmountField,
-  DEDUCTION_LABELS,
-  NullableAmountField,
-  ToggleButton,
-  toAmount,
-} from "./deductionFields";
+import { DEDUCTION_LABELS, NullableAmountField, ToggleButton } from "./deductionFields";
 import styles from "./DeductionPanel.css";
 
 export interface DeductionPanelProps {
@@ -100,7 +95,7 @@ export const DeductionPanel = ({
             addLabel="＋ 医療費を追加"
           />
         </Col>
-        <AmountField
+        <LabeledAmountField
           label="医療費の補填金（保険金など）"
           value={deductions.medicalReimbursement}
           onChange={(v) => set({ medicalReimbursement: v })}
@@ -119,59 +114,59 @@ export const DeductionPanel = ({
         </Col>
 
         <Text className={styles.subhead}>保険料</Text>
-        <AmountField
+        <LabeledAmountField
           label="生命保険料（新契約・一般）"
           value={deductions.lifeInsurance.newGeneral}
           onChange={(v) => setLife({ newGeneral: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="生命保険料（新契約・介護医療）"
           value={deductions.lifeInsurance.newCareMedical}
           onChange={(v) => setLife({ newCareMedical: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="生命保険料（新契約・個人年金）"
           value={deductions.lifeInsurance.newPension}
           onChange={(v) => setLife({ newPension: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="生命保険料（旧契約・一般）"
           value={deductions.lifeInsurance.oldGeneral}
           onChange={(v) => setLife({ oldGeneral: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="生命保険料（旧契約・個人年金）"
           value={deductions.lifeInsurance.oldPension}
           onChange={(v) => setLife({ oldPension: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="地震保険料（地震部分）"
           value={deductions.earthquakeInsurance.earthquake}
           onChange={(v) => setEarthquake({ earthquake: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="旧長期損害保険料"
           value={deductions.earthquakeInsurance.oldLongTerm}
           onChange={(v) => setEarthquake({ oldLongTerm: v })}
         />
 
         <Text className={styles.subhead}>雑損控除（災害・盗難などの損失）</Text>
-        <AmountField
+        <LabeledAmountField
           label="損害金額"
           value={casualty.damageAmount}
           onChange={(v) => setCasualty({ damageAmount: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="災害関連支出（取壊し・除去費用など）"
           value={casualty.disasterRelatedExpenses}
           onChange={(v) => setCasualty({ disasterRelatedExpenses: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="その他の関連支出（原状回復費など）"
           value={casualty.otherRelatedExpenses}
           onChange={(v) => setCasualty({ otherRelatedExpenses: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="補填金（保険金・損害賠償金など）"
           value={casualty.compensation}
           onChange={(v) => setCasualty({ compensation: v })}
@@ -198,25 +193,25 @@ export const DeductionPanel = ({
           value={deductions.spouseTotalIncome}
           onChange={(v) => set({ spouseTotalIncome: v })}
         />
-        <AmountField
+        <LabeledAmountField
           label="扶養親族（一般）"
           suffix="人"
           value={deductions.dependents.general}
           onChange={(v) => set({ dependents: { ...deductions.dependents, general: v } })}
         />
-        <AmountField
+        <LabeledAmountField
           label="扶養親族（特定・19〜22歳）"
           suffix="人"
           value={deductions.dependents.specific}
           onChange={(v) => set({ dependents: { ...deductions.dependents, specific: v } })}
         />
-        <AmountField
+        <LabeledAmountField
           label="扶養親族（老人・70歳以上）"
           suffix="人"
           value={deductions.dependents.elderly}
           onChange={(v) => set({ dependents: { ...deductions.dependents, elderly: v } })}
         />
-        <AmountField
+        <LabeledAmountField
           label="扶養親族（同居老親等）"
           suffix="人"
           value={deductions.dependents.elderlyCohabiting}
@@ -224,19 +219,19 @@ export const DeductionPanel = ({
             set({ dependents: { ...deductions.dependents, elderlyCohabiting: v } })
           }
         />
-        <AmountField
+        <LabeledAmountField
           label="障害者"
           suffix="人"
           value={deductions.disability.general}
           onChange={(v) => set({ disability: { ...deductions.disability, general: v } })}
         />
-        <AmountField
+        <LabeledAmountField
           label="特別障害者"
           suffix="人"
           value={deductions.disability.special}
           onChange={(v) => set({ disability: { ...deductions.disability, special: v } })}
         />
-        <AmountField
+        <LabeledAmountField
           label="同居特別障害者"
           suffix="人"
           value={deductions.disability.specialCohabiting}
