@@ -19,10 +19,10 @@ export type AgentUiAction =
   | { type: "reloadTransactions" }
   /** 控除入力の変更を画面側の保存値へ適用する（set_deductions の結果）。 */
   | { type: "applyDeductions"; year: number; patch: DeductionPatch }
-  /** 設定・申告まわりの変更後に、表示中の画面を読み直す。 */
-  | { type: "reloadView" };
+  /** 変更の影響を受ける画面を、表示中なら読み直す（他の画面の未保存の入力は残す）。 */
+  | { type: "reloadView"; view: AppView };
 
-/** 帳簿DBへの書き込み系ツール（成功したら画面の取引を読み直す）。 */
+/** 帳簿DBへの書き込み系ツール（成功したら画面の取引と、帳簿を自前で読む画面を読み直す）。 */
 const WRITE_TOOL_NAMES = new Set(["update_transactions", "add_transaction", "delete_transaction"]);
 
 /** 設定系の書き込みツール（成功したら表示中の画面を読み直す）。 */
@@ -63,6 +63,8 @@ export const deriveUiActions = (
       // 書き込みが成功していたら、帳簿の最新状態を画面へ反映する。
       if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
         push({ type: "reloadTransactions" });
+        push({ type: "reloadView", view: AppView.Ledger });
+        push({ type: "reloadView", view: AppView.Receipt });
       }
     } else if (tc.name === "set_deductions") {
       // 控除入力の変更は画面側の保存値へ適用し、確定申告画面で見せる。
@@ -81,18 +83,18 @@ export const deriveUiActions = (
       // 申告ステータスは確定申告画面の表示に効く。
       if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
         push({ type: "navigate", view: AppView.Filing });
-        push({ type: "reloadView" });
+        push({ type: "reloadView", view: AppView.Filing });
       }
     } else if (tc.name === "update_taxpayer_profile") {
       // 納税者情報は独立画面で見せる。
       if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
         push({ type: "navigate", view: AppView.Taxpayer });
-        push({ type: "reloadView" });
+        push({ type: "reloadView", view: AppView.Taxpayer });
       }
     } else if (SETTINGS_WRITE_TOOL_NAMES.has(tc.name)) {
       // 設定の変更は、設定画面を開いていればその表示に効く。
       if ((tc.result as { ok?: unknown } | undefined)?.ok === true) {
-        push({ type: "reloadView" });
+        push({ type: "reloadView", view: AppView.Settings });
       }
     }
   }

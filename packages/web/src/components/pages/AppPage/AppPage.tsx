@@ -87,8 +87,11 @@ export const AppPage = () => {
   const [agentConnection, setAgentConnection] = useState<AgentConnectionConfig>(() =>
     loadAgentConnection(),
   );
-  // エージェントが設定・申告まわりを変更したときに、表示中の画面を読み直させる。
+  // エージェントが控除入力を変更したときに、表示中の画面を読み直させる。
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
+  // エージェントの変更の影響を受けた画面ごとの読み直し回数。表示中の画面の key に使い、
+  // 影響の無い画面（入力途中の設定など）は作り直さない。
+  const [viewReloads, setViewReloads] = useState<Partial<Record<AppView, number>>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingSession, setViewingSession] = useState<ChatSession | null>(null);
   // 会話クリアはパネル側の操作だが、ボタンはヘッダー（履歴の隣）に置くためハンドラを受け取る。
@@ -170,7 +173,7 @@ export const AppPage = () => {
       saveDeductionState(action.year, applyDeductionPatch(loadDeductionState(action.year), patch));
       setViewRefreshKey((v) => v + 1);
     } else if (action.type === "reloadView") {
-      setViewRefreshKey((v) => v + 1);
+      setViewReloads((current) => ({ ...current, [action.view]: (current[action.view] ?? 0) + 1 }));
     } else if (action.type === "reloadTransactions") {
       reloadTransactions();
     } else if (action.type === "setTheme") {
@@ -269,7 +272,7 @@ export const AppPage = () => {
         )
       ) : (
         <ActiveComponent
-          key={viewRefreshKey}
+          key={`${viewRefreshKey}:${viewReloads[active.id] ?? 0}`}
           transactions={transactions}
           year={year}
           onUseTransactions={handleUseImported}
