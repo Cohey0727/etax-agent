@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { FlatList, StyleSheet, View } from "react-native";
 import {
   createLedgerTransaction,
   deleteLedgerTransaction,
@@ -97,12 +97,12 @@ export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScr
     }
   };
 
-  const openRow = (row: LedgerTransaction) => {
+  const openRow = useCallback((row: LedgerTransaction) => {
     setSelected(row);
     setEdit(toInput(row));
     setDeleteArmed(false);
     setError(null);
-  };
+  }, []);
   const closeSheet = () => { setSelected(null); setEdit(null); };
 
   const handleSave = async () => {
@@ -162,8 +162,12 @@ export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScr
     );
   }
 
-  return (
-    <ScreenContainer>
+  const renderRow = ({ item }: { item: LedgerTransaction }) => (
+    <LedgerRow row={item} onPress={openRow} />
+  );
+
+  const listHeader = (
+    <View style={styles.listHeader}>
       <View style={styles.headerRow}>
         <AppText size="xl" weight="bold">帳簿</AppText>
         <AppButton label="＋ 取引を追加" size="sm" onPress={() => { setDraft(emptyDraft(year)); setError(null); setAddOpen(true); }} />
@@ -213,15 +217,31 @@ export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScr
         taxCategories={taxCategories}
       />
       {error && !selected && !addOpen ? <AlertBox tone="error" message={error} /> : null}
-      {yearRows.length === 0 ? (
-        <AppText tone="muted">まだ取引がありません。「取引を追加」から追加するか、CSV取込・領収書から取り込むと自動で帳簿に保存されます。</AppText>
-      ) : visible.length === 0 ? (
-        <AppText tone="muted">条件に一致する取引はありません。</AppText>
-      ) : (
-        <View style={{ gap: space.sm }}>
-          {visible.map((row) => <LedgerRow key={row.id} row={row} onPress={openRow} />)}
-        </View>
-      )}
+    </View>
+  );
+
+  return (
+    <ScreenContainer noScroll>
+      <FlatList
+        data={visible}
+        keyExtractor={(row) => String(row.id)}
+        renderItem={renderRow}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <AppText tone="muted">
+            {yearRows.length === 0
+              ? "まだ取引がありません。「取引を追加」から追加するか、CSV取込・領収書から取り込むと自動で帳簿に保存されます。"
+              : "条件に一致する取引はありません。"}
+          </AppText>
+        }
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={9}
+        removeClippedSubviews
+        keyboardShouldPersistTaps="handled"
+      />
 
       <Sheet visible={selected !== null} title="取引の詳細" onClose={closeSheet} scroll>
         {selected && edit ? (
@@ -256,7 +276,13 @@ export function LedgerScreen({ initialCategories, initialIncomeType }: LedgerScr
   );
 }
 
+// フローティングボトムバー（高さ約48 + 下マージン）に末尾の行が隠れないための逃げ。
+const BOTTOM_BAR_CLEARANCE = 64;
+
 const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   exportRow: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
+  list: { flex: 1 },
+  listContent: { padding: space.md, gap: space.sm, paddingBottom: space.xl + BOTTOM_BAR_CLEARANCE },
+  listHeader: { gap: space.md, paddingBottom: space.sm },
 });
