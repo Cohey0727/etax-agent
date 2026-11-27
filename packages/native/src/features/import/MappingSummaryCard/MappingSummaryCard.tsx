@@ -48,7 +48,7 @@ export function MappingSummaryCard({ result, using, disabled, onUse }: MappingSu
         ファイル: {result.filename}（{result.encoding}）／ 取込 {result.count} 件
         {result.skippedRows > 0 ? ` ／ 読めずスキップ ${result.skippedRows} 件` : ""}
         {result.duplicatesSkipped > 0 ? ` ／ 重複除外 ${result.duplicatesSkipped} 件` : ""}
-        {result.persisted ? " ／ DBに保存しました" : " ／ DB未接続のためプレビューのみ（保存されていません）"}
+        {result.persisted ? " ／ 帳簿データベースに保存しました" : " ／ 帳簿データベースに接続できないためプレビューのみ（保存されていません）"}
       </AppText>
       {result.persistWarning ? <AlertBox tone="warn" message={result.persistWarning} /> : null}
       <AppButton

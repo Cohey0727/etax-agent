@@ -47,7 +47,7 @@ export function ReceiptLibrary({ receipts, ledger, busy, onLink, onUnlink }: Rec
         解析した領収書画像の一覧です。取引へ紐付けると、帳簿から証憑を辿れるようになります（電子帳簿保存法の相互関連性）。
       </AppText>
       {receipts === null ? (
-        <AppText tone="muted">帳簿DBに接続できないため、証憑の一覧を表示できません。</AppText>
+        <AppText tone="muted">帳簿データベースに接続できないため、証憑の一覧を表示できません。</AppText>
       ) : receipts.length === 0 ? (
         <AppText tone="muted">まだ証憑がありません。上の欄から領収書画像を解析すると、ここに残ります。</AppText>
       ) : (

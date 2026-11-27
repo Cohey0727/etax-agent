@@ -1,6 +1,6 @@
 import { DeductionPatch } from "@etax/shared";
 
-/** エージェントが代行する画面操作（Web の agentChatHelpers と同じ導出規則）。 */
+/** エージェントが代行する画面操作。ツールの実行結果から導く（deriveUiActions）。 */
 export type AgentUiAction =
   | { type: "setYear"; year: number }
   | { type: "navigate"; route: "/" | "/filing" | "/taxpayer" }

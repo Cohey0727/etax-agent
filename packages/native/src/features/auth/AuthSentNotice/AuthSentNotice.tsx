@@ -19,7 +19,7 @@ const NOTICES: Record<AuthSentNoticeProps["variant"], { title: string; body: str
   },
 };
 
-/** メール送信済みの案内（Web の AuthSentNotice 相当）。 */
+/** ログイン用リンク・登録の確認メールを送ったことの案内。 */
 export function AuthSentNotice({ variant, onBack }: AuthSentNoticeProps) {
   const notice = NOTICES[variant];
   return (
