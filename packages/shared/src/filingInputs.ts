@@ -11,6 +11,7 @@
 import { type AgricultureInput, EMPTY_AGRICULTURE_INPUT, normalizeAgricultureInput } from "./agriculture";
 import { normalizeBalanceSheetInput } from "./balanceSheet";
 import {
+  computeIncomeTax,
   computeManualIncomes,
   type DeductionInputs,
   EMPTY_DEDUCTION_INPUTS,
@@ -18,13 +19,26 @@ import {
   EMPTY_SALARY_INCOME,
   EMPTY_TAX_CREDIT_INPUTS,
   type IncomeTaxResult,
+  type ManualIncomeBreakdown,
   type MiscIncomeInput,
   type SalaryIncomeInput,
   type TaxCreditInputs,
 } from "./deductions";
-import { EMPTY_EXPANDED_INCOME, type ExpandedIncomeInput, normalizeExpandedIncomeInput } from "./expandedIncome";
+import {
+  computeExpandedIncomes,
+  EMPTY_EXPANDED_INCOME,
+  type ExpandedIncomeBreakdown,
+  type ExpandedIncomeInput,
+  normalizeExpandedIncomeInput,
+  resolveTaxCreditInputs,
+} from "./expandedIncome";
 import { filterYear } from "./ledger";
-import { type ComputeCorrectedFiguresOptions, computeCorrectedFigures, type FilingType } from "./taxcalc";
+import {
+  type ComputeCorrectedFiguresOptions,
+  computeCorrectedFigures,
+  type CorrectedFigures,
+  type FilingType,
+} from "./taxcalc";
 import { TAX_PARAMETERS } from "./taxParameters";
 import type { Transaction } from "./types";
 import type { XtxBalanceSheetInput } from "./xtx";
@@ -138,6 +152,20 @@ export interface FilingSnapshotFigures {
   total_deductions: number;
   taxable_income: number;
   final_tax: number;
+}
+
+/** 帳簿と申告入力から求めた、所得と所得税額の一式。 */
+export interface FilingFigures {
+  /** 帳簿と農業所得の入力から求めた申告数値（収入・経費・青色申告特別控除の配分） */
+  corrected: CorrectedFigures;
+  /** 給与所得・公的年金等・雑所得 */
+  manual: ManualIncomeBreakdown;
+  /** 配当・一時・株式等譲渡 */
+  expanded: ExpandedIncomeBreakdown;
+  /** 合計所得金額（総合課税分） */
+  totalIncome: number;
+  /** 所得税額の計算結果 */
+  taxResult: IncomeTaxResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -386,9 +414,47 @@ export function applyDeductionPatch(state: DeductionState, patch: DeductionPatch
 // ---------------------------------------------------------------------------
 
 /**
+ * 帳簿（対象年の取引）と申告入力から、所得と所得税額を求める。
+ * 帳簿の所得（事業・不動産・農業）、給与・雑所得、拡張所得の総合課税分を
+ * 合計所得とし、拡張所得の申告分離課税分と配当控除も税額計算に渡す。
+ * 画面に出す所得の要約と確定スナップショットは、すべてこの結果から作る。
+ */
+export function computeFilingFigures(
+  transactions: Transaction[],
+  year: number,
+  state: DeductionState,
+): FilingFigures {
+  const corrected = computeCorrectedFigures(filterYear(transactions, year), year, {
+    filingType: state.filingType,
+    realEstateBusinessScale: state.realEstateBusinessScale,
+    agriculture: state.agriculture,
+  });
+  const ledgerIncome = ledgerIncomeOf(corrected);
+  const manual = computeManualIncomes(year, state.salaryIncome, state.miscIncome, ledgerIncome);
+  const expanded = computeExpandedIncomes(state.expandedIncome);
+  const totalIncome = ledgerIncome + manual.total + expanded.comprehensiveAddition;
+  const taxResult = computeIncomeTax({
+    year,
+    totalIncome,
+    deductions: state.deductions,
+    taxCredits: resolveTaxCreditInputs(state.taxCredits, expanded),
+    separateTaxation: {
+      stockIncome: expanded.separateStockIncome,
+      dividendIncome: expanded.separateDividendIncome,
+    },
+  });
+  return { corrected, manual, expanded, totalIncome, taxResult };
+}
+
+/** 確定スナップショットの数値（computeFilingFigures の結果から作る）。 */
+export function snapshotFiguresOf(figures: FilingFigures): FilingSnapshotFigures {
+  return toSnapshotFigures(figures.corrected, figures.manual, figures.taxResult);
+}
+
+/**
  * 確定スナップショット用の計算結果を組み立てる。
- * 所得の内訳は帳簿から、税額は計算結果から取る。
- * 取引が無い年や計算結果が無い場合は null（スナップショットを作らない）。
+ * 所得の内訳は帳簿から、税額は計算結果から取る。計算結果が無い場合は null
+ * （スナップショットを作らない）。帳簿に取引が無い年（給与・雑所得だけの年）も作る。
  */
 export function buildSnapshotFigures(
   transactions: Transaction[],
@@ -399,20 +465,33 @@ export function buildSnapshotFigures(
   salaryIncome?: SalaryIncomeInput,
 ): FilingSnapshotFigures | null {
   if (!taxResult) return null;
-  const yearTransactions = filterYear(transactions, year);
-  if (yearTransactions.length === 0) return null;
-  const figures = computeCorrectedFigures(yearTransactions, year, filingOptions);
+  const corrected = computeCorrectedFigures(filterYear(transactions, year), year, filingOptions);
   const manual = computeManualIncomes(
     year,
     salaryIncome ?? EMPTY_SALARY_INCOME,
     miscIncome ?? EMPTY_MISC_INCOME,
-    figures._detail.business_income +
-      figures._detail.real_estate_income +
-      figures._detail.agriculture_income,
+    ledgerIncomeOf(corrected),
   );
+  return toSnapshotFigures(corrected, manual, taxResult);
+}
+
+/** 帳簿から求める所得（事業・不動産・農業の青色申告特別控除後）の合計。 */
+function ledgerIncomeOf(corrected: CorrectedFigures): number {
+  return (
+    corrected._detail.business_income +
+    corrected._detail.real_estate_income +
+    corrected._detail.agriculture_income
+  );
+}
+
+function toSnapshotFigures(
+  corrected: CorrectedFigures,
+  manual: ManualIncomeBreakdown,
+  taxResult: IncomeTaxResult,
+): FilingSnapshotFigures {
   return {
-    business_income: figures._detail.business_income,
-    real_estate_income: figures._detail.real_estate_income,
+    business_income: corrected._detail.business_income,
+    real_estate_income: corrected._detail.real_estate_income,
     misc_income: manual.miscTotal,
     total_income: taxResult.totalIncome,
     total_deductions: taxResult.deductionsTotal,

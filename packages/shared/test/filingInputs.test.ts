@@ -7,9 +7,11 @@ import {
   applyBreakdownEntries,
   applyDeductionPatch,
   buildSnapshotFigures,
+  computeFilingFigures,
   deriveBasePeriodSalesThousands,
   freshDeductionState,
   parseDeductionState,
+  snapshotFiguresOf,
   specialRelativeInputApplies,
 } from "../src/filingInputs";
 import { computeIncomeTax, EMPTY_DEDUCTION_INPUTS, EMPTY_TAX_CREDIT_INPUTS } from "../src/deductions";
@@ -163,9 +165,65 @@ describe("buildSnapshotFigures", () => {
     });
   });
 
-  test("計算結果が無い・対象年の取引が無い場合は null", () => {
+  test("計算結果が無い場合は null", () => {
     expect(buildSnapshotFigures(transactions, 2025, undefined, undefined, undefined)).toBeNull();
-    expect(buildSnapshotFigures(transactions, 2024, undefined, undefined, taxResult)).toBeNull();
+  });
+
+  test("対象年の取引が無くても（給与・雑所得だけの年）計算結果から控えを作る", () => {
+    const salaryOnly = computeIncomeTax({
+      year: 2024,
+      totalIncome: 4_000_000,
+      deductions: EMPTY_DEDUCTION_INPUTS,
+      taxCredits: EMPTY_TAX_CREDIT_INPUTS,
+    });
+    const figures = buildSnapshotFigures(transactions, 2024, undefined, undefined, salaryOnly);
+    expect(figures?.business_income).toBe(0);
+    expect(figures?.total_income).toBe(salaryOnly.totalIncome);
+    expect(figures?.final_tax).toBe(salaryOnly.finalTax);
+  });
+});
+
+describe("computeFilingFigures / snapshotFiguresOf", () => {
+  // 不動産（事業的規模でない）だけを帳簿に持ち、農業所得と一時所得を申告入力で持つ。
+  const transactions = [
+    tx("2025-03-01", 2_000_000, "家賃収入", { income_type: "real_estate" }),
+    tx("2025-03-10", -500_000, "修繕費", { income_type: "real_estate" }),
+  ];
+  const state = {
+    ...freshDeductionState(),
+    agriculture: {
+      ...freshDeductionState().agriculture,
+      salesAmount: 3_000_000,
+      expenseTotals: { 肥料費: 1_000_000 },
+    },
+    expandedIncome: {
+      ...freshDeductionState().expandedIncome,
+      temp: { revenue: 1_500_000, expenses: 0 },
+    },
+  };
+
+  test("合計所得に農業所得と一時所得（2分の1）を含め、青色申告特別控除は農業所得込みで配分する", () => {
+    const f = computeFilingFigures(transactions, 2025, state);
+    // 不動産 150万 + 農業 200万 − 青色 65万（不動産へ先に配分）+ 一時 (150万 − 50万) / 2
+    expect(f.corrected.blue_deduction).toBe(650_000);
+    expect(f.corrected._detail.real_estate_income).toBe(850_000);
+    expect(f.corrected._detail.agriculture_income).toBe(2_000_000);
+    expect(f.expanded.comprehensiveAddition).toBe(500_000);
+    expect(f.totalIncome).toBe(3_350_000);
+    expect(f.taxResult.totalIncome).toBe(3_350_000);
+  });
+
+  test("確定スナップショットの所得内訳も同じ計算から作る", () => {
+    const f = computeFilingFigures(transactions, 2025, state);
+    expect(snapshotFiguresOf(f)).toEqual({
+      business_income: 0,
+      real_estate_income: 850_000,
+      misc_income: 0,
+      total_income: 3_350_000,
+      total_deductions: f.taxResult.deductionsTotal,
+      taxable_income: f.taxResult.taxableIncome,
+      final_tax: f.taxResult.finalTax,
+    });
   });
 });
 
