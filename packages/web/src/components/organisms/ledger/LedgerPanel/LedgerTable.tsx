@@ -16,7 +16,7 @@ import { LedgerTransaction } from "@types";
 import {
   BUSINESS_RATIO_GUIDE_CATEGORIES,
   BUSINESS_RATIO_GUIDE_TEXT,
-  CATEGORY_OPTIONS,
+  categoryOptionsWith,
   INCOME_TYPE_OPTIONS,
   PAGE_SIZE,
   TAX_CATEGORY_OPTIONS,
@@ -165,7 +165,7 @@ export const LedgerTable = ({
                       onChange={(e) => onEdit(row, { category: e.target.value })}
                       aria-label="勘定科目"
                     >
-                      {CATEGORY_OPTIONS.map((name) => (
+                      {categoryOptionsWith([edit.category]).map((name) => (
                         <option key={name} value={name}>
                           {name}
                         </option>

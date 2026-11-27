@@ -13,6 +13,18 @@ export const INCOME_TYPE_OPTIONS = [
 
 export const CATEGORY_OPTIONS: readonly string[] = ["未分類", ...ACCOUNT_NAMES];
 
+/**
+ * 勘定科目の選択肢に、一覧に無い科目（科目推定・CSV の明示列・分類ルールが
+ * 付けたもの）を足す。足りないと選択欄が先頭の「未分類」を表示してしまう。
+ */
+export function categoryOptionsWith(categories: Iterable<string>): string[] {
+  const options = [...CATEGORY_OPTIONS];
+  for (const category of categories) {
+    if (category && !options.includes(category)) options.push(category);
+  }
+  return options;
+}
+
 export const TAX_CATEGORY_OPTIONS: readonly { value: string; label: string }[] = [
   { value: "", label: "未設定" },
   ...TAX_CATEGORIES.map((name) => ({ value: name, label: name })),

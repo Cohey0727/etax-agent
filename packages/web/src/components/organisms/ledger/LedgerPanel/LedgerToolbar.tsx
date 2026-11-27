@@ -22,6 +22,7 @@ export const LedgerToolbar = ({
   periodFilter,
   otherFilters,
   yearOptions,
+  categoryOptions,
   onDownloadPdf,
   onDownloadCsv,
   onOpenHistory,
@@ -40,6 +41,7 @@ export const LedgerToolbar = ({
   periodFilter: LedgerFilter | undefined;
   otherFilters: readonly LedgerFilter[];
   yearOptions: readonly number[];
+  categoryOptions: readonly string[];
   onDownloadPdf: () => void;
   onDownloadCsv: () => void;
   onOpenHistory: () => void;
@@ -176,7 +178,13 @@ export const LedgerToolbar = ({
       <Row gap="sm" align="center" justify="spaceBetween" wrap>
         <Row gap="sm" align="center" wrap>
           {periodFilter ? (
-            <FilterChip bare filter={periodFilter} years={yearOptions} onChange={onFilterChange} />
+            <FilterChip
+              bare
+              filter={periodFilter}
+              years={yearOptions}
+              categories={categoryOptions}
+              onChange={onFilterChange}
+            />
           ) : null}
           <div className={styles.searchWrap}>
             <span className={styles.searchIcon}>
@@ -202,6 +210,7 @@ export const LedgerToolbar = ({
             key={filter.field}
             filter={filter}
             years={yearOptions}
+            categories={categoryOptions}
             onChange={onFilterChange}
             onRemove={() => onFilterRemove(filter.field)}
           />

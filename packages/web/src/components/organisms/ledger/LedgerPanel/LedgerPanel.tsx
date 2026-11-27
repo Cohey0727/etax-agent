@@ -166,6 +166,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
     setPageState({ signature: filterSignature, page: Math.min(Math.max(1, page), totalPages) });
   // 年度の選択肢はデータにある割り当て年度から作る（新しい順）。
   const yearOptions = [...new Set(rows.map((row) => row.fiscal_year))].sort((a, b) => b - a);
+  const categoryOptions = [...new Set(rows.map((row) => row.category))];
   // 期間フィルターは常設で、検索の左に置く。それ以外は下の段に並べる。
   const periodFilter = filters.find((f) => f.field === "period");
   const otherFilters = filters.filter((f) => f.field !== "period");
@@ -198,6 +199,7 @@ export const LedgerPanel = ({ onSyncTransactions, onNavigate }: LedgerPanelProps
         periodFilter={periodFilter}
         otherFilters={otherFilters}
         yearOptions={yearOptions}
+        categoryOptions={categoryOptions}
         onDownloadPdf={() => void handleDownloadPdf()}
         onDownloadCsv={handleDownloadCsv}
         onOpenHistory={() => setHistoryTarget({ mode: "all" })}

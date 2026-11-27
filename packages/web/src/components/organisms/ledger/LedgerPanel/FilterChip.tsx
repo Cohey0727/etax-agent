@@ -1,13 +1,14 @@
 import { Icon, Input, Select, Text } from "@components/atoms";
 import { MultiSelectFilter } from "@components/molecules";
 import { FILTER_FIELD_LABELS, LedgerFilter } from "./ledgerFilters";
-import { CATEGORY_OPTIONS, INCOME_TYPE_OPTIONS, TAX_CATEGORY_OPTIONS } from "./ledgerOptions";
+import { categoryOptionsWith, INCOME_TYPE_OPTIONS, TAX_CATEGORY_OPTIONS } from "./ledgerOptions";
 import styles from "./LedgerPanel.css";
 
 /** フィルター1件分のチップ。項目名＋条件の入力＋削除ボタンで構成する。 */
 export const FilterChip = ({
   filter,
   years,
+  categories,
   onChange,
   onRemove,
   bare = false,
@@ -15,6 +16,8 @@ export const FilterChip = ({
   filter: LedgerFilter;
   /** 年度フィルターの選択肢（データにある割り当て年度）。 */
   years: readonly number[];
+  /** データにある勘定科目（一覧に無い科目も選択肢に出す）。 */
+  categories: readonly string[];
   onChange: (next: LedgerFilter) => void;
   /** 削除ボタン。無いフィルター（期間）は常設なので渡さない。 */
   onRemove?: () => void;
@@ -83,7 +86,10 @@ export const FilterChip = ({
       ) : filter.field === "category" ? (
         <MultiSelectFilter
           ariaLabel="勘定科目で絞り込み"
-          options={CATEGORY_OPTIONS.map((name) => ({ value: name, label: name }))}
+          options={categoryOptionsWith([...categories, ...filter.values]).map((name) => ({
+            value: name,
+            label: name,
+          }))}
           values={filter.values}
           onChange={(values) => onChange({ ...filter, values })}
         />
