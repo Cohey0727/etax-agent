@@ -9,7 +9,7 @@ import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { Db, getDb } from "../lib/db";
+import { Db } from "../lib/db";
 import { beginChallengeUse, burnChallenge, verifyChallenge } from "../lib/loginChallenge";
 import { enforceAccountRateLimit } from "../lib/rateLimit";
 import { currentUserId } from "../lib/tenantContext";
@@ -27,16 +27,10 @@ import {
   TotpCodeRequestSchema,
   TotpSetupResponseSchema,
 } from "../schemas/auth";
-import { issueSession } from "./authSession";
+import { issueSession, requireAuthDb } from "./authSession";
 
-function requireDb(c: Context) {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
-  return db;
-}
-
-async function requireUser(c: Context) {
-  const db = requireDb(c);
+async function requireUser() {
+  const db = requireAuthDb();
   const userId = currentUserId();
   if (userId === undefined) {
     throw new HTTPException(401, { message: "ログインが必要です" });
@@ -78,7 +72,7 @@ export const totpSetupRoute = createRoute({
 });
 
 export const totpSetupHandler: RouteHandler<typeof totpSetupRoute> = async (c) => {
-  const { db, user } = await requireUser(c);
+  const { db, user } = await requireUser();
   if (user.totpEnabled) {
     // 有効なまま秘密を差し替えると、新しい秘密の登録を確かめる前に
     // 古いコードが使えなくなり、ログインできなくなる。解除してから設定し直す。
@@ -106,7 +100,7 @@ export const totpEnableRoute = createRoute({
 });
 
 export const totpEnableHandler: RouteHandler<typeof totpEnableRoute> = async (c) => {
-  const { db, user } = await requireUser(c);
+  const { db, user } = await requireUser();
   const secret = readUserTotpSecret(user);
   if (!secret) {
     throw new HTTPException(400, { message: "先に TOTP の設定を開始してください" });
@@ -134,7 +128,7 @@ export const totpDisableRoute = createRoute({
 });
 
 export const totpDisableHandler: RouteHandler<typeof totpDisableRoute> = async (c) => {
-  const { db, user } = await requireUser(c);
+  const { db, user } = await requireUser();
   const code = await readCode(c);
   if (!(await consumeTotpCode(db, user.id, readUserTotpSecret(user), code))) {
     throw new HTTPException(400, { message: "コードが違います" });
@@ -162,7 +156,7 @@ export const loginTotpRoute = createRoute({
 });
 
 export const loginTotpHandler: RouteHandler<typeof loginTotpRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const body = (await c.req.json().catch(() => null)) as
     | { challenge?: unknown; code?: unknown }
     | null;

@@ -74,7 +74,7 @@ function providerFromParam(c: Context): OAuthProvider {
  * Host / Origin ヘッダは汚染され得るため使わない（Issue #6）。
  * 未設定なら安全な redirect_uri を作れないので null を返す。
  */
-function redirectUri(c: Context, provider: OAuthProvider): string | null {
+function redirectUri(provider: OAuthProvider): string | null {
   const base = publicBaseUrl();
   return base ? `${base}/api/auth/oauth/${provider}/callback` : null;
 }
@@ -85,7 +85,7 @@ export async function oauthStartHandler(c: Context): Promise<Response> {
   if (!oauthConfigured(provider)) {
     throw new HTTPException(503, { message: "このログイン方法は設定されていません" });
   }
-  const uri = redirectUri(c, provider);
+  const uri = redirectUri(provider);
   if (!uri) {
     throw new HTTPException(503, { message: "公開オリジン（ETAX_PUBLIC_URL）が設定されていません" });
   }
@@ -118,13 +118,9 @@ export async function oauthStartHandler(c: Context): Promise<Response> {
   return c.redirect(`${config.authorizeUrl}?${params.toString()}`);
 }
 
-async function exchangeCode(
-  c: Context,
-  provider: OAuthProvider,
-  code: string,
-): Promise<string> {
+async function exchangeCode(provider: OAuthProvider, code: string): Promise<string> {
   const config = PROVIDERS[provider];
-  const uri = redirectUri(c, provider);
+  const uri = redirectUri(provider);
   if (!uri) throw new Error("公開オリジンが設定されていません");
   const res = await fetch(config.tokenUrl, {
     method: "POST",
@@ -203,7 +199,7 @@ export async function oauthCallbackHandler(c: Context): Promise<Response> {
   }
   burnChallenge(state, `oauth:${provider}`);
   try {
-    const accessToken = await exchangeCode(c, provider, code);
+    const accessToken = await exchangeCode(provider, code);
     const profile = await fetchProfile(provider, accessToken);
     const user = await findOrCreateOAuthUser(db, provider, profile.providerUserId, profile.email);
     // TOTP 有効なユーザーは OAuth でも2段階目を必須にする（2FA 迂回防止）。

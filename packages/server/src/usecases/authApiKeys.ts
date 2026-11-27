@@ -4,9 +4,8 @@
  * 発行・失効は権限昇格にあたるため MCP ツール化せず、この画面（人間の操作）だけが正規経路。
  */
 import { createRoute, RouteHandler, z } from "@hono/zod-openapi";
-import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
+import { Db } from "../lib/db";
 import { currentUserId } from "../lib/tenantContext";
 import {
   apiKeyStatus,
@@ -16,10 +15,10 @@ import {
 } from "../repositories/userRepository";
 import { ApiKeyRow } from "../repositories/schema";
 import { ApiKeyResponseSchema, CreateApiKeyRequestSchema } from "../schemas/auth";
+import { requireAuthDb } from "./authSession";
 
-function requireUser(c: Context): { db: NonNullable<ReturnType<typeof getDb>>; userId: number } {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
+function requireUser(): { db: Db; userId: number } {
+  const db = requireAuthDb();
   const userId = currentUserId();
   if (userId === undefined) throw new HTTPException(401, { message: "ログインしていません" });
   return { db, userId };
@@ -66,7 +65,7 @@ export const createApiKeyRoute = createRoute({
 });
 
 export const createApiKeyHandler: RouteHandler<typeof createApiKeyRoute> = async (c) => {
-  const { db, userId } = requireUser(c);
+  const { db, userId } = requireUser();
   const body = c.req.valid("json");
   const expiresAt = parseExpiresAt(body.expires_at);
   const { row, key } = await createApiKey(db, userId, body.name, expiresAt);
@@ -85,7 +84,7 @@ export const listApiKeysRoute = createRoute({
 });
 
 export const listApiKeysHandler: RouteHandler<typeof listApiKeysRoute> = async (c) => {
-  const { db, userId } = requireUser(c);
+  const { db, userId } = requireUser();
   const rows = await listApiKeyRows(db, userId);
   return c.json(rows.map(keyToApi));
 };
@@ -103,7 +102,7 @@ export const revokeApiKeyRoute = createRoute({
 });
 
 export const revokeApiKeyHandler: RouteHandler<typeof revokeApiKeyRoute> = async (c) => {
-  const { db, userId } = requireUser(c);
+  const { db, userId } = requireUser();
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id)) throw new HTTPException(400, { message: "id が不正です" });
   const revoked = await revokeApiKeyRow(db, userId, id);

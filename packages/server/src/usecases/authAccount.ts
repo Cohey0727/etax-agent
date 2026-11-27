@@ -4,10 +4,8 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
-import { Context } from "hono";
 import { deleteCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
 import { issueChallenge } from "../lib/loginChallenge";
 import { publicBaseUrl } from "../lib/publicUrl";
 import { enforceAccountRateLimit } from "../lib/rateLimit";
@@ -28,13 +26,7 @@ import {
   TotpChallengeResponseSchema,
 } from "../schemas/auth";
 import { sendMail } from "../services/email/mailer";
-import { SESSION_COOKIE, issueSession, requestSessionToken } from "./authSession";
-
-function requireDb(c: Context) {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
-  return db;
-}
+import { issueSession, requestSessionToken, requireAuthDb, SESSION_COOKIE } from "./authSession";
 
 export const registerRoute = createRoute({
   method: "post",
@@ -55,7 +47,7 @@ export const registerRoute = createRoute({
 });
 
 export const registerHandler: RouteHandler<typeof registerRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const body = (await c.req.json().catch(() => null)) as
     | { email?: unknown; password?: unknown }
     | null;
@@ -117,7 +109,7 @@ export const loginRoute = createRoute({
 });
 
 export const loginHandler: RouteHandler<typeof loginRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const body = (await c.req.json().catch(() => null)) as
     | { email?: unknown; password?: unknown }
     | null;
@@ -164,7 +156,7 @@ export const logoutRoute = createRoute({
 });
 
 export const logoutHandler: RouteHandler<typeof logoutRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const token = requestSessionToken(c);
   if (token) await deleteSession(db, token);
   deleteCookie(c, SESSION_COOKIE, { path: "/" });
@@ -183,7 +175,7 @@ export const meRoute = createRoute({
 });
 
 export const meHandler: RouteHandler<typeof meRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const userId = currentUserId();
   if (userId === undefined) {
     throw new HTTPException(401, { message: "ログインしていません" });

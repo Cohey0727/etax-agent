@@ -8,9 +8,7 @@
  * 安全なリンクを作れないので送信自体をしない。
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
-import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
 import { publicBaseUrl } from "../lib/publicUrl";
 import { issueChallenge } from "../lib/loginChallenge";
 import { enforceAccountRateLimit } from "../lib/rateLimit";
@@ -29,13 +27,7 @@ import {
   TotpChallengeResponseSchema,
 } from "../schemas/auth";
 import { sendMail } from "../services/email/mailer";
-import { issueSession } from "./authSession";
-
-function requireDb(c: Context) {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
-  return db;
-}
+import { issueSession, requireAuthDb } from "./authSession";
 
 /** 同じメールアドレスへのリンク送信の上限（宛先へのメール爆撃を止める）。 */
 const ACCOUNT_MAGIC_LINK_LIMIT = 5;
@@ -56,7 +48,7 @@ export const magicLinkRequestRoute = createRoute({
 });
 
 export const magicLinkRequestHandler: RouteHandler<typeof magicLinkRequestRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const body = (await c.req.json().catch(() => null)) as { email?: unknown } | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   if (email.includes("@")) {
@@ -101,7 +93,7 @@ export const magicLinkConsumeRoute = createRoute({
 });
 
 export const magicLinkConsumeHandler: RouteHandler<typeof magicLinkConsumeRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const body = (await c.req.json().catch(() => null)) as { token?: unknown } | null;
   const token = typeof body?.token === "string" ? body.token : "";
   const email = token ? await consumeMagicLinkToken(db, token) : undefined;

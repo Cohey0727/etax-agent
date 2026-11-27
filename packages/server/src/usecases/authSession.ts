@@ -7,11 +7,19 @@
  */
 import { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { Db } from "../lib/db";
+import { HTTPException } from "hono/http-exception";
+import { Db, getDb } from "../lib/db";
 import { isSecureDeployment } from "../lib/publicUrl";
 import { createSession, resolveApiKeyUserId, resolveSessionUserId } from "../repositories/userRepository";
 
 export const SESSION_COOKIE = "etax_session";
+
+/** 認証 API が使う DB。未設定なら 503。 */
+export function requireAuthDb(): Db {
+  const db = getDb();
+  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
+  return db;
+}
 
 /** セッションを発行し、httpOnly Cookie とレスポンス用トークンを返す。 */
 export async function issueSession(c: Context, db: Db, userId: number): Promise<string> {

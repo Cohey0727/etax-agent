@@ -6,9 +6,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
-import { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { getDb } from "../lib/db";
 import { issueChallenge } from "../lib/loginChallenge";
 import { usersTable } from "../repositories/schema";
 import {
@@ -20,13 +18,7 @@ import {
   TotpChallengeResponseSchema,
   VerifyEmailRequestSchema,
 } from "../schemas/auth";
-import { issueSession } from "./authSession";
-
-function requireDb(c: Context) {
-  const db = getDb();
-  if (!db) throw new HTTPException(503, { message: "データベースが設定されていません" });
-  return db;
-}
+import { issueSession, requireAuthDb } from "./authSession";
 
 export const verifyEmailRoute = createRoute({
   method: "post",
@@ -47,7 +39,7 @@ export const verifyEmailRoute = createRoute({
 });
 
 export const verifyEmailHandler: RouteHandler<typeof verifyEmailRoute> = async (c) => {
-  const db = requireDb(c);
+  const db = requireAuthDb();
   const body = (await c.req.json().catch(() => null)) as { token?: unknown } | null;
   const token = typeof body?.token === "string" ? body.token : "";
   const userId = token ? await consumeEmailVerificationToken(db, token) : undefined;
