@@ -80,6 +80,17 @@ export function comprehensiveTotalIncome(ordinaryIncome: number, tempIncomeAmoun
   return tempAfterOffset >= 0 ? Math.floor(tempAfterOffset / 2) : tempAfterOffset;
 }
 
+/**
+ * 一時所得のうち総所得金額に算入する額（損益通算の後）。経常所得の損失を一時所得の
+ * 金額から差し引いてから1/2にし（損益の通算の計算書の「所得金額」の一時）、
+ * 引き切れなければ 0。経常所得が黒字なら一時所得の金額の1/2。
+ */
+export function tempIncomeIncludedAfterOffset(ordinaryIncome: number, tempIncomeAmount: number): number {
+  const ordinary = signed(ordinaryIncome);
+  const temp = amount(tempIncomeAmount);
+  return Math.floor(Math.max(temp + Math.min(ordinary, 0), 0) / 2);
+}
+
 /** 一時所得の金額と1/2算入額を計算する。 */
 export function computeTempIncome(input: TempIncomeInput): TempIncomeBreakdown {
   const revenue = amount(input.revenue);

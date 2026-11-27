@@ -13,6 +13,7 @@ import {
   computeStockTransfer,
   computeTempIncome,
   comprehensiveTotalIncome,
+  tempIncomeIncludedAfterOffset,
   normalizeExpandedIncomeInput,
   separateTaxAmount,
 } from "../src/index";
@@ -65,6 +66,20 @@ describe("総所得金額（損益通算 → 一時所得の1/2）", () => {
   test("1/2の円未満は切り捨てる", () => {
     expect(comprehensiveTotalIncome(0, 1)).toBe(0);
     expect(comprehensiveTotalIncome(-1, 4)).toBe(1);
+  });
+});
+
+describe("一時所得のうち総所得金額に算入する額（損益通算の後）", () => {
+  test("経常所得が黒字なら、一時所得の金額の1/2", () => {
+    expect(tempIncomeIncludedAfterOffset(1_000_000, 1_500_000)).toBe(750_000);
+  });
+
+  test("経常所得の損失を一時所得から差し引いてから1/2にする", () => {
+    expect(tempIncomeIncludedAfterOffset(-1_000_000, 1_500_000)).toBe(250_000);
+  });
+
+  test("一時所得で損失を引き切れなければ 0", () => {
+    expect(tempIncomeIncludedAfterOffset(-2_000_000, 1_500_000)).toBe(0);
   });
 });
 

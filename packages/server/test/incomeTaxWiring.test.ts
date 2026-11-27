@@ -136,6 +136,9 @@ describe("合計所得金額は事業の損失と一時所得を通算してか�
     });
     expect(r.status).toBe(200);
     expect(String(r.body.xtx)).toContain("<ABB00410>250000</ABB00410>");
+    // 第一表の事業は損益通算前の額、総合譲渡・一時は損益通算の後の額（損益の通算の計算書の所得金額）
+    expect(String(r.body.xtx)).toContain("<ABB00300>-1000000</ABB00300>");
+    expect(String(r.body.xtx)).toContain("<ABB00400>250000</ABB00400>");
   }, 30_000);
 
   test("MCP の income_tax と export_xtx", async () => {

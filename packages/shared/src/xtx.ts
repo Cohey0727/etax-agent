@@ -40,6 +40,7 @@ import {
   ExpandedIncomeInput,
   computeExpandedIncomes,
   isExpandedIncomeEmpty,
+  tempIncomeIncludedAfterOffset,
 } from "./expandedIncome";
 import { CorrectedFigures, FilingType } from "./taxcalc";
 import {
@@ -642,7 +643,7 @@ function buildKoa020Face1(data: XtxFilingData): string {
     }
     revenues.push(`<ABB00090>${misc.join("")}</ABB00090>`);
   }
-  // 一時（収入金額。所得金額は1/2算入後の額を ABB00400 に出す）
+  // 一時（収入金額。所得金額は総所得金額に算入する額を ABB00400 に出す）
   if (expanded) revenues.push(amount("ABB00230", expanded.temp.revenue));
   if (revenues.length > 0) body.push(`<ABB00010>${revenues.join("")}</ABB00010>`);
 
@@ -682,8 +683,18 @@ function buildKoa020Face1(data: XtxFilingData): string {
     miscParts.push(amountAlways("ABB01130", manual.miscTotal));
     incomes.push(`<ABB01050>${miscParts.join("")}</ABB01050>`);
   }
-  // 総合譲渡・一時（⑫）: 一時所得の1/2算入後の額（総合譲渡は対象外）
-  if (expanded) incomes.push(amount("ABB00400", expanded.temp.includedAmount));
+  // 総合譲渡・一時（⑪）: 一時所得のうち総所得金額に算入する額（総合譲渡は対象外）。
+  // 事業・不動産などの損失があれば、①〜⑩は損益通算の前の額のまま、この欄は損益通算の
+  // 後の額（損益の通算の計算書の「所得金額」）にする。経常所得が黒字なら一時所得の1/2
+  if (expanded) {
+    const ordinaryIncome =
+      f._detail.business_income +
+      f._detail.real_estate_income +
+      f._detail.agriculture_income +
+      manual.total +
+      Math.max(expanded.dividend.comprehensiveIncome, 0);
+    incomes.push(amount("ABB00400", tempIncomeIncludedAfterOffset(ordinaryIncome, expanded.temp.amount)));
+  }
   incomes.push(amountAlways("ABB00410", data.tax.totalIncome));
   body.push(`<ABB00270>${incomes.join("")}</ABB00270>`);
 
