@@ -731,25 +731,54 @@ describe("第一表の区分・欠落タグ・税額チェーン (#3-2/#3-3)", (
     expect(tagValue(xtx, "ABB00540")).toBe(tax.deductions.dependents);
   });
 
-  test("外国税額控除があっても ABB01020 = floor(ABB01010 × 2.1%) の検算が成立する", () => {
+  test("外国税額控除があっても申告納税額 ABB00720 は所得税の計算結果（finalTax）と一致する", () => {
     const { xtx, tax } = buildCustom({
       year: 2025,
       taxCredits: { foreignTaxPaid: 500_000, foreignIncome: 3_000_000 },
     });
     expect(tax.taxCredits.foreignTax).toBeGreaterThan(0);
-    const b = tagValue(xtx, "ABB01010");
-    const r = tagValue(xtx, "ABB01020");
-    expect(b).toBe(tax.standardIncomeTax);
-    expect(r).toBe(Math.floor((b * 21) / 1000));
+    // 基準所得税額は外国税額控除を適用する前の額で、外国税額控除は ABB01040 で一度だけ引く
+    expect(tagValue(xtx, "ABB01010")).toBe(tax.taxAfterOtherCredits);
+    expect(tagValue(xtx, "ABB01020")).toBe(tax.reconstructionTaxGross);
     expect(tagValue(xtx, "ABB01040")).toBe(tax.taxCredits.foreignTax);
-    expect(tagValue(xtx, "ABB00720")).toBe(
-      Math.floor((b + r - tax.taxCredits.foreignTax) / 100) * 100,
-    );
+    expect(tagValue(xtx, "ABB00720")).toBe(tax.finalTax);
+  });
+
+  test("令和6年分で定額減税が所得税額を上回っても、差引所得税額・再差引所得税額は所得税額を超えない", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2024,
+      txs: [tx({ date: "2024-06-15", year: 2024, amount: 1_500_000, category: "売上高" })],
+      taxCredits: { flatReduction: 90_000 },
+    });
+    expect(tax.incomeTaxBase).toBeLessThan(90_000);
+    expect(tagValue(xtx, "ABB00670")).toBe(tax.incomeTaxBase);
+    expect(tagValue(xtx, "ABB00682")).toBe(tax.incomeTaxBase);
+    // 特別税額控除は 3万円 × 人数 を書き、再々差引所得税額（基準所得税額）は 0 になる
+    expect(tagValue(xtx, "ABB00688")).toBe(90_000);
+    expect(tagValue(xtx, "ABB01010")).toBe(0);
+  });
+
+  test("住宅借入金等特別控除と定額減税で税額が0になっても、差引所得税額は定額減税前の額", () => {
+    const { xtx, tax } = buildCustom({
+      year: 2024,
+      txs: [tx({ date: "2024-06-15", year: 2024, amount: 1_500_000, category: "売上高" })],
+      taxCredits: {
+        flatReduction: 30_000,
+        housingLoanBalance: 1_000_000,
+        housingLoanLimit: 30_000_000,
+        housingLoanRate: 0.007,
+      },
+    });
+    const housingLoan = tax.taxCredits.housingLoan;
+    expect(housingLoan).toBeGreaterThan(0);
+    expect(housingLoan).toBeLessThan(tax.incomeTaxBase);
+    expect(tagValue(xtx, "ABB00670")).toBe(tax.incomeTaxBase - housingLoan);
+    expect(tagValue(xtx, "ABB01010")).toBe(tax.taxAfterOtherCredits);
   });
 
   test("還付になる場合は ABB00720 を負のまま出す（0にクランプしない）", () => {
     const { xtx, tax } = buildCustom({ year: 2025, withholdingTax: 2_000_000 });
-    const raw = tax.standardIncomeTax + tax.reconstructionTaxGross - 2_000_000;
+    const raw = tax.taxAfterOtherCredits + tax.reconstructionTaxGross - 2_000_000;
     expect(raw).toBeLessThan(0);
     expect(tagValue(xtx, "ABB00720")).toBe(raw);
     expect(tagValue(xtx, "ABB00760")).toBe(-raw);

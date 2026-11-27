@@ -562,13 +562,15 @@ function buildKoa020Face1(data: XtxFilingData): string {
   // 税金の計算
   const taxCalc: string[] = [];
   const tax = data.tax;
-  // 差引所得税額は定額減税を引く前の額で示す。令和6年分は
-  // 再差引所得税額・令和6年分特別税額控除の欄を経て、再々差引
-  // 所得税額（基準所得税額）に至るチェーンになる（KOA020-022）。
-  // 復興特別所得税額は基準所得税額 × 2.1%（外国税額控除前）で、
-  // 外国税額控除等は所得税等の額から引く（ABB01040）。
-  const differential = tax.taxAfterOtherCredits + c.flatReduction;
-  const taxTotal = tax.standardIncomeTax + tax.reconstructionTaxGross;
+  // 差引所得税額は定額減税と外国税額控除を引く前の額（0が下限）。令和6年分は
+  // 再差引所得税額・令和6年分特別税額控除（3万円 × 人数をそのまま書く）を経て、
+  // 再々差引所得税額（基準所得税額）に至る。基準所得税額は外国税額控除を
+  // 適用しない額で、外国税額控除等は所得税及び復興特別所得税の額から
+  // ABB01040 として一度だけ引く。
+  const creditsBeforeFlatReduction = c.total - c.foreignTax - c.flatReduction;
+  const differential = Math.max(tax.incomeTaxBase - creditsBeforeFlatReduction, 0);
+  const standardIncomeTax = tax.taxAfterOtherCredits;
+  const taxTotal = standardIncomeTax + tax.reconstructionTaxGross;
   // 課税される所得金額: 第三表がある場合は総合＋分離課税分の合計
   const taxableTotal =
     tax.taxableIncome +
@@ -583,14 +585,14 @@ function buildKoa020Face1(data: XtxFilingData): string {
   taxCalc.push(amount("ABB00663", c.seismicRetrofit));
   taxCalc.push(amountAlways("ABB00670", differential));
   if (data.year === 2024) {
-    taxCalc.push(amountAlways("ABB00682", tax.standardIncomeTax + c.flatReduction));
+    taxCalc.push(amountAlways("ABB00682", differential));
     if (c.flatReduction > 0) {
       taxCalc.push(
         `<ABB00684>${amountAlways("ABB00686", Math.trunc(c.flatReduction / 30_000))}${amountAlways("ABB00688", c.flatReduction)}</ABB00684>`,
       );
     }
   }
-  taxCalc.push(amountAlways("ABB01010", tax.standardIncomeTax));
+  taxCalc.push(amountAlways("ABB01010", standardIncomeTax));
   taxCalc.push(amountAlways("ABB01020", tax.reconstructionTaxGross));
   taxCalc.push(amountAlways("ABB01030", taxTotal));
   taxCalc.push(amount("ABB01040", c.foreignTax));
