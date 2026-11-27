@@ -8,7 +8,6 @@ import {
 } from "@etax/shared";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
-import { formatYen } from "@utils";
 import { toAmount } from "@utils/amountInput";
 import { removeAgricultureExpense, setAgricultureExpense } from "./AgriculturePanel.utils";
 import { ResultRow, TextField } from "./fields";
@@ -98,7 +97,7 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
           value={agriculture.produceClosingInventory}
           onChange={(v) => set({ produceClosingInventory: v })}
         />
-        <ResultRow label="収入金額の計" value={formatYen(statement.revenueTotal)} />
+        <ResultRow label="収入金額の計" amount={statement.revenueTotal} />
 
         <Text variant="sectionTitle">経費</Text>
         {AGRICULTURE_EXPENSE_CATEGORIES.map((category) => (
@@ -164,8 +163,8 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
           value={agriculture.cultivationCostDeduction}
           onChange={(v) => set({ cultivationCostDeduction: v })}
         />
-        <ResultRow label="経費計" value={formatYen(statement.expensesTotal)} />
-        <ResultRow label="差引金額" value={formatYen(statement.balanceAmount)} />
+        <ResultRow label="経費計" amount={statement.expensesTotal} />
+        <ResultRow label="差引金額" amount={statement.balanceAmount} />
 
         {white ? (
           <>
@@ -203,7 +202,7 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
         />
         <ResultRow
           label={white ? "農業所得の金額" : "青色申告特別控除前の所得金額"}
-          value={formatYen(incomeBeforeBlue)}
+          amount={incomeBeforeBlue}
         />
       </Col>
     </Card>

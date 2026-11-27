@@ -7,7 +7,6 @@ import {
   TempIncomeInput,
 } from "@etax/shared";
 import { Card, Col, Row, Select, Text } from "@components/atoms";
-import { formatYen } from "@utils";
 import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import { ResultRow } from "./fields";
 import { StockTransferFields } from "./StockTransferFields";
@@ -71,8 +70,8 @@ export const ExpandedIncomePanel = ({ expandedIncome, breakdown, taxResult, onCh
             value={expandedIncome.temp.expenses}
             onChange={(v) => setTemp({ expenses: v })}
           />
-          <ResultRow label="一時所得の金額（特別控除後）" value={formatYen(breakdown.temp.amount)} />
-          <ResultRow label="総合課税への算入額（2分の1）" value={formatYen(breakdown.temp.includedAmount)} />
+          <ResultRow label="一時所得の金額（特別控除後）" amount={breakdown.temp.amount} />
+          <ResultRow label="総合課税への算入額（2分の1）" amount={breakdown.temp.includedAmount} />
 
           <Text variant="sectionTitle">配当所得</Text>
           <Row gap="sm">
@@ -133,8 +132,8 @@ export const ExpandedIncomePanel = ({ expandedIncome, breakdown, taxResult, onCh
             value={expandedIncome.dividend.interestExpense}
             onChange={(v) => setDividend({ interestExpense: v })}
           />
-          <ResultRow label="配当所得の金額（総合課税分）" value={formatYen(d.comprehensiveIncome)} />
-          <ResultRow label="配当等の金額（申告分離課税分）" value={formatYen(breakdown.separateDividendIncome)} />
+          <ResultRow label="配当所得の金額（総合課税分）" amount={d.comprehensiveIncome} />
+          <ResultRow label="配当等の金額（申告分離課税分）" amount={breakdown.separateDividendIncome} />
         </Col>
       </Card>
       <StockTransferFields

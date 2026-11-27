@@ -62,7 +62,7 @@ export const StockTransferFields = ({ stocks, breakdown, taxResult, onChange }: 
           category={stocks.general}
           onPatch={(patch) => setCategory("general", patch)}
         />
-        <ResultRow label="一般株式等の所得金額" value={formatYen(s.general.income)} />
+        <ResultRow label="一般株式等の所得金額" amount={s.general.income} />
 
         <Text variant="sectionTitle">上場株式等（特定口座以外）</Text>
         <CategoryFields
@@ -120,15 +120,15 @@ export const StockTransferFields = ({ stocks, breakdown, taxResult, onChange }: 
             口座を追加
           </Button>
         </Row>
-        <ResultRow label="上場株式等の所得金額（特定口座分を含む）" value={formatYen(s.listed.income)} />
+        <ResultRow label="上場株式等の所得金額（特定口座分を含む）" amount={s.listed.income} />
 
         <Text variant="sectionTitle">損益通算・分離課税</Text>
         <ResultRow
           label="上場の譲渡損失と上場配当（申告分離）との損益通算額"
-          value={formatYen(breakdown.listedLossOffsetToDividend)}
+          amount={breakdown.listedLossOffsetToDividend}
         />
-        <ResultRow label="株式等譲渡の申告分離課税の税額（15%）" value={formatYen(taxResult.incomeTaxSeparateStocks)} />
-        <ResultRow label="上場配当の申告分離課税の税額（15%）" value={formatYen(taxResult.incomeTaxSeparateDividends)} />
+        <ResultRow label="株式等譲渡の申告分離課税の税額（15%）" amount={taxResult.incomeTaxSeparateStocks} />
+        <ResultRow label="上場配当の申告分離課税の税額（15%）" amount={taxResult.incomeTaxSeparateDividends} />
         {breakdown.unabsorbedListedLoss > 0 ? (
           <Text variant="muted">
             {`損益通算しきれない上場株式等の譲渡損失 ${formatYen(breakdown.unabsorbedListedLoss)} があります。翌年以降への繰越控除（専用付表の連続提出が必要）はこの画面では未対応です。`}

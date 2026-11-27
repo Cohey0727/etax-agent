@@ -1,4 +1,5 @@
 import { Input, Row, Text } from "@components/atoms";
+import { formatYen } from "@utils";
 import styles from "./AgriculturePanel.css";
 
 interface TextFieldProps {
@@ -25,15 +26,15 @@ export const TextField = ({ label, value, onChange }: TextFieldProps) => (
 
 interface ResultRowProps {
   label: string;
-  value: string;
+  amount: number;
 }
 
-/** 計算結果の表示行（ラベル＋右寄せの値）。 */
-export const ResultRow = ({ label, value }: ResultRowProps) => (
+/** 計算結果の金額の表示行（ラベル＋右寄せの金額）。 */
+export const ResultRow = ({ label, amount }: ResultRowProps) => (
   <Row gap="sm">
     <div className={styles.fieldLabel}>
       <Text variant="muted">{label}</Text>
     </div>
-    <Text className={styles.resultValue}>{value}</Text>
+    <Text className={styles.resultValue}>{formatYen(amount)}</Text>
   </Row>
 );

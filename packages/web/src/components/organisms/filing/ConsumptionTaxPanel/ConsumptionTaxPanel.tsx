@@ -26,7 +26,7 @@ import {
   EditableKey,
   SUMMARY_ROWS,
 } from "./consumptionTaxFields";
-import { buildResultRows } from "./consumptionTaxHelpers";
+import { ConsumptionResultUnit, buildResultRows } from "./consumptionTaxHelpers";
 import styles from "./ConsumptionTaxPanel.css";
 
 export interface ConsumptionTaxPanelProps {
@@ -41,6 +41,12 @@ export interface ConsumptionTaxPanelProps {
   consumptionFiling: ConsumptionFilingInputs;
   onConsumptionFilingChange: (next: ConsumptionFilingInputs) => void;
 }
+
+/** 計算結果の値の単位ごとの表示。 */
+const RESULT_VALUE_FORMATS: Record<ConsumptionResultUnit, (value: number) => string> = {
+  percent: (value) => `${value}%`,
+  yen: formatYen,
+};
 
 /**
  * 消費税申告書（一般用・本則）の作成パネル。
@@ -273,7 +279,7 @@ export const ConsumptionTaxPanel = ({
               <div className={styles.fieldLabel}>
                 <Text variant="muted">{row.label}</Text>
               </div>
-              <Text className={styles.amountValue}>{row.value}</Text>
+              <Text className={styles.amountValue}>{RESULT_VALUE_FORMATS[row.unit](row.value)}</Text>
             </Row>
             <Row gap="sm">
               <div className={styles.backingSpacer} />
