@@ -3,15 +3,14 @@ import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
 import { View } from "react-native";
 import {
-  classifyAccountsBatch, createLedgerTransaction, ImportCsvResponse, importCsvBytes,
-  readLocalFileBytes, recordClassificationFeedback, replaceYearLedgerTransactions,
-  transactionToLedgerInput,
+  classifyAccountsBatch, createLedgerTransaction, fetchLedgerTransactions, ImportCsvResponse,
+  importCsvBytes, readLocalFileBytes, recordClassificationFeedback, transactionToLedgerInput,
 } from "@/api";
 import { AlertBox, AppButton, AppText, Card, ScreenContainer, SelectField } from "@/components";
 import { useAppState } from "@/state/AppContext";
 import { formatDate, formatYen } from "@/utils";
 import { MappingSummaryCard } from "../MappingSummaryCard";
-import { toInput } from "../../ledger/options";
+import { planSampleRegistration, SampleRegistrationPlan } from "./ImportScreen.utils";
 
 const INCOME_TYPE_LABELS: Record<string, string> = { business: "事業", real_estate: "不動産", other: "その他" };
 const SOURCE_LABELS: Record<string, string> = { generated: "生成ルール", systemone: "AI判定", rules: "キーワードルール", none: "判定なし" };
@@ -20,7 +19,7 @@ interface Suggestion { index: number; account: string; source: string; confidenc
 
 /** CSV取込画面。ファイル選択→自動マッピング→科目判定→帳簿登録までを行う。 */
 export function ImportScreen() {
-  const { ledgerRows, reloadLedger } = useAppState();
+  const { reloadLedger } = useAppState();
   const [result, setResult] = useState<ImportCsvResponse | null>(null);
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +27,7 @@ export function ImportScreen() {
   const [using, setUsing] = useState(false);
   const [used, setUsed] = useState(false);
   const [sampleBusy, setSampleBusy] = useState(false);
-  const [sampleDone, setSampleDone] = useState(false);
+  const [sampleResult, setSampleResult] = useState<SampleRegistrationPlan | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const [judging, setJudging] = useState(false);
   const [classified, setClassified] = useState(false);
@@ -73,21 +72,23 @@ export function ImportScreen() {
   };
 
   const handleLoadSample = async () => {
-    if (sampleBusy) return;
+    if (sampleBusy || sampleResult) return;
     setSampleBusy(true); setError(null);
     try {
       const sample = sampleTransactions();
-      const sampleYears = [...new Set(sample.map((tx) => tx.year))];
-      for (const sampleYear of sampleYears) {
-        const existing = (ledgerRows ?? []).filter((r) => r.fiscal_year === sampleYear).map(toInput);
-        const inputs = [
-          ...existing,
-          ...sample.filter((tx) => tx.year === sampleYear).map(transactionToLedgerInput),
-        ];
-        await replaceYearLedgerTransactions(sampleYear, inputs);
+      const yearsWithRows = new Set<number>();
+      for (const sampleYear of new Set(sample.map((tx) => tx.year))) {
+        // 画面が持つ帳簿は古い可能性があるので、追加の判断はサーバーの帳簿で行う
+        const rows = await fetchLedgerTransactions(sampleYear);
+        if (rows === null) throw new Error("帳簿データベースに接続できません。");
+        if (rows.length > 0) yearsWithRows.add(sampleYear);
+      }
+      const plan = planSampleRegistration(sample, yearsWithRows);
+      for (const tx of plan.register) {
+        await createLedgerTransaction(transactionToLedgerInput(tx));
       }
       await reloadLedger();
-      setSampleDone(true);
+      setSampleResult(plan);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setSampleBusy(false); }
@@ -140,9 +141,20 @@ export function ImportScreen() {
         </AppText>
         <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
           <AppButton label={loading ? "取込中…" : "CSVファイルを選ぶ"} loading={loading} onPress={() => void handlePick()} />
-          <AppButton label="サンプルデータを読み込む" variant="ghost" loading={sampleBusy} onPress={() => void handleLoadSample()} />
+          <AppButton
+            label="サンプルデータを読み込む"
+            variant="ghost"
+            loading={sampleBusy}
+            disabled={sampleResult !== null}
+            onPress={() => void handleLoadSample()}
+          />
         </View>
-        {sampleDone ? <AlertBox tone="success" message="サンプルデータを帳簿に登録しました。" /> : null}
+        {sampleResult ? (
+          <AlertBox
+            tone={sampleResult.register.length > 0 ? "success" : "info"}
+            message={sampleResultMessage(sampleResult)}
+          />
+        ) : null}
       </Card>
 
       {error ? <AlertBox tone="error" message={`取込エラー: ${error}`} /> : null}
@@ -200,4 +212,13 @@ export function ImportScreen() {
       ) : null}
     </ScreenContainer>
   );
+}
+
+function sampleResultMessage({ register, skippedYears }: SampleRegistrationPlan): string {
+  const skipped = skippedYears.map((year) => `${year}年分`).join("・");
+  if (register.length === 0) {
+    return `${skipped}は帳簿に取引があるため、サンプルデータは追加していません。`;
+  }
+  if (skippedYears.length === 0) return "サンプルデータを帳簿に登録しました。";
+  return `サンプルデータを帳簿に登録しました。${skipped}は帳簿に取引があるため追加していません。`;
 }
