@@ -8,7 +8,7 @@
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { authRequired } from "../lib/tenantContext";
 import { AuthConfigResponseSchema } from "../schemas/auth";
-import { mailConfigured } from "../services/email/mailer";
+import { mailConfigured } from "../gateways/mailGateway";
 import { oauthConfigured } from "./authOAuth";
 
 export const authConfigRoute = createRoute({

@@ -25,7 +25,7 @@ import {
   RegisterRequestSchema,
   TotpChallengeResponseSchema,
 } from "../schemas/auth";
-import { sendMail } from "../services/email/mailer";
+import { sendMail } from "../gateways/mailGateway";
 import { issueSession, requestSessionToken, requireAuthDb, SESSION_COOKIE } from "./authSession";
 
 export const registerRoute = createRoute({

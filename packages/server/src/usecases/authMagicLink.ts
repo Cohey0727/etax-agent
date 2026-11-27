@@ -2,7 +2,7 @@
  * authMagicLink.ts — メールリンクによるログイン（usecases）。
  * リクエストでは登録の有無を明かさず常に同じ応答を返す。リンクの有効期限は
  * 15分・1回限り。未登録のメールアドレスなら、消費時にパスワードなしの
- * ユーザーを作る（パスワードレス登録）。送信は Resend（services/email）。
+ * ユーザーを作る（パスワードレス登録）。送信は Resend（gateways/mailGateway）。
  * リンクの宛先は設定済みの公開オリジン（ETAX_PUBLIC_URL）だけで組み立てる。
  * Host / Origin ヘッダは汚染され得るため使わない。未設定なら
  * 安全なリンクを作れないので送信自体をしない。
@@ -26,7 +26,7 @@ import {
   MagicLinkRequestSchema,
   TotpChallengeResponseSchema,
 } from "../schemas/auth";
-import { sendMail } from "../services/email/mailer";
+import { sendMail } from "../gateways/mailGateway";
 import { issueSession, requireAuthDb } from "./authSession";
 
 /** 同じメールアドレスへのリンク送信の上限（宛先へのメール爆撃を止める）。 */
