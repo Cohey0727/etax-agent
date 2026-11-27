@@ -4,15 +4,10 @@
  * 指定年の取引を帳簿画面と同じ並びで PDF 化して返す。生成は services/pdf。
  * 日本語フォントがサーバーに配置されていない場合は 503 で配置方法を案内する。
  */
-import { createRoute, RouteHandler } from "@hono/zod-openapi";
+import { createRoute, RouteHandler, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { z } from "@hono/zod-openapi";
 import { requireDb } from "../lib/errors";
-import {
-  effectiveFiscalYear,
-  listTransactionRows,
-  transactionToApi,
-} from "../repositories/transactionRepository";
+import { listTransactionRows, transactionToApi } from "../repositories/transactionRepository";
 import { ErrorSchema } from "../schemas/common";
 import { LedgerPdfQuerySchema } from "../schemas/transaction";
 import { buildLedgerPdf } from "../services/pdf/buildLedgerPdf";
@@ -44,8 +39,8 @@ export const exportLedgerPdfRoute = createRoute({
 export const exportLedgerPdfHandler: RouteHandler<typeof exportLedgerPdfRoute> = async (c) => {
   const db = requireDb();
   const { year } = c.req.valid("query");
-  const rows = await listTransactionRows(db);
-  const yearRows = rows.filter((r) => effectiveFiscalYear(r) === year).map(transactionToApi);
+  // 対象年の絞り込みは割り当て年度で、SQL 側で行う（日付の年とは限らない）。
+  const yearRows = (await listTransactionRows(db, undefined, year)).map(transactionToApi);
   const fontBytes = await loadJapaneseFont();
   if (!fontBytes) {
     throw new HTTPException(503, {

@@ -15,6 +15,11 @@ export const ErrorSchema = z
 
 export type ErrorResponse = z.infer<typeof ErrorSchema>;
 
+/** 削除・取り外しなど、結果を文言だけで返す操作の応答。 */
+export const MessageResponseSchema = z
+  .object({ message: z.string() })
+  .openapi("MessageResponse");
+
 /** 税務パラメータを定義している年分。所得税額の計算と申告データの出力はこの年分だけを受ける。 */
 export const TaxYearSchema = z
   .number()

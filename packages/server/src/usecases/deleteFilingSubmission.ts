@@ -8,14 +8,9 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { requireDb } from "../lib/errors";
-import { ErrorSchema } from "../schemas/common";
-import {
-  DeleteFilingSubmissionResponseSchema,
-  FilingSubmissionKindParamSchema,
-} from "../schemas/filingSubmission";
-import {
-  deleteFilingSubmissionRecord,
-} from "../services/filingSubmission/filingSubmissionRecords";
+import { ErrorSchema, MessageResponseSchema } from "../schemas/common";
+import { FilingSubmissionKindParamSchema } from "../schemas/filingSubmission";
+import { deleteFilingSubmissionRecord } from "../services/filingSubmission/filingSubmissionRecords";
 
 export const deleteFilingSubmissionRoute = createRoute({
   method: "delete",
@@ -26,7 +21,7 @@ export const deleteFilingSubmissionRoute = createRoute({
   request: { params: FilingSubmissionKindParamSchema },
   responses: {
     200: {
-      content: { "application/json": { schema: DeleteFilingSubmissionResponseSchema } },
+      content: { "application/json": { schema: MessageResponseSchema } },
       description: "削除完了",
     },
     400: {

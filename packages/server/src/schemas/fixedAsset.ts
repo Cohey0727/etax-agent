@@ -35,10 +35,6 @@ export const FixedAssetIdParamSchema = z
   .object({ id: IdSchema })
   .openapi("FixedAssetIdParam");
 
-export const MessageResponseSchema = z
-  .object({ message: z.string() })
-  .openapi("MessageResponse");
-
 export const CreateFixedAssetRequestSchema = z
   .object({
     name: z.string().min(1),

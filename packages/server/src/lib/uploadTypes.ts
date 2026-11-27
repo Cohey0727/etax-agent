@@ -2,7 +2,7 @@
  * uploadTypes.ts — アップロード可能な Content-Type のホワイトリスト（lib）。
  *
  * 領収書アップロードは画像のみ。presign のスキーマ（schemas/file の
- * UploadableImageMimeTypeSchema）と同じ値を使うこと。
+ * UploadableImageMimeTypeSchema）と領収書の解析もこのリストを使う。
  * 任意のタイプを許可すると、アップロードした HTML/SVG が自オリジンから
  * text/html で配信される Stored XSS になるため、受け入れ時と配信時の
  * 両方でこのリストに寄せる（Issue #7）。

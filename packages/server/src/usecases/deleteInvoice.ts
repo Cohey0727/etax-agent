@@ -6,8 +6,7 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { requireDb } from "../lib/errors";
-import { ErrorSchema } from "../schemas/common";
-import { MessageResponseSchema } from "../schemas/fixedAsset";
+import { ErrorSchema, MessageResponseSchema } from "../schemas/common";
 import { InvoiceIdParamSchema } from "../schemas/invoice";
 import { deleteInvoiceDocument } from "../services/invoice/invoiceDocuments";
 

@@ -86,12 +86,6 @@ export const AttachFilingReceiptRequestSchema = z
   })
   .openapi("AttachFilingReceiptRequest");
 
-export const DeleteFilingSubmissionResponseSchema = z
-  .object({
-    message: z.string(),
-  })
-  .openapi("DeleteFilingSubmissionResponse");
-
 export type AttachFilingReceiptRequest = z.infer<typeof AttachFilingReceiptRequestSchema>;
 
 /** 提出の記録の変更履歴1件（登録・更新・削除の記録）。 */

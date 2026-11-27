@@ -11,11 +11,8 @@ import { loadStorageConfig } from "../lib/config";
 import { requireDb } from "../lib/errors";
 import { getFixedAssetRow } from "../repositories/fixedAssetRepository";
 import { deleteFixedAssetImageRow } from "../repositories/fixedAssetImageRepository";
-import { ErrorSchema } from "../schemas/common";
-import {
-  FixedAssetImageParamsSchema,
-  MessageResponseSchema,
-} from "../schemas/fixedAsset";
+import { ErrorSchema, MessageResponseSchema } from "../schemas/common";
+import { FixedAssetImageParamsSchema } from "../schemas/fixedAsset";
 
 export const detachFixedAssetImageRoute = createRoute({
   method: "delete",

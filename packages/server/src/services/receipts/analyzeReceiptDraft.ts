@@ -28,6 +28,7 @@ import {
   loadSystemOneConfig,
 } from "../../lib/config";
 import { Db } from "../../lib/db";
+import { ALLOWED_UPLOAD_CONTENT_TYPES } from "../../lib/uploadTypes";
 import { loadClassificationHistory } from "../../repositories/classificationHistoryRepository";
 import { upsertReceiptExtraction } from "../../repositories/receiptRepository";
 import { AnalyzeReceiptResponse } from "../../schemas/receipt";
@@ -51,13 +52,6 @@ export interface AnalyzeReceiptDraftInput {
   mimeType?: string;
 }
 
-const RECEIPT_MIME_TYPES: readonly string[] = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-];
-
 /** リクエストから解析対象の画像（Base64 + MIME）を解決する。 */
 async function resolveReceiptImage(input: AnalyzeReceiptDraftInput): Promise<ReceiptImage> {
   if (input.fileId && input.imageBase64) {
@@ -68,7 +62,7 @@ async function resolveReceiptImage(input: AnalyzeReceiptDraftInput): Promise<Rec
     try {
       const storage = createStorageClient(storageConfig);
       const downloaded = await storage.download(receiptObjectKey(input.fileId));
-      if (!RECEIPT_MIME_TYPES.includes(downloaded.mimeType)) {
+      if (!(ALLOWED_UPLOAD_CONTENT_TYPES as readonly string[]).includes(downloaded.mimeType)) {
         throw new ReceiptAnalysisError(
           400,
           `対応していない画像形式です: ${downloaded.mimeType}`,

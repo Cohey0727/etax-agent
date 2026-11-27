@@ -2,14 +2,10 @@
  * file.ts — ファイルアップロード（署名付きURL発行）のスキーマ（schemas）。
  */
 import { z } from "@hono/zod-openapi";
+import { ALLOWED_UPLOAD_CONTENT_TYPES } from "../lib/uploadTypes";
 
-/** アップロードを受け付ける画像形式（領収書の想定）。 */
-export const UploadableImageMimeTypeSchema = z.enum([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
+/** アップロードを受け付ける画像形式（領収書・固定資産の想定）。 */
+export const UploadableImageMimeTypeSchema = z.enum(ALLOWED_UPLOAD_CONTENT_TYPES);
 
 export const PresignUploadFileRequestSchema = z
   .object({

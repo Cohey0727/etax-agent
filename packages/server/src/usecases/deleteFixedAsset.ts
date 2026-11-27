@@ -9,8 +9,8 @@ import { loadStorageConfig } from "../lib/config";
 import { requireDb } from "../lib/errors";
 import { deleteFixedAssetRow } from "../repositories/fixedAssetRepository";
 import { listFixedAssetImageRows } from "../repositories/fixedAssetImageRepository";
-import { ErrorSchema } from "../schemas/common";
-import { FixedAssetIdParamSchema, MessageResponseSchema } from "../schemas/fixedAsset";
+import { ErrorSchema, MessageResponseSchema } from "../schemas/common";
+import { FixedAssetIdParamSchema } from "../schemas/fixedAsset";
 
 export const deleteFixedAssetRoute = createRoute({
   method: "delete",
