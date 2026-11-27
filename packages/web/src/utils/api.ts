@@ -158,7 +158,13 @@ async function uploadViaPresignedUrl(file: File, purpose: UploadPurpose): Promis
   return presign.fileId;
 }
 
-/** サーバーが生成したファイルを取得して保存する。 */
+const DOWNLOAD_URL_LIFETIME_MS = 30_000;
+
+/**
+ * サーバーが生成したファイルを取得して保存する。リンクは文書に付けてから押し
+ * （文書に無いリンクの click を無視するブラウザがある）、Blob の URL は保存が
+ * 始まるのを待ってから失効させる（押した直後に失効させると保存に失敗するブラウザがある）。
+ */
 async function downloadFile(path: string, filename: string): Promise<void> {
   const resp = await apiFetch(path);
   if (!resp.ok) {
@@ -170,8 +176,10 @@ async function downloadFile(path: string, filename: string): Promise<void> {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  document.body.append(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_LIFETIME_MS);
 }
 
 /** CSVファイルを生バイトのまま送る（Shift_JISのデコードはサーバー側）。 */
