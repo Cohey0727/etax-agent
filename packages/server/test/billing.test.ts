@@ -1,10 +1,11 @@
 /**
- * billing.test.ts — 課金基盤の検証: Webhook 署名検証と課金状態リポジトリ。
+ * billing.test.ts — 課金基盤の検証: Webhook 署名検証、Checkout の応答検証、
+ * 課金状態リポジトリ。
  */
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { createTestDb } from "./testDb";
 import { createHmac } from "node:crypto";
-import { verifyWebhookSignature } from "../src/gateways/stripeGateway";
+import { createCheckoutSession, verifyWebhookSignature } from "../src/gateways/stripeGateway";
 import {
   getSubscriptionRow,
   hasActivePlan,
@@ -51,5 +52,46 @@ describe("課金状態リポジトリ", () => {
       // 解約しても顧客IDは保持される（再契約時の再利用）
       expect((await getSubscriptionRow(db))?.stripeCustomerId).toBe("cus_123");
     });
+  });
+});
+
+describe("createCheckoutSession の応答検証", () => {
+  async function withStripeResponse<T>(body: unknown, run: () => Promise<T>): Promise<T> {
+    const saved = {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
+    };
+    process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
+    process.env.STRIPE_PRICE_ID = "price_dummy";
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(Response.json(body));
+    try {
+      return await run();
+    } finally {
+      fetchSpy.mockRestore();
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  }
+
+  const input = {
+    userId: 1,
+    successUrl: "https://app.example/ok",
+    cancelUrl: "https://app.example/cancel",
+  };
+
+  test("決済ページの URL が返れば、その id と url を返す", async () => {
+    const session = await withStripeResponse(
+      { id: "cs_test_1", url: "https://checkout.stripe.com/c/pay/cs_test_1", object: "checkout.session" },
+      () => createCheckoutSession(input),
+    );
+    expect(session).toEqual({ id: "cs_test_1", url: "https://checkout.stripe.com/c/pay/cs_test_1" });
+  });
+
+  test("url の無い応答は失敗にする（\"undefined\" を決済ページとして返さない）", async () => {
+    await expect(
+      withStripeResponse({ id: "cs_test_2" }, () => createCheckoutSession(input)),
+    ).rejects.toThrow();
   });
 });

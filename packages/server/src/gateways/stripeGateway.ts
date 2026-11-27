@@ -1,13 +1,14 @@
 /**
  * stripeGateway.ts — Stripe API への接続（gateways）。
  *
- * 公式 SDK は導入せず、REST API（フォームエンコード）を fetch で叩く。
+ * REST API（フォームエンコード）を fetch で呼び、使う応答は zod で検証する。
  * 料金は月額490円の Price（Stripe ダッシュボードで作成し、その ID を
  * 環境変数 STRIPE_PRICE_ID で渡す）。秘密鍵は STRIPE_SECRET_KEY、
  * Webhook 署名シークレットは STRIPE_WEBHOOK_SECRET。
  * いずれも未設定なら課金は無効（billingEnabled() === false）。
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { z } from "@hono/zod-openapi";
 
 /** 課金が有効か（Stripe の鍵と Price が設定されているか）。 */
 export function billingEnabled(): boolean {
@@ -39,6 +40,12 @@ async function stripePost(path: string, params: URLSearchParams): Promise<Record
   return data;
 }
 
+/** Checkout セッション作成の応答（使う部分だけを検証する）。 */
+const checkoutSessionSchema = z.looseObject({
+  id: z.string().min(1),
+  url: z.string().url(),
+});
+
 /**
  * サブスクリプション用の Checkout セッションを作り、決済ページの URL を返す。
  * 解約は期間末（Stripe 側の cancel_at_period_end 運用を基本とし、
@@ -64,8 +71,9 @@ export async function createCheckoutSession(input: {
   params.set("cancel_url", input.cancelUrl);
   if (input.customerId) params.set("customer", input.customerId);
   else if (input.customerEmail) params.set("customer_email", input.customerEmail);
-  const session = await stripePost("/checkout/sessions", params);
-  return { id: String(session.id), url: String(session.url) };
+  const parsed = checkoutSessionSchema.safeParse(await stripePost("/checkout/sessions", params));
+  if (!parsed.success) throw new Error("Stripe の応答形式が想定外です（決済ページの URL がありません）");
+  return { id: parsed.data.id, url: parsed.data.url };
 }
 
 const SIGNATURE_TOLERANCE_SEC = 300;
