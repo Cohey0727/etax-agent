@@ -48,6 +48,33 @@ export interface BreakdownEntry {
 /** 内訳を持つ控除入力のキー。 */
 export type BreakdownEntriesKey = "donations" | "socialInsurance" | "mutualAid" | "medical";
 
+/** 所得税で、申告納税額を求めるときに差し引く納付済みの税額（提出パネルの手入力）。 */
+export interface IncomeTaxPaymentInputs {
+  /**
+   * 源泉徴収税額。配当・株式等譲渡の源泉徴収税額は各所得の入力で持ち、
+   * ここには含めない。
+   */
+  withholdingTax: number;
+  /** 予定納税額 */
+  prepaidTax: number;
+}
+
+/** 消費税申告書の、帳簿の外にある数字の手入力。 */
+export interface ConsumptionFilingInputs {
+  /** 申告の種類（1 = 確定、3 = 修正確定） */
+  filingKind: 1 | 3;
+  /** 基準期間の課税売上高（千円）。null は帳簿から求めた値を使う */
+  basePeriodSalesThousands: number | null;
+  /** 中間納付税額（国税） */
+  interimNational: number;
+  /** 中間納付譲渡割額（地方） */
+  interimLocal: number;
+  /** 既確定税額（国税）。修正確定のときだけ使う */
+  originalNational: number;
+  /** 既確定譲渡割額（地方）。修正確定のときだけ使う */
+  originalLocal: number;
+}
+
 export interface DeductionState {
   deductions: DeductionInputs;
   taxCredits: TaxCreditInputs;
@@ -77,6 +104,10 @@ export interface DeductionState {
    * 変換する。未入力は null。
    */
   balanceSheet: XtxBalanceSheetInput | null;
+  /** 所得税の源泉徴収税額・予定納税額 */
+  incomeTaxPayments: IncomeTaxPaymentInputs;
+  /** 消費税申告書の手入力 */
+  consumptionFiling: ConsumptionFilingInputs;
 }
 
 /** エージェント（set_deductions ツール）から適用される申告入力の変更分。 */
@@ -157,12 +188,26 @@ export function freshDeductionState(): DeductionState {
     mutualAidEntries: [],
     medicalEntries: [],
     balanceSheet: null,
+    incomeTaxPayments: { withholdingTax: 0, prepaidTax: 0 },
+    consumptionFiling: {
+      filingKind: 1,
+      basePeriodSalesThousands: null,
+      interimNational: 0,
+      interimLocal: 0,
+      originalNational: 0,
+      originalLocal: 0,
+    },
   };
 }
 
-/** 有限の数値なら整数に切り捨てて返し、数値でない項目は 0 にする。 */
+/** 有限の数値なら整数に切り捨てて返し、それ以外は null。 */
+function finiteInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
+}
+
+/** 数値でない項目は 0 にする。 */
 function integerOrZero(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : 0;
+  return finiteInteger(value) ?? 0;
 }
 
 function asRecord(raw: unknown): Record<string, unknown> | null {
@@ -209,6 +254,26 @@ function parseBreakdownEntries(raw: unknown): BreakdownEntry[] {
   return entries;
 }
 
+function parseIncomeTaxPayments(raw: unknown): IncomeTaxPaymentInputs {
+  const p = asRecord(raw);
+  return {
+    withholdingTax: integerOrZero(p?.withholdingTax),
+    prepaidTax: integerOrZero(p?.prepaidTax),
+  };
+}
+
+function parseConsumptionFiling(raw: unknown): ConsumptionFilingInputs {
+  const c = asRecord(raw);
+  return {
+    filingKind: c?.filingKind === 3 ? 3 : 1,
+    basePeriodSalesThousands: finiteInteger(c?.basePeriodSalesThousands),
+    interimNational: integerOrZero(c?.interimNational),
+    interimLocal: integerOrZero(c?.interimLocal),
+    originalNational: integerOrZero(c?.originalNational),
+    originalLocal: integerOrZero(c?.originalLocal),
+  };
+}
+
 /** パース済みの保存値を検証して DeductionState にする。欠けた項目は空の入力で補う。 */
 export function parseDeductionState(parsed: Partial<DeductionState>): DeductionState {
   const base = freshDeductionState();
@@ -240,6 +305,8 @@ export function parseDeductionState(parsed: Partial<DeductionState>): DeductionS
     mutualAidEntries: parseBreakdownEntries(parsed.mutualAidEntries),
     medicalEntries: parseBreakdownEntries(parsed.medicalEntries),
     balanceSheet: normalizeBalanceSheetInput(parsed.balanceSheet),
+    incomeTaxPayments: parseIncomeTaxPayments(parsed.incomeTaxPayments),
+    consumptionFiling: parseConsumptionFiling(parsed.consumptionFiling),
   };
 }
 
