@@ -15,6 +15,7 @@ export type LineIconName =
   | "image"
   | "import"
   | "menu"
+  | "plus"
   | "receipt"
   | "send"
   | "settings"
@@ -105,6 +106,12 @@ const ICON_PATHS: Record<LineIconName, ReactNode> = {
       <Path d="M4 6h16" />
       <Path d="M4 12h16" />
       <Path d="M4 18h16" />
+    </>
+  ),
+  plus: (
+    <>
+      <Path d="M12 5v14" />
+      <Path d="M5 12h14" />
     </>
   ),
   receipt: (

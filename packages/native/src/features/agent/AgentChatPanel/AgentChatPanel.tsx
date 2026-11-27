@@ -53,6 +53,7 @@ export function AgentChatPanel({
   const [viewing, setViewing] = useState<ChatSession | null>(null);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [attachOpen, setAttachOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scrollView, setScrollView] = useState<{ scrollToEnd: (options?: { animated?: boolean }) => void } | null>(null);
@@ -248,26 +249,55 @@ export function AgentChatPanel({
               ))}
             </View>
           ) : null}
+          {attachOpen ? (
+            <View style={styles.attachRow}>
+              <BouncePressable
+                accessibilityRole="button"
+                accessibilityLabel="画像を添付"
+                disabled={loading}
+                onPress={() => {
+                  setAttachOpen(false);
+                  void addAttachments(pickImageAttachments);
+                }}
+                style={styles.attachOption}
+                pressScale={0.95}
+              >
+                <LineIcon name="image" size={18} color={colors.accent} />
+                <AppText size="sm" weight="semibold" tone="accent">
+                  画像
+                </AppText>
+              </BouncePressable>
+              <BouncePressable
+                accessibilityRole="button"
+                accessibilityLabel="ファイル（PDF/CSV）を添付"
+                disabled={loading}
+                onPress={() => {
+                  setAttachOpen(false);
+                  void addAttachments(pickDocumentAttachments);
+                }}
+                style={styles.attachOption}
+                pressScale={0.95}
+              >
+                <LineIcon name="file" size={18} color={colors.accent} />
+                <AppText size="sm" weight="semibold" tone="accent">
+                  ファイル
+                </AppText>
+              </BouncePressable>
+            </View>
+          ) : null}
           <View style={styles.composer}>
             <BouncePressable
               accessibilityRole="button"
-              accessibilityLabel="画像を添付"
+              accessibilityLabel={attachOpen ? "添付メニューを閉じる" : "添付メニューを開く"}
+              aria-expanded={attachOpen}
               disabled={loading}
-              onPress={() => void addAttachments(pickImageAttachments)}
-              style={styles.attachButton}
+              onPress={() => setAttachOpen((prev) => !prev)}
+              style={[styles.attachButton, attachOpen ? styles.attachButtonOpen : null]}
               pressScale={0.9}
             >
-              <LineIcon name="image" size={20} color={colors.muted} />
-            </BouncePressable>
-            <BouncePressable
-              accessibilityRole="button"
-              accessibilityLabel="ファイル（PDF/CSV）を添付"
-              disabled={loading}
-              onPress={() => void addAttachments(pickDocumentAttachments)}
-              style={styles.attachButton}
-              pressScale={0.9}
-            >
-              <LineIcon name="file" size={20} color={colors.muted} />
+              <View style={attachOpen ? styles.plusOpen : undefined}>
+                <LineIcon name="plus" size={20} color={attachOpen ? colors.accent : colors.muted} />
+              </View>
             </BouncePressable>
             <TextInput
               accessibilityLabel="メッセージ"
@@ -299,7 +329,7 @@ export function AgentChatPanel({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: space.md, gap: space.sm },
+  root: { flex: 1, paddingVertical: space.md, paddingHorizontal: 0, gap: space.sm },
   headerRow: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
   logContent: { gap: space.sm, paddingBottom: space.md },
   sessionItem: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 14, padding: space.sm, gap: 2 },
@@ -323,6 +353,18 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+  },
+  attachButtonOpen: { backgroundColor: colors.accentSoft },
+  plusOpen: { transform: [{ rotate: "45deg" }] },
+  attachRow: { flexDirection: "row", gap: space.xs },
+  attachOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
   },
   input: {
     flex: 1,
