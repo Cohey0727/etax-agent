@@ -85,14 +85,6 @@ export async function consumeMagicLink(token: string): Promise<LoginResponse> {
   );
 }
 
-/** 登録時の確認メールのトークンを消費してメール確認とログインを行う。 */
-export async function verifyEmailAccount(token: string): Promise<LoginResponse> {
-  return apiJson<LoginResponse>(
-    "/api/auth/verify-email",
-    { method: "POST", body: { token }, anonymous: true },
-  );
-}
-
 /** TOTP 設定の開始（秘密と otpauth URL を受け取る）。 */
 export async function setupTotp(): Promise<{ otpauth_url: string; secret: string }> {
   return apiJson("/api/auth/totp/setup", { method: "POST", body: {} });

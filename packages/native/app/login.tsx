@@ -8,7 +8,6 @@ import {
   loginWithTotp,
   registerAccount,
   requestMagicLink,
-  verifyEmailAccount,
 } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
 import { AlertBox } from "@/components/AlertBox";
@@ -44,8 +43,6 @@ function errorMessage(e: unknown, fallback: string): string {
 export default function LoginScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
-    magic?: string;
-    verify?: string;
     totp_challenge?: string;
     auth_error?: string;
   }>();
@@ -79,7 +76,7 @@ export default function LoginScreen() {
     }
   };
 
-  // ディープリンクのパラメータ（メールリンク・確認リンク・OAuth戻り）を一度だけ処理する
+  // OAuth の戻り（auth-callback から渡る TOTP 要求・失敗）を一度だけ処理する
   useEffect(() => {
     if (consumedRef.current) return;
     consumedRef.current = true;
@@ -90,25 +87,6 @@ export default function LoginScreen() {
     if (params.totp_challenge) {
       setChallenge(params.totp_challenge);
       setMode("totp");
-      return;
-    }
-    if (params.verify) {
-      setBusy(true);
-      verifyEmailAccount(params.verify)
-        .then((res) => acceptLogin(res))
-        .catch(() => setError("確認リンクが無効か期限切れです。お手数ですが、もう一度登録してください。"))
-        .finally(() => setBusy(false));
-      return;
-    }
-    if (params.magic) {
-      setBusy(true);
-      consumeMagicLink(params.magic)
-        .then((res) => acceptLogin(res))
-        .catch(() => {
-          setError("ログインリンクが無効か期限切れです。新しいリンクを送ってください。");
-          setMode("magic");
-        })
-        .finally(() => setBusy(false));
     }
     // 初回マウント時のパラメータだけを対象にする
     // eslint-disable-next-line react-hooks/exhaustive-deps
