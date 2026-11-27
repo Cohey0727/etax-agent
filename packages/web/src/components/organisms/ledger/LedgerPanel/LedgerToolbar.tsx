@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Card, Col, Icon, Input, Row, Text } from "@components/atoms";
 import { AppView } from "@types";
 import { FilterChip } from "./FilterChip";
+import { FilterChipInput } from "./FilterChipInput";
 import {
   FILTER_FIELD_LABELS,
   FILTER_FIELDS,
@@ -178,13 +179,14 @@ export const LedgerToolbar = ({
       <Row gap="sm" align="center" justify="spaceBetween" wrap>
         <Row gap="sm" align="center" wrap>
           {periodFilter ? (
-            <FilterChip
-              bare
-              filter={periodFilter}
-              years={yearOptions}
-              categories={categoryOptions}
-              onChange={onFilterChange}
-            />
+            <div className={styles.filterBare}>
+              <FilterChipInput
+                filter={periodFilter}
+                years={yearOptions}
+                categories={categoryOptions}
+                onChange={onFilterChange}
+              />
+            </div>
           ) : null}
           <div className={styles.searchWrap}>
             <span className={styles.searchIcon}>
