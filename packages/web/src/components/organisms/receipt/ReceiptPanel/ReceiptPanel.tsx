@@ -5,10 +5,11 @@ import { AlertBox } from "@components/molecules";
 import { AccountClassification, ClassificationSource } from "@types";
 import { analyzeReceiptImage, recordClassificationFeedback } from "@utils";
 import styles from "./ReceiptPanel.css";
+import { registerReceiptTransaction } from "./ReceiptPanel.utils";
 
 export interface ReceiptPanelProps {
-  transactions: Transaction[];
-  onUseTransactions: (transactions: Transaction[]) => void;
+  /** 帳簿へ登録した取引を画面の取引へ加える。 */
+  onRegistered: (transaction: Transaction) => void;
 }
 
 const sourceLabels = {
@@ -24,14 +25,17 @@ interface ReceiptDraft {
   description: string;
   account: string;
   classification: AccountClassification;
+  /** 証憑台帳に記録された証憑。登録した取引へ紐付ける（Base64 で解析した場合は null）。 */
+  fileId: string | null;
 }
 
-export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelProps) => {
+export const ReceiptPanel = ({ onRegistered }: ReceiptPanelProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [draft, setDraft] = useState<ReceiptDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [added, setAdded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [added, setAdded] = useState<{ linked: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // 撮影専用の受け口。capture を付けるとスマホではカメラが直接開く
   // （PCでは通常のファイル選択として振る舞う）。
@@ -46,11 +50,11 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
   const handleFile = async (file: File) => {
     setLoading(true);
     setError(null);
-    setAdded(false);
+    setAdded(null);
     setDraft(null);
     setPreviewUrl(URL.createObjectURL(file));
     try {
-      const res = await analyzeReceiptImage(file);
+      const { result: res, fileId } = await analyzeReceiptImage(file);
       const description = [res.payee, res.description].filter(Boolean).join(" ");
       setDraft({
         date: res.date ?? "",
@@ -58,6 +62,7 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
         description,
         account: res.classification.account,
         classification: res.classification,
+        fileId,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -66,8 +71,8 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
     }
   };
 
-  const handleAdd = () => {
-    if (!draft) return;
+  const handleAdd = async () => {
+    if (!draft || saving) return;
     const amount = Number(draft.amount);
     if (!draft.date || !Number.isFinite(amount) || amount === 0) {
       setError("日付と金額を確認してください");
@@ -84,10 +89,20 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
       // 領収書は仕入・経費なので、既定は課税仕入10%（帳簿で直せる）
       tax_category: "課対仕入10%",
     };
-    onUseTransactions([...transactions, tx]);
-    // 確定した科目は学習履歴に記録し、生成ルールとプロンプトの材料にする
-    void recordClassificationFeedback(draft.description, draft.account);
-    setAdded(true);
+    setSaving(true);
+    setError(null);
+    try {
+      const registered = await registerReceiptTransaction(tx, draft.fileId);
+      onRegistered(registered.transaction);
+      // 確定した科目は学習履歴に記録し、生成ルールとプロンプトの材料にする
+      void recordClassificationFeedback(draft.description, draft.account);
+      setAdded({ linked: registered.linked });
+      setDraft(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -146,6 +161,7 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
         <Col gap="sm">
           <AlertBox variant="notice">
             帳簿に追加しました。ダッシュボードで集計に反映されています。科目は学習履歴に記録しました。
+            {added.linked ? "証憑を取引に紐付けました。" : ""}
           </AlertBox>
           <Row gap="sm" align="center">
             <Button size="md" onClick={() => cameraRef.current?.click()}>
@@ -207,8 +223,14 @@ export const ReceiptPanel = ({ transactions, onUseTransactions }: ReceiptPanelPr
                   .join("、")}`}
             </Text>
             <Row gap="sm" align="center" wrap>
-              <Button size="md" className={styles.addButton} onClick={handleAdd}>
-                帳簿に追加
+              <Button
+                size="md"
+                className={styles.addButton}
+                disabled={saving}
+                disabledReason="登録中です"
+                onClick={() => void handleAdd()}
+              >
+                {saving ? "登録中…" : "帳簿に追加"}
               </Button>
               <Text variant="caption">支出として登録します（金額はマイナスで計上）。</Text>
             </Row>

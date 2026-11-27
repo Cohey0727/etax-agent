@@ -67,12 +67,11 @@ export function useLedgerSync(options: {
   };
 
   /**
-   * 領収書からの登録専用経路。取込と違い、登録しても画面は遷移させない
-   * （その場で続けて撮影・登録できるようにする。スマホの撮影導線の要）。
+   * 領収書から登録した取引（帳簿への保存は登録側で済んでいる）を画面へ加える。
+   * 取込と違い、登録しても画面は遷移させない（その場で続けて撮影・登録できるようにする）。
    */
-  const handleRegisterTransactions = (next: Transaction[]) => {
-    setTransactions(next);
-    saveTransactionsByYear(next);
+  const handleRegisterTransaction = (tx: Transaction) => {
+    setTransactions((current) => [...current, tx]);
   };
 
   // CSV取込（DB保存済み）の「ダッシュボードで使う」専用経路。
@@ -143,7 +142,7 @@ export function useLedgerSync(options: {
     dataSource,
     ledgerLoading,
     handleUseImported,
-    handleRegisterTransactions,
+    handleRegisterTransaction,
     handleUseCsvImported,
     handleSyncTransactions,
     handleLoadSample,
