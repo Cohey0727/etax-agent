@@ -8,6 +8,7 @@ import {
 } from "@etax/shared";
 import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { formatYen } from "@utils";
+import { removeAgricultureExpense, setAgricultureExpense } from "./AgriculturePanel.utils";
 import { AmountField, ResultRow, TextField, toAmount } from "./fields";
 import styles from "./AgriculturePanel.css";
 
@@ -32,12 +33,10 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
   const [extraAmount, setExtraAmount] = useState(0);
 
   const set = (patch: Partial<AgricultureInput>) => onChange({ ...agriculture, ...patch });
-  const setExpense = (category: string, value: number) => {
-    const expenseTotals = { ...agriculture.expenseTotals };
-    if (value === 0) delete expenseTotals[category];
-    else expenseTotals[category] = value;
-    set({ expenseTotals });
-  };
+  const setExpense = (category: string, value: number) =>
+    set({ expenseTotals: setAgricultureExpense(agriculture.expenseTotals, category, value) });
+  const removeExpense = (category: string) =>
+    set({ expenseTotals: removeAgricultureExpense(agriculture.expenseTotals, category) });
   const extraCategories = Object.keys(agriculture.expenseTotals).filter(
     (category) => !AGRICULTURE_EXPENSE_CATEGORIES.includes(category),
   );
@@ -120,7 +119,7 @@ export const AgriculturePanel = ({ agriculture, filingType, onChange }: Agricult
               onChange={(e) => setExpense(category, toAmount(e.target.value))}
               aria-label={category}
             />
-            <Button variant="ghost" size="sm" onClick={() => setExpense(category, 0)}>
+            <Button variant="ghost" size="sm" onClick={() => removeExpense(category)}>
               削除
             </Button>
           </Row>
