@@ -24,19 +24,27 @@ export interface DashboardPanelProps {
 export function DashboardPanel({ transactions, year }: DashboardPanelProps) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const [deductionState, setDeductionState] = useState<DeductionState>(() => freshDeductionState());
+  // 取り込んだ申告入力は、取り込んだときの利用者・年度と組にして持ち、一致するときだけ使う。
+  const [loaded, setLoaded] = useState<{
+    userId: number | null;
+    year: number;
+    state: DeductionState;
+  } | null>(null);
+  const [emptyState] = useState(() => freshDeductionState());
 
   useEffect(() => {
     let cancelled = false;
     void hydrateDeductionStateFromServer(userId, year)
       .then((state) => {
-        if (!cancelled) setDeductionState(state);
+        if (!cancelled) setLoaded({ userId, year, state });
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [userId, year]);
+  const deductionState =
+    loaded !== null && loaded.userId === userId && loaded.year === year ? loaded.state : emptyState;
 
   const tx = useMemo(() => filterYear(transactions, year), [transactions, year]);
   const figures = useMemo(

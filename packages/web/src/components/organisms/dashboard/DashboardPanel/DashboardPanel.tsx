@@ -1,7 +1,10 @@
 import { dashboardFigures, DeductionState, filterYear, isAgricultureEmpty, Transaction } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
 import { Col, Text } from "@components/atoms";
-import { loadDeductionState } from "@components/organisms/filing/DeductionPanel/deductionStorage";
+import {
+  hydrateDeductionStateFromServer,
+  loadDeductionState,
+} from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { ConsumptionTaxComparison } from "../ConsumptionTaxComparison";
 import { IncomeSummary } from "../IncomeSummary";
 
@@ -13,13 +16,22 @@ export interface DashboardPanelProps {
 
 export const DashboardPanel = ({ transactions, year }: DashboardPanelProps) => {
   const tx = useMemo(() => filterYear(transactions, year), [transactions, year]);
-  // 申告の種類は納税者情報画面で管理し、保存先を共有する。年度が替わったら読み直す。
-  const [deductionState, setDeductionState] = useState<DeductionState>(() =>
-    loadDeductionState(year),
-  );
+  // 申告の種類・農業所得は申告入力（サーバーの保存値が正）から取る。サーバーから
+  // 取り込むまでは端末のキャッシュを出し、取り込んだ値はその年度のときだけ使う。
+  const [hydrated, setHydrated] = useState<{ year: number; state: DeductionState } | null>(null);
   useEffect(() => {
-    setDeductionState(loadDeductionState(year));
+    let cancelled = false;
+    void hydrateDeductionStateFromServer(year)
+      .catch(() => undefined)
+      .then(() => {
+        if (!cancelled) setHydrated({ year, state: loadDeductionState(year) });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [year]);
+  const cachedState = useMemo(() => loadDeductionState(year), [year]);
+  const deductionState = hydrated?.year === year ? hydrated.state : cachedState;
   const figures = useMemo(
     () =>
       dashboardFigures(tx, {
