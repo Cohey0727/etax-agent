@@ -22,3 +22,4 @@ export * from "./filingInputs";
 export * from "./csvClassificationEdits";
 export * from "./fixedAssetLedger";
 export * from "./dashboard";
+export * from "./trialBalanceRows";
