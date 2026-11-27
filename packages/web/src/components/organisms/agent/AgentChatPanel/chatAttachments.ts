@@ -29,6 +29,9 @@ const ATTACHMENT_KIND_BY_MIME: Record<string, AttachmentKind> = {
   "application/vnd.ms-excel": "csv",
 };
 
+// 添付の id（画面の中で一意なら足りる。crypto.randomUUID は http で開くと使えない）。
+let nextAttachmentId = 0;
+
 /** ファイル選択ダイアログの accept（CSV は拡張子でも拾う）。 */
 export const ATTACH_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,application/pdf,text/csv,.csv";
@@ -51,7 +54,8 @@ export const readAttachment = async (file: File): Promise<PendingAttachment> => 
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(`ファイルが大きすぎます（上限 10MB）: ${file.name}`);
   }
-  const id = crypto.randomUUID();
+  nextAttachmentId += 1;
+  const id = `attachment-${nextAttachmentId}`;
   if (kind === "csv") {
     return { id, name: file.name, mimeType: "text/csv", text: await file.text() };
   }
