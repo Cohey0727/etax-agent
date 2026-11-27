@@ -12,10 +12,11 @@ import {
   aggregateIncome,
   BlueDeduction,
   blueDeduction,
+  compareConsumptionMethods,
   ComputeCorrectedFiguresOptions,
   computeCorrectedFigures,
   ConsumptionMethod,
-  consumptionTax,
+  ConsumptionTaxResult,
   IncomeBreakdown,
   transactionBusinessAmount,
 } from "./taxcalc";
@@ -57,8 +58,7 @@ export interface DashboardFigures {
  * 対象年の取引（割り当て年度で絞ったもの）から、ダッシュボードの数値一式を求める。
  * 青色申告特別控除と消費税は確定申告画面と同じ computeCorrectedFigures から取る
  * （申告入力の農業所得も控除の配分に入り、消費税は年分の特例の率・課税売上割合の
- * 按分で計算する）。方式ごとの売上税額・仕入税額の内訳は、同じ入力で consumptionTax
- * を呼んで求める。
+ * 按分で計算する）。消費税の方式ごとの内訳は compareConsumptionMethods の結果を使う。
  */
 export function dashboardFigures(
   yearTransactions: Transaction[],
@@ -73,35 +73,34 @@ export function dashboardFigures(
     agriculture: corrected._detail.blue_deduction_agriculture,
     total: corrected.blue_deduction,
   };
-  const specialRate = corrected._detail.small_business_special_rate;
-  const methods: readonly ConsumptionMethod[] =
-    specialRate === null ? ["standard", "simplified"] : ["standard", "simplified", "special20"];
-  const consumption = methods.map((method) => {
-    const result = consumptionTax({
-      taxableSalesIncl: corrected.taxable_sales,
-      nontaxableSalesIncl: corrected.nontaxable_sales,
-      inputTax: corrected.input_tax_estimate,
-      method,
-      businessKind: options.businessKind,
-      specialRate: specialRate ?? undefined,
-    });
-    return {
-      method,
-      outputTax: result.outputTax,
-      inputTax: result.inputTax,
-      nationalPayable: result.nationalPayable,
-      localPayable: result.localPayable,
-      payable: result.payable,
-    };
-  });
+  const comparison = compareConsumptionMethods(yearTransactions, year, options.businessKind);
+  const methodResults: readonly [ConsumptionMethod, ConsumptionTaxResult | null][] = [
+    ["standard", comparison.standard],
+    ["simplified", comparison.simplified],
+    ["special20", comparison.special],
+  ];
+  const consumption = methodResults.flatMap(([method, result]) =>
+    result === null
+      ? []
+      : [
+          {
+            method,
+            outputTax: result.outputTax,
+            inputTax: result.inputTax,
+            nationalPayable: result.nationalPayable,
+            localPayable: result.localPayable,
+            payable: result.payable,
+          },
+        ],
+  );
   return {
     breakdown,
     blue,
     blueDeductionLimit: blueDeductionLimit(yearTransactions, options),
-    taxableSalesIncl: corrected.taxable_sales,
-    nontaxableSalesIncl: corrected.nontaxable_sales,
-    inputTaxEstimate: corrected.input_tax_estimate,
-    smallBusinessSpecialRate: specialRate,
+    taxableSalesIncl: comparison.taxableSalesIncl,
+    nontaxableSalesIncl: comparison.nontaxableSalesIncl,
+    inputTaxEstimate: comparison.inputTaxEstimate,
+    smallBusinessSpecialRate: comparison.smallBusinessSpecialRate,
     consumption,
   };
 }
