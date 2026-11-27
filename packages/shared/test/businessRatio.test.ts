@@ -109,7 +109,7 @@ describe("集計への反映", () => {
       delete copy.business_ratio_basis;
       return copy;
     });
-    // 按分なしでは家賃は全額が経費になる（従来どおり）
+    // 按分なしでは家賃は全額が経費になる
     const plainFigures = computeCorrectedFigures(plain, 2025);
     expect(plainFigures.business_expenses).toBe(1_200_000 + 110_000);
     expect(plainFigures.real_estate_expenses).toBe(50_000);

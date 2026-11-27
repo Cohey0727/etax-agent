@@ -1,5 +1,5 @@
 /**
- * expandedIncome.test.ts — 配当・一時・株式等譲渡（Issue #27 Phase A〜C）と
+ * expandedIncome.test.ts — 配当・一時・株式等譲渡と
  * 分離課税を含む所得税計算の検証。
  */
 import { describe, expect, test } from "bun:test";
@@ -18,10 +18,10 @@ import {
 } from "../src/index";
 
 // ---------------------------------------------------------------------------
-// Phase A: 一時所得
+// 一時所得
 // ---------------------------------------------------------------------------
 
-describe("一時所得（Phase A、No.1490）", () => {
+describe("一時所得（No.1490）", () => {
   test("特別控除50万円を引き、1/2を算入する", () => {
     const r = computeTempIncome({ revenue: 1_500_000, expenses: 300_000 });
     expect(r.specialDeduction).toBe(500_000);
@@ -69,10 +69,10 @@ describe("総所得金額（損益通算 → 一時所得の1/2）", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase B: 配当所得（総合課税）＋配当控除の対象額
+// 配当所得（総合課税）＋配当控除の対象額
 // ---------------------------------------------------------------------------
 
-describe("配当所得（Phase B、No.1330 / No.1250）", () => {
+describe("配当所得（No.1330 / No.1250）", () => {
   test("総合課税: 収入金額 − 負債の利子が配当所得", () => {
     const r = computeDividendIncome({
       ...EMPTY_EXPANDED_INCOME.dividend,
@@ -136,10 +136,10 @@ describe("配当所得（Phase B、No.1330 / No.1250）", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase C: 株式等譲渡と損益通算
+// 株式等譲渡と損益通算
 // ---------------------------------------------------------------------------
 
-describe("株式等譲渡（Phase C、No.1463 / No.1474 / No.1476）", () => {
+describe("株式等譲渡（No.1463 / No.1474 / No.1476）", () => {
   test("一般と上場は別区分で計算し、特定口座分は上場へ合算する", () => {
     const r = computeStockTransfer({
       general: { revenue: 1_000_000, otherRevenue: 0, acquisitionCost: 600_000, transferFees: 0, otherExpenses: 0 },
@@ -177,7 +177,7 @@ describe("株式等譲渡（Phase C、No.1463 / No.1474 / No.1476）", () => {
     expect(r.separateStockIncome).toBe(0);
   });
 
-  test("通算し切れない上場の譲渡損失は参考値として残る（繰越はPhase D）", () => {
+  test("通算し切れない上場の譲渡損失は参考値として残る（繰越は扱わない）", () => {
     const r = computeExpandedIncomes({
       temp: { revenue: 0, expenses: 0 },
       dividend: {
@@ -347,7 +347,7 @@ describe("分離課税を含む所得税計算", () => {
     expect(withSeparate.taxCredits.dividend).toBe(74_000);
   });
 
-  test("分離課税なしでは従来の結果と一致する（回帰）", () => {
+  test("分離課税なしでは総合課税だけの計算と一致する", () => {
     const plain = computeIncomeTax({
       year: 2025,
       totalIncome: 5_000_000,

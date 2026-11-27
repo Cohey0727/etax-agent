@@ -77,8 +77,7 @@ describe("normalizeNameKana", () => {
 
   test("合成できない濁点が別文字に化けない", () => {
     // セ+゛ は合成形が無い。NFKC で結合濁点（U+3099）になり、そのまま
-    // 残るのが正しい。旧い変換範囲（ぁ-ゟ）では +0x60 の対象になって
-    // 別文字に化けていた
+    // 残るのが正しい（ひらがなの変換範囲に含めると +0x60 で別文字に化ける）
     const out = normalizeNameKana("セ゛");
     expect(out).toBe("セ\u3099");
     expect(out).not.toContain("・");

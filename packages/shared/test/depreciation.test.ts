@@ -37,7 +37,6 @@ describe("償却率表", () => {
     expect(decliningBalanceRates(5)).toEqual({ rate: 0.4, revisedRate: 0.5, guaranteeRate: 0.108 });
     expect(decliningBalanceRates(6)).toEqual({ rate: 0.333, revisedRate: 0.334, guaranteeRate: 0.09911 });
     expect(decliningBalanceRates(10)).toEqual({ rate: 0.2, revisedRate: 0.25, guaranteeRate: 0.06552 });
-    // 2026-11-23 に別表第十（e-Gov原文＋2ソース照合）から転記した範囲
     expect(decliningBalanceRates(16)).toEqual({ rate: 0.125, revisedRate: 0.143, guaranteeRate: 0.04294 });
     expect(decliningBalanceRates(19)).toEqual({ rate: 0.105, revisedRate: 0.112, guaranteeRate: 0.03693 });
     expect(decliningBalanceRates(28)).toEqual({ rate: 0.071, revisedRate: 0.072, guaranteeRate: 0.02568 });
@@ -128,7 +127,7 @@ describe("一括償却資産・少額特例", () => {
   });
 });
 
-describe("整数演算化と入力検証 (#3-5)", () => {
+describe("整数演算と入力検証", () => {
   test("率の乗算は整数演算（10,000 × 0.143 = 1,430、float では 1,429 になる）", () => {
     const a = asset({ cost: 10_000, usefulLifeYears: 7, acquisitionDate: "2025-01-01" });
     expect(depreciationForYear(a, 2025)?.ordinary).toBe(1_430);
@@ -153,7 +152,7 @@ describe("整数演算化と入力検証 (#3-5)", () => {
     expect(() => depreciationSchedule(a, 2025)).toThrow(/日付の形式が不正/);
   });
 
-  test("取得価額が NaN なら例外（従来は検証をすり抜けていた）", () => {
+  test("取得価額が NaN なら例外", () => {
     const a = asset({ cost: Number.NaN });
     expect(() => depreciationSchedule(a, 2025)).toThrow(/取得価額/);
   });

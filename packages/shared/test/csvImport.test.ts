@@ -1,6 +1,6 @@
 /**
  * csvImport.test.ts — 内部形式CSV取込（importCsvText / parseCsv /
- * suggestCategory）の回帰テスト（Issue #13）。
+ * suggestCategory）の回帰テスト。
  * 列の有無の区別、空金額、実在しない日付、セル途中のクォート、
  * 表記ゆれへの科目推定を担保する。
  */
@@ -53,7 +53,7 @@ describe("parseCsv", () => {
     expect(rows[2]?.[1]).toBe("次の行");
   });
 
-  test("引用符セルの中のカンマとエスケープは従来どおり", () => {
+  test("引用符セルの中のカンマとエスケープを扱える", () => {
     const rows = parseCsv('a,b\n"x,y","z""w"');
     expect(rows[1]).toEqual(["x,y", 'z"w']);
   });

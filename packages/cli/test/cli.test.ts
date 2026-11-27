@@ -1,5 +1,5 @@
 /**
- * cli.test.ts — スタンドアロン CLI の引数パース・出力の回帰テスト（Issue #13）。
+ * cli.test.ts — スタンドアロン CLI の引数パース・出力の回帰テスト。
  * CLI をサブプロセスとして起動し、終了コードと stdout/stderr を検証する。
  */
 import { describe, expect, test } from "bun:test";

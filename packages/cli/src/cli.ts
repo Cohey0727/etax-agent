@@ -52,10 +52,9 @@ function yen(n: number): string {
   return `${Math.trunc(n).toLocaleString("en-US")}円`;
 }
 
-/** Python の repr 風表示（非数値差分の表示用）。 */
-function pyRepr(v: unknown): string {
-  if (typeof v === "string") return `'${v}'`;
-  if (v === null || v === undefined) return "None";
+/** 数値でない差分の値の表示（値が無い場合は画面と同じく「—」）。 */
+function displayValue(v: unknown): string {
+  if (v === null || v === undefined) return "—";
   return String(v);
 }
 
@@ -299,7 +298,7 @@ async function cmdAmend(opts: CliOptions): Promise<number> {
   } else {
     for (const [fieldName, v] of diffEntries) {
       if (v.diff === null) {
-        console.log(`${fieldName}: ${pyRepr(v.original)} → ${pyRepr(v.corrected)}`);
+        console.log(`${fieldName}: ${displayValue(v.original)} → ${displayValue(v.corrected)}`);
       } else {
         const sign = v.diff > 0 ? "+" : "";
         console.log(

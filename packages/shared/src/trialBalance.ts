@@ -1,5 +1,5 @@
 /**
- * trialBalance.ts — 残高試算表レポートの集計（Issue #18）。
+ * trialBalance.ts — 残高試算表レポートの集計。
  *
  * 損益計算書の部は、XTXの青色申告決算書（KOA210/KOA220）と数値が一致する
  * よう、既存の決定的な計算（computeCorrectedFigures）と決算書の科目

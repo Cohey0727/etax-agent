@@ -1,5 +1,5 @@
 /**
- * agriculture.test.ts — 農業所得（Issue #24 Phase 1）の決定的計算の検証。
+ * agriculture.test.ts — 農業所得の決定的計算の検証。
  *
  * 計算チェーンは青色申告決算書（農業所得用）KOA240・収支内訳書
  * （農業所得用）KOA120 の様式どおり:
@@ -189,7 +189,7 @@ describe("normalizeAgricultureInput / isAgricultureEmpty / wire変換", () => {
 });
 
 describe("blueDeduction への農業の配分", () => {
-  test("農業なしの場合は従来どおり（不動産→事業）", () => {
+  test("農業なしの場合は不動産→事業の順に配分する", () => {
     const blue = blueDeduction(300_000, 5_000_000, { filingType: "blue65" });
     expect(blue.realEstate).toBe(300_000);
     expect(blue.business).toBe(350_000);
@@ -211,7 +211,7 @@ describe("blueDeduction への農業の配分", () => {
     expect(blue.agriculture).toBe(350_000);
   });
 
-  test("農業が赤字なら配分は0で、総額は従来と変わらない", () => {
+  test("農業が赤字なら配分は0で、総額は農業なしと同じ", () => {
     const blue = blueDeduction(300_000, 5_000_000, { filingType: "blue65" }, -100_000);
     expect(blue.agriculture).toBe(0);
     expect(blue.total).toBe(650_000);
@@ -254,7 +254,7 @@ describe("computeCorrectedFigures への農業の統合", () => {
     expect(figures._detail.business_income).toBe(350_000);
   });
 
-  test("農業入力が無い場合は農業分は全て0で従来と一致する", () => {
+  test("農業入力が無い場合は農業分は全て0で、農業なしの計算と一致する", () => {
     const withNone = computeCorrectedFigures(businessTx, 2025, {
       filingType: "blue65",
     });

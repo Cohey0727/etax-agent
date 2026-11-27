@@ -1089,7 +1089,7 @@ export function computeManualIncomes(
 }
 
 /**
- * 申告分離課税の所得（Issue #27 Phase C）。金額は損益通算後・
+ * 申告分離課税の所得。金額は損益通算後・
  * 所得控除の配分前で、いずれも0以上。所得控除は総合課税分から先に
  * 差し引き、引き切れない分を株式等→上場配当の順に配分する
  * （分離課税への控除配分順のうち本スコープの区分）。
@@ -1107,7 +1107,7 @@ export interface IncomeTaxOptions {
   totalIncome: number;
   deductions: DeductionInputs;
   taxCredits: TaxCreditInputs;
-  /** 申告分離課税の所得。省略時は分離課税なし（従来どおりの計算） */
+  /** 申告分離課税の所得。省略時は分離課税なし */
   separateTaxation?: SeparateTaxationAmounts;
 }
 
