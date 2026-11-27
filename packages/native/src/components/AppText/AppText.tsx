@@ -1,15 +1,14 @@
 import { StyleSheet, Text, TextProps } from "react-native";
-import { colors, fontFamily, FontWeightName } from "@/theme";
+import { colors, fontFamily, fontSizes, FontWeightName } from "@/theme";
 
 export interface AppTextProps extends TextProps {
   /** 文字の大きさの段階。 */
-  size?: "xs" | "sm" | "md" | "lg" | "xl" | "xxl" | "hero";
+  size?: keyof typeof fontSizes;
   weight?: FontWeightName;
   tone?: "text" | "subtle" | "muted" | "accent" | "positive" | "negative" | "onNavy" | "onNavySubtle";
   align?: "left" | "center" | "right";
 }
 
-const sizeMap = { xs: 12, sm: 13, md: 15, lg: 17, xl: 20, xxl: 26, hero: 40 } as const;
 const toneMap = {
   text: colors.text,
   subtle: colors.textSubtle,
@@ -34,7 +33,7 @@ export function AppText({
     <Text
       style={[
         styles.base,
-        { fontFamily: fontFamily[weight], fontSize: sizeMap[size], color: toneMap[tone] },
+        { fontFamily: fontFamily[weight], fontSize: fontSizes[size], color: toneMap[tone] },
         align ? { textAlign: align } : null,
         style,
       ]}

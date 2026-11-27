@@ -11,7 +11,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { LedgerTransaction, fetchLedgerTransactions, ledgerRowToTransaction } from "@/api";
@@ -42,7 +41,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [year, setYearState] = useState<number>(currentYear());
   const [ledgerRows, setLedgerRows] = useState<LedgerTransaction[] | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(true);
-  const yearLoadedRef = useRef(false);
 
   // 保存済みの年度を復元する
   useEffect(() => {
@@ -56,7 +54,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch {
         // 復元できなくても今年で続ける
       }
-      yearLoadedRef.current = true;
     })();
   }, []);
 
