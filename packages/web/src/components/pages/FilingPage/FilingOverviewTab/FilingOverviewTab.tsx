@@ -31,7 +31,7 @@ export const FilingOverviewTab = ({
         year={year}
         transactions={yearTransactions}
         state={state}
-        incomeBeforeBlue={figures.corrected._detail.business_income_before_deduction}
+        figures={figures}
         onIncomeTaxPaymentsChange={(next) => deduction.update({ incomeTaxPayments: next })}
         onOpenSection={onOpenSection}
       />

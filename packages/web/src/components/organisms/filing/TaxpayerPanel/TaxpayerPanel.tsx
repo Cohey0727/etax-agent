@@ -1,10 +1,12 @@
 import {
   DeductionState,
+  FilingFigures,
   IncomeTaxPaymentInputs,
   Transaction,
   agricultureToWire,
   balanceSheetToWire,
   buildTrialBalanceSheet,
+  declaredIncomeTaxOf,
   expandedIncomeToWire,
   isAgricultureEmpty,
   isBalanceSheetEmpty,
@@ -18,6 +20,7 @@ import { LabeledAmountField } from "@components/molecules/LabeledAmountField";
 import { ExportXtxRequest, XtxTaxpayerInput } from "@types";
 import { exportDomicilePdfFile, exportReturnPdfFile, exportXtxFile } from "@utils/api";
 import { downloadPdfFile, downloadTextFile } from "@utils/fileDownload";
+import { formatYen } from "@utils";
 import { todayIso } from "@utils/localDate";
 import { EtaxImportGuide } from "@components/organisms/filing/EtaxImportGuide";
 import { EtaxSubmitActions } from "@components/organisms/filing/EtaxSubmitActions";
@@ -32,8 +35,8 @@ export interface TaxpayerPanelProps {
   transactions: Transaction[];
   /** 対象年の申告入力。控除・所得・申告の種類・貸借対照表・源泉徴収税額を出力に使う。 */
   state: DeductionState;
-  /** 青色申告特別控除前の事業所得（貸借対照表の貸借チェックに使う）。 */
-  incomeBeforeBlue: number;
+  /** 帳簿と申告入力から求めた所得と所得税額。申告納税額の精算と貸借チェックに使う。 */
+  figures: FilingFigures;
   onIncomeTaxPaymentsChange: (next: IncomeTaxPaymentInputs) => void;
   /** 納税者情報タブへの遷移。 */
   onOpenSection: (section: FilingSection) => void;
@@ -48,7 +51,7 @@ export const TaxpayerPanel = ({
   year,
   transactions,
   state,
-  incomeBeforeBlue,
+  figures,
   onIncomeTaxPaymentsChange,
   onOpenSection,
 }: TaxpayerPanelProps) => {
@@ -65,6 +68,7 @@ export const TaxpayerPanel = ({
 
   const supported = xtxSupportedYears().includes(year);
   const { incomeTaxPayments, expandedIncome, agriculture, balanceSheet } = state;
+  const declared = declaredIncomeTaxOf(figures, incomeTaxPayments);
 
   // 納税者情報タブで編集して戻ってきた場合も、マウントし直しで最新を読む。
   useEffect(() => {
@@ -100,7 +104,10 @@ export const TaxpayerPanel = ({
 
   // 貸借対照表の貸借チェック（警告のみ。出力ボタンは止めないが、
   // 不一致のまま出力するとサーバー側で不整合としてエラーになる）。
-  const unbalancedSides = balanceSheetUnbalancedSides(balanceSheet, incomeBeforeBlue);
+  const unbalancedSides = balanceSheetUnbalancedSides(
+    balanceSheet,
+    figures.corrected._detail.business_income_before_deduction,
+  );
 
   const handleExport = async () => {
     setExporting(true);
@@ -208,6 +215,20 @@ export const TaxpayerPanel = ({
           value={incomeTaxPayments.prepaidTax}
           onChange={(v) => onIncomeTaxPaymentsChange({ ...incomeTaxPayments, prepaidTax: v })}
         />
+        <Col gap="sm">
+          <Row align="center" justify="spaceBetween">
+            <Text variant="muted">申告納税額</Text>
+            <Text className={styles.amount}>{formatYen(declared.declaredTax)}</Text>
+          </Row>
+          <Row align="center" justify="spaceBetween" className={styles.totalRow}>
+            <Text>
+              {declared.thirdPeriodTax < 0
+                ? "第3期分の税額（還付される税金）"
+                : "第3期分の税額（納める税金）"}
+            </Text>
+            <Text className={styles.amount}>{formatYen(Math.abs(declared.thirdPeriodTax))}</Text>
+          </Row>
+        </Col>
 
         {unbalancedSides ? (
           <AlertBox variant="notice">

@@ -24,6 +24,17 @@ const styles = {
     fontWeight: theme.fontWeight.semibold,
     color: theme.color.textSubtle,
   }),
+  // 金額は等幅数字で桁を揃える。
+  amount: style({
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  }),
+  // 第3期分の行。区切り線と太字で締める。
+  totalRow: style({
+    borderTop: `2px solid ${theme.color.borderStrong}`,
+    paddingTop: theme.space.sm,
+    fontWeight: theme.fontWeight.semibold,
+  }),
 };
 
 export default styles;
