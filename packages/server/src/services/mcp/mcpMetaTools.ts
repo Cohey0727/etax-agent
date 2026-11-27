@@ -18,15 +18,12 @@ import {
   loadStorageConfig,
   loadSystemOneConfig,
   serverDataDir,
-  SystemOneOverrides,
 } from "../../lib/config";
 import { isDatabaseConfigured } from "../../lib/db";
-import { assertSafeUserBaseUrl, UnsafeUrlError } from "../../lib/ssrfGuard";
 import { currentUserId } from "../../lib/tenantContext";
 import { loadClassificationHistory } from "../../repositories/classificationHistoryRepository";
 import { saveJevPromptOverride } from "../../repositories/jevPromptRepository";
 import { saveRegexRulesOverride } from "../../repositories/regexRulesRepository";
-import { saveSystemOneSettings } from "../../repositories/systemOneSettingsRepository";
 import { getSubscriptionRow } from "../../repositories/subscriptionRepository";
 import { listTransactionRows } from "../../repositories/transactionRepository";
 import { BalanceSheetInputSchema } from "../../schemas/etax";
@@ -35,6 +32,7 @@ import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsVie
 import { AgentChatError, executeAgentChat } from "../agent/executeAgentChat";
 import { testAgentConnection } from "../agent/testAgentConnection";
 import { testSystemOneConnection } from "../classification/testSystemOneConnection";
+import { updateSystemOneSettings } from "../classification/updateSystemOneSettings";
 import { generateRules, RegexRule } from "../classification/generateRules";
 import { buildRegexRulesView } from "../classification/regexRulesView";
 import { validateRegexRules } from "../classification/validateRegexRules";
@@ -83,7 +81,7 @@ export const mcpMetaTools: McpToolModule = {
     {
       name: "update_systemone_settings",
       description:
-        "科目判定AI（SystemOne / jev）の接続設定を保存する。base_url / model は渡した値で置き換わり（空文字で保存値クリア）、api_key は渡した時だけ差し替わり、clear_api_key=true で削除される。保存した設定は画面・MCP・エージェントの判定すべてに効く。",
+        "科目判定AI（SystemOne / jev）の接続設定を保存する。base_url / model は渡した項目だけが置き換わり（空文字で保存値クリア、省略した項目は保存値のまま）、api_key は渡した時だけ差し替わり、clear_api_key=true で削除される。保存した設定は画面・MCP・エージェントの判定すべてに効く。",
       inputSchema: {
         type: "object",
         properties: {
@@ -261,28 +259,15 @@ export const mcpMetaTools: McpToolModule = {
       return textResult(toSystemOneSettingsResponse(getSystemOneOverrides(), loadSystemOneConfig()));
     },
     update_systemone_settings: async (args) => {
-      const current = getSystemOneOverrides();
-      const next: SystemOneOverrides = {};
-      const baseUrl = typeof args["base_url"] === "string" ? args["base_url"].trim() : "";
-      if (baseUrl) {
-        // ユーザー指定の接続先は保存前に SSRF 検証する（REST と同じ）。
-        try {
-          await assertSafeUserBaseUrl(baseUrl);
-        } catch (e) {
-          if (e instanceof UnsafeUrlError) throw new Error(e.message);
-          throw e;
-        }
-        next.baseUrl = baseUrl;
-      }
-      const model = typeof args["model"] === "string" ? args["model"].trim() : "";
-      if (model) next.model = model;
-      const clearApiKey = args["clear_api_key"] === true;
-      const newKey = typeof args["api_key"] === "string" ? args["api_key"].trim() : "";
-      // 削除指定が最優先。新しい値が来たら差し替え、来なければ既存を維持する。
-      if (!clearApiKey && newKey) next.apiKey = newKey;
-      if (!clearApiKey && !newKey && current.apiKey) next.apiKey = current.apiKey;
-      await saveSystemOneSettings(next);
-      return textResult(toSystemOneSettingsResponse(next, loadSystemOneConfig()));
+      const optionalText = (value: unknown): string | undefined =>
+        typeof value === "string" ? value : undefined;
+      const saved = await updateSystemOneSettings({
+        baseUrl: optionalText(args["base_url"]),
+        model: optionalText(args["model"]),
+        apiKey: optionalText(args["api_key"]),
+        clearApiKey: args["clear_api_key"] === true,
+      });
+      return textResult(toSystemOneSettingsResponse(saved, loadSystemOneConfig()));
     },
     test_systemone_connection: async (args) => {
       return textResult(

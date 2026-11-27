@@ -23,10 +23,7 @@ import {
 } from "../../repositories/filingStatusRepository";
 import { saveJevPromptOverride } from "../../repositories/jevPromptRepository";
 import { saveRegexRulesOverride } from "../../repositories/regexRulesRepository";
-import {
-  readStoredSystemOneSettings,
-  saveSystemOneSettings,
-} from "../../repositories/systemOneSettingsRepository";
+import { readStoredSystemOneSettings } from "../../repositories/systemOneSettingsRepository";
 import {
   emptyTaxpayerProfile,
   findTaxpayerCarryRow,
@@ -38,6 +35,7 @@ import { TaxpayerProfile } from "../../schemas/taxpayer";
 import { classifyAccount } from "../classification/classifyAccount";
 import { buildRegexRulesView } from "../classification/regexRulesView";
 import { RegexRule, generateRules } from "../classification/generateRules";
+import { updateSystemOneSettings } from "../classification/updateSystemOneSettings";
 import { validateRegexRules } from "../classification/validateRegexRules";
 import { toSystemOneSettingsResponse } from "../../usecases/systemOneSettingsView";
 
@@ -97,12 +95,12 @@ export async function updateSystemOneSettingsForAgent(args: {
   model?: string;
   apiKey?: string;
 }) {
-  const stored = await readStoredSystemOneSettings();
-  const next = { ...stored };
-  if (typeof args.baseUrl === "string" && args.baseUrl.trim()) next.baseUrl = args.baseUrl.trim();
-  if (typeof args.model === "string" && args.model.trim()) next.model = args.model.trim();
-  if (typeof args.apiKey === "string" && args.apiKey.trim()) next.apiKey = args.apiKey.trim();
-  await saveSystemOneSettings(next);
+  const unlessBlank = (value: string | undefined) => (value?.trim() ? value : undefined);
+  await updateSystemOneSettings({
+    baseUrl: unlessBlank(args.baseUrl),
+    model: unlessBlank(args.model),
+    apiKey: unlessBlank(args.apiKey),
+  });
   return getSystemOneSettingsForAgent();
 }
 

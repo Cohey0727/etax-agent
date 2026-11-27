@@ -5,13 +5,11 @@
  */
 import { createRoute, RouteHandler } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
+import { loadSystemOneConfig } from "../lib/config";
 import {
-  getSystemOneOverrides,
-  loadSystemOneConfig,
-  SystemOneOverrides,
-} from "../lib/config";
-import { assertSafeUserBaseUrl, UnsafeUrlError } from "../lib/ssrfGuard";
-import { saveSystemOneSettings } from "../repositories/systemOneSettingsRepository";
+  SystemOneSettingsInputError,
+  updateSystemOneSettings,
+} from "../services/classification/updateSystemOneSettings";
 import {
   SystemOneSettingsResponseSchema,
   UpdateSystemOneSettingsRequestSchema,
@@ -47,25 +45,19 @@ export const updateSystemOneSettingsHandler: RouteHandler<
   typeof updateSystemOneSettingsRoute
 > = async (c) => {
   const body = c.req.valid("json");
-  const current = getSystemOneOverrides();
-  const next: SystemOneOverrides = {};
-  const baseUrl = body.baseUrl.trim();
-  if (baseUrl) {
-    // ユーザー指定の接続先は保存前に SSRF 検証する。
-    try {
-      await assertSafeUserBaseUrl(baseUrl);
-    } catch (e) {
-      if (e instanceof UnsafeUrlError) throw new HTTPException(400, { message: e.message });
-      throw e;
+  let saved;
+  try {
+    saved = await updateSystemOneSettings({
+      baseUrl: body.baseUrl,
+      model: body.model,
+      apiKey: body.apiKey,
+      clearApiKey: body.clearApiKey,
+    });
+  } catch (e) {
+    if (e instanceof SystemOneSettingsInputError) {
+      throw new HTTPException(400, { message: e.message });
     }
-    next.baseUrl = baseUrl;
+    throw e;
   }
-  const model = body.model.trim();
-  if (model) next.model = model;
-  const newKey = body.apiKey?.trim() ?? "";
-  // 削除指定が最優先。新しい値が来たら差し替え、来なければ既存を維持する。
-  if (!body.clearApiKey && newKey) next.apiKey = newKey;
-  if (!body.clearApiKey && !newKey && current.apiKey) next.apiKey = current.apiKey;
-  await saveSystemOneSettings(next);
-  return c.json(toSystemOneSettingsResponse(next, loadSystemOneConfig()), 200);
+  return c.json(toSystemOneSettingsResponse(saved, loadSystemOneConfig()), 200);
 };
