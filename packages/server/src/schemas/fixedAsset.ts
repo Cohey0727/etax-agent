@@ -2,7 +2,7 @@
  * fixedAsset.ts — 固定資産台帳エンドポイントのスキーマ（schemas）。
  */
 import { z } from "@hono/zod-openapi";
-import { IdSchema } from "./common";
+import { CalendarDateSchema, IdSchema } from "./common";
 
 export const DepreciationMethodSchema = z.enum([
   "straight_line",
@@ -44,15 +44,15 @@ export const CreateFixedAssetRequestSchema = z
     name: z.string().min(1),
     quantity: z.string().optional(),
     income_type: z.enum(["business", "real_estate", "agriculture"]).optional(),
-    acquisition_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    service_start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    acquisition_date: CalendarDateSchema,
+    service_start_date: CalendarDateSchema.nullable().optional(),
     cost: z.number().int().positive(),
     useful_life_years: z.number().int().min(1),
     method: DepreciationMethodSchema.optional(),
     // DB 列は integer。小数を許すと保存時に型エラー（503）になるため、
     // ここで整数として検証して 400 で返す。
     business_ratio_percent: z.number().int().min(0).max(100).optional(),
-    disposed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    disposed_date: CalendarDateSchema.nullable().optional(),
   })
   .openapi("CreateFixedAssetRequest");
 

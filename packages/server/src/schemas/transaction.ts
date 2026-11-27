@@ -7,7 +7,7 @@
  * undefined へ落とす。date / amount の不正は従来どおり 400 にする。
  */
 import { z } from "@hono/zod-openapi";
-import { IdSchema, YearSchema } from "./common";
+import { IdSchema, IncomeTypeSchema, YearSchema } from "./common";
 
 export const TransactionSchema = z
   .object({
@@ -105,7 +105,8 @@ export const CreateTransactionRequestSchema = z
     amount: z.number().optional(),
     account: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
-    income_type: z.string().optional().catch(undefined),
+    /** 未知の値・型違いは未指定として扱う（登録では「その他」になる）。 */
+    income_type: IncomeTypeSchema.optional().catch(undefined),
     tax_category: z.string().optional().catch(undefined),
     /** 事業専用割合（家事按分、0〜100）。範囲外はハンドラ側で正規化する */
     business_ratio_percent: z.number().optional().catch(undefined),
@@ -126,7 +127,8 @@ export const UpdateTransactionRequestSchema = z
     amount: z.number().optional().catch(undefined),
     account: z.string().optional().catch(undefined),
     category: z.string().optional().catch(undefined),
-    income_type: z.string().optional().catch(undefined),
+    /** 未知の値・型違いは未指定として扱う（登録では「その他」になる）。 */
+    income_type: IncomeTypeSchema.optional().catch(undefined),
     tax_category: z.string().optional().catch(undefined),
     /** 事業専用割合（家事按分、0〜100）。範囲外はハンドラ側で正規化する */
     business_ratio_percent: z.number().optional().catch(undefined),

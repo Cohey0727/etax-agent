@@ -12,7 +12,7 @@ import { requireDb } from "../lib/errors";
 import { readJsonBody } from "../lib/readJsonBody";
 import { TransactionRow } from "../repositories/schema";
 import { transactionToApi, updateTransactionRow } from "../repositories/transactionRepository";
-import { ErrorSchema } from "../schemas/common";
+import { CalendarDateSchema, ErrorSchema } from "../schemas/common";
 import {
   SingleTransactionResponse,
   SingleTransactionResponseSchema,
@@ -57,9 +57,9 @@ export const updateTransactionHandler: RouteHandler<typeof updateTransactionRout
   const body = parsed.data;
   const patch: Partial<TransactionRow> = {};
   if (body.date !== undefined) {
-    // 登録時と同じ日付形式チェック（不正な日付で年度判定が壊れるのを防ぐ）。
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
-      throw new HTTPException(400, { message: "date は YYYY-MM-DD 形式で指定してください" });
+    // 登録時と同じ日付チェック（不正な日付で年度判定・月次集計が壊れるのを防ぐ）。
+    if (!CalendarDateSchema.safeParse(body.date).success) {
+      throw new HTTPException(400, { message: "date は存在する日付を YYYY-MM-DD 形式で指定してください" });
     }
     patch.date = body.date;
   }

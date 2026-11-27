@@ -328,3 +328,51 @@ describe("DB エラーと壊れた保存データの応答", () => {
     expect(String(r.body["error"])).toContain("freee");
   });
 });
+
+describe("取引・固定資産の日付と収入区分", () => {
+  test("暦に無い日付の取引は登録・更新できない", async () => {
+    await createTestDb();
+    const bad = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-13-45", amount: 1000, description: "x" },
+    });
+    expect(bad.status).toBe(400);
+    const leap = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2024-02-29", amount: 1000, description: "閏日" },
+    });
+    expect(leap.status).toBe(201);
+    const id = (leap.body["transaction"] as { id: number }).id;
+    const updated = await req(`/api/transactions/${id}`, { method: "PUT", json: { date: "2025-02-29" } });
+    expect(updated.status).toBe(400);
+  });
+
+  test("暦に無い取得日の固定資産は登録できない", async () => {
+    await createTestDb();
+    const r = await req("/api/fixed-assets", {
+      method: "POST",
+      json: { name: "PC", acquisition_date: "2025-13-01", cost: 300000, useful_life_years: 4 },
+    });
+    expect(r.status).toBe(400);
+  });
+
+  test("未知の収入区分は「その他」として保存し、null も拒否しない", async () => {
+    await createTestDb();
+    const unknown = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-03-01", amount: 1000, description: "a", income_type: "Business" },
+    });
+    expect(unknown.status).toBe(201);
+    expect((unknown.body["transaction"] as { income_type: string }).income_type).toBe("other");
+    const nullType = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-03-01", amount: 1000, description: "b", income_type: null },
+    });
+    expect(nullType.status).toBe(201);
+    const known = await req("/api/transactions", {
+      method: "POST",
+      json: { date: "2025-03-01", amount: 1000, description: "c", income_type: "real_estate" },
+    });
+    expect((known.body["transaction"] as { income_type: string }).income_type).toBe("real_estate");
+  });
+});

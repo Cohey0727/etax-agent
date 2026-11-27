@@ -59,6 +59,9 @@ export const replaceYearTransactionsHandler: RouteHandler<
   }
   const values = transactions.map((body) => {
     const date = body.date ?? "";
+    // 形式だけを見る（暦として存在するかは見ない）。画面はその年の既存の取引も
+    // まとめて送り直すため、他の経路で入った不正な日付が1件あるだけで、
+    // その年の保存全体を拒むことになる。
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new HTTPException(400, {
         message: "date は YYYY-MM-DD 形式で指定してください",

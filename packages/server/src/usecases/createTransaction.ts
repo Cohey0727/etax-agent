@@ -15,7 +15,7 @@ import {
   transactionToApi,
 } from "../repositories/transactionRepository";
 import { linkReceiptRow } from "../repositories/receiptRepository";
-import { ErrorSchema } from "../schemas/common";
+import { CalendarDateSchema, ErrorSchema } from "../schemas/common";
 import {
   CreateTransactionRequestSchema,
   SingleTransactionResponse,
@@ -58,8 +58,8 @@ export const createTransactionHandler: RouteHandler<typeof createTransactionRout
   }
   const body = parsed.data;
   const date = body.date ?? "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new HTTPException(400, { message: "date は YYYY-MM-DD 形式で指定してください" });
+  if (!CalendarDateSchema.safeParse(date).success) {
+    throw new HTTPException(400, { message: "date は存在する日付を YYYY-MM-DD 形式で指定してください" });
   }
   if (typeof body.amount !== "number" || !Number.isFinite(body.amount)) {
     throw new HTTPException(400, { message: "amount は数値で指定してください" });

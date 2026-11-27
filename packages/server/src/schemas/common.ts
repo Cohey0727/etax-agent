@@ -21,6 +21,12 @@ export const TaxYearSchema = z
   .int()
   .refine((year) => Object.hasOwn(TAX_PARAMETERS, year));
 
+/** 暦として存在する日付（YYYY-MM-DD。13月・2月30日・平年の2月29日は通さない）。 */
+export const CalendarDateSchema = z.iso.date();
+
+/** 取引の収入区分。 */
+export const IncomeTypeSchema = z.enum(["business", "real_estate", "other"]);
+
 /** PostgreSQL の integer 列の上限。ID をこの範囲で受け、範囲外を DB エラーにしない。 */
 const maxInt4 = 2_147_483_647;
 
