@@ -282,10 +282,22 @@ businessKind?: BusinessKind;
 }
 
 /**
+ * 課税売上割合（%、小数第2位未満切捨て）。分母は課税売上（税抜）＋非課税売上。
+ * 売上が無いときは 100 とする（按分しない）。
+ */
+export function taxableSalesRatioPercent(taxableSalesIncl: number, nontaxableSales: number): number {
+  const taxableExcl = Math.floor((Math.max(Math.trunc(taxableSalesIncl), 0) * 100) / 110);
+  const total = taxableExcl + Math.max(Math.trunc(nontaxableSales), 0);
+  if (total <= 0) return 100;
+  return Math.floor((taxableExcl * 10000) / total) / 100;
+}
+
+/**
 * 消費税の納付税額を計算する（税込経理・税率10%前提）。
 * - standard （本則）: 売上税額 - 仕入税額。
 * 課税売上には非課税の住宅家賃を含めないこと（呼び出し側の
-* 責任。taxableSalesFromBreakdown がそれを担う）。
+* 責任。taxableSalesFromBreakdown がそれを担う）。課税売上割合が
+* 95%未満のときは、仕入税額に課税売上割合を掛ける（一括比例配分方式）。
 * - simplified（簡易課税）: 売上税額 × (1 - みなし仕入率)。
 * 既定はサービス業（第5種・50%）。
 * - special20 （2割特例）: 売上税額 × 20%。
@@ -306,9 +318,11 @@ let detail: Record<string, unknown>;
 let usedInput: number;
 
 if (method === "standard") {
-payable = output - Math.trunc(inputTax);
-detail = { formula: "output_tax - input_tax"};
-usedInput = Math.trunc(inputTax);
+const ratio = taxableSalesRatioPercent(taxableSalesIncl, nontaxableSalesIncl);
+const rawInput = Math.trunc(inputTax);
+usedInput = ratio >= 95 ? rawInput : Math.floor((rawInput * ratio) / 100);
+payable = output - usedInput;
+detail = { formula: "output_tax - input_tax", taxable_sales_ratio_percent: ratio };
 } else if (method === "simplified") {
 const rate = SIMPLIFIED_RATES[businessKind];
 payable = floorYen(output * (1 - rate));
@@ -380,11 +394,14 @@ export const NON_TAXABLE_EXPENSE_CATEGORIES: ReadonlySet<string> = new Set([
 
 /**
 * 経費取引から仕入税額を概算する（税込経費 × 10/110、課税仕入のみ）。
+* 対象は事業・不動産の取引だけで、資金移動・私用（収入区分 other）は数えない。
+* 課税売上割合による按分前の額。
 * あくまで概算。本則課税の正式な仕入税額は請求書等で確定させること。
 */
 export function estimateInputTax(transactions: Transaction[]): number {
 let total = 0;
 for (const t of transactions) {
+if (t.income_type !== "business" && t.income_type !== "real_estate") continue;
 // 課税仕入れの母数は事業分のみ（家事按分後の金額。消基通11-1-5）。
 const amount = transactionBusinessAmount(t);
 if (amount >= 0) continue;

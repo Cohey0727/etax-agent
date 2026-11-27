@@ -5,7 +5,7 @@
  *   (b) 2割特例 : 同上 → ¥272,727
  *   (c) 青色申告特別控除: 不動産所得30万・事業所得500万 → 10万 + 65万 = 75万
  *   (d) 本則課税: 住宅家賃（非課税）は課税売上から除外される
- *   サンプル2024年分: 消費税3方式 本則 879,045 / 簡易 518,181 / 2割 207,272
+ *   サンプル2024年分: 消費税3方式 本則 901,935 / 簡易 518,181 / 2割 207,272
  *   修正申告差分: 税額 +135,000
  */
 import { describe, expect, test } from "bun:test";
@@ -19,6 +19,7 @@ import {
   estimateInputTax,
   filterYear,
   importCsvText,
+  normalizeTransactions,
   residentialRentTotal,
   sampleTransactions,
   suggestCategory,
@@ -160,12 +161,12 @@ describe("サンプルCSV（2024年分）", () => {
     expect(blueDeduction(b.realEstateIncome, b.businessIncome).total).toBe(650_000);
   });
 
-  test("消費税3方式のサンプル値（本則 879,045 / 簡易 518,181 / 2割 207,272）", () => {
+  test("消費税3方式のサンプル値（本則 901,935 / 簡易 518,181 / 2割 207,272）", () => {
     const rent = residentialRentTotal(tx2024);
     const [taxable, nontaxable] = taxableSalesFromBreakdown(b, rent);
     const inputTax = estimateInputTax(tx2024);
     expect(inputTax).toBe(157_318);
-    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "standard" }).payable).toBe(879_045);
+    expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "standard" }).payable).toBe(901_935);
     expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "simplified" }).payable).toBe(518_181);
     expect(consumptionTax({ taxableSalesIncl: taxable, nontaxableSalesIncl: nontaxable, inputTax, method: "special20" }).payable).toBe(207_272);
   });
@@ -193,6 +194,37 @@ describe("サンプルCSV（2024年分）", () => {
       mk("貸倒金", -110_000),
     ];
     expect(estimateInputTax(txs)).toBe(10_000);
+  });
+
+  test("estimateInputTax は収入区分 other（資金移動・私用）の出金を数えない", () => {
+    const txs = normalizeTransactions([
+      { date: "2025-03-05", year: 2025, description: "回線", amount: -110_000, category: "通信費", income_type: "business" },
+      { date: "2025-04-01", year: 2025, description: "定期預金へ振替", amount: -1_100_000, category: "未分類", income_type: "other" },
+      { date: "2025-04-02", year: 2025, description: "生活費", amount: -550_000, category: "未分類", income_type: "other" },
+    ]);
+    expect(estimateInputTax(txs)).toBe(10_000);
+  });
+
+  test("本則: 課税売上割合が95%未満なら仕入税額を一括比例配分で按分する", () => {
+    // 課税売上 11,000,000（税抜 10,000,000）・非課税売上 1,000,000 → 割合 90.90%
+    const r = consumptionTax({
+      taxableSalesIncl: 11_000_000,
+      nontaxableSalesIncl: 1_000_000,
+      inputTax: 100_000,
+      method: "standard",
+    });
+    expect(r.inputTax).toBe(90_900);
+  });
+
+  test("本則: 課税売上割合が95%以上なら仕入税額は全額控除", () => {
+    // 税抜 10,000,000・非課税 500,000 → 割合 95.23%
+    const r = consumptionTax({
+      taxableSalesIncl: 11_000_000,
+      nontaxableSalesIncl: 500_000,
+      inputTax: 100_000,
+      method: "standard",
+    });
+    expect(r.inputTax).toBe(100_000);
   });
 });
 
@@ -302,8 +334,8 @@ describe("修正パイプライン（computeCorrectedFigures）", () => {
     expect(figs.nontaxable_sales).toBe(1_764_000);
   });
 
-  test("パイプライン: 消費税 本則 879,045", () => {
-    expect(figs.consumption_tax_standard).toBe(879_045);
+  test("パイプライン: 消費税 本則 901,935", () => {
+    expect(figs.consumption_tax_standard).toBe(901_935);
   });
 
   test("パイプライン: 消費税 簡易課税 518,181", () => {
