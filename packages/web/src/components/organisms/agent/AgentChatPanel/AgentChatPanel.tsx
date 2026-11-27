@@ -1,57 +1,34 @@
-import { Transaction } from "@etax/shared";
 import { clsx } from "clsx";
 import { DragEvent, useEffect, useRef, useState } from "react";
 import { Button, Col, Icon, LoadingCircle, Row, Text, Textarea } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
-import { AgentConnectionConfig, ChatMessage, ChatRole, SendKeyMode } from "@types";
-import {
-  agentChat,
-  ChatSession,
-  formatDateTime,
-  loadCurrentMessages,
-  saveCurrentMessages,
-} from "@utils";
+import { ChatMessage, ChatRole, SendKeyMode } from "@types";
+import { ChatSession, formatDateTime } from "@utils";
 import { MessageBubbles } from "./MessageBubbles";
 import { PendingAttachmentChips } from "./PendingAttachmentChips";
-import {
-  type AgentUiAction,
-  deriveUiActions,
-  sessionExcerpt,
-} from "./agentChatHelpers";
-import { ATTACH_ACCEPT, toChatAttachmentUpload } from "./chatAttachments";
+import { sessionExcerpt } from "./agentChatHelpers";
+import { ATTACH_ACCEPT, PendingAttachment } from "./chatAttachments";
 import { useChatAttachments } from "./useChatAttachments";
 import styles from "./AgentChatPanel.css";
 
-export type { AgentUiAction } from "./agentChatHelpers";
-
 export interface AgentChatPanelProps {
-  transactions: Transaction[];
-  onUiAction?: (action: AgentUiAction) => void;
+  /** 進行中の会話（AppPage が useAgentConversation で持つ）。 */
+  messages: ChatMessage[];
+  /** 応答待ちか。 */
+  loading: boolean;
+  /** 送信の失敗・中断の案内。 */
+  error: string | null;
+  onSend: (text: string, attachments: PendingAttachment[]) => void;
+  /** 応答待ちをやめる。 */
+  onStop: () => void;
   /** チャットの送信キー（設定画面で切替、AppPage が保持） */
   sendKeyMode: SendKeyMode;
-  /** 送信時点の控除入力スナップショットを返す（エージェントの控除ツール用）。 */
-  getDeductionsSnapshot?: () => { year: number; state: unknown } | null;
-  /** 外部接続（AI）の上書き設定（設定画面で入力、AppPage が保持） */
-  agentConnection: AgentConnectionConfig;
   /** 保存済みの過去の会話（履歴の状態は AppPage が保持し、見出し横のボタンと共有する） */
   sessions: ChatSession[];
   historyOpen: boolean;
   viewing: ChatSession | null;
   onSelectSession: (session: ChatSession) => void;
-  /** クリア時に現在の会話を履歴へ保存する。 */
-  onArchive: (messages: ChatMessage[]) => void;
-  /**
-   * クリア操作をヘッダー側（履歴ボタンの隣）へ渡す。
-   * クリアできる状態のときだけハンドラを渡し、それ以外は null を渡す。
-   */
-  onClearReady?: (handler: (() => void) | null) => void;
 }
-
-/**
- * 応答を待つ上限。サーバーはツール呼び出しを挟んで AI を最大10回呼ぶ。これを超えて
- * 返らないものは止まっているとみなし、チャットを使える状態に戻す。
- */
-const AGENT_REPLY_TIMEOUT_MS = 5 * 60 * 1000;
 
 // 送信キーの修飾キー表示。Mac は ⌘、それ以外（Windows 等）は Ctrl。
 const MOD_KEY_LABEL =
@@ -60,29 +37,24 @@ const MOD_KEY_LABEL =
     : "Ctrl";
 
 export const AgentChatPanel = ({
-  transactions,
-  onUiAction,
+  messages,
+  loading,
+  error,
+  onSend,
+  onStop,
   sendKeyMode,
-  getDeductionsSnapshot,
-  agentConnection,
   sessions,
   historyOpen,
   viewing,
   onSelectSession,
-  onArchive,
-  onClearReady,
 }: AgentChatPanelProps) => {
-  // 会話は端末に保存し、再読み込みしても続きから使えるようにする。
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadCurrentMessages());
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 添付の読み込み・検証の失敗（送信の失敗は error で受け取る）。
+  const [attachError, setAttachError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 応答待ちの送信（中断ボタン・時間切れで止める）。送信と中断のイベントの中でだけ書く。
-  const pendingRequestRef = useRef<AbortController | null>(null);
-  const { pending, addFiles, removeFile, clear: clearFiles } = useChatAttachments(setError);
+  const { pending, addFiles, removeFile, clear: clearFiles } = useChatAttachments(setAttachError);
   const inHistory = historyOpen || viewing !== null;
 
   // 新しいメッセージが来たら会話ログを一番下までスクロールする（履歴閲覧時は先頭から）。
@@ -92,101 +64,14 @@ export const AgentChatPanel = ({
     el.scrollTop = viewing ? 0 : el.scrollHeight;
   }, [messages, loading, viewing, historyOpen]);
 
-  const send = async () => {
+  const send = () => {
     const text = input.trim();
     if ((!text && pending.length === 0) || loading) return;
-    // 添付だけの送信もできるよう、本文が空なら定型文を入れる。
-    const sent = pending;
-    const userMessage: ChatMessage = {
-      role: ChatRole.User,
-      content: text || "添付ファイルを確認してください。",
-      ...(sent.length > 0
-        ? { attachments: sent.map(({ name, mimeType }) => ({ name, mimeType })) }
-        : {}),
-    };
-    const next: ChatMessage[] = [...messages, userMessage];
-    setMessages(next);
-    saveCurrentMessages(next);
+    onSend(text, pending);
     setInput("");
     clearFiles();
-    setLoading(true);
-    setError(null);
-    const controller = new AbortController();
-    pendingRequestRef.current = controller;
-    const timer = setTimeout(() => controller.abort("timeout"), AGENT_REPLY_TIMEOUT_MS);
-    try {
-      const res = await agentChat(
-        next,
-        transactions,
-        agentConnection,
-        getDeductionsSnapshot?.() ?? undefined,
-        sent.map(toChatAttachmentUpload),
-        controller.signal,
-      );
-      // 使ったツールは発言に添えて表示する（何をしたか分かるように）。
-      const answered: ChatMessage[] = [
-        ...next,
-        {
-          role: ChatRole.Assistant,
-          content: res.reply,
-          ...(res.toolCalls.length > 0
-            ? {
-                toolCalls: res.toolCalls.map((tc) => ({
-                  name: tc.name,
-                  arguments: tc.arguments,
-                })),
-              }
-            : {}),
-        },
-      ];
-      setMessages(answered);
-      saveCurrentMessages(answered);
-      if (res.toolCalls.length > 0) {
-        const actions = deriveUiActions(res.toolCalls);
-        if (onUiAction && actions.length > 0) {
-          actions.forEach((action) => onUiAction(action));
-        }
-      }
-    } catch (e) {
-      if (controller.signal.aborted) {
-        // 画面が待つのをやめても、サーバー側の処理は続いて保存まで済む場合がある
-        setError(
-          controller.signal.reason === "timeout"
-            ? "応答がないため待つのをやめました。処理はサーバーで続いている場合があります。"
-            : "応答を待つのをやめました。処理はサーバーで続いている場合があります。",
-        );
-      } else {
-        // 503（キー未設定）などは案内としてそのまま見せる
-        setError(e instanceof Error ? e.message : String(e));
-      }
-    } finally {
-      clearTimeout(timer);
-      pendingRequestRef.current = null;
-      setLoading(false);
-    }
+    setAttachError(null);
   };
-
-  const stopWaiting = () => {
-    pendingRequestRef.current?.abort("user");
-  };
-
-  // パネルが外れたら（ログアウト・ログイン切れなど）応答待ちをやめる。
-  useEffect(() => () => pendingRequestRef.current?.abort("user"), []);
-
-  // クリア = いまの会話を履歴へ保存してから空にする（履歴から後で見返せる）。
-  const clearChat = () => {
-    if (messages.length === 0) return;
-    onArchive(messages);
-    setMessages([]);
-    saveCurrentMessages([]);
-  };
-
-  // クリアボタンはヘッダー（履歴の隣）に置くため、押せる状態だけハンドラを渡す。
-  useEffect(() => {
-    onClearReady?.(!inHistory && messages.length > 0 && !loading ? clearChat : null);
-    // clearChat は毎レンダーで作り直されるが、状態が変わったときだけ親へ伝えれば足りる
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, inHistory, loading, onClearReady]);
 
   // ファイルのドラッグ&ドロップ受け口（履歴閲覧中は無効）。
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -268,7 +153,7 @@ export const AgentChatPanel = ({
               </div>
             )}
           </div>
-          {error && <AlertBox variant="error">{error}</AlertBox>}
+          {(attachError ?? error) && <AlertBox variant="error">{attachError ?? error}</AlertBox>}
           <PendingAttachmentChips pending={pending} onRemove={removeFile} />
           <Row gap="sm" align="end" className={styles.inputRow}>
             <input
@@ -304,7 +189,7 @@ export const AgentChatPanel = ({
                   sendKeyMode === "modEnter" ? modPressed : !e.shiftKey && !modPressed;
                 if (shouldSend) {
                   e.preventDefault();
-                  void send();
+                  send();
                 }
               }}
               placeholder={
@@ -316,11 +201,11 @@ export const AgentChatPanel = ({
               disabled={loading}
             />
             {loading ? (
-              <Button variant="ghost" onClick={stopWaiting}>
+              <Button variant="ghost" onClick={onStop}>
                 中断
               </Button>
             ) : (
-              <Button onClick={() => void send()}>送信</Button>
+              <Button onClick={send}>送信</Button>
             )}
           </Row>
         </>

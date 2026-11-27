@@ -1,9 +1,13 @@
 import { applyDeductionPatch, sampleTransactions, Transaction } from "@etax/shared";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@components/atoms";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageSkeleton, TableSkeleton } from "@components/molecules";
 import { DashboardSkeleton } from "@components/organisms/dashboard";
-import { AgentChatPanel, AgentUiAction } from "@components/organisms/agent";
+import {
+  AgentChatPanel,
+  AgentHeaderActions,
+  AgentUiAction,
+  useAgentConversation,
+} from "@components/organisms/agent";
 import {
   loadDeductionState,
   saveDeductionState,
@@ -47,9 +51,10 @@ export const AppPage = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => loadChatSessions());
   // 認証ゲート: 設定（必須かどうか）とログイン状態を確認するまで待つ。
   // 必須でないローカル運用ではログインせずに使える。
-  // 確認が終わったら、そのアカウントの端末保存（会話履歴・外部接続・年度）を読み直す。
-  const { authConfig, authUser, authChecked, authQueryRef, refreshAuth, loginRequired } =
+  // 確認が終わったら、そのアカウントの端末保存（会話・会話履歴・外部接続・年度）を読み直す。
+  const { authConfig, authUser, authChecked, authQuery, refreshAuth, loginRequired } =
     useAuthGate(() => {
+      conversation.reloadForAccount();
       setChatSessions(loadChatSessions());
       setAgentConnection(loadAgentConnection());
       reloadStoredYears();
@@ -100,13 +105,6 @@ export const AppPage = () => {
   const [viewReloads, setViewReloads] = useState<Partial<Record<AppView, number>>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingSession, setViewingSession] = useState<ChatSession | null>(null);
-  // 会話クリアはパネル側の操作だが、ボタンはヘッダー（履歴の隣）に置くためハンドラを受け取る。
-  const clearChatRef = useRef<(() => void) | null>(null);
-  const [canClearChat, setCanClearChat] = useState(false);
-  const handleClearReady = useCallback((handler: (() => void) | null) => {
-    clearChatRef.current = handler;
-    setCanClearChat(handler !== null);
-  }, []);
 
   const handleThemeModeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
@@ -195,6 +193,15 @@ export const AppPage = () => {
     }
   };
 
+  // エージェントとの会話。クリアのボタンは見出し（履歴の隣）に置くので、パネルではなくここで持つ。
+  const conversation = useAgentConversation({
+    transactions,
+    agentConnection,
+    getDeductionsSnapshot: () => ({ year, state: loadDeductionState(year) }),
+    onUiAction: handleUiAction,
+    onArchive: handleArchiveChat,
+  });
+
   const active = appViews.find((view) => view.id === activeView) ?? appViews[0];
   const ActiveComponent = active.Component;
 
@@ -208,10 +215,10 @@ export const AppPage = () => {
       <LoginPage
         config={authConfig}
         onAuthenticated={() => void refreshAuth()}
-        magic={authQueryRef.current.magic}
-        authError={authQueryRef.current.authError}
-        verify={authQueryRef.current.verify}
-        totpChallenge={authQueryRef.current.totpChallenge}
+        magic={authQuery.magic}
+        authError={authQuery.authError}
+        verify={authQuery.verify}
+        totpChallenge={authQuery.totpChallenge}
       />
     );
   }
@@ -228,46 +235,27 @@ export const AppPage = () => {
       transactionCount={transactions.length}
       agentPanel={
         <AgentChatPanel
-          transactions={transactions}
-          onUiAction={handleUiAction}
+          messages={conversation.messages}
+          loading={conversation.loading}
+          error={conversation.error}
+          onSend={(text, attachments) => void conversation.send(text, attachments)}
+          onStop={conversation.stopWaiting}
           sendKeyMode={sendKeyMode}
-          getDeductionsSnapshot={() => ({ year, state: loadDeductionState(year) })}
-          agentConnection={agentConnection}
           sessions={chatSessions}
           historyOpen={historyOpen}
           viewing={viewingSession}
           onSelectSession={setViewingSession}
-          onArchive={handleArchiveChat}
-          onClearReady={handleClearReady}
         />
       }
       agentHeaderExtra={
-        historyOpen || viewingSession ? (
-          <Button variant="ghost" size="sm" onClick={handleBackToChat}>
-            ← チャットに戻る
-          </Button>
-        ) : (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={chatSessions.length === 0}
-              disabledReason="履歴がありません"
-              onClick={() => setHistoryOpen(true)}
-            >
-              履歴{chatSessions.length > 0 ? `（${chatSessions.length}）` : ""}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!canClearChat}
-              disabledReason="クリアできる会話がありません"
-              onClick={() => clearChatRef.current?.()}
-            >
-              クリア
-            </Button>
-          </>
-        )
+        <AgentHeaderActions
+          inHistory={historyOpen || viewingSession !== null}
+          sessionCount={chatSessions.length}
+          canClear={conversation.messages.length > 0 && !conversation.loading}
+          onOpenHistory={() => setHistoryOpen(true)}
+          onBackToChat={handleBackToChat}
+          onClear={conversation.clear}
+        />
       }
       onViewChange={setActiveView}
       navChildren={filingNavChildren}

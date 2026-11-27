@@ -11,17 +11,20 @@ import { fetchAuthConfig, fetchMe, setUnauthorizedHandler } from "@utils/api";
  * （パスだけの書き換え）で消える前に値ごと捕捉しておき、ログイン画面へ
  * 渡す。
  */
+const emptyAuthQuery: AuthQuery = { magic: null, authError: null, verify: null, totpChallenge: null };
+
 export function useAuthGate(onUserResolved: () => void) {
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const authQueryRef = useRef<AuthQuery>(
-    typeof window !== "undefined"
-      ? parseAuthQuery(window.location.search)
-      : { magic: null, authError: null, verify: null, totpChallenge: null },
+  const [authQuery, setAuthQuery] = useState<AuthQuery>(() =>
+    typeof window !== "undefined" ? parseAuthQuery(window.location.search) : emptyAuthQuery,
   );
+  // refreshAuth（非同期の確認の完了）から最新の onUserResolved を呼ぶための参照。
   const resolvedCallbackRef = useRef(onUserResolved);
-  resolvedCallbackRef.current = onUserResolved;
+  useEffect(() => {
+    resolvedCallbackRef.current = onUserResolved;
+  });
   // API の 401 を受けたときに、ログイン中だったかと確認中かを読む（refreshAuth の中で書く）。
   const signedInRef = useRef(false);
   const refreshingRef = useRef(false);
@@ -45,7 +48,7 @@ export function useAuthGate(onUserResolved: () => void) {
     setAuthChecked(true);
     if (me) {
       // ログインできたらクエリ（magic 等）を消して通常表示に戻す
-      authQueryRef.current = { magic: null, authError: null, verify: null, totpChallenge: null };
+      setAuthQuery(emptyAuthQuery);
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, []);
@@ -65,13 +68,13 @@ export function useAuthGate(onUserResolved: () => void) {
 
   /** ログイン画面の表示が必要な状態か（未確認・必須モード未ログイン・認証クエリ処理待ち）。 */
   const authQueryPending =
-    authQueryRef.current.magic !== null ||
-    authQueryRef.current.authError !== null ||
-    authQueryRef.current.verify !== null ||
-    authQueryRef.current.totpChallenge !== null;
+    authQuery.magic !== null ||
+    authQuery.authError !== null ||
+    authQuery.verify !== null ||
+    authQuery.totpChallenge !== null;
   const loginRequired = Boolean(
     authConfig && ((authConfig.required && !authUser) || (authQueryPending && !authUser)),
   );
 
-  return { authConfig, authUser, authChecked, authQueryRef, refreshAuth, loginRequired };
+  return { authConfig, authUser, authChecked, authQuery, refreshAuth, loginRequired };
 }
