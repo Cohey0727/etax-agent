@@ -48,9 +48,8 @@ export function dbWasAttempted(): boolean {
 }
 
 /**
- * スキーマの DDL（冪等）。drizzle-kit のマイグレーションを持ち込まず、
- * 起動時にスキーマを自己修復するための最小DDL（schema.ts と一致させる）。
- * テスト（test/testDb.ts）も同じ DDL を使う。
+ * スキーマの DDL（冪等）。DB スキーマの正はこの DDL で、起動時に適用して
+ * 自己修復する（schema.ts と一致させる）。テスト（test/testDb.ts）も同じ DDL を使う。
  */
 const schemaDdl: string[] = [
   // 部分一致検索（ILIKE）の高速化に使う trigram 拡張。

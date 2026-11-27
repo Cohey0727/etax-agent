@@ -1,2 +1,0 @@
-ALTER TABLE "transactions" ADD COLUMN "business_ratio_percent" integer DEFAULT 100 NOT NULL;--> statement-breakpoint
-ALTER TABLE "transactions" ADD COLUMN "business_ratio_basis" text DEFAULT '' NOT NULL;

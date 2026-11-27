@@ -110,8 +110,7 @@ packages/
     src/gateways/    llmGateway（OpenAI互換 / Anthropic。raw fetch + Zod検証、UA・セッションヘッダー要件つき）
     src/repositories/ Drizzle スキーマとデータアクセス（transactions / imports）
     src/services/    csvImport（自動マッピング・デコード・パース）/ agent（ツール定義・実行ループ）
-    src/lib/         DB遅延初期化・AGENT_* 設定・エラ文言・バリデーションフック
-    drizzle/         生成済みマイグレーションSQL
+    src/lib/         DB遅延初期化とスキーマの DDL（起動時に適用）・AGENT_* 設定・エラー文言・バリデーションフック
   web/      React アプリ（ダッシュボード / 帳簿 / 取込 / 領収書 / 納税者情報 /
             確定申告 / 設定 / ログイン。修正は独立画面を持たず、確定申告画面の
             前回確定との差分として出す）
