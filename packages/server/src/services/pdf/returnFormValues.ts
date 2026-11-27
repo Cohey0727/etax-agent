@@ -6,7 +6,7 @@
  * 除いた税額控除で引き、基準所得税額（再差引所得税額）は外国税額控除の前の
  * 額、外国税額控除等は「所得税及び復興特別所得税の額」から引く。申告納税額は
  * 100円未満切捨てで、赤字（還付）は切り捨てずにそのまま。第3期分は予定納税
- * との精算。
+ * との精算。修正申告の第3期分の税額の増加額は100円未満切捨て（XTX と同じ）。
  */
 import {
   CorrectedFigures,
@@ -16,6 +16,7 @@ import {
   MiscIncomeInput,
   SalaryIncomeInput,
   XtxTaxpayer,
+  amendmentTaxIncreaseOf,
   incomeTaxSettlementOf,
 } from "@etax/shared";
 
@@ -140,7 +141,7 @@ export function buildReturnFormValues(source: ReturnFormSource): ReturnFormValue
   );
   const increase =
     source.amendment && source.originalThirdPeriodTax !== null
-      ? Math.max(thirdPeriod - source.originalThirdPeriodTax, 0)
+      ? amendmentTaxIncreaseOf(thirdPeriod, source.originalThirdPeriodTax)
       : 0;
 
   const amounts: Partial<Record<ReturnAmountKey, number>> = {

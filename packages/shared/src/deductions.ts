@@ -1261,3 +1261,11 @@ export function incomeTaxSettlementOf(
   const declaredTax = raw > 0 ? Math.floor(raw / 100) * 100 : raw;
   return { declaredTax, thirdPeriodTax: declaredTax - prepaidTax };
 }
+
+/**
+ * 修正申告の「第3期分の税額の増加額」（修正後 − 修正前の第3期分の税額。0未満は0）。
+ * 修正申告で納める税額なので100円未満を切り捨てる（国税通則法119条）。
+ */
+export function amendmentTaxIncreaseOf(thirdPeriodTax: number, originalThirdPeriodTax: number): number {
+  return Math.floor(Math.max(thirdPeriodTax - originalThirdPeriodTax, 0) / 100) * 100;
+}

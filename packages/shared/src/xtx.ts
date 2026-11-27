@@ -31,6 +31,7 @@ import {
   IncomeTaxResult,
   MiscIncomeInput,
   SalaryIncomeInput,
+  amendmentTaxIncreaseOf,
   computeManualIncomes,
   incomeTaxSettlementOf,
 } from "./deductions";
@@ -775,7 +776,7 @@ function buildKoa020Face1(data: XtxFilingData): string {
 
   // 修正申告・その他は「税金の計算」グループの外（申告内容の直下）に置く
   if (data.amendment && data.originalThirdPeriodTax !== null) {
-    const increase = Math.floor(Math.max(thirdPeriod - data.originalThirdPeriodTax, 0) / 100) * 100;
+    const increase = amendmentTaxIncreaseOf(thirdPeriod, data.originalThirdPeriodTax);
     body.push(
       `<ABB00763>${amountAlways("ABB00765", data.originalThirdPeriodTax)}${amountAlways("ABB00767", increase)}</ABB00763>`,
     );

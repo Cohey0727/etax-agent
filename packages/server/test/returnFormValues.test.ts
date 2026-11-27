@@ -33,6 +33,8 @@ function formValues(options: {
   credits?: Partial<TaxCreditInputs>;
   withholding?: number;
   separateStockIncome?: number;
+  /** 修正申告: 修正前の第3期分の税額 */
+  originalThirdPeriodTax?: number;
   /** 計算エンジンの結果の一部を差し替える（エンジンでは作りにくい組み合わせの検証用） */
   overrideTax?: (tax: IncomeTaxResult) => IncomeTaxResult;
 }): { values: ReturnFormValues; tax: IncomeTaxResult } {
@@ -50,7 +52,7 @@ function formValues(options: {
   const tax = options.overrideTax ? options.overrideTax(computed) : computed;
   const values = buildReturnFormValues({
     year: YEAR,
-    amendment: false,
+    amendment: options.originalThirdPeriodTax !== undefined,
     submissionDate: "2026-03-01",
     taxpayer: EMPTY_XTX_TAXPAYER,
     figures,
@@ -61,7 +63,7 @@ function formValues(options: {
     deductionInputs: EMPTY_DEDUCTION_INPUTS,
     withholdingTax: options.withholding ?? 0,
     prepaidTax: 0,
-    originalThirdPeriodTax: null,
+    originalThirdPeriodTax: options.originalThirdPeriodTax ?? null,
   });
   return { values, tax };
 }
@@ -121,6 +123,16 @@ describe("buildReturnFormValues の税金の計算", () => {
     expect(a.thirdRefund).toBe(-raw);
     expect(a.thirdPay).toBeUndefined();
     expect(a.dueByDeadline).toBe(0);
+  });
+
+  test("修正申告の第3期分の税額の増加額は100円未満を切り捨て、申告期限までに納付する税金も同額", () => {
+    // 修正前が還付（△12,345）だと、増加額の元は端数を持つ
+    const { values } = formValues({ originalThirdPeriodTax: -12_345 });
+    const a = values.amounts;
+    expect(a.amendOriginal).toBe(-12_345);
+    const expected = Math.floor(((a.thirdPay ?? 0) + 12_345) / 100) * 100;
+    expect(a.amendIncrease).toBe(expected);
+    expect(a.dueByDeadline).toBe(expected);
   });
 
   test("申告分離課税の所得がある場合、課税される所得金額は分離課税分を合算する", () => {

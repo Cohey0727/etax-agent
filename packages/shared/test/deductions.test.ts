@@ -33,6 +33,7 @@ import {
   EMPTY_DEDUCTION_INPUTS,
   EMPTY_TAX_CREDIT_INPUTS,
   incomeTaxSettlementOf,
+  amendmentTaxIncreaseOf,
 } from "../src/index";
 
 describe("基礎控除", () => {
@@ -574,5 +575,13 @@ describe("incomeTaxSettlementOf", () => {
     const result = incomeTaxSettlementOf(tax, withholding, 0);
     expect(result.declaredTax).toBe(tax.incomeTaxAfterForeignCredit + tax.reconstructionTax - withholding);
     expect(result.declaredTax).toBeLessThan(0);
+  });
+});
+
+describe("amendmentTaxIncreaseOf", () => {
+  test("修正後と修正前の第3期分の差を100円未満切り捨て、減ったときは 0", () => {
+    expect(amendmentTaxIncreaseOf(100_000, -12_345)).toBe(112_300);
+    expect(amendmentTaxIncreaseOf(100_000, 40_000)).toBe(60_000);
+    expect(amendmentTaxIncreaseOf(30_000, 40_000)).toBe(0);
   });
 });
