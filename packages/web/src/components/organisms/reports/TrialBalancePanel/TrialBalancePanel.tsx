@@ -5,13 +5,14 @@ import {
   isBalanceSheetEmpty,
 } from "@etax/shared";
 import { useEffect, useMemo, useState } from "react";
-import { Card, Col, SkeletonBar, Text } from "@components/atoms";
+import { Card, Col, Text } from "@components/atoms";
 import {
   hydrateDeductionStateFromServer,
   loadDeductionState,
 } from "@components/organisms/filing/DeductionPanel/deductionStorage";
 import { AppView, TrialBalanceResponse } from "@types";
 import { fetchTrialBalance } from "@utils";
+import { ReportSkeleton } from "../ReportSkeleton";
 import { BalanceSheetSection } from "./BalanceSheetSection";
 import { MonthlySection } from "./MonthlySection";
 import { OtherSection } from "./OtherSection";
@@ -90,7 +91,7 @@ export const TrialBalancePanel = ({ transactions, year, onNavigate }: TrialBalan
       </Card>
     );
   }
-  if (!report) return <TrialBalanceSkeleton />;
+  if (!report) return <ReportSkeleton />;
   if (!hasTransactions) {
     return (
       <Card>
@@ -131,19 +132,3 @@ export const TrialBalancePanel = ({ transactions, year, onNavigate }: TrialBalan
     </Col>
   );
 };
-
-/** 読み込み中のスケルトン（試算表の表組みに似せた形）。 */
-const TrialBalanceSkeleton = () => (
-  <Col gap="md">
-    {[0, 1].map((card) => (
-      <Card key={card}>
-        <Col gap="sm">
-          <SkeletonBar width="30%" height={14} />
-          {[0, 1, 2, 3, 4, 5].map((row) => (
-            <SkeletonBar key={row} width="100%" height={12} />
-          ))}
-        </Col>
-      </Card>
-    ))}
-  </Col>
-);

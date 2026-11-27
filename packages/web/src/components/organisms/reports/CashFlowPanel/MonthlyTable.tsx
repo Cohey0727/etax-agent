@@ -1,3 +1,4 @@
+import { yearMonthLabel } from "@etax/shared";
 import { Card, Col, Text } from "@components/atoms";
 import { CashFlowMonth } from "@types";
 import { formatYen } from "@utils";
@@ -49,7 +50,7 @@ export const MonthlyTable = ({ months, openingBalance }: MonthlyTableProps) => {
           {months.map((row) => (
             <div key={row.month} className={styles.monthRow}>
               <span>
-                {monthLabel(row.month)}
+                {yearMonthLabel(row.month)}
                 <span className={styles.phaseLabel}>{PHASE_LABELS[row.phase]}</span>
               </span>
               <span className={styles.cell}>{formatYen(row.actual_inflow)}</span>
@@ -82,8 +83,3 @@ export const MonthlyTable = ({ months, openingBalance }: MonthlyTableProps) => {
     </Card>
   );
 };
-
-/** YYYY-MM を「YYYY年M月」にする。 */
-function monthLabel(month: string): string {
-  return `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`;
-}

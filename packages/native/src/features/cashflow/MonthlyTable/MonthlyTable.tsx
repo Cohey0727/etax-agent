@@ -1,9 +1,9 @@
+import { yearMonthLabel } from "@etax/shared";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { CashFlowMonth } from "@/api";
 import { AppText, Card, Chip, ChipTone } from "@/components";
 import { colors, space } from "@/theme";
 import { formatYen } from "@/utils";
-import { monthLabel } from "../format";
 
 export interface MonthlyTableProps {
   months: CashFlowMonth[];
@@ -62,7 +62,7 @@ export function MonthlyTable({ months, openingBalance }: MonthlyTableProps) {
             return (
               <View key={row.month} style={styles.row}>
                 <View style={styles.monthCell}>
-                  <AppText size="sm">{monthLabel(row.month)}</AppText>
+                  <AppText size="sm">{yearMonthLabel(row.month)}</AppText>
                   <Chip label={PHASE_LABELS[row.phase]} tone={PHASE_TONES[row.phase]} />
                 </View>
                 {values.map((value, index) => (

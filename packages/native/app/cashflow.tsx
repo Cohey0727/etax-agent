@@ -1,3 +1,4 @@
+import { yearMonthLabel } from "@etax/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CashFlowReport, fetchCashFlowReport } from "@/api";
 import {
@@ -10,7 +11,6 @@ import {
   SkeletonCard,
 } from "@/components";
 import { BalanceChart, MonthlyTable, UpcomingSection } from "@/features/cashflow";
-import { monthLabel } from "@/features/cashflow/format";
 import { formatYen, parseAmount } from "@/utils";
 
 /** 資金繰りレポート。取得に失敗しても入力欄は残し、「反映」で取り直せるようにする。 */
@@ -68,7 +68,7 @@ export default function CashFlowScreen() {
         {report ? (
           <AppText size="sm" tone="muted">
             登録済みの取引実績と未入金の請求書に基づく試算です。
-            {monthLabel(report.from_month)}から{monthLabel(report.to_month)}
+            {yearMonthLabel(report.from_month)}から{yearMonthLabel(report.to_month)}
             までを表示しています。 最終月の月末残高（試算）は{" "}
             {formatYen(report.projected_closing_balance)} です。
           </AppText>

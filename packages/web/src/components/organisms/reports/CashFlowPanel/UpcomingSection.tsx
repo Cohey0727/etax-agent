@@ -1,3 +1,4 @@
+import { yearMonthLabel } from "@etax/shared";
 import { Card, Col, Text } from "@components/atoms";
 import { CashFlowReceipt, CashFlowScheduledReceipt } from "@types";
 import { formatYen } from "@utils";
@@ -49,7 +50,7 @@ export const UpcomingSection = ({ upcoming, undated, overdueAmount }: UpcomingSe
             </div>
             {upcoming.map((receipt) => (
               <div key={receipt.document_id} className={styles.receiptRow}>
-                <span>{monthLabel(receipt.scheduled_month)}</span>
+                <span>{yearMonthLabel(receipt.scheduled_month)}</span>
                 <span>{receipt.counterparty_name}</span>
                 <span>{receipt.document_number ?? "―"}</span>
                 <span>{receipt.due_date ?? "―"}</span>
@@ -91,8 +92,3 @@ export const UpcomingSection = ({ upcoming, undated, overdueAmount }: UpcomingSe
     </Card>
   );
 };
-
-/** YYYY-MM を「YYYY年M月」にする。 */
-function monthLabel(month: string): string {
-  return `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`;
-}

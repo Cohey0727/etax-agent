@@ -1,9 +1,9 @@
+import { yearMonthLabel } from "@etax/shared";
 import { StyleSheet, View } from "react-native";
 import { CashFlowReceipt, CashFlowScheduledReceipt } from "@/api";
 import { AlertBox, AppText, Card, Chip } from "@/components";
 import { colors, space } from "@/theme";
 import { formatDate, formatYen } from "@/utils";
-import { monthLabel } from "../format";
 
 export interface UpcomingSectionProps {
   upcoming: CashFlowScheduledReceipt[];
@@ -42,7 +42,7 @@ export function UpcomingSection({ upcoming, undated, overdueAmount }: UpcomingSe
       {upcoming.map((receipt) => (
         <ReceiptRow
           key={receipt.document_id}
-          title={`${monthLabel(receipt.scheduled_month)} ・ ${receipt.counterparty_name}`}
+          title={`${yearMonthLabel(receipt.scheduled_month)} ・ ${receipt.counterparty_name}`}
           receipt={receipt}
           statusLabel={receipt.overdue ? "期日超過" : receipt.status === "partial" ? "一部入金" : "未入金"}
           overdue={receipt.overdue}

@@ -25,3 +25,4 @@ export * from "./dashboard";
 export * from "./trialBalanceRows";
 export * from "./invoiceForm";
 export * from "./ledgerCsv";
+export * from "./yearMonthLabel";

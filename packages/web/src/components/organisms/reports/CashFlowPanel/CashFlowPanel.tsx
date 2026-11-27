@@ -1,8 +1,10 @@
+import { yearMonthLabel } from "@etax/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Col, Input, Row, SkeletonBar, Text } from "@components/atoms";
+import { Button, Card, Col, Input, Row, Text } from "@components/atoms";
 import { AlertBox } from "@components/molecules";
 import { CashFlowReport } from "@types";
 import { fetchCashFlowReport, formatYen } from "@utils";
+import { ReportSkeleton } from "../ReportSkeleton";
 import { BalanceChart } from "./BalanceChart";
 import styles from "./CashFlowPanel.css";
 import { MonthlyTable } from "./MonthlyTable";
@@ -45,7 +47,7 @@ export const CashFlowPanel = () => {
     }
   };
 
-  if (!report && !failed) return <CashFlowSkeleton />;
+  if (!report && !failed) return <ReportSkeleton />;
   const hasData =
     report !== null &&
     (report.months.some((m) => m.actual_inflow !== 0 || m.actual_outflow !== 0) ||
@@ -64,7 +66,7 @@ export const CashFlowPanel = () => {
           {report ? (
             <Text variant="muted">
               登録済みの取引実績と未入金の請求書に基づく試算です。
-              {monthLabel(report.from_month)}から{monthLabel(report.to_month)}
+              {yearMonthLabel(report.from_month)}から{yearMonthLabel(report.to_month)}
               までを表示しています。
               最終月の月末残高（試算）は {formatYen(report.projected_closing_balance)} です。
             </Text>
@@ -108,24 +110,3 @@ export const CashFlowPanel = () => {
     </Col>
   );
 };
-
-/** YYYY-MM を「YYYY年M月」にする。 */
-function monthLabel(month: string): string {
-  return `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`;
-}
-
-/** 読み込み中のスケルトン（月次表の形に似せた形）。 */
-const CashFlowSkeleton = () => (
-  <Col gap="md">
-    {[0, 1].map((card) => (
-      <Card key={card}>
-        <Col gap="sm">
-          <SkeletonBar width="30%" height={14} />
-          {[0, 1, 2, 3, 4, 5].map((row) => (
-            <SkeletonBar key={row} width="100%" height={12} />
-          ))}
-        </Col>
-      </Card>
-    ))}
-  </Col>
-);
