@@ -9,6 +9,7 @@ import {
   loadPanelOpen,
   savePanelOpen,
   useMediaQuery,
+  yearSelectOptions,
 } from "./appTemplateUtils";
 
 export interface AppTemplateProps {
@@ -52,8 +53,7 @@ export const AppTemplate = ({
   children,
 }: AppTemplateProps) => {
   // 年度の追加はセレクタの中の選択肢で行う（最大年度+1 / 最小年度-1）。
-  const nextYear = (years[0] ?? new Date().getFullYear()) + 1;
-  const prevYear = years.length > 0 ? years[years.length - 1] - 1 : null;
+  const yearOptions = yearSelectOptions(years, selectedYear);
   const handleYearSelect = (raw: string) => {
     if (raw.startsWith("add:")) {
       onAddYear?.(Number(raw.slice("add:".length)));
@@ -138,15 +138,19 @@ export const AppTemplate = ({
                             aria-label="年度"
                           >
                             {onAddYear ? (
-                              <option value={`add:${nextYear}`}>{nextYear}年度を追加</option>
+                              <option value={`add:${yearOptions.nextYear}`}>
+                                {yearOptions.nextYear}年度を追加
+                              </option>
                             ) : null}
-                            {years.map((year) => (
+                            {yearOptions.years.map((year) => (
                               <option key={year} value={year}>
                                 {year}年度
                               </option>
                             ))}
-                            {onAddYear && prevYear !== null ? (
-                              <option value={`add:${prevYear}`}>{prevYear}年度を追加</option>
+                            {onAddYear ? (
+                              <option value={`add:${yearOptions.prevYear}`}>
+                                {yearOptions.prevYear}年度を追加
+                              </option>
                             ) : null}
                           </Select>
                         </Col>
