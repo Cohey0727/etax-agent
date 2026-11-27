@@ -24,7 +24,7 @@
 */
 import { SIMPLIFIED_RATES, BusinessKind} from "./taxcalc";
 import { normalizeXtxTaxpayer} from "./taxpayerNormalize";
-import { XtxTaxpayer, amount, amountAlways, esc, kubun, ref} from "./xtx";
+import { SHOHI_NS, XtxTaxpayer, amount, amountAlways, formRootXml, kubun, ref, xtxDocumentXml} from "./xtx";
 import {
 amendmentIncrease,
 buildShohiIt,
@@ -36,9 +36,6 @@ settleConsumptionTax,
 signedLocalTax,
 signedNationalTax,
 } from "./xtxShohi";
-
-const SOFT_NAME = "eTaxAgent";
-const SHOHI_NS = "http://xml.e-tax.nta.go.jp/XSD/shohi";
 
 /** 簡易課税の事業区分（1=卸売、2=小売、3=製造等、4=その他、5=サービス等、6=不動産）。 */
 export type SimplifiedCategory = 1 | 2 | 3 | 4 | 5 | 6;
@@ -572,13 +569,7 @@ amountAlways("ABR00000", r.outputTax) +
 `<ABV00000>${amountAlways("ABV00010", localBase)}${amountAlways("ABV00040", localBase)}</ABV00000>` +
 `</SHA020-2>`;
 
-return (
-`<SHA020 VR="9.0" id="SHA020" page="1" sakuseiDay="${esc(data.submissionDate)}" ` +
-`sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="${SHOHI_NS}">` +
-page1 +
-page2 +
-`</SHA020>`
-);
+return formRootXml("SHA020", "9.0", SHOHI_NS, data, page1 + page2);
 }
 
 // ---------------------------------------------------------------------------
@@ -621,12 +612,7 @@ parts.push(
 parts.push(
 `<DUJ00000>${amount("DUJ00010", r.refundLocal)}${amountAlways("DUJ00020", r.localTaxGross)}</DUJ00000>`,
 );
-return (
-`<SHB047 VR="1.0" id="SHB047" page="1" sakuseiDay="${esc(data.submissionDate)}" ` +
-`sakuseiNM="${esc(data.taxpayer.name)}" softNM="${SOFT_NAME}" xmlns="${SHOHI_NS}">` +
-parts.join("") +
-`</SHB047>`
-);
+return formRootXml("SHB047", "1.0", SHOHI_NS, data, parts.join(""));
 }
 
 // ---------------------------------------------------------------------------
@@ -764,12 +750,13 @@ page2.push(
 `<DVE00720>${amount("DVE00730", r.inputTax8)}${amount("DVE00740", r.inputTax10)}${amountAlways("DVE00750", r.inputTax)}</DVE00720>`,
 );
 
-return (
-`<SHB067 VR="1.0" id="SHB067" page="1" sakuseiDay="${esc(data.submissionDate)}" ` +
-`sakuseiNM="${esc(data.taxpayer.name)}" softNM="${SOFT_NAME}" xmlns="${SHOHI_NS}">` +
+return formRootXml(
+"SHB067",
+"1.0",
+SHOHI_NS,
+data,
 `<SHB067-1 page="1">${page1.join("")}</SHB067-1>` +
-`<SHB067-2 page="2"><DVE00000>${page2.join("")}</DVE00000></SHB067-2>` +
-`</SHB067>`
+`<SHB067-2 page="2"><DVE00000>${page2.join("")}</DVE00000></SHB067-2>`,
 );
 }
 
@@ -794,26 +781,10 @@ const forms: { id: string; xml: string}[] = [
 { id: "SHB047", xml: buildShb047(normalized)},
 { id: "SHB067", xml: buildShb067(normalized)},
 ];
-const catalog =
-`<CATALOG id="CATALOG">` +
-`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
-`<rdf:Description ID="REPORT">` +
-`<SEND_DATA/>` +
-`<IT_SEC/>` +
-`<FORM_SEC><rdf:Seq>${forms.map((f) => `<rdf:li>${f.id}</rdf:li>`).join("")}</rdf:Seq></FORM_SEC>` +
-`<TENPU_SEC/>` +
-`<XBRL_SEC/>` +
-`<XBRL2_1_SEC/>` +
-`<SOFUSHO_SEC/>` +
-`<ATTACH_SEC/>` +
-`<CSV_SEC/>` +
-`</rdf:Description></rdf:RDF></CATALOG>`;
-return (
-`<?xml version="1.0" encoding="UTF-8"?>\n` +
-`<DATA id="DATA" xmlns="${SHOHI_NS}">` +
-`<RSH0030 VR="26.0.0" id="RSH0030" xmlns="${SHOHI_NS}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
-catalog +
-`<CONTENTS id="CONTENTS">${buildShohiIt(normalized, "RSH0030")}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
-`</RSH0030></DATA>`
+return xtxDocumentXml(
+SHOHI_NS,
+{ cd: "RSH0030", vr: "26.0.0" },
+buildShohiIt(normalized, "RSH0030"),
+forms,
 );
 }

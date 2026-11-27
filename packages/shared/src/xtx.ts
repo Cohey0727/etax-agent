@@ -376,12 +376,20 @@ export function nozeishaIdXml(t: XtxTaxpayer): string {
   return `<NOZEISHA_ID ID="NOZEISHA_ID">${esc(digits)}</NOZEISHA_ID>`;
 }
 
-function buildIt(data: XtxFilingData): string {
-  const t = data.taxpayer;
-  // ITdefinition.xsd の ITtype シーケンス順に並べる（順序が違うと検証エラー）。
+/**
+ * IT部（納税者情報と手続）。ITdefinition.xsd の ITtype シーケンス順に並べる
+ * （順序が違うと検証エラー）。1月1日の住所・生年月日・職業は所得税の申告書だけが
+ * 参照するため incomeTaxItems のときに入れる。trailing は手続コードより後ろの要素。
+ */
+export function buildItXml(
+  t: XtxTaxpayer,
+  submissionDate: string,
+  procedureCd: string,
+  options: { incomeTaxItems: boolean; trailing: string[] },
+): string {
   const items: string[] = [];
   if (t.taxOfficeName) items.push(zeimushoXml(t));
-  const sub = yymmddXml(data.submissionDate);
+  const sub = yymmddXml(submissionDate);
   if (sub) items.push(`<TEISYUTSU_DAY ID="TEISYUTSU_DAY">${sub}</TEISYUTSU_DAY>`);
   const uid = nozeishaIdXml(t);
   if (uid) items.push(uid);
@@ -395,21 +403,93 @@ function buildIt(data: XtxFilingData): string {
   const zip = zipXml(t.zipCode);
   if (zip) items.push(`<NOZEISHA_ZIP ID="NOZEISHA_ZIP">${zip}</NOZEISHA_ZIP>`);
   if (t.address) items.push(`<NOZEISHA_ADR ID="NOZEISHA_ADR">${esc(t.address)}</NOZEISHA_ADR>`);
-  if (t.jan1Address) {
+  if (options.incomeTaxItems && t.jan1Address) {
     items.push(`<ICHIGATSUIPPI_ADR ID="ICHIGATSUIPPI_ADR">${esc(t.jan1Address)}</ICHIGATSUIPPI_ADR>`);
   }
   if (t.shopName) items.push(`<NOZEISHA_YAGO ID="NOZEISHA_YAGO">${limitedText(t.shopName, 30, "屋号")}</NOZEISHA_YAGO>`);
   const tel = phoneXml(t.phone);
   if (tel) items.push(`<NOZEISHA_TEL ID="NOZEISHA_TEL">${tel}</NOZEISHA_TEL>`);
-  const birth = yymmddXml(t.birthDate);
-  if (birth) items.push(`<BIRTHDAY ID="BIRTHDAY">${birth}</BIRTHDAY>`);
-  if (t.occupation) items.push(`<SHOKUGYO ID="SHOKUGYO">${limitedText(t.occupation, 20, "職業")}</SHOKUGYO>`);
-  items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>RKO0010</procedure_CD></TETSUZUKI>`);
-  items.push(`<NENBUN ID="NENBUN">${eraYearXml(data.year)}</NENBUN>`);
-  items.push(
-    `<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>${data.amendment ? 2 : 1}</kubun_CD></SHINKOKU_KBN>`,
-  );
+  if (options.incomeTaxItems) {
+    const birth = yymmddXml(t.birthDate);
+    if (birth) items.push(`<BIRTHDAY ID="BIRTHDAY">${birth}</BIRTHDAY>`);
+    if (t.occupation) items.push(`<SHOKUGYO ID="SHOKUGYO">${limitedText(t.occupation, 20, "職業")}</SHOKUGYO>`);
+  }
+  items.push(`<TETSUZUKI ID="TETSUZUKI"><procedure_CD>${procedureCd}</procedure_CD></TETSUZUKI>`);
+  items.push(...options.trailing);
   return `<IT VR="1.0" id="IT">${items.join("")}</IT>`;
+}
+
+function buildIt(data: XtxFilingData): string {
+  return buildItXml(data.taxpayer, data.submissionDate, "RKO0010", {
+    incomeTaxItems: true,
+    trailing: [
+      `<NENBUN ID="NENBUN">${eraYearXml(data.year)}</NENBUN>`,
+      `<SHINKOKU_KBN ID="SHINKOKU_KBN"><kubun_CD>${data.amendment ? 2 : 1}</kubun_CD></SHINKOKU_KBN>`,
+    ],
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 様式・申告等データ全体の枠
+// ---------------------------------------------------------------------------
+
+export const SHOTOKU_NS = "http://xml.e-tax.nta.go.jp/XSD/shotoku";
+export const SHOHI_NS = "http://xml.e-tax.nta.go.jp/XSD/shohi";
+
+/** 様式のルート要素（版・作成日・作成者・作成ソフト・名前空間の属性つき）。 */
+export function formRootXml(
+  id: string,
+  vr: string,
+  ns: string,
+  data: { submissionDate: string; taxpayer: XtxTaxpayer },
+  content: string,
+): string {
+  return (
+    `<${id} VR="${vr}" id="${id}" page="1" sakuseiDay="${esc(data.submissionDate)}" ` +
+    `sakuseiNM="${esc(data.taxpayer.name)}" softNM="${SOFT_NAME}" xmlns="${ns}">${content}</${id}>`
+  );
+}
+
+/** 期間（1月1日〜12月31日）の月日要素。 */
+export function fullYearPeriodXml(fromTag: string, toTag: string): string {
+  return (
+    `<${fromTag}><gen:mm>1</gen:mm><gen:dd>1</gen:dd></${fromTag}>` +
+    `<${toTag}><gen:mm>12</gen:mm><gen:dd>31</gen:dd></${toTag}>`
+  );
+}
+
+/**
+ * 申告等データ全体（DATA → 手続 → CATALOG・CONTENTS）。CATALOG（管理用部分）の
+ * RDF は CATALOG.xsd が lax のため骨格のみとし、FORM_SEC に様式IDを列挙する。
+ */
+export function xtxDocumentXml(
+  ns: string,
+  procedure: { cd: string; vr: string },
+  it: string,
+  forms: { id: string; xml: string }[],
+): string {
+  const catalog =
+    `<CATALOG id="CATALOG">` +
+    `<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
+    `<rdf:Description ID="REPORT">` +
+    `<SEND_DATA/>` +
+    `<IT_SEC/>` +
+    `<FORM_SEC><rdf:Seq>${forms.map((f) => `<rdf:li>${f.id}</rdf:li>`).join("")}</rdf:Seq></FORM_SEC>` +
+    `<TENPU_SEC/>` +
+    `<XBRL_SEC/>` +
+    `<XBRL2_1_SEC/>` +
+    `<SOFUSHO_SEC/>` +
+    `<ATTACH_SEC/>` +
+    `<CSV_SEC/>` +
+    `</rdf:Description></rdf:RDF></CATALOG>`;
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<DATA id="DATA" xmlns="${ns}">` +
+    `<${procedure.cd} VR="${procedure.vr}" id="${procedure.cd}" xmlns="${ns}" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
+    catalog +
+    `<CONTENTS id="CONTENTS">${it}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
+    `</${procedure.cd}></DATA>`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -965,7 +1045,7 @@ function buildKoc080(data: XtxFilingData, vr: string): string {
       `<EHQ00140>${totalsParts.join("")}</EHQ00140></EHQ00000></KOC080-2>`;
   }
 
-  return `<KOC080 VR="${vr}" id="KOC080" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${page1}${page2}</KOC080>`;
+  return formRootXml("KOC080", vr, SHOTOKU_NS, data, `${page1}${page2}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1013,7 +1093,7 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
   if (toEraDate(data.submissionDate)) parts.push(ref("AME00000", "TEISYUTSU_DAY"));
 
   const pl: string[] = [];
-  pl.push(`<AMF00020><AMF00030><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AMF00030><AMF00040><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AMF00040></AMF00020>`);
+  pl.push(`<AMF00020>${fullYearPeriodXml("AMF00030", "AMF00040")}</AMF00020>`);
   const amounts: string[] = [];
   amounts.push(amountAlways("AMF00100", revenue));
   if (purchases > 0) {
@@ -1055,7 +1135,7 @@ function buildKoa210(data: XtxFilingData, vr: string): string {
   const depDetail210 = buildDepreciationDetail(data.depreciation?.business ?? [], DEP_TAGS_KOA210);
   const page3 = depDetail210 ? `<KOA210-3 page="3">${depDetail210}</KOA210-3>` : "";
   const page4 = buildBalanceSheetPage(data);
-  return `<KOA210 VR="${vr}" id="KOA210" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA210-1 page="1">${parts.join("")}</KOA210-1>${page3}${page4}</KOA210>`;
+  return formRootXml("KOA210", vr, SHOTOKU_NS, data, `<KOA210-1 page="1">${parts.join("")}</KOA210-1>${page3}${page4}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1092,7 +1172,7 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
   if (toEraDate(data.submissionDate)) parts.push(ref("ANE00000", "TEISYUTSU_DAY"));
 
   const pl: string[] = [];
-  pl.push(`<ANF00020><ANF00030><gen:mm>1</gen:mm><gen:dd>1</gen:dd></ANF00030><ANF00040><gen:mm>12</gen:mm><gen:dd>31</gen:dd></ANF00040></ANF00020>`);
+  pl.push(`<ANF00020>${fullYearPeriodXml("ANF00030", "ANF00040")}</ANF00020>`);
   const extraRevenue = Math.max(revenue - rent, 0);
   if (extraRevenue > 0) pl.push(`<ANF00050>その他収入</ANF00050>`);
   const revenueParts: string[] = [];
@@ -1131,7 +1211,7 @@ function buildKoa220(data: XtxFilingData, vr: string): string {
   const depDetail220 = buildDepreciationDetail(data.depreciation?.realEstate ?? [], DEP_TAGS_KOA220);
   // 減価償却費の計算（ANF00880）は KOA220 の3ページ目の要素
   const page3_220 = depDetail220 ? `<KOA220-3 page="3">${depDetail220}</KOA220-3>` : "";
-  return `<KOA220 VR="${vr}" id="KOA220" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA220-1 page="1">${parts.join("")}</KOA220-1>${page3_220}</KOA220>`;
+  return formRootXml("KOA220", vr, SHOTOKU_NS, data, `<KOA220-1 page="1">${parts.join("")}</KOA220-1>${page3_220}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1177,7 +1257,7 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
   // 営業等（1）固定: 雑（業務）は雑所得側の様式で扱うため対象外
   parts.push(`<AIR00000><kubun_CD>1</kubun_CD></AIR00000>`);
   parts.push(
-    `<AIF00000><AIF00010><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AIF00010><AIF00020><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AIF00020></AIF00000>`,
+    `<AIF00000>${fullYearPeriodXml("AIF00010", "AIF00020")}</AIF00000>`,
   );
 
   const pl: string[] = [];
@@ -1237,7 +1317,7 @@ function buildKoa110(data: XtxFilingData, vr: string): string {
 
   const depDetail110 = buildDepreciationDetail(data.depreciation?.business ?? [], DEP_TAGS_KOA110);
   const page2_110 = depDetail110 ? `<KOA110-2 page="2">${depDetail110}</KOA110-2>` : "";
-  return `<KOA110 VR="${vr}" id="KOA110" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA110-1 page="1">${parts.join("")}</KOA110-1>${page2_110}</KOA110>`;
+  return formRootXml("KOA110", vr, SHOTOKU_NS, data, `<KOA110-1 page="1">${parts.join("")}</KOA110-1>${page2_110}`);
 }
 
 /** KOA130 の固定経費行（その他の経費グループ）: [科目名, タグ] */
@@ -1283,7 +1363,7 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
   if (taxpayer.length > 0) parts.push(`<AKB00000>${taxpayer.join("")}</AKB00000>`);
   if (toEraDate(data.submissionDate)) parts.push(ref("AKE00000", "TEISYUTSU_DAY"));
   parts.push(
-    `<AKF00000><AKF00010><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AKF00010><AKF00020><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AKF00020></AKF00000>`,
+    `<AKF00000>${fullYearPeriodXml("AKF00010", "AKF00020")}</AKF00000>`,
   );
 
   const pl: string[] = [];
@@ -1327,7 +1407,7 @@ function buildKoa130(data: XtxFilingData, vr: string): string {
 
   const depDetail = buildDepreciationDetail(data.depreciation?.realEstate ?? [], DEP_TAGS_KOA130);
   const page2 = depDetail ? `<KOA130-2 page="2">${depDetail}</KOA130-2>` : "";
-  return `<KOA130 VR="${vr}" id="KOA130" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA130-1 page="1">${parts.join("")}</KOA130-1>${page2}</KOA130>`;
+  return formRootXml("KOA130", vr, SHOTOKU_NS, data, `<KOA130-1 page="1">${parts.join("")}</KOA130-1>${page2}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1426,7 +1506,7 @@ function buildKoa240(data: XtxFilingData, vr: string): string {
   amounts.push(amount("APF00610", stmt.beefCattleExemptionAmount));
 
   parts.push(
-    `<APF00000><APF00010><APF00020><APF00030><gen:mm>1</gen:mm><gen:dd>1</gen:dd></APF00030><APF00040><gen:mm>12</gen:mm><gen:dd>31</gen:dd></APF00040></APF00020><APF00090>${amounts.join("")}</APF00090></APF00010></APF00000>`,
+    `<APF00000><APF00010><APF00020>${fullYearPeriodXml("APF00030", "APF00040")}</APF00020><APF00090>${amounts.join("")}</APF00090></APF00010></APF00000>`,
   );
 
   const depDetail240 = buildDepreciationDetail(
@@ -1434,7 +1514,7 @@ function buildKoa240(data: XtxFilingData, vr: string): string {
     DEP_TAGS_KOA240,
   );
   const page3 = depDetail240 ? `<KOA240-3 page="3">${depDetail240}</KOA240-3>` : "";
-  return `<KOA240 VR="${vr}" id="KOA240" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA240-1 page="1">${parts.join("")}</KOA240-1>${page3}</KOA240>`;
+  return formRootXml("KOA240", vr, SHOTOKU_NS, data, `<KOA240-1 page="1">${parts.join("")}</KOA240-1>${page3}`);
 }
 
 /** KOA120 の経費の先頭の独立行: [科目名, タグ]。「地代賃借料」は様式の「小作料・賃借料」行。 */
@@ -1480,7 +1560,7 @@ function buildKoa120(data: XtxFilingData, vr: string): string {
   if (taxpayer.length > 0) parts.push(`<AJB00000>${taxpayer.join("")}</AJB00000>`);
   if (toEraDate(data.submissionDate)) parts.push(ref("AJE00000", "TEISYUTSU_DAY"));
   parts.push(
-    `<AJF00000><AJF00010><gen:mm>1</gen:mm><gen:dd>1</gen:dd></AJF00010><AJF00020><gen:mm>12</gen:mm><gen:dd>31</gen:dd></AJF00020></AJF00000>`,
+    `<AJF00000>${fullYearPeriodXml("AJF00010", "AJF00020")}</AJF00000>`,
   );
 
   const pl: string[] = [];
@@ -1536,7 +1616,7 @@ function buildKoa120(data: XtxFilingData, vr: string): string {
     DEP_TAGS_KOA120,
   );
   const page2 = depDetail120 ? `<KOA120-2 page="2">${depDetail120}</KOA120-2>` : "";
-  return `<KOA120 VR="${vr}" id="KOA120" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku"><KOA120-1 page="1">${parts.join("")}</KOA120-1>${page2}</KOA120>`;
+  return formRootXml("KOA120", vr, SHOTOKU_NS, data, `<KOA120-1 page="1">${parts.join("")}</KOA120-1>${page2}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1869,12 +1949,16 @@ export function buildXtxFiling(data: XtxFilingData): string {
     filingKind: null,
   });
   const normalized: XtxFilingData = { ...data, taxpayer };
-  const t = taxpayer;
   const forms: { id: string; xml: string }[] = [];
   forms.push({
     id: "KOA020",
-    xml:
-      `<KOA020 VR="${versions.koa020}" id="KOA020" page="1" sakuseiDay="${esc(data.submissionDate)}" sakuseiNM="${esc(t.name)}" softNM="${SOFT_NAME}" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}${buildKoa020Face3(normalized)}</KOA020>`,
+    xml: formRootXml(
+      "KOA020",
+      versions.koa020,
+      SHOTOKU_NS,
+      normalized,
+      `${buildKoa020Face1(normalized)}${buildKoa020Face2(normalized)}${buildKoa020Face3(normalized)}`,
+    ),
   });
   // 白色申告では青色申告決算書は添付せず、収支内訳書を添付する。
   // 固定資産だけがある区分も、減価償却明細を落とさないよう様式を添付する。
@@ -1924,31 +2008,9 @@ export function buildXtxFiling(data: XtxFilingData): string {
     );
   }
   // 株式等に係る譲渡所得等の金額の計算明細書（KOC080）: 株式等譲渡の
-  // 入力がある場合に添付する（Issue #27 Phase C）
+  // 入力がある場合に添付する
   const koc080 = buildKoc080(normalized, versions.koc080);
   if (koc080) forms.push({ id: "KOC080", xml: koc080 });
 
-  const catalog =
-    `<CATALOG id="CATALOG">` +
-    `<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
-    `<rdf:Description ID="REPORT">` +
-    `<SEND_DATA/>` +
-    `<IT_SEC/>` +
-    `<FORM_SEC><rdf:Seq>${forms.map((f) => `<rdf:li>${f.id}</rdf:li>`).join("")}</rdf:Seq></FORM_SEC>` +
-    `<TENPU_SEC/>` +
-    `<XBRL_SEC/>` +
-    `<XBRL2_1_SEC/>` +
-    `<SOFUSHO_SEC/>` +
-    `<ATTACH_SEC/>` +
-    `<CSV_SEC/>` +
-    `</rdf:Description></rdf:RDF></CATALOG>`;
-
-  return (
-    `<?xml version="1.0" encoding="UTF-8" ?>\n` +
-    `<DATA id="DATA" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku">` +
-    `<RKO0010 VR="${versions.procedure}" id="RKO0010" xmlns="http://xml.e-tax.nta.go.jp/XSD/shotoku" xmlns:gen="http://xml.e-tax.nta.go.jp/XSD/general">` +
-    catalog +
-    `<CONTENTS id="CONTENTS">${buildIt(normalized)}${forms.map((f) => f.xml).join("")}</CONTENTS>` +
-    `</RKO0010></DATA>`
-  );
+  return xtxDocumentXml(SHOTOKU_NS, { cd: "RKO0010", vr: versions.procedure }, buildIt(normalized), forms);
 }
