@@ -2,19 +2,22 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { AgentConnectionConfig } from "@/api";
 import { useAuth } from "@/auth/AuthContext";
-import { ScreenContainer } from "@/components/ScreenContainer";
-import { AgentChatPanel, AgentUiAction, applyDeductionPatch } from "@/features/agent";
-import {
-  loadDeductionState,
-  saveDeductionState,
-} from "@/features/filing/deductionState";
+import { AgentChatPanel } from "../AgentChatPanel";
+import { AgentUiAction, applyDeductionPatch } from "../agentChatHelpers";
+import { loadDeductionState, saveDeductionState } from "@/features/filing/deductionState";
 import {
   EMPTY_AGENT_CONNECTION,
   loadAgentConnection,
 } from "@/features/settings/agentConnectionStorage";
 import { useAppState } from "@/state/AppContext";
 
-export default function AgentScreen() {
+export interface AgentChatScreenProps {
+  /** 別画面へ遷移するUIアクションの直前に呼ばれる（シートを閉じるため）。 */
+  onBeforeNavigate?: () => void;
+}
+
+/** チャットの画面本体。接続設定の読み込みとUIアクションの適用を担う。 */
+export function AgentChatScreen({ onBeforeNavigate }: AgentChatScreenProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { year, transactions, setYear, reloadLedger } = useAppState();
@@ -34,6 +37,7 @@ export default function AgentScreen() {
       if (action.type === "setYear") {
         setYear(action.year);
       } else if (action.type === "navigate") {
+        onBeforeNavigate?.();
         router.navigate(action.route);
       } else if (action.type === "reloadTransactions" || action.type === "reloadView") {
         void reloadLedger();
@@ -48,18 +52,16 @@ export default function AgentScreen() {
         })();
       }
     },
-    [router, setYear, reloadLedger, user?.id],
+    [router, setYear, reloadLedger, user?.id, onBeforeNavigate],
   );
 
   return (
-    <ScreenContainer noScroll>
-      <AgentChatPanel
-        userId={user?.id ?? null}
-        transactions={transactions}
-        connection={connection}
-        getDeductionsSnapshot={getDeductionsSnapshot}
-        onUiAction={handleUiAction}
-      />
-    </ScreenContainer>
+    <AgentChatPanel
+      userId={user?.id ?? null}
+      transactions={transactions}
+      connection={connection}
+      getDeductionsSnapshot={getDeductionsSnapshot}
+      onUiAction={handleUiAction}
+    />
   );
 }
