@@ -253,3 +253,23 @@ describe("specialRelativeInputApplies", () => {
     expect(specialRelativeInputApplies(1999)).toBe(false);
   });
 });
+
+describe("特定口座の明細の id", () => {
+  test("保存値の id を保ち、id の無い明細はそのまま読む", () => {
+    const base = freshDeductionState().expandedIncome;
+    const state = parseDeductionState({
+      expandedIncome: {
+        ...base,
+        stocks: {
+          ...base.stocks,
+          specialAccounts: [
+            { id: "account-a", brokerName: "A証券", branchName: "", withholdingAccount: true, revenue: 1, cost: 0, withholding: 0 },
+            { brokerName: "B証券", branchName: "", withholdingAccount: true, revenue: 2, cost: 0, withholding: 0 },
+          ],
+        },
+      },
+    });
+    expect(state.expandedIncome.stocks.specialAccounts.map((a) => a.id)).toEqual(["account-a", undefined]);
+    expect(state.expandedIncome.stocks.specialAccounts[1]?.brokerName).toBe("B証券");
+  });
+});

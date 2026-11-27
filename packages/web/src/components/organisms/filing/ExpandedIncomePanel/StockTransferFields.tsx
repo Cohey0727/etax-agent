@@ -40,7 +40,11 @@ export const StockTransferFields = ({ stocks, breakdown, taxResult, onChange }: 
       ...stocks,
       specialAccounts: stocks.specialAccounts.map((a, i) => (i === index ? { ...a, ...patch } : a)),
     });
-  const addAccount = () => onChange({ ...stocks, specialAccounts: [...stocks.specialAccounts, { ...EMPTY_ACCOUNT }] });
+  const addAccount = () =>
+    onChange({
+      ...stocks,
+      specialAccounts: [...stocks.specialAccounts, { ...EMPTY_ACCOUNT, id: newAccountId() }],
+    });
   const removeAccount = (index: number) =>
     onChange({ ...stocks, specialAccounts: stocks.specialAccounts.filter((_, i) => i !== index) });
 
@@ -81,7 +85,7 @@ export const StockTransferFields = ({ stocks, breakdown, taxResult, onChange }: 
           入力します。計算明細書（KOC080）の2面に載ります（5口座まで）。
         </Text>
         {stocks.specialAccounts.map((account, index) => (
-          <Col key={index} gap="sm">
+          <Col key={account.id ?? `account-${index}`} gap="sm">
             <Row gap="sm" align="center">
               <Text variant="muted">{`口座 ${index + 1}`}</Text>
               <Button variant="ghost" size="sm" onClick={() => removeAccount(index)}>
@@ -154,3 +158,11 @@ const CategoryFields = ({ category, onPatch }: CategoryFieldsProps) => (
     <LabeledAmountField label="その他の費用" value={category.otherExpenses} onChange={(v) => onPatch({ otherExpenses: v })} />
   </>
 );
+
+let accountCounter = 0;
+
+/** 追加した特定口座の明細の識別子（行の key に使う。削除しても他の行がずれないように）。 */
+function newAccountId(): string {
+  accountCounter += 1;
+  return `account-${Date.now().toString(36)}-${accountCounter}`;
+}

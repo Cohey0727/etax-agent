@@ -242,6 +242,8 @@ export const EMPTY_STOCK_CATEGORY: StockTransferCategoryInput = {
  * 口座はここに入れない（申告データに混ざらない）。
  */
 export interface SpecialAccountInput {
+  /** 画面で明細を区別するための識別子（計算・XTX には使わない）。 */
+  id?: string;
   /** 取引先（証券会社等）の名称 */
   brokerName: string;
   /** 支店名。なければ空文字 */
@@ -498,6 +500,7 @@ function normalizeSpecialAccount(
     return { brokerName: "", branchName: "", withholdingAccount: true, revenue: 0, cost: 0, withholding: 0 };
   }
   return {
+    ...(typeof partial.id === "string" && partial.id ? { id: partial.id } : {}),
     brokerName: typeof partial.brokerName === "string" ? partial.brokerName : "",
     branchName: typeof partial.branchName === "string" ? partial.branchName : "",
     withholdingAccount: partial.withholdingAccount !== false,
