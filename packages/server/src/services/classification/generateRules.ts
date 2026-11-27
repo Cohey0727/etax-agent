@@ -182,8 +182,11 @@ function buildJevPrompt(
   return sections.join("\n");
 }
 
-/** 照合対象の最大長。バックトラックのコストは入力長に比例するため切り詰める。 */
-const MAX_MATCH_INPUT_LENGTH = 500;
+/**
+ * 照合対象の最大長。量指定子が重なるパターンのバックトラックは入力長の
+ * べき乗で増えるため、摘要として意味のある長さで切り詰める。
+ */
+const MAX_MATCH_INPUT_LENGTH = 200;
 
 /** コンパイル済み正規表現のキャッシュ（パターン文字列単位）。 */
 const compiledPatternCache = new Map<string, RegExp>();
