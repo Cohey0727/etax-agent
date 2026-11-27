@@ -160,3 +160,16 @@ export function validateInvoiceInput(input: InvoiceFormInput): string | null {
   }
   return null;
 }
+
+/**
+ * 詳細・編集に出す請求書。一覧にある同じ請求書（消込などで更新された最新の値）を
+ * 優先し、検索条件で一覧から外れていれば、作成・発行・保存の応答として手元に
+ * 持っている値を使う（作った請求書が画面から消えないようにする）。
+ */
+export function latestInvoiceRecord<T extends { id: number }>(
+  invoices: readonly T[],
+  held: T | null,
+): T | null {
+  if (held === null) return null;
+  return invoices.find((invoice) => invoice.id === held.id) ?? held;
+}

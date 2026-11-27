@@ -1,4 +1,4 @@
-import { emptyInvoiceInput, invoiceRecordToInput } from "@etax/shared";
+import { emptyInvoiceInput, invoiceRecordToInput, latestInvoiceRecord } from "@etax/shared";
 import { useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { InvoiceInput, InvoiceRecord, InvoiceSearchFilters } from "@/api";
@@ -19,7 +19,8 @@ import { InvoiceList } from "@/features/invoices/InvoiceList";
 import { useInvoicesData } from "@/features/invoices/useInvoicesData";
 import { space } from "@/theme";
 
-type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
+// 編集・詳細の請求書は、開いたときの値も持つ（検索条件で一覧から外れても消えない）。
+type FormState = { kind: "create" } | { kind: "edit"; invoice: InvoiceRecord } | null;
 
 const STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] = [
   { value: "", label: "すべて" },
@@ -49,7 +50,7 @@ export default function InvoicesScreen() {
   } = useInvoicesData();
   const [formState, setFormState] = useState<FormState>(null);
   const [draft, setDraft] = useState<InvoiceInput>(() => emptyInvoiceInput());
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<InvoiceRecord | null>(null);
   // 検索条件の入力値（「検索」を押すまで一覧には反映しない）。
   const [searchText, setSearchText] = useState("");
   const [searchFrom, setSearchFrom] = useState("");
@@ -76,11 +77,10 @@ export default function InvoicesScreen() {
     );
   }
 
-  const detailInvoice =
-    detailId !== null ? (invoices.find((invoice) => invoice.id === detailId) ?? null) : null;
+  const detailInvoice = latestInvoiceRecord(invoices, detail);
   const editingInvoice =
     formState?.kind === "edit"
-      ? (invoices.find((invoice) => invoice.id === formState.id) ?? null)
+      ? latestInvoiceRecord(invoices, formState.invoice)
       : null;
 
   const openCreate = () => {
@@ -91,7 +91,7 @@ export default function InvoicesScreen() {
   const openEdit = () => {
     if (!detailInvoice) return;
     setDraft(invoiceRecordToInput(detailInvoice));
-    setFormState({ kind: "edit", id: detailInvoice.id });
+    setFormState({ kind: "edit", invoice: detailInvoice });
   };
 
   const submitForm = async () => {
@@ -100,11 +100,14 @@ export default function InvoicesScreen() {
       const created = await handleCreate(draft);
       if (created) {
         setFormState(null);
-        setDetailId(created.id);
+        setDetail(created);
       }
     } else {
-      const ok = await handleUpdate(formState.id, draft);
-      if (ok) setFormState(null);
+      const updated = await handleUpdate(formState.invoice.id, draft);
+      if (updated) {
+        setFormState(null);
+        setDetail(updated);
+      }
     }
   };
 
@@ -117,7 +120,7 @@ export default function InvoicesScreen() {
         onPress: () => {
           void (async () => {
             const deleted = await handleDelete(invoice);
-            if (deleted) setDetailId(null);
+            if (deleted) setDetail(null);
           })();
         },
       },
@@ -176,13 +179,13 @@ export default function InvoicesScreen() {
           invoices={invoices}
           onSelect={(invoiceId) => {
             setFormState(null);
-            setDetailId(invoiceId);
+            setDetail(invoices.find((invoice) => invoice.id === invoiceId) ?? null);
           }}
         />
       )}
 
       <Sheet
-        onClose={() => (formState ? setFormState(null) : setDetailId(null))}
+        onClose={() => (formState ? setFormState(null) : setDetail(null))}
         scroll
         title={formState ? formTitle : "請求書の詳細"}
         visible={formState !== null || detailInvoice !== null}
@@ -205,8 +208,8 @@ export default function InvoicesScreen() {
                 const correction = await handleCorrect(detailInvoice.id);
                 if (correction) {
                   setDraft(invoiceRecordToInput(correction));
-                  setFormState({ kind: "edit", id: correction.id });
-                  setDetailId(null);
+                  setFormState({ kind: "edit", invoice: correction });
+                  setDetail(null);
                 }
               })();
             }}
@@ -215,7 +218,7 @@ export default function InvoicesScreen() {
             onIssue={() => {
               void (async () => {
                 const issued = await handleIssue(detailInvoice.id);
-                if (issued) setDetailId(issued.id);
+                if (issued) setDetail(issued);
               })();
             }}
             onReconciliationChanged={() => void refreshList()}

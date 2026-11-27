@@ -1,8 +1,8 @@
-import { emptyInvoiceInput, invoiceRecordToInput } from "@etax/shared";
+import { emptyInvoiceInput, invoiceRecordToInput, latestInvoiceRecord } from "@etax/shared";
 import { useState } from "react";
 import { Button, Col, Icon, Input, Row, Select, Text } from "@components/atoms";
 import { AlertBox, Drawer } from "@components/molecules";
-import { InvoiceInput } from "@types";
+import { InvoiceInput, InvoiceRecord } from "@types";
 import { InvoiceDetail } from "./InvoiceDetail";
 import { InvoiceForm } from "./InvoiceForm";
 import { InvoiceList } from "./InvoiceList";
@@ -10,7 +10,8 @@ import { InvoiceSkeleton } from "./InvoiceSkeleton";
 import styles from "./InvoicePanel.css";
 import { useInvoicesData } from "./useInvoicesData";
 
-type FormState = { kind: "create" } | { kind: "edit"; id: number } | null;
+// 編集・詳細の請求書は、開いたときの値も持つ（検索条件で一覧から外れても消えない）。
+type FormState = { kind: "create" } | { kind: "edit"; invoice: InvoiceRecord } | null;
 
 const STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] = [
   { value: "", label: "すべて" },
@@ -42,7 +43,7 @@ export const InvoicePanel = () => {
   } = useInvoicesData();
   const [formState, setFormState] = useState<FormState>(null);
   const [draft, setDraft] = useState<InvoiceInput>(() => emptyInvoiceInput());
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<InvoiceRecord | null>(null);
   // 検索条件の入力値（「検索」を押すまで一覧には反映しない）。
   const [searchText, setSearchText] = useState("");
   const [searchFrom, setSearchFrom] = useState("");
@@ -62,12 +63,9 @@ export const InvoicePanel = () => {
     );
   }
 
-  const detailInvoice =
-    detailId !== null ? (invoices.find((invoice) => invoice.id === detailId) ?? null) : null;
+  const detailInvoice = latestInvoiceRecord(invoices, detail);
   const editingInvoice =
-    formState?.kind === "edit"
-      ? (invoices.find((invoice) => invoice.id === formState.id) ?? null)
-      : null;
+    formState?.kind === "edit" ? latestInvoiceRecord(invoices, formState.invoice) : null;
 
   const openCreate = () => {
     setDraft(emptyInvoiceInput());
@@ -77,7 +75,7 @@ export const InvoicePanel = () => {
   const openEdit = () => {
     if (!detailInvoice) return;
     setDraft(invoiceRecordToInput(detailInvoice));
-    setFormState({ kind: "edit", id: detailInvoice.id });
+    setFormState({ kind: "edit", invoice: detailInvoice });
   };
 
   const submitForm = async () => {
@@ -86,11 +84,14 @@ export const InvoicePanel = () => {
       const created = await handleCreate(draft);
       if (created) {
         setFormState(null);
-        setDetailId(created.id);
+        setDetail(created);
       }
     } else {
-      const ok = await handleUpdate(formState.id, draft);
-      if (ok) setFormState(null);
+      const updated = await handleUpdate(formState.invoice.id, draft);
+      if (updated) {
+        setFormState(null);
+        setDetail(updated);
+      }
     }
   };
 
@@ -177,7 +178,7 @@ export const InvoicePanel = () => {
           onSelect={(invoiceId) => {
             setFormState(null);
             setDeleteArmedId(null);
-            setDetailId(invoiceId);
+            setDetail(invoices.find((invoice) => invoice.id === invoiceId) ?? null);
           }}
         />
       )}
@@ -186,7 +187,7 @@ export const InvoicePanel = () => {
         open={formState !== null || detailInvoice !== null}
         title={formState ? formTitle : detailInvoice ? "請求書の詳細" : undefined}
         width="min(860px, 96vw)"
-        onClose={() => (formState ? setFormState(null) : setDetailId(null))}
+        onClose={() => (formState ? setFormState(null) : setDetail(null))}
       >
         {formState ? (
           <InvoiceForm
@@ -206,13 +207,13 @@ export const InvoicePanel = () => {
             onDelete={() => {
               void (async () => {
                 const deleted = await handleDelete(detailInvoice);
-                if (deleted) setDetailId(null);
+                if (deleted) setDetail(null);
               })();
             }}
             onIssue={() => {
               void (async () => {
                 const issued = await handleIssue(detailInvoice.id);
-                if (issued) setDetailId(issued.id);
+                if (issued) setDetail(issued);
               })();
             }}
             onCorrect={() => {
@@ -220,8 +221,8 @@ export const InvoicePanel = () => {
                 const correction = await handleCorrect(detailInvoice.id);
                 if (correction) {
                   setDraft(invoiceRecordToInput(correction));
-                  setFormState({ kind: "edit", id: correction.id });
-                  setDetailId(null);
+                  setFormState({ kind: "edit", invoice: correction });
+                  setDetail(null);
                 }
               })();
             }}

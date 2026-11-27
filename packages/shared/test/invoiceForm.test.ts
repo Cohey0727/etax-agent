@@ -8,6 +8,7 @@ import {
   INVOICE_TAX_ROUNDING_OPTIONS,
   invoiceInputTotals,
   invoiceRecordToInput,
+  latestInvoiceRecord,
   validateInvoiceInput,
 } from "../src/invoiceForm";
 
@@ -72,5 +73,17 @@ describe("formatInvoiceQuantity / validateInvoiceInput / 選択肢", () => {
       "四捨五入",
       "切り上げ",
     ]);
+  });
+});
+
+describe("latestInvoiceRecord", () => {
+  test("一覧にある同じ請求書を優先し、検索条件で一覧から外れていれば手元の値を使う", () => {
+    const held = { id: 1, counterparty_name: "作成直後" };
+    expect(latestInvoiceRecord([{ id: 1, counterparty_name: "一覧の最新" }], held)).toEqual({
+      id: 1,
+      counterparty_name: "一覧の最新",
+    });
+    expect(latestInvoiceRecord([{ id: 2, counterparty_name: "別の請求書" }], held)).toBe(held);
+    expect(latestInvoiceRecord([], null)).toBeNull();
   });
 });

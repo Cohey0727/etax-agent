@@ -88,22 +88,22 @@ export function useInvoicesData() {
     }
   };
 
-  const handleUpdate = async (id: number, input: InvoiceInput): Promise<boolean> => {
+  const handleUpdate = async (id: number, input: InvoiceInput): Promise<InvoiceRecord | null> => {
     const problem = validateInvoiceInput(input);
     if (problem) {
       setError(problem);
-      return false;
+      return null;
     }
-    if (busy) return false;
+    if (busy) return null;
     setBusy(true);
     setError(null);
     try {
-      await updateInvoice(id, input);
+      const updated = await updateInvoice(id, input);
       await reload(filters);
-      return true;
+      return updated;
     } catch (e) {
       setError(e instanceof Error ? e.message : "更新に失敗しました");
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
