@@ -30,13 +30,22 @@ export interface TaxKnowledgeSearchResult {
   hits: TaxKnowledgeHit[];
 }
 
-/** クエリを検索語に分解する（空白区切り、句読点や記号は落とす）。 */
+/**
+ * クエリを検索語に分解する（空白区切り、句読点や記号は落とす）。
+ * 出典の表記「No.2072」「No2072」は番号だけの語にする（本文の表記は
+ * 「コード2072」なので、接頭辞つきのままでは番号でも本文でも当たらない）。
+ */
 function splitTerms(query: string): string[] {
   // 全角英数（例: ２０７２）や半角カタカナで入力されても本文に当たるよう正規化する。
   return query
     .normalize("NFKC")
     .split(/[\s　]+/)
-    .map((term) => term.replace(/["'「」『』（）()、。・:：/／]/g, "").trim())
+    .map((term) =>
+      term
+        .replace(/["'「」『』（）()、。・:：/／]/g, "")
+        .replace(/^no\.?(?=\d*$)/i, "")
+        .trim(),
+    )
     .filter((term) => term.length >= 2);
 }
 
