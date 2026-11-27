@@ -66,7 +66,7 @@ export const DeductionPanel = ({
           <BreakdownEntriesFields
             title="社会保険料"
             entries={breakdownEntries.socialInsurance}
-            legacyTotal={deductions.socialInsurancePaid}
+            savedTotal={deductions.socialInsurancePaid}
             onChange={(entries) => onBreakdownEntriesChange("socialInsurance", entries)}
             namePlaceholder="国民年金・国民健康保険など"
             nameLabel="社会保険料の名称"
@@ -77,7 +77,7 @@ export const DeductionPanel = ({
           <BreakdownEntriesFields
             title="小規模企業共済・iDeCo等"
             entries={breakdownEntries.mutualAid}
-            legacyTotal={deductions.smallBusinessMutualAidPaid}
+            savedTotal={deductions.smallBusinessMutualAidPaid}
             onChange={(entries) => onBreakdownEntriesChange("mutualAid", entries)}
             namePlaceholder="小規模企業共済・iDeCoなど"
             nameLabel="掛金の名称"
@@ -88,7 +88,7 @@ export const DeductionPanel = ({
           <BreakdownEntriesFields
             title="医療費"
             entries={breakdownEntries.medical}
-            legacyTotal={deductions.medicalExpensesPaid}
+            savedTotal={deductions.medicalExpensesPaid}
             onChange={(entries) => onBreakdownEntriesChange("medical", entries)}
             namePlaceholder="医療機関名など"
             nameLabel="医療費の支払先"
@@ -104,7 +104,7 @@ export const DeductionPanel = ({
           <BreakdownEntriesFields
             title="寄附金（ふるさと納税を含む）"
             entries={breakdownEntries.donations}
-            legacyTotal={deductions.donationsTotal}
+            savedTotal={deductions.donationsTotal}
             onChange={(entries) => onBreakdownEntriesChange("donations", entries)}
             namePlaceholder="寄附先（自治体名など）"
             nameLabel="寄附先"

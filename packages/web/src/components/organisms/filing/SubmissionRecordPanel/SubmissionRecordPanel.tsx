@@ -24,7 +24,7 @@ const KIND_LABELS: Record<FilingSubmissionKind, string> = {
 };
 
 /**
- * 提出の記録パネル（Issue #28 Phase 1）。e-Tax で提出した後に、
+ * 提出の記録パネル。e-Tax で提出した後に、
  * 受信通知の受付番号と提出日を手入力で残し、受信通知PDFを添付して
  * 保管する。受付番号を保存すると申告ステータスの「提出済み」と
  * 連動する（サーバー側）。

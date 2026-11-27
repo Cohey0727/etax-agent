@@ -24,7 +24,7 @@ const STEPS_WITHOUT_FILE: readonly { title: string; body: string }[] = [
 /**
  * XTX生成直後に出す、e-Taxソフト（WEB版）への取り込み手順。
  * 送信そのものは本人が e-Tax で行うため、迷わず取り込めるよう
- * 実際の画面遷移の順にステップで案内する（Issue #28 Phase 1）。
+ * 実際の画面遷移の順にステップで案内する。
  */
 export const EtaxImportGuide = ({ filename }: EtaxImportGuideProps) => {
   const steps: readonly { title: string; body: string }[] = [

@@ -21,11 +21,11 @@ export interface AgriculturePanelProps {
 }
 
 /**
- * 農業所得の入力（Issue #24 Phase 1）。帳簿の取引とは混ぜず申告入力として
+ * 農業所得の入力。帳簿の取引とは混ぜず申告入力として
  * 保持し、農業所得用の決算書（青色は青色申告決算書（農業所得用）、白色は
  * 収支内訳書（農業所得用））と申告書の農業欄へ反映する。科目構成と
  * 計算は国税庁の農業所得用様式どおり（shared の決定的計算）。
- * 収入金額の内訳・育成費用の計算・貸借対照表は Phase 1 の対象外。
+ * 収入金額の内訳・育成費用の計算・貸借対照表は扱わない。
  */
 export const AgriculturePanel = ({ agriculture, filingType, onChange }: AgriculturePanelProps) => {
   const statement = useMemo(() => computeAgricultureStatement(agriculture), [agriculture]);
