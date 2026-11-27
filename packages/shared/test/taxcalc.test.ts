@@ -91,6 +91,42 @@ describe("消費税の素計算（申告書と同じ端数処理）", () => {
   });
 });
 
+describe("小規模事業者の特例（2割特例・3割特例）と簡易課税の事業区分", () => {
+  const sales = normalizeTransactions([
+    { date: "2026-03-01", year: 2026, description: "売上", amount: 15_000_000, category: "売上高", income_type: "business" },
+  ]);
+  const at = (year: number) => sales.map((t) => ({ ...t, year, date: `${year}-03-01` }));
+
+  test("令和8年分までは2割特例（納付税額 = 売上税額 × 20%）", () => {
+    const figures = computeCorrectedFigures(at(2026), 2026);
+    expect(figures.consumption_tax_special20).toBe(272_600);
+    expect(figures._detail.small_business_special_rate).toBe(0.2);
+  });
+
+  test("令和9年分は個人事業者の3割特例（納付税額 = 売上税額 × 30%）", () => {
+    const figures = computeCorrectedFigures(at(2027), 2027);
+    // 売上税額 1,063,608 − 控除 744,525 = 319,083 → 国税 319,000 + 地方 89,900
+    expect(figures.consumption_tax_special20).toBe(408_900);
+    expect(figures._detail.small_business_special_rate).toBe(0.3);
+  });
+
+  test("特例の無い年分は 0 で、特例の率は null", () => {
+    const figures = computeCorrectedFigures(at(2022), 2022);
+    expect(figures.consumption_tax_special20).toBe(0);
+    expect(figures._detail.small_business_special_rate).toBeNull();
+  });
+
+  test("簡易課税は事業区分のみなし仕入率で計算する（既定は第5種）", () => {
+    const services = computeCorrectedFigures(at(2026), 2026);
+    const retail = computeCorrectedFigures(at(2026), 2026, { businessKind: "retail" });
+    expect(services.consumption_tax_simplified).toBe(681_700);
+    expect(retail.consumption_tax_simplified).toBe(
+      consumptionTax({ taxableSalesIncl: 15_000_000, method: "simplified", businessKind: "retail" }).payable,
+    );
+    expect(retail.consumption_tax_simplified).toBeLessThan(services.consumption_tax_simplified);
+  });
+});
+
 describe("青色申告特別控除の振り分け", () => {
   // No.2072: 65万円控除は不動産＋事業の合計額が限度（不動産→事業の順に控除）
   test("(c) 不動産30万・事業500万 → 300,000 + 350,000 = 650,000", () => {

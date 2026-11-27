@@ -31,6 +31,7 @@ import {
   isAgricultureEmpty,
 } from "./agriculture";
 import type { AgricultureInput } from "./agriculture";
+import { TAX_PARAMETERS } from "./taxParameters";
 
 /** 消費税 標準税率 */
 export const TAX_RATE = 0.1;
@@ -335,6 +336,8 @@ nontaxableSalesIncl?: number;
 inputTax?: number;
 method?: ConsumptionMethod;
 businessKind?: BusinessKind;
+/** special20 の特例の率（納付税額 = 売上税額 × 率）。既定は 0.2（2割特例） */
+specialRate?: number;
 }
 
 /**
@@ -358,7 +361,8 @@ export function taxableSalesRatioPercent(taxableSalesIncl: number, nontaxableSal
 * 95%未満のときは、仕入税額に課税売上割合を掛ける（一括比例配分方式）。
 * - simplified（簡易課税）: 売上税額 −（売上税額 × みなし仕入率）。
 * 既定はサービス業（第5種・50%）。
-* - special20 （2割特例）: 売上税額 −（売上税額 × 80%）。
+* - special20 （2割特例・3割特例）: 売上税額 −（売上税額 ×（1 − 特例の率））。
+* 特例の率は specialRate（既定 0.2）。
 */
 export function consumptionTax(opts: ConsumptionTaxOptions): ConsumptionTaxResult {
 const {
@@ -367,6 +371,7 @@ nontaxableSalesIncl = 0,
 inputTax = 0,
 method = "standard",
 businessKind = "services",
+specialRate = 0.2,
 } = opts;
 
 const output = outputTaxFromTaxInclusive(taxableSalesIncl);
@@ -389,8 +394,9 @@ deemed_purchase_rate: rate,
 business_kind: businessKind,
 };
 } else if (method === "special20") {
-usedInput = Math.floor((output * 80) / 100);
-detail = { formula: "output_tax - output_tax * 80% (2割特例)"};
+const creditPercent = 100 - Math.round(specialRate * 100);
+usedInput = Math.floor((output * creditPercent) / 100);
+detail = { formula: "output_tax - output_tax * (1 - special_rate)", special_rate: specialRate };
 } else {
 throw new Error(
 `未知の計算方式です: ${JSON.stringify(method)} (standard / simplified / special20)`,
@@ -508,6 +514,8 @@ export interface CorrectedFiguresDetail {
   blue_deduction_agriculture: number;
   /** 農業所得（控除後） */
   agriculture_income: number;
+  /** 小規模事業者の特例の率（2割特例 0.2・3割特例 0.3）。特例の無い年分は null */
+  small_business_special_rate: number | null;
 }
 
 /**
@@ -537,6 +545,7 @@ export interface CorrectedFigures {
   input_tax_estimate: number;
   consumption_tax_standard: number;
   consumption_tax_simplified: number;
+  /** 小規模事業者の特例（2割特例・3割特例）の納付税額。特例の無い年分は 0 */
   consumption_tax_special20: number;
   _detail: CorrectedFiguresDetail;
 }
@@ -559,6 +568,8 @@ export interface ComputeCorrectedFiguresOptions extends BlueDeductionOptions {
    * 混ぜない）。未指定または全て空の場合は農業なしとして計算する。
    */
   agriculture?: AgricultureInput;
+  /** 簡易課税の事業区分（既定: services＝第5種） */
+  businessKind?: BusinessKind;
 }
 
 export function computeCorrectedFigures(
@@ -592,16 +603,17 @@ export function computeCorrectedFigures(
 
   const [taxable, nontaxable] = taxableSalesFromBreakdown(b, residentialRentTotal(transactions));
   const inputTax = estimateInputTax(transactions);
-  const methods = ["standard", "simplified", "special20"] as const;
-  const payables = methods.map(
-    (m) =>
-      consumptionTax({
-        taxableSalesIncl: taxable,
-        nontaxableSalesIncl: nontaxable,
-        inputTax,
-        method: m,
-      }).payable,
-  );
+  // 年分パラメータに無い年分（特例の制度が無い年分）は特例を計算しない
+  const specialRate = TAX_PARAMETERS[year]?.smallBusinessSpecialRate ?? null;
+  const consumption = (method: ConsumptionMethod) =>
+    consumptionTax({
+      taxableSalesIncl: taxable,
+      nontaxableSalesIncl: nontaxable,
+      inputTax,
+      method,
+      businessKind: options.businessKind,
+      specialRate: specialRate ?? undefined,
+    }).payable;
 
   return {
     year: Math.trunc(year),
@@ -615,9 +627,9 @@ export function computeCorrectedFigures(
     taxable_sales: taxable,
     nontaxable_sales: nontaxable,
     input_tax_estimate: inputTax,
-    consumption_tax_standard: payables[0] as number,
-    consumption_tax_simplified: payables[1] as number,
-    consumption_tax_special20: payables[2] as number,
+    consumption_tax_standard: consumption("standard"),
+    consumption_tax_simplified: consumption("simplified"),
+    consumption_tax_special20: specialRate === null ? 0 : consumption("special20"),
     _detail: {
       business_income_before_deduction: b.businessIncome,
       real_estate_income_before_deduction: b.realEstateIncome,
@@ -628,6 +640,7 @@ export function computeCorrectedFigures(
       agriculture_income_before_deduction: agricultureBeforeDeduction,
       blue_deduction_agriculture: blue.agriculture,
       agriculture_income: agricultureBeforeDeduction - blue.agriculture,
+      small_business_special_rate: specialRate,
     },
   };
 }

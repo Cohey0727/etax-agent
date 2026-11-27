@@ -86,6 +86,12 @@ export interface YearTaxParameters {
   listedDividendSeparateTaxRate: number;
   /** 定額減税（措法41条の3の3）の対象年分か。対象外の年分では入力があっても控除しない。 */
   flatReductionApplies: boolean;
+  /**
+   * 免税事業者からインボイス登録で課税事業者になった個人事業者の消費税の特例の率
+   * （納付税額 = 売上税額 × 率）。令和8年分までは2割特例（0.2）、令和9・10年分は
+   * 3割特例（0.3）。特例の無い年分は null。
+   */
+  smallBusinessSpecialRate: number | null;
 }
 
 const INF = Number.POSITIVE_INFINITY;
@@ -195,6 +201,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,
+    smallBusinessSpecialRate: 0.2,
   },
   2024: {
     basicDeductionTiers: BASIC_TIERS_2023_2024,
@@ -212,6 +219,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: true,
+    smallBusinessSpecialRate: 0.2,
   },
   2025: {
     // 本則58万円＋令和7・8年分限りの上乗せ特例（措法41条の16の2）
@@ -240,6 +248,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,
+    smallBusinessSpecialRate: 0.2,
   },
   2026: {
     // 令和8年度税制改正後の本則（No.1199）。令和9年分と同額
@@ -259,6 +268,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,
+    smallBusinessSpecialRate: 0.2,
   },
   2027: {
     // 令和9年分も令和8年分と同額（No.1199）
@@ -277,6 +287,7 @@ export const TAX_PARAMETERS: Readonly<Record<number, YearTaxParameters>> = {
     stockSeparateTaxRate: 0.15,
     listedDividendSeparateTaxRate: 0.15,
     flatReductionApplies: false,
+    smallBusinessSpecialRate: 0.3,
   },
 };
 
