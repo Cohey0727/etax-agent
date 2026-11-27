@@ -15,6 +15,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
 import { InvoiceResponse } from "../../schemas/invoice";
+import { toSingleLine } from "./pdfText";
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -49,11 +50,12 @@ function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
 }
 
-/** 列幅に収まるよう末尾を … で詰める。 */
+/** 1行にして、列幅に収まるよう末尾を … で詰める。 */
 function fitText(font: PDFFont, text: string, maxWidth: number, size: number): string {
-  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  const line = toSingleLine(text);
+  if (font.widthOfTextAtSize(line, size) <= maxWidth) return line;
   const ellipsis = "…";
-  let trimmed = text;
+  let trimmed = line;
   while (trimmed.length > 0 && font.widthOfTextAtSize(trimmed + ellipsis, size) > maxWidth) {
     trimmed = trimmed.slice(0, -1);
   }
@@ -61,11 +63,12 @@ function fitText(font: PDFFont, text: string, maxWidth: number, size: number): s
 }
 
 function drawLeft(page: PDFPage, font: PDFFont, x: number, y: number, text: string, size: number, color = TEXT_COLOR): void {
-  page.drawText(text, { x, y, size, font, color });
+  page.drawText(toSingleLine(text), { x, y, size, font, color });
 }
 
 function drawRight(page: PDFPage, font: PDFFont, right: number, y: number, text: string, size: number, color = TEXT_COLOR): void {
-  page.drawText(text, { x: right - font.widthOfTextAtSize(text, size), y, size, font, color });
+  const line = toSingleLine(text);
+  page.drawText(line, { x: right - font.widthOfTextAtSize(line, size), y, size, font, color });
 }
 
 interface Column {

@@ -8,6 +8,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
 import { TransactionResponse } from "../../schemas/transaction";
+import { toSingleLine } from "./pdfText";
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -52,11 +53,12 @@ function formatAmount(value: number): string {
   return value < 0 ? `-${digits}` : digits;
 }
 
-/** 列幅に収まるよう末尾を … で詰める。 */
+/** 1行にして、列幅に収まるよう末尾を … で詰める。 */
 function fitText(font: PDFFont, text: string, maxWidth: number): string {
-  if (font.widthOfTextAtSize(text, FONT_SIZE) <= maxWidth) return text;
+  const line = toSingleLine(text);
+  if (font.widthOfTextAtSize(line, FONT_SIZE) <= maxWidth) return line;
   const ellipsis = "…";
-  let trimmed = text;
+  let trimmed = line;
   while (trimmed.length > 0 && font.widthOfTextAtSize(trimmed + ellipsis, FONT_SIZE) > maxWidth) {
     trimmed = trimmed.slice(0, -1);
   }
