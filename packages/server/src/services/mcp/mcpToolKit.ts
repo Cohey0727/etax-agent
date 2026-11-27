@@ -77,22 +77,25 @@ export function requireDb(): Db {
   return db;
 }
 
+/** DB行を shared の取引形式へ変換する（year は割り当て年度）。 */
+export function rowToTransaction(row: TransactionRow): Transaction {
+  return {
+    date: row.date,
+    year: effectiveFiscalYear(row),
+    description: row.description,
+    amount: row.amount,
+    account: row.account,
+    category: row.category,
+    income_type: row.incomeType as IncomeType,
+    tax_category: row.taxCategory,
+    business_ratio_percent: row.businessRatioPercent,
+    business_ratio_basis: row.businessRatioBasis,
+  };
+}
+
 /** DB行を指定した割り当て年度の shared 取引形式へ変換する。 */
 export function rowsToTransactions(rows: TransactionRow[], year: number): Transaction[] {
-  return rows
-    .filter((row) => effectiveFiscalYear(row) === year)
-    .map((row) => ({
-      date: row.date,
-      year,
-      description: row.description,
-      amount: row.amount,
-      account: row.account,
-      category: row.category,
-      income_type: row.incomeType as IncomeType,
-      tax_category: row.taxCategory,
-      business_ratio_percent: row.businessRatioPercent,
-      business_ratio_basis: row.businessRatioBasis,
-    }));
+  return rows.filter((row) => effectiveFiscalYear(row) === year).map(rowToTransaction);
 }
 
 /** 対象年の帳簿取引（shared 形式）をDBから取る（年度絞り込みは SQL 側）。 */

@@ -26,6 +26,7 @@ import {
   updateTransactionRowWith,
 } from "../../repositories/transactionRepository";
 import { TransactionRow } from "../../repositories/schema";
+import { rowToTransaction } from "../mcp/mcpToolKit";
 
 /** 一括変更の上限件数（誤った条件での大量変更を防ぐ）。 */
 const MAX_BULK_UPDATE = 500;
@@ -227,14 +228,5 @@ export async function loadAllTransactionsForAgent(): Promise<Transaction[]> {
   const db = getDb();
   if (!db) return [];
   const rows = await listTransactionRows(db);
-  return rows.map((row) => ({
-    date: row.date,
-    year: effectiveFiscalYear(row),
-    description: row.description,
-    amount: row.amount,
-    account: row.account,
-    category: row.category,
-    income_type: row.incomeType as IncomeType,
-    tax_category: row.taxCategory,
-  }));
+  return rows.map(rowToTransaction);
 }
