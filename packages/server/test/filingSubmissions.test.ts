@@ -120,6 +120,26 @@ describe("HTTP: 提出の記録（受付番号）", () => {
     ).toBe("20260210999999999999");
   });
 
+  test("受付番号を保存し直しても、申告ステータスの提出日時は最初の記録のまま", async () => {
+    await createTestDb();
+    const submittedAt = async () =>
+      (
+        (await req("/api/filing-status")).body.statuses as { year: number; submitted_at: string | null }[]
+      ).find((s) => s.year === 2025)?.submitted_at ?? null;
+    await req("/api/filing-submissions/2025/income", {
+      method: "PUT",
+      json: { acceptance_number: "20260210123456789012", submitted_date: "2026-02-10" },
+    });
+    const first = await submittedAt();
+    expect(first).not.toBeNull();
+    await Bun.sleep(5);
+    await req("/api/filing-submissions/2025/income", {
+      method: "PUT",
+      json: { acceptance_number: "20260210123456789012", submitted_date: "2026-02-11" },
+    });
+    expect(await submittedAt()).toBe(first);
+  });
+
   test("変更履歴に登録・更新・削除がスナップショット付きで残る", async () => {
     const db = await createTestDb();
     await req("/api/filing-submissions/2024/consumption", {

@@ -22,7 +22,10 @@ import {
   getFilingSubmissionRowByFileId,
   upsertFilingSubmissionRow,
 } from "../../repositories/filingSubmissionRepository";
-import { upsertFilingStatusRow } from "../../repositories/filingStatusRepository";
+import {
+  listFilingStatusRows,
+  upsertFilingStatusRow,
+} from "../../repositories/filingStatusRepository";
 import {
   FilingSubmissionKind,
   FilingSubmissionResponse,
@@ -44,7 +47,8 @@ export class FilingSubmissionError extends Error {
 /**
  * 提出記録を保存する。受付番号が記録されたら、申告ステータスの
  * 「提出済み」を立てる（提出の証跡があるのにステータスが未提出のままに
- * ならないようにする連動）。
+ * ならないようにする連動）。すでに提出済みなら、提出日時は最初に立てた
+ * ときのまま変えない（記録の訂正で日時が動かないようにする）。
  */
 export async function saveFilingSubmissionRecord(
   db: Db,
@@ -59,7 +63,8 @@ export async function saveFilingSubmissionRecord(
     submittedDate,
   });
   if (acceptanceNumber !== "") {
-    await upsertFilingStatusRow(db, year, { submitted: true });
+    const status = (await listFilingStatusRows(db)).find((row) => row.year === year);
+    if (!status?.submittedAt) await upsertFilingStatusRow(db, year, { submitted: true });
   }
   return filingSubmissionToApi(row);
 }
