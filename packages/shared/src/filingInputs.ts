@@ -25,6 +25,7 @@ import {
 import { EMPTY_EXPANDED_INCOME, type ExpandedIncomeInput, normalizeExpandedIncomeInput } from "./expandedIncome";
 import { filterYear } from "./ledger";
 import { type ComputeCorrectedFiguresOptions, computeCorrectedFigures, type FilingType } from "./taxcalc";
+import { TAX_PARAMETERS } from "./taxParameters";
 import type { Transaction } from "./types";
 import type { XtxBalanceSheetInput } from "./xtx";
 import { summarizeConsumptionTax } from "./xtxShohi";
@@ -418,6 +419,15 @@ export function buildSnapshotFigures(
     taxable_income: taxResult.taxableIncome,
     final_tax: taxResult.finalTax,
   };
+}
+
+/**
+ * 特定親族（19〜22歳）の合計所得金額を入力として受ける年分か。
+ * 特定親族特別控除の段階表を持つ年分だけが対象で、税務パラメータの
+ * 無い年分は対象にしない。
+ */
+export function specialRelativeInputApplies(year: number): boolean {
+  return (TAX_PARAMETERS[year]?.specialRelativeTiers ?? null) !== null;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   IncomeDeductionBreakdown,
   LifeInsurancePremiums,
   SpouseCategory,
+  specialRelativeInputApplies,
 } from "@etax/shared";
 import { Button, Card, Col, Input, Row, Select, Text } from "@components/atoms";
 import { formatNumber } from "@utils";
@@ -260,13 +261,13 @@ export const DeductionPanel = ({
             onClick={() => set({ isWorkingStudent: !deductions.isWorkingStudent })}
           />
         </Row>
-        {year === 2025 && (
+        {specialRelativeInputApplies(year) ? (
           <NullableAmountField
             label="特定親族（19〜22歳）の合計所得金額"
             value={deductions.specialRelativeTotalIncome}
             onChange={(v) => set({ specialRelativeTotalIncome: v })}
           />
-        )}
+        ) : null}
 
         <Text className={styles.subhead}>所得控除の内訳（自動計算）</Text>
         <Col gap="sm">

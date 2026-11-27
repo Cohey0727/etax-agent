@@ -10,6 +10,7 @@ import {
   deriveBasePeriodSalesThousands,
   freshDeductionState,
   parseDeductionState,
+  specialRelativeInputApplies,
 } from "../src/filingInputs";
 import { computeIncomeTax, EMPTY_DEDUCTION_INPUTS, EMPTY_TAX_CREDIT_INPUTS } from "../src/deductions";
 import type { Transaction } from "../src/types";
@@ -179,5 +180,18 @@ describe("deriveBasePeriodSalesThousands", () => {
 
   test("2年前の帳簿が無ければ 0", () => {
     expect(deriveBasePeriodSalesThousands([tx("2025-01-01", 1_100_000, "売上高")], 2025)).toBe(0);
+  });
+});
+
+describe("specialRelativeInputApplies", () => {
+  test("特定親族特別控除のある年分（令和7年分以後）だけ入力を受ける", () => {
+    expect(specialRelativeInputApplies(2024)).toBe(false);
+    expect(specialRelativeInputApplies(2025)).toBe(true);
+    expect(specialRelativeInputApplies(2026)).toBe(true);
+    expect(specialRelativeInputApplies(2027)).toBe(true);
+  });
+
+  test("税務パラメータの無い年分は受けない", () => {
+    expect(specialRelativeInputApplies(1999)).toBe(false);
   });
 });
