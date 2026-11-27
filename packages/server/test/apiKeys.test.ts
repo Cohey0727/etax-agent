@@ -139,9 +139,9 @@ describe("APIキー REST API（HTTP）", () => {
     expect(list).toHaveLength(1);
     expect(list[0].status).toBe("active");
 
-    // 発行したキー自体でも認証できる（失効前）
+    // 発行したキー自体でも REST の認証が通る（失効前）
     const byKeyRes = await appFetch(
-      new Request("http://localhost/api/auth/api-keys", {
+      new Request("http://localhost/api/transactions", {
         headers: { Authorization: `Bearer ${created.key}` },
       }),
     );
@@ -165,11 +165,55 @@ describe("APIキー REST API（HTTP）", () => {
 
     // 失効したキーは認証で拒否される
     const rejectedRes = await appFetch(
-      new Request("http://localhost/api/auth/api-keys", {
+      new Request("http://localhost/api/transactions", {
         headers: { Authorization: `Bearer ${created.key}` },
       }),
     );
     expect(rejectedRes.status).toBe(401);
+  });
+
+  test("APIキーではキーの発行・一覧・失効と2段階認証の設定を行えない（403）", async () => {
+    const db = await createTestDb();
+    const user = await createUser(db, "scope@example.com", "password-123");
+    const { row, key } = await createApiKey(db, user.id, "mcp", new Date(Date.now() + 60_000));
+    const byKey = { Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+    const attempts = [
+      new Request("http://localhost/api/auth/api-keys", {
+        method: "POST",
+        headers: byKey,
+        body: JSON.stringify({ name: "minted", expires_at: null }),
+      }),
+      new Request("http://localhost/api/auth/api-keys", { headers: byKey }),
+      new Request(`http://localhost/api/auth/api-keys/${row.id}`, { method: "DELETE", headers: byKey }),
+      new Request("http://localhost/api/auth/totp/setup", {
+        method: "POST",
+        headers: byKey,
+        body: JSON.stringify({}),
+      }),
+      new Request("http://localhost/api/auth/totp/disable", {
+        method: "POST",
+        headers: byKey,
+        body: JSON.stringify({ code: "000000" }),
+      }),
+    ];
+    for (const request of attempts) {
+      const res = await appFetch(request);
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error?: string };
+      expect(body.error).toContain("APIキーでは行えません");
+    }
+    expect(await listApiKeyRows(db, user.id)).toHaveLength(1);
+    const [listed] = await listApiKeyRows(db, user.id);
+    expect(listed.revokedAt).toBeNull();
+
+    // セッションなら同じ操作を行える
+    const session = await createSession(db, user.id);
+    const bySession = await appFetch(
+      new Request("http://localhost/api/auth/api-keys", {
+        headers: { Authorization: `Bearer ${session}` },
+      }),
+    );
+    expect(bySession.status).toBe(200);
   });
 
   test("過去の有効期限は 400、他人のキーの失効は 404", async () => {
@@ -219,5 +263,40 @@ describe("APIキー REST API（HTTP）", () => {
     expect(info.tool_count).toBe(info.tools.length);
     expect(info.tool_count).toBeGreaterThan(0);
     expect(info.tools.some((tool) => tool.name === "health")).toBe(true);
+  });
+});
+
+describe("認証・プランゲートのエラー形式（HTTP）", () => {
+  test("未ログインの 401 とプラン未加入の 402 は { error } で返る", async () => {
+    const db = await createTestDb();
+    const anon = await appFetch(new Request("http://localhost/api/transactions"));
+    expect(anon.status).toBe(401);
+    expect(await anon.json()).toEqual({ error: "ログインが必要です" });
+
+    const saved = {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
+    };
+    process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
+    process.env.STRIPE_PRICE_ID = "price_dummy";
+    try {
+      const user = await createUser(db, "plan@example.com", "password-123");
+      const session = await createSession(db, user.id);
+      const gated = await appFetch(
+        new Request("http://localhost/api/etax/xtx", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session}`, "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }),
+      );
+      expect(gated.status).toBe(402);
+      const body = (await gated.json()) as { error?: string };
+      expect(body.error).toContain("有料プラン");
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
   });
 });

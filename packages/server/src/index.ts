@@ -62,7 +62,7 @@ import { billingEnabled } from "./gateways/stripeGateway";
 import { StorageError, StorageObjectNotFoundError } from "./gateways/storageGateway";
 import { hasActivePlan } from "./repositories/subscriptionRepository";
 import { authRequired, runWithTenant } from "./lib/tenantContext";
-import { resolveRequestUserId } from "./usecases/authSession";
+import { requiresSessionCredential, resolveRequestCredential } from "./usecases/authSession";
 import {
   OPENAPI_DOCUMENT_PATH,
   createOpenApiDocumentHandler,
@@ -186,6 +186,7 @@ app.use("/api/*", async (c, next) => {
  * 認証ミドルウェア: セッション/APIキーからユーザーを解決し、テナント文脈を
  * 載せて後続を実行する。ETAX_AUTH_MODE=required（SaaS）のときは認証の無い
  * リクエストを 401 にする（/api/auth/* と /api/health は除く）。
+ * API キーの発行・失効と2段階認証の設定は、API キーでは 403 にする。
  * 認証オフ（既定）のローカル運用では文脈だけ載せて素通しする。
  */
 async function authMiddleware(
@@ -196,14 +197,20 @@ async function authMiddleware(
   const isPublic =
     path.startsWith("/api/auth/") || path === "/api/health" || path === "/api/billing/webhook";
   const db = getDb();
-  const userId = db ? await resolveRequestUserId(db, c) : undefined;
-  if (userId === undefined) {
+  const credential = db ? await resolveRequestCredential(db, c) : undefined;
+  if (credential === undefined) {
     if (authRequired() && !isPublic) {
-      return c.json({ message: "ログインが必要です" }, 401);
+      return c.json({ error: "ログインが必要です" }, 401);
     }
     return next();
   }
-  return runWithTenant(userId, () => next());
+  if (credential.kind === "apiKey" && requiresSessionCredential(path)) {
+    return c.json(
+      { error: "この操作はAPIキーでは行えません。画面からログインして操作してください" },
+      403,
+    );
+  }
+  return runWithTenant(credential.userId, () => next());
 }
 app.use("/api/*", authMiddleware);
 app.use("/mcp", authMiddleware);
@@ -219,7 +226,7 @@ async function planGateMiddleware(c: Context, next: Next): Promise<Response | vo
   if (!db) return next();
   if (await hasActivePlan(db)) return next();
   return c.json(
-    { message: "この機能は有料プラン（月額490円）への加入が必要です" },
+    { error: "この機能は有料プラン（月額490円）への加入が必要です" },
     402,
   );
 }

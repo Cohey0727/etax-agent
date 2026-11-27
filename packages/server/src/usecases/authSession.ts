@@ -27,19 +27,42 @@ export async function issueSession(c: Context, db: Db, userId: number): Promise<
   return token;
 }
 
-/** リクエストの資格情報からユーザーIDを解決する。無ければ undefined。 */
-export async function resolveRequestUserId(
+/** リクエストの資格情報の種類。API キーは外部エージェント向けで、使える操作が狭い。 */
+export type CredentialKind = "session" | "apiKey";
+
+export interface RequestCredential {
+  userId: number;
+  kind: CredentialKind;
+}
+
+/** リクエストの資格情報からユーザーIDと資格情報の種類を解決する。無ければ undefined。 */
+export async function resolveRequestCredential(
   db: Db,
   c: Context,
-): Promise<number | undefined> {
+): Promise<RequestCredential | undefined> {
   const authorization = c.req.header("Authorization");
   const bearer = authorization?.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length).trim()
     : undefined;
   const token = bearer ?? getCookie(c, SESSION_COOKIE);
   if (!token) return undefined;
-  if (token.startsWith("etax_")) return resolveApiKeyUserId(db, token);
-  return resolveSessionUserId(db, token);
+  const kind: CredentialKind = token.startsWith("etax_") ? "apiKey" : "session";
+  const userId =
+    kind === "apiKey" ? await resolveApiKeyUserId(db, token) : await resolveSessionUserId(db, token);
+  return userId === undefined ? undefined : { userId, kind };
+}
+
+/**
+ * セッション（画面からのログイン）でだけ許す操作か。API キーの発行・失効と
+ * 2段階認証の設定は、漏れたキーで無期限のキーを作ったり 2FA を外したり
+ * できないよう、API キーでは受け付けない。
+ */
+export function requiresSessionCredential(path: string): boolean {
+  return (
+    path === "/api/auth/api-keys" ||
+    path.startsWith("/api/auth/api-keys/") ||
+    path.startsWith("/api/auth/totp/")
+  );
 }
 
 /** リクエストのセッショントークン（ログアウト用）。 */
