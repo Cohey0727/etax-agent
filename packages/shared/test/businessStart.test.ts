@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test";
 import {
   businessStartDeadlines,
   incomeTaxFilingDeadline,
+  isBusinessDay,
   japaneseHolidays,
 } from "../src/businessStart";
 
@@ -84,5 +85,19 @@ describe("開業からの期限計算", () => {
     expect(businessStartDeadlines("")).toBeNull();
     expect(businessStartDeadlines("2026-13-01")).toBeNull();
     expect(businessStartDeadlines("2026-02-30")).toBeNull();
+  });
+});
+
+describe("年末年始（12月29日〜1月3日）の期限", () => {
+  test("12月29〜31日・1月2〜3日は期限にならず、次の平日に延びる（国税通則法10条2項）", () => {
+    for (const day of ["2026-12-29", "2026-12-30", "2026-12-31", "2027-01-02", "2027-01-03"]) {
+      expect(isBusinessDay(day)).toBe(false);
+    }
+    expect(isBusinessDay("2027-01-04")).toBe(true);
+  });
+
+  test("期限が年末年始に当たる届出は翌年1月4日（平日）まで", () => {
+    expect(businessStartDeadlines("2026-11-29")?.salaryOffice.date).toBe("2027-01-04");
+    expect(businessStartDeadlines("2026-10-30")?.blueReturnApplication.date).toBe("2027-01-04");
   });
 });

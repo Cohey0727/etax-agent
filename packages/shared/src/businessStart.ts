@@ -12,8 +12,8 @@
  *   1か月以内（所得税法第230条）。
  * 「◯か月以内」の期間計算は国税通則法第10条第1項が準用する民法の原則
  * （初日不算入・応当日の前日満了、応当日が無い月はその月の末日）に従う。
- * 期限が土曜日・日曜日・祝日等に当たる場合は、その翌日（次の平日）が
- * 期限になる（国税通則法第10条第2項）。
+ * 期限が土曜日・日曜日・祝日等・12月29日〜1月3日に当たる場合は、その翌日
+ * （次の平日）が期限になる（国税通則法第10条第2項）。
  */
 
 /** ISO 日付文字列（YYYY-MM-DD）を UTC の Date にする。不正なら null。 */
@@ -135,17 +135,24 @@ export function japaneseHolidays(year: number): ReadonlySet<string> {
   return holidays;
 }
 
-/** 土日・祝日でない日か。 */
+/**
+ * 国税の期限になり得る日か。土日・祝日のほか、12月29日〜31日（国税通則法
+ * 施行令2条2項）と、一般の休日である1月2日・3日も期限にならない。
+ */
 export function isBusinessDay(iso: string): boolean {
   const date = parseIsoDate(iso);
   if (!date) return false;
   const day = date.getUTCDay();
   if (day === 0 || day === 6) return false;
+  const month = date.getUTCMonth() + 1;
+  const dayOfMonth = date.getUTCDate();
+  if (month === 12 && dayOfMonth >= 29) return false;
+  if (month === 1 && dayOfMonth <= 3) return false;
   return !japaneseHolidays(date.getUTCFullYear()).has(iso);
 }
 
 /**
- * 期限日のシフト（国税通則法第10条第2項）: 土日・祝日に当たる場合は
+ * 期限日のシフト（国税通則法第10条第2項）: 土日・祝日・年末年始に当たる場合は
  * 次の平日まで後ろ倒しする。
  */
 export function shiftDeadlineToBusinessDay(iso: string): string {
