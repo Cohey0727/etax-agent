@@ -4,13 +4,15 @@
  *
  * サブコマンド:
  *   aggregate   --year YYYY --csv FILE [--filing-type blue65|blue55|blue10|white]
+ *               [--real-estate-business-scale]
  *       事業所得/不動産所得の集計と青色申告特別控除を表示する。
+ *       --real-estate-business-scale は不動産貸付けが事業的規模であることを示す。
  *   consumption --year YYYY --csv FILE [--business-kind KIND]
  *       消費税を 本則 / 簡易課税 / 2割特例 の3方式で比較表示する。
  *       KIND は簡易課税の事業区分（wholesale/retail/manufacturing/other/
  *       services/real_estate、既定は services=第5種）。
  *   amend       --year YYYY --original ORIG.json [--corrected CORR.json] [--csv FILE]
- *               [--filing-type ...]
+ *               [--filing-type ...] [--real-estate-business-scale]
  *       申告済みと修正後の差分（項目別＋税額の増減）を表示する。
  *       --csv を渡すと修正後の数値を取引データから計算する
  *       （所得の切り分け→青色申告特別控除→消費税3方式の比較）。
@@ -42,9 +44,9 @@ import {
 } from "@etax/shared";
 
 const USAGE = `使い方: cli <aggregate|consumption|amend> [オプション]
-  aggregate   --year YYYY --csv FILE [--filing-type blue65|blue55|blue10|white]
+  aggregate   --year YYYY --csv FILE [--filing-type blue65|blue55|blue10|white] [--real-estate-business-scale]
   consumption --year YYYY --csv FILE [--business-kind wholesale|retail|manufacturing|other|services|real_estate]
-  amend       --year YYYY --original ORIG.json [--corrected CORR.json] [--csv FILE] [--filing-type ...]
+  amend       --year YYYY --original ORIG.json [--corrected CORR.json] [--csv FILE] [--filing-type ...] [--real-estate-business-scale]
   （--key=value 形式も可。--help / -h でこの使い方を表示）`;
 
 class UsageError extends Error {}
@@ -67,16 +69,24 @@ interface CliOptions {
   corrected?: string;
   filingType?: FilingType;
   businessKind?: BusinessKind;
+  realEstateBusinessScale?: boolean;
 }
 
 const FILING_TYPE_VALUES: readonly string[] = ["blue65", "blue55", "blue10", "white"];
+/** 値を取らないフラグ。 */
+const FLAG_OPTIONS: readonly string[] = ["real-estate-business-scale"];
 const BUSINESS_KIND_VALUES: readonly string[] = Object.keys(SIMPLIFIED_RATES);
 
 function parseOptions(argv: string[]): CliOptions {
   const raw: Record<string, string> = {};
+  const flags = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
     if (!a.startsWith("--")) throw new UsageError(`不明な引数です: ${a}`);
+    if (FLAG_OPTIONS.includes(a.slice(2))) {
+      flags.add(a.slice(2));
+      continue;
+    }
     // --key=value 形式と --key value 形式の両方を受ける。
     const eq = a.indexOf("=");
     const key = eq >= 0 ? a.slice(2, eq) : a.slice(2);
@@ -96,7 +106,7 @@ function parseOptions(argv: string[]): CliOptions {
     raw[key] = val;
     i++;
   }
-  const opts: CliOptions = {};
+  const opts: CliOptions = { realEstateBusinessScale: flags.has("real-estate-business-scale") };
   if (raw["year"] !== undefined) {
     // Number("") === 0 や負数を素通ししないよう、4桁の西暦として厳密に見る。
     if (!/^\d{4}$/.test(raw["year"])) {
@@ -162,6 +172,8 @@ async function cmdAggregate(opts: CliOptions): Promise<number> {
   const b = aggregateIncome(tx);
   const blue = blueDeduction(b.realEstateIncome, b.businessIncome, {
     filingType: opts.filingType,
+    realEstateBusinessScale: opts.realEstateBusinessScale,
+    operatesBusiness: tx.some((t) => t.income_type === "business"),
   });
   console.log(`== ${year}年 所得集計（税込経理） ==`);
   console.log(`事業収入        : ${yen(b.businessRevenue)}`);
@@ -233,7 +245,10 @@ async function cmdAmend(opts: CliOptions): Promise<number> {
       console.error(`${year}年の取引がありませんでした。`);
       return 1;
     }
-    const figs = computeCorrectedFigures(tx, year, { filingType: opts.filingType });
+    const figs = computeCorrectedFigures(tx, year, {
+      filingType: opts.filingType,
+      realEstateBusinessScale: opts.realEstateBusinessScale,
+    });
     corrected = figs;
     detail = figs._detail;
   }
