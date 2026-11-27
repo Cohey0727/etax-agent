@@ -22,12 +22,21 @@ import {
   Text,
 } from "@components/atoms";
 import { ApiKeyItem, ApiKeyStatus, CreatedApiKey } from "@types";
-import { createApiKey, fetchApiKeys, formatApiKeyLastUsed, formatDateTime, maskApiKey, revokeApiKey } from "@utils";
+import {
+  ApiError,
+  createApiKey,
+  fetchApiKeys,
+  formatApiKeyLastUsed,
+  formatDateTime,
+  maskApiKey,
+  revokeApiKey,
+} from "@utils";
 import { CreateApiKeyModal } from "../CreateApiKeyModal";
 import { RevokeApiKeyModal } from "../RevokeApiKeyModal";
 import styles from "./ApiKeysPanel.css";
 
-type LoadState = "loading" | "anonymous" | "ready";
+/** anonymous は未ログイン（401）、failed はそれ以外の理由で一覧を読めなかったとき。 */
+type LoadState = "loading" | "anonymous" | "failed" | "ready";
 
 interface StatusMessage {
   ok: boolean;
@@ -58,8 +67,8 @@ export const ApiKeysPanel = () => {
       const rows = await fetchApiKeys();
       setKeys(rows);
       setLoadState("ready");
-    } catch {
-      setLoadState("anonymous");
+    } catch (e) {
+      setLoadState(e instanceof ApiError && e.status === 401 ? "anonymous" : "failed");
     }
   }, []);
 
@@ -135,24 +144,28 @@ export const ApiKeysPanel = () => {
           <Text variant="caption">
             APIキーの発行・管理にはログインが必要です（認証が有効な運用でのみ使えます）。
           </Text>
-        ) : (
+        ) : loadState === "failed" ? (
+          <Text variant="caption">⚠ APIキーの読み込みに失敗しました</Text>
+        ) : null}
+        {/* 発行した平文キーは二度と取得できないので、一覧の読み直しに失敗しても出し続ける。 */}
+        {createdKey ? (
+          <Col gap="sm">
+            <Text variant="statLabel">発行したキー（この画面を離れると二度と表示されません）</Text>
+            <Row gap="sm" align="center">
+              <Input
+                value={createdKey.key}
+                readOnly
+                aria-label="発行したAPIキー"
+                className={styles.keyInput}
+              />
+              <Button variant="ghost" size="sm" onClick={handleCopyCreated}>
+                コピー
+              </Button>
+            </Row>
+          </Col>
+        ) : null}
+        {loadState === "ready" ? (
           <>
-            {createdKey ? (
-              <Col gap="sm">
-                <Text variant="statLabel">発行したキー（この画面を離れると二度と表示されません）</Text>
-                <Row gap="sm" align="center">
-                  <Input
-                    value={createdKey.key}
-                    readOnly
-                    aria-label="発行したAPIキー"
-                    className={styles.keyInput}
-                  />
-                  <Button variant="ghost" size="sm" onClick={handleCopyCreated}>
-                    コピー
-                  </Button>
-                </Row>
-              </Col>
-            ) : null}
             {keys.length === 0 ? (
               <Text variant="caption">
                 まだAPIキーはありません。「キーを発行」から最初のキーを作成してください。
@@ -207,7 +220,7 @@ export const ApiKeysPanel = () => {
               </Table>
             )}
           </>
-        )}
+        ) : null}
         {message ? (
           <Text variant="caption">
             {message.ok ? "✓ " : "⚠ "}
