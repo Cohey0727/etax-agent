@@ -33,12 +33,13 @@ export interface MoneyFieldProps {
   label: string;
   /** 表示する文字列（桁区切り済みでも生の数字でもよい）。 */
   value: string;
+  /** 入力された文字列をそのまま渡す。数値への変換は parseAmount で行う。 */
   onChangeValue: (value: string) => void;
   hint?: string;
   placeholder?: string;
 }
 
-/** 金額入力。数字キーパッドで受け、 blur 時に桁区切りへ整形する。 */
+/** 金額入力。数字キーパッドで受ける。 */
 export function MoneyField({ label, value, onChangeValue, hint, placeholder }: MoneyFieldProps) {
   return (
     <Field
@@ -46,7 +47,7 @@ export function MoneyField({ label, value, onChangeValue, hint, placeholder }: M
       hint={hint}
       inputMode="numeric"
       keyboardType="number-pad"
-      onChangeText={(text) => onChangeValue(text.replace(/[^0-9-]/g, ""))}
+      onChangeText={onChangeValue}
       placeholder={placeholder ?? "0"}
       value={value}
     />
