@@ -54,8 +54,7 @@ export function normalizeNameKana(value: string): string {
 
 /**
  * 電話番号をハイフン区切りの3要素に正規化する。区切りなしの数字列は
- * 携帯11桁なら 3-4-4、市外局番つき10桁なら 4-2-4 に分ける
- * （xtx.ts の phoneXml と同じ分け方）。3要素にできず、合計が10桁・
+ * 携帯11桁なら 3-4-4、市外局番つき10桁なら 4-2-4 に分ける。3要素にできず、合計が10桁・
  * 11桁にならない入力は空文字を返し、検証側で不備として扱う。
  */
 export function normalizePhoneNumber(value: string): string {

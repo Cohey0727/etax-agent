@@ -330,24 +330,14 @@ export function yymmddXml(iso: string): string {
   return `<gen:era>${d.era}</gen:era><gen:yy>${d.yy}</gen:yy><gen:mm>${d.mm}</gen:mm><gen:dd>${d.dd}</gen:dd>`;
 }
 
-/** 電話番号を tel1/tel2/tel3 に分ける。ハイフン区切り優先。 */
+/**
+ * 電話番号を tel1/tel2/tel3 に分ける。入力は taxpayerNormalize で
+ * 「市外局番-局番-番号」の3要素に正規化済みの値。
+ */
 export function phoneXml(phone: string): string {
-  const parts = phone.split("-").filter((p) => p !== "");
-  let tel: string[] = [];
-  if (parts.length === 3) {
-    tel = parts;
-  } else {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length === 11) tel = [digits.slice(0, 3), digits.slice(3, 7), digits.slice(7)];
-    else if (digits.length === 10) tel = [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6)];
-    else if (digits) tel = [digits];
-  }
-  if (tel.length === 0) return "";
-  return (
-    (tel[0] ? `<gen:tel1>${esc(tel[0])}</gen:tel1>` : "") +
-    (tel[1] ? `<gen:tel2>${esc(tel[1])}</gen:tel2>` : "") +
-    (tel[2] ? `<gen:tel3>${esc(tel[2])}</gen:tel3>` : "")
-  );
+  const [tel1, tel2, tel3] = phone.split("-");
+  if (!tel1 || !tel2 || !tel3) return "";
+  return `<gen:tel1>${esc(tel1)}</gen:tel1><gen:tel2>${esc(tel2)}</gen:tel2><gen:tel3>${esc(tel3)}</gen:tel3>`;
 }
 
 /** 郵便番号を zip1/zip2 に分ける。 */
@@ -817,14 +807,14 @@ function buildKoa020Face2(data: XtxFilingData): string {
     ["ABH00235", lp.newCareMedical],
   ];
   for (const [tag, value] of lifeFields) {
-    if (value > 0) lifeRows.push(`<${tag}>${value}</${tag}>`);
+    if (value > 0) lifeRows.push(amount(tag, value));
   }
   if (lifeRows.length > 0) detail.push(`<ABH00210>${lifeRows.join("")}</ABH00210>`);
 
   const eq = data.deductionInputs.earthquakeInsurance;
   const eqRows: string[] = [];
-  if (eq.earthquake > 0) eqRows.push(`<ABH00250>${eq.earthquake}</ABH00250>`);
-  if (eq.oldLongTerm > 0) eqRows.push(`<ABH00260>${eq.oldLongTerm}</ABH00260>`);
+  if (eq.earthquake > 0) eqRows.push(amount("ABH00250", eq.earthquake));
+  if (eq.oldLongTerm > 0) eqRows.push(amount("ABH00260", eq.oldLongTerm));
   if (eqRows.length > 0) detail.push(`<ABH00240>${eqRows.join("")}</ABH00240>`);
 
   const parts: string[] = [`<ABC00000>${header.join("")}</ABC00000>`];
@@ -1643,14 +1633,12 @@ interface DepDetailTags {
   rate: string;
   months: string;
   ordinary: string;
-  special: string;
   total: string;
   ratio: string;
   deductible: string;
   closing: string;
   totalsWrap: string;
   tOrdinary: string;
-  tSpecial: string;
   tTotal: string;
   tDeductible: string;
   tClosing: string;
@@ -1662,9 +1650,9 @@ const DEP_TAGS_KOA210: DepDetailTags = {
   group: "AMF01590", row: "AMF01600", name: "AMF01610", quantity: "AMF01620",
   acquisition: "AMF01630", cost: "AMF01640", guarantee: "AMF01645", basis: "AMF01650",
   method: "AMF01660", life: "AMF01670", rateWrap: "AMF01680", rate: "AMF01690",
-  months: "AMF01720", ordinary: "AMF01730", special: "AMF01740", total: "AMF01750",
+  months: "AMF01720", ordinary: "AMF01730", total: "AMF01750",
   ratio: "AMF01760", deductible: "AMF01770", closing: "AMF01780",
-  totalsWrap: "AMF01800", tOrdinary: "AMF01810", tSpecial: "AMF01820",
+  totalsWrap: "AMF01800", tOrdinary: "AMF01810",
   tTotal: "AMF01830", tDeductible: "AMF01840", tClosing: "AMF01850",
 };
 
@@ -1674,9 +1662,9 @@ const DEP_TAGS_KOA220: DepDetailTags = {
   group: "ANF00880", row: "ANF00890", name: "ANF00900", quantity: "ANF00910",
   acquisition: "ANF00920", cost: "ANF00930", guarantee: "ANF00935", basis: "ANF00940",
   method: "ANF00950", life: "ANF00960", rateWrap: "ANF00970", rate: "ANF00980",
-  months: "ANF01010", ordinary: "ANF01020", special: "ANF01030", total: "ANF01040",
+  months: "ANF01010", ordinary: "ANF01020", total: "ANF01040",
   ratio: "ANF01050", deductible: "ANF01060", closing: "ANF01070",
-  totalsWrap: "ANF01090", tOrdinary: "ANF01100", tSpecial: "ANF01110",
+  totalsWrap: "ANF01090", tOrdinary: "ANF01100",
   tTotal: "ANF01120", tDeductible: "ANF01130", tClosing: "ANF01140",
 };
 
@@ -1686,9 +1674,9 @@ const DEP_TAGS_KOA110: DepDetailTags = {
   group: "AIM00000", row: "AIM00010", name: "AIM00020", quantity: "AIM00030",
   acquisition: "AIM00050", cost: "AIM00060", guarantee: "AIM00065", basis: "AIM00070",
   method: "AIM00080", life: "AIM00090", rateWrap: "AIM00100", rate: "AIM00110",
-  months: "AIM00140", ordinary: "AIM00150", special: "AIM00160", total: "AIM00170",
+  months: "AIM00140", ordinary: "AIM00150", total: "AIM00170",
   ratio: "AIM00180", deductible: "AIM00190", closing: "AIM00200",
-  totalsWrap: "AIM00220", tOrdinary: "AIM00230", tSpecial: "AIM00240",
+  totalsWrap: "AIM00220", tOrdinary: "AIM00230",
   tTotal: "AIM00250", tDeductible: "AIM00260", tClosing: "AIM00270",
 };
 
@@ -1698,9 +1686,9 @@ const DEP_TAGS_KOA130: DepDetailTags = {
   group: "AKK00000", row: "AKK00010", name: "AKK00020", quantity: "AKK00030",
   acquisition: "AKK00050", cost: "AKK00060", guarantee: "AKK00065", basis: "AKK00070",
   method: "AKK00080", life: "AKK00090", rateWrap: "AKK00100", rate: "AKK00110",
-  months: "AKK00140", ordinary: "AKK00150", special: "AKK00160", total: "AKK00170",
+  months: "AKK00140", ordinary: "AKK00150", total: "AKK00170",
   ratio: "AKK00180", deductible: "AKK00190", closing: "AKK00200",
-  totalsWrap: "AKK00220", tOrdinary: "AKK00230", tSpecial: "AKK00240",
+  totalsWrap: "AKK00220", tOrdinary: "AKK00230",
   tTotal: "AKK00250", tDeductible: "AKK00260", tClosing: "AKK00270",
 };
 
@@ -1710,9 +1698,9 @@ const DEP_TAGS_KOA240: DepDetailTags = {
   group: "APF02030", row: "APF02040", name: "APF02050", quantity: "APF02060",
   acquisition: "APF02070", cost: "APF02080", guarantee: "APF02085", basis: "APF02090",
   method: "APF02100", life: "APF02110", rateWrap: "APF02120", rate: "APF02130",
-  months: "APF02160", ordinary: "APF02170", special: "APF02180", total: "APF02190",
+  months: "APF02160", ordinary: "APF02170", total: "APF02190",
   ratio: "APF02200", deductible: "APF02210", closing: "APF02220",
-  totalsWrap: "APF02240", tOrdinary: "APF02250", tSpecial: "APF02260",
+  totalsWrap: "APF02240", tOrdinary: "APF02250",
   tTotal: "APF02270", tDeductible: "APF02280", tClosing: "APF02290",
 };
 
@@ -1722,9 +1710,9 @@ const DEP_TAGS_KOA120: DepDetailTags = {
   group: "AJL00000", row: "AJL00010", name: "AJL00020", quantity: "AJL00030",
   acquisition: "AJL00050", cost: "AJL00060", guarantee: "AJL00065", basis: "AJL00070",
   method: "AJL00080", life: "AJL00090", rateWrap: "AJL00100", rate: "AJL00110",
-  months: "AJL00140", ordinary: "AJL00150", special: "AJL00160", total: "AJL00170",
+  months: "AJL00140", ordinary: "AJL00150", total: "AJL00170",
   ratio: "AJL00180", deductible: "AJL00190", closing: "AJL00200",
-  totalsWrap: "AJL00220", tOrdinary: "AJL00230", tSpecial: "AJL00240",
+  totalsWrap: "AJL00220", tOrdinary: "AJL00230",
   tTotal: "AJL00250", tDeductible: "AJL00260", tClosing: "AJL00270",
 };
 

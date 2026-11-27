@@ -118,20 +118,29 @@ export type SimplifiedAppliedRule =
 | { kind: "special1"; category: SimplifiedCategory }
 | { kind: "special2"; higher: SimplifiedCategory; lower: SimplifiedCategory };
 
-/** 特例（75%）の選択肢1件分の計算結果（付表5-3 ロへの転記値）。 */
-export interface SimplifiedSpecialOption {
-rule: "special1" | "special2";
-/** special1: 75%以上を占める事業区分 */
-category?: SimplifiedCategory;
-/** special2: ペアのうち率が高い方の事業区分 */
-higher?: SimplifiedCategory;
-/** special2: ペアのうち率が低い方の事業区分 */
-lower?: SimplifiedCategory;
+/** 特例（75%）の選択肢1件分の控除対象仕入税額。 */
+interface SimplifiedSpecialAmounts {
 /** この方式での控除対象仕入税額・軽減税率8%適用分 */
 inputTax8: number;
 /** この方式での控除対象仕入税額・税率10%適用分 */
 inputTax10: number;
 }
+
+/** 特例1号の選択肢（75%以上を占める事業区分の率を全体に適用）。 */
+export type SimplifiedSpecial1Option = SimplifiedSpecialAmounts & {
+rule: "special1";
+category: SimplifiedCategory;
+};
+
+/** 特例2号の選択肢（ペアのうち高い方の率はその事業に、低い方の率を残り全部に適用）。 */
+export type SimplifiedSpecial2Option = SimplifiedSpecialAmounts & {
+rule: "special2";
+higher: SimplifiedCategory;
+lower: SimplifiedCategory;
+};
+
+/** 特例（75%）の選択肢1件分の計算結果（付表5-3 ロへの転記値）。 */
+export type SimplifiedSpecialOption = SimplifiedSpecial1Option | SimplifiedSpecial2Option;
 
 /** 簡易課税申告の計算結果（申告書・付表への転記値）。 */
 export interface SimplifiedConsumptionReturn {
@@ -349,12 +358,8 @@ inputTax8 = option.inputTax8;
 inputTax10 = option.inputTax10;
 appliedRule =
 option.rule === "special1"
-? { kind: "special1", category: option.category as SimplifiedCategory }
-: {
-kind: "special2",
-higher: option.higher as SimplifiedCategory,
-lower: option.lower as SimplifiedCategory,
-};
+? { kind: "special1", category: option.category }
+: { kind: "special2", higher: option.higher, lower: option.lower };
 }
 }
 }
@@ -619,16 +624,6 @@ return formRootXml("SHB047", "1.0", SHOHI_NS, data, parts.join(""));
 // SHB067 付表5-3（控除対象仕入税額等の計算表）
 // ---------------------------------------------------------------------------
 
-/** みなし仕入率 → DVC00010 の区分コード（1:90% 2:80% 3:70% 4:60% 5:50% 6:40%）。 */
-const RATE_KUBUN: Record<SimplifiedCategory, number> = {
-1: 1,
-2: 2,
-3: 3,
-4: 4,
-5: 5,
-6: 6,
-};
-
 /** 付表5-3 特例（ロ）のペア列挙順（高い方の区分, 低い方の区分）。 */
 const SPECIAL2_PAIRS: [SimplifiedCategory, SimplifiedCategory][] = [
 [1, 2], [1, 3], [1, 4], [1, 5], [1, 6],
@@ -682,8 +677,9 @@ page1.push(
 );
 
 if (r.singleCategory!== null) {
+// みなし仕入率の区分コード（DVC00010）は事業区分の番号と同じ（1:90% … 6:40%）
 page1.push(
-`<DVC00000>${kubun("DVC00010", RATE_KUBUN[r.singleCategory])}${amount("DVC00020", r.inputTax8)}${amount("DVC00030", r.inputTax10)}${amountAlways("DVC00040", r.inputTax)}</DVC00000>`,
+`<DVC00000>${kubun("DVC00010", r.singleCategory)}${amount("DVC00020", r.inputTax8)}${amount("DVC00030", r.inputTax10)}${amountAlways("DVC00040", r.inputTax)}</DVC00000>`,
 );
 } else if (r.categories.length > 1) {
 const salesGroups: string[] = [];
@@ -721,18 +717,17 @@ page2.push(
 }
 if (r.specialOptions.length > 0) {
 const specialBlocks: string[] = [];
-const special1 = r.specialOptions.find((o) => o.rule === "special1");
-if (special1 && special1.category!== undefined) {
+const special1 = r.specialOptions.find((o): o is SimplifiedSpecial1Option => o.rule === "special1");
+if (special1) {
 specialBlocks.push(
-`<DVE00060>${kubun("DVE00070", RATE_KUBUN[special1.category])}${amount("DVE00080", special1.inputTax8)}${amount("DVE00090", special1.inputTax10)}${amountAlways("DVE00100", special1.inputTax8 + special1.inputTax10)}</DVE00060>`,
+`<DVE00060>${kubun("DVE00070", special1.category)}${amount("DVE00080", special1.inputTax8)}${amount("DVE00090", special1.inputTax10)}${amountAlways("DVE00100", special1.inputTax8 + special1.inputTax10)}</DVE00060>`,
 );
 }
-const special2Options = r.specialOptions.filter((o) => o.rule === "special2");
+const special2Options = r.specialOptions.filter((o): o is SimplifiedSpecial2Option => o.rule === "special2");
 if (special2Options.length > 0) {
 const pairBlocks: string[] = [];
 for (const option of special2Options) {
-const higher = option.higher as SimplifiedCategory;
-const lower = option.lower as SimplifiedCategory;
+const { higher, lower } = option;
 // ペアの並びは様式の列挙順（高い方の区分→低い方の区分）。
 // グループタグは DVE00120 から 40 刻みで 15 ペア分が並ぶ。
 const pairIndex = SPECIAL2_PAIRS.findIndex(([h, l]) => h === higher && l === lower);
