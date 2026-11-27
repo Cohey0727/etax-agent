@@ -302,7 +302,7 @@ export const exportXtxHandler: RouteHandler<typeof exportXtxRoute> = async (c) =
   // できない場合（未同梱・エンジン不在）は警告を応答に含めて続行する。
   let xsdWarning: string | null;
   try {
-    xsdWarning = xsdWarningOrThrow(xtx);
+    xsdWarning = await xsdWarningOrThrow(xtx);
   } catch (e) {
     if (e instanceof XtxXsdInvalidError) {
       throw new HTTPException(400, { message: e.message });

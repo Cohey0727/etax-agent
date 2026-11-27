@@ -7,10 +7,7 @@
 XSDディレクトリは e-Tax 仕様書ページ「19 XMLスキーマ」(e-tax19.CAB) を
 展開した中にある「19XMLスキーマ」フォルダ。スキーマ相対パスはそのフォルダ
 からの相対パス（例: shotoku/RKO0010-231.xsd）。
-
-2026-11-19 にこの検証で、e-Taxソフト（WEB版）が SE00S170 で読み込めなかった
-原因（手続VR・名前空間・IT部の必須要素と並び順・zeimusho の表記）を特定した。
-生成器を変更したら、ETAX_XSD_DIR を設定して bun test を回し直すこと。
+XML として解析できないファイルも INVALID として報告する。
 """
 import sys
 
@@ -26,7 +23,13 @@ def main() -> int:
     for pair in sys.argv[2:]:
         xml_path, schema_rel = pair.rsplit(":", 1)
         schema = etree.XMLSchema(etree.parse(f"{xsd_dir}/{schema_rel}"))
-        doc = etree.parse(xml_path)
+        try:
+            doc = etree.parse(xml_path)
+        except etree.XMLSyntaxError as err:
+            failed = True
+            print(f"INVALID {xml_path}  ({schema_rel})")
+            print(f"  line {err.lineno}: {err.msg}")
+            continue
         if schema.validate(doc):
             print(f"VALID  {xml_path}  ({schema_rel})")
         else:

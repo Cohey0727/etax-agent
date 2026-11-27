@@ -102,7 +102,7 @@ function exportIncomeRequest(year: number): Record<string, unknown> {
 }
 
 /** 検証エンジンが使える環境か（unavailable の理由がエンジン不在なら false）。 */
-function engineAvailable(result: ReturnType<typeof validateXtxWithOfficialXsd>): boolean {
+function engineAvailable(result: Awaited<ReturnType<typeof validateXtxWithOfficialXsd>>): boolean {
   return !(result.kind === "unavailable" && /python3|lxml/.test(result.reason));
 }
 
@@ -148,7 +148,7 @@ describe("validateXtxWithOfficialXsd", () => {
   test("同梱XSDで正しい所得税XTX（2025年分）が valid になる", async () => {
     const r = await requestJson("POST", "/api/etax/export-xtx", exportIncomeRequest(2025));
     expect(r.status).toBe(200);
-    const result = validateXtxWithOfficialXsd(r.body.xtx as string);
+    const result = await validateXtxWithOfficialXsd(r.body.xtx as string);
     if (!engineAvailable(result)) {
       console.log("検証エンジンが無いためスキップ:", result);
       return;
@@ -159,7 +159,7 @@ describe("validateXtxWithOfficialXsd", () => {
   test("2026年分の所得税はXSD未同梱のため理由つき unavailable", async () => {
     const r = await requestJson("POST", "/api/etax/export-xtx", exportIncomeRequest(2026));
     expect(r.status).toBe(200);
-    const result = validateXtxWithOfficialXsd(r.body.xtx as string);
+    const result = await validateXtxWithOfficialXsd(r.body.xtx as string);
     expect(result.kind).toBe("unavailable");
     if (result.kind === "unavailable") {
       expect(result.reason).toContain("RKO0010-260.xsd");
@@ -169,14 +169,26 @@ describe("validateXtxWithOfficialXsd", () => {
   test("XSDディレクトリが無ければ理由つき unavailable（無言スキップしない）", async () => {
     const r = await requestJson("POST", "/api/etax/export-xtx", exportIncomeRequest(2025));
     process.env.ETAX_XSD_DIR = join(tmpdir(), "etax-xsd-does-not-exist-xyz");
-    const result = validateXtxWithOfficialXsd(r.body.xtx as string);
+    const result = await validateXtxWithOfficialXsd(r.body.xtx as string);
     expect(result.kind).toBe("unavailable");
+  });
+
+  test("XMLとして解析できないXTXは invalid（検証エンジン不在と取り違えない）", async () => {
+    const r = await requestJson("POST", "/api/etax/export-xtx", exportIncomeRequest(2025));
+    const broken = (r.body.xtx as string).replace("</NOZEISHA_NM>", "\u0001</NOZEISHA_NM>");
+    const probe = await validateXtxWithOfficialXsd(r.body.xtx as string);
+    if (!engineAvailable(probe)) {
+      console.log("検証エンジンが無いためスキップ:", probe);
+      return;
+    }
+    const result = await validateXtxWithOfficialXsd(broken);
+    expect(result.kind).toBe("invalid");
   });
 
   test("スキーマに適合しないXTXは invalid でエラー内容が返る", async () => {
     const r = await requestJson("POST", "/api/etax/export-xtx", exportIncomeRequest(2025));
     process.env.ETAX_XSD_DIR = makeRejectingXsdDir();
-    const result = validateXtxWithOfficialXsd(r.body.xtx as string);
+    const result = await validateXtxWithOfficialXsd(r.body.xtx as string);
     if (!engineAvailable(result)) {
       console.log("検証エンジンが無いためスキップ:", result);
       return;
@@ -190,7 +202,7 @@ describe("HTTP: XTX出力時の常時検証", () => {
   test("所得税2025年分は検証が通り xsd_warning が null", async () => {
     const r = await requestJson("POST", "/api/etax/export-xtx", exportIncomeRequest(2025));
     expect(r.status).toBe(200);
-    const probe = validateXtxWithOfficialXsd(r.body.xtx as string);
+    const probe = await validateXtxWithOfficialXsd(r.body.xtx as string);
     if (!engineAvailable(probe)) {
       console.log("検証エンジンが無いためスキップ:", probe);
       return;
@@ -236,7 +248,7 @@ describe("HTTP: XTX出力時の常時検証", () => {
       original_local: null,
     });
     expect(r.status).toBe(200);
-    const probe = validateXtxWithOfficialXsd(r.body.xtx as string);
+    const probe = await validateXtxWithOfficialXsd(r.body.xtx as string);
     if (!engineAvailable(probe)) {
       console.log("検証エンジンが無いためスキップ:", probe);
       return;

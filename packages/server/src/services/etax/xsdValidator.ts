@@ -1,9 +1,9 @@
 /**
  * xsdValidator.ts — 生成した XTX の公式 XML スキーマ検証（services/etax）。
  *
- * XTX 生成時に常時実行する（Issue #28 Phase 1）。検証エンジンは
- * テストで実績のある python3 + lxml（packages/shared/assets/
- * validate-xtx-xsd.py）をサブプロセスで使う。公式 XSD は shared の
+ * XTX 生成時に常時実行する。検証エンジンは python3 + lxml
+ * （packages/shared/assets/validate-xtx-xsd.py）で、他のリクエストを
+ * 止めないよう非同期のサブプロセスで動かす。公式 XSD は shared の
  * assets/etax-xsd に同梱し、環境変数 ETAX_XSD_DIR があればそちらを優先する。
  *
  * 結果は3値で返す:
@@ -14,7 +14,6 @@
  *   例: 所得税2026年分の RKO0010-260.xsd は令和9年1月受付開始分で
  *   公開予定のため、公開までは同梱できず unavailable になる。
  */
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,8 +39,8 @@ export class XtxXsdInvalidError extends Error {
  * 検証できなければ警告文を返し、スキーマ違反なら XtxXsdInvalidError
  * を投げる（呼び出し側で 400 に変換して生成を止める）。
  */
-export function xsdWarningOrThrow(xtx: string): string | null {
-  const result = validateXtxWithOfficialXsd(xtx);
+export async function xsdWarningOrThrow(xtx: string): Promise<string | null> {
+  const result = await validateXtxWithOfficialXsd(xtx);
   if (result.kind === "valid") return null;
   if (result.kind === "invalid") throw new XtxXsdInvalidError(result.errors);
   return result.reason;
@@ -95,7 +94,7 @@ export function resolveEtaxXsdDir(): string | null {
  * 生成直後の XTX を公式スキーマで検証する。検証エンジン
  * （python3 + lxml）が無い環境では unavailable を返す。
  */
-export function validateXtxWithOfficialXsd(xtx: string): XtxXsdValidation {
+export async function validateXtxWithOfficialXsd(xtx: string): Promise<XtxXsdValidation> {
   const relativePath = etaxSchemaRelativePath(xtx);
   if (!relativePath) {
     return { kind: "unavailable", reason: "XTXから手続とバージョンを特定できませんでした" };
@@ -121,18 +120,14 @@ export function validateXtxWithOfficialXsd(xtx: string): XtxXsdValidation {
   try {
     const xmlPath = join(dir, "filing.xtx");
     writeFileSync(xmlPath, xtx);
-    const result = spawnSync("python3", [script, xsdDir, `${xmlPath}:${relativePath}`], {
-      encoding: "utf-8",
-      timeout: VALIDATION_TIMEOUT_MS,
-    });
-    if (result.error) {
+    const run = await runValidationScript([script, xsdDir, `${xmlPath}:${relativePath}`]);
+    if (run.kind === "failed") {
       return {
         kind: "unavailable",
-        reason: `スキーマ検証エンジン（python3）を実行できませんでした: ${result.error.message}`,
+        reason: `スキーマ検証エンジン（python3）を実行できませんでした: ${run.message}`,
       };
     }
-    const stdout = result.stdout ?? "";
-    const lines = stdout.split("\n").map((line) => line.trim());
+    const lines = run.stdout.split("\n").map((line) => line.trim());
     // "INVALID" は "VALID" を部分文字列に含むため、行頭で判定する。
     if (lines.some((line) => line.startsWith("INVALID"))) {
       const errors = lines
@@ -144,12 +139,38 @@ export function validateXtxWithOfficialXsd(xtx: string): XtxXsdValidation {
       };
     }
     if (lines.some((line) => line.startsWith("VALID"))) return { kind: "valid" };
-    // スクリプトが検証結果を出さずに終わった（lxml 不在など）。
-    const detail = (result.stderr ?? "").includes("lxml")
+    // スクリプトが検証結果を出さずに終わった（lxml 不在・タイムアウトなど）。
+    // 解析エラーの traceback にも "lxml" は出るため、モジュール不在の文言で判定する。
+    const detail = run.stderr.includes("No module named 'lxml'")
       ? "python3 の lxml がインストールされていません"
       : "検証スクリプトが結果を返しませんでした";
     return { kind: "unavailable", reason: `スキーマ検証を実行できませんでした: ${detail}` };
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+type ScriptRun =
+  | { kind: "finished"; stdout: string; stderr: string }
+  | { kind: "failed"; message: string };
+
+/** 検証スクリプトを非同期に実行する。時間切れなら強制終了し、出力は途中までになる。 */
+async function runValidationScript(args: string[]): Promise<ScriptRun> {
+  try {
+    const proc = Bun.spawn(["python3", ...args], { stdout: "pipe", stderr: "pipe" });
+    const timer = setTimeout(() => proc.kill(), VALIDATION_TIMEOUT_MS);
+    try {
+      const [stdout, stderr] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      await proc.exited;
+      return { kind: "finished", stdout, stderr };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e) {
+    // python3 が見つからない場合は spawn 自体が例外になる
+    return { kind: "failed", message: e instanceof Error ? e.message : String(e) };
   }
 }
